@@ -103,6 +103,80 @@
     if (overlay) overlay.setAttribute('hidden', '');
   }
 
+  /* ── Welcome-Back Toast ──────────────────────────────────────
+     Transient banner pinned top-right, auto-dismisses after 10s.
+     Shows once per session to avoid being annoying on refresh.
+  ─────────────────────────────────────────────────────────── */
+  var WELCOME_TOAST_TTL_MS = 10000;
+  var _welcomeToastTimer = null;
+
+  function getInitials(fullName) {
+    if (!fullName) return '?';
+    var parts = String(fullName).trim().split(/\s+/);
+    var first = parts[0] ? parts[0][0] : '';
+    var last  = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (first + last).toUpperCase() || '?';
+  }
+
+  function closeWelcomeToast() {
+    var toast = document.getElementById('welcomeToast');
+    if (!toast) return;
+    toast.classList.remove('show');
+    if (_welcomeToastTimer) { clearTimeout(_welcomeToastTimer); _welcomeToastTimer = null; }
+    setTimeout(function () { toast.setAttribute('hidden', ''); }, 300);
+  }
+  window.closeWelcomeToast = closeWelcomeToast;
+
+  function showWelcomeToast(profile, opts) {
+    if (!profile || !profile.name) return;
+    opts = opts || {};
+
+    // Show only once per browser-tab session unless explicitly forced
+    // (forced = right after a fresh Google sign-in).
+    if (!opts.force) {
+      try {
+        if (sessionStorage.getItem('welcome_toast_shown') === '1') return;
+      } catch (_) {}
+    }
+
+    var toast    = document.getElementById('welcomeToast');
+    var photoEl  = document.getElementById('welcomeToastPhoto');
+    var titleEl  = document.getElementById('welcomeToastTitle');
+    var nameEl   = document.getElementById('welcomeToastName');
+    var closeEl  = document.getElementById('welcomeToastClose');
+    if (!toast || !photoEl || !titleEl || !nameEl) return;
+
+    var first = profile.name.split(' ')[0];
+    titleEl.textContent = profile.isReturning ? t().toastWelcomeBack : t().toastWelcomeNew;
+    nameEl.textContent  = first;
+
+    photoEl.innerHTML = '';
+    if (profile.picture) {
+      var img = document.createElement('img');
+      img.src = profile.picture;
+      img.alt = first;
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = function () { photoEl.textContent = getInitials(profile.name); };
+      photoEl.appendChild(img);
+    } else {
+      photoEl.textContent = getInitials(profile.name);
+    }
+
+    if (closeEl && !closeEl._wired) {
+      closeEl.addEventListener('click', closeWelcomeToast);
+      closeEl._wired = true;
+    }
+
+    toast.removeAttribute('hidden');
+    // Kick off the slide-in on the next frame so the transition runs
+    requestAnimationFrame(function () { toast.classList.add('show'); });
+
+    if (_welcomeToastTimer) clearTimeout(_welcomeToastTimer);
+    _welcomeToastTimer = setTimeout(closeWelcomeToast, WELCOME_TOAST_TTL_MS);
+
+    try { sessionStorage.setItem('welcome_toast_shown', '1'); } catch (_) {}
+  }
+
   function handleGoogleSignIn(response) {
     var profile;
     try {
@@ -132,6 +206,10 @@
           profile.lastSeenAt  = data.lastSeenAt  || null;
         }
         saveSiteProfile(profile);
+
+        // Reset the once-per-session guard so a fresh sign-in always shows
+        try { sessionStorage.removeItem('welcome_toast_shown'); } catch (_) {}
+        showWelcomeToast(profile, { force: true });
 
         var chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
         if (chatOpen) applyGoogleProfileToChat(profile);
@@ -257,6 +335,8 @@
       botDuplicate: function (name) { return "Looks like you've already reached out, " + name + " — thanks! I'll get back to you within 1\u20132 business days."; },
       botWelcomeNew:  function (name) { return 'Welcome, ' + name + '! I have your details from Google. Just a few more questions.'; },
       botWelcomeBack: function (name) { return 'Welcome back, ' + name + '! Good to see you again \u2014 a couple of quick questions and we\u2019re set.'; },
+      toastWelcomeBack: 'Welcome back!',
+      toastWelcomeNew:  'Welcome!',
       choices: {
         roles: ['SF Developer', 'SF Architect', 'Tech Lead', 'Consulting', 'Other'],
         contracts: ['Permanent', 'Contract', 'Freelance'],
@@ -293,6 +373,8 @@
       botDuplicate: function (name) { return 'Vous nous avez déjà contactés, ' + name + ' \u2014 merci! Je vous répondrai sous 1 à 2 jours ouvrés.'; },
       botWelcomeNew:  function (name) { return 'Bienvenue, ' + name + ' ! J\u2019ai vos informations Google. Encore quelques questions.'; },
       botWelcomeBack: function (name) { return 'Bon retour, ' + name + ' ! Ravi de vous revoir \u2014 quelques questions rapides et nous sommes prêts.'; },
+      toastWelcomeBack: 'Bon retour !',
+      toastWelcomeNew:  'Bienvenue !',
       choices: {
         roles: ['Développeur SF', 'Architecte SF', 'Tech Lead', 'Conseil', 'Autre'],
         contracts: ['CDI', 'CDD / Contrat', 'Freelance'],
@@ -423,6 +505,11 @@
   // Restore topbar user if session exists
   if (siteProfile) {
     updateTopbarUser(siteProfile);
+    // Show the once-per-session welcome toast for signed-in (non-guest) users
+    if (siteProfile.type !== 'guest' && siteProfile.name) {
+      // Defer to next tick so DOM/CSS are settled before the slide-in
+      setTimeout(function () { showWelcomeToast(siteProfile); }, 200);
+    }
   } else {
     showWelcomeOverlay();
   }
