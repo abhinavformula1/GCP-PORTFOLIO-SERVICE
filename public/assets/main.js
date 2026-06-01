@@ -56,19 +56,56 @@
   function signOut() {
     saveSiteProfile(null);
     try { sessionStorage.removeItem('portfolio_profile'); } catch (_) {}
+    try { sessionStorage.removeItem('welcome_toast_shown'); } catch (_) {}
     siteProfile = null;
     updateTopbarUser(null);
     closeUserMenu();
     if (window.google && window.google.accounts) {
       google.accounts.id.disableAutoSelect();
     }
-    // Only show welcome overlay if chat is not mid-conversation
+
+    // Wipe any in-flight chat state so the next user starts clean
+    resetChatState();
     var chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
-    if (!chatOpen || state.step <= 1) {
-      showWelcomeOverlay();
+    if (chatOpen) {
+      forceCloseAssistantSafe();
     }
+
+    showWelcomeOverlay();
   }
   window.signOut = signOut;
+
+  /**
+   * Wipes the in-memory chat state and any DOM mirrors so a new user
+   * starts from a clean slate. Safe to call even if the chat panel
+   * isn't open.
+   */
+  function resetChatState() {
+    if (typeof state === 'object' && state) {
+      state.step = 0;
+      state.answers = { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' };
+      state.googleProfile  = null;
+      state.showGoogleStep = false;
+      state.minimised      = false;
+    }
+    var msgs = document.getElementById('gaMessages');
+    if (msgs) msgs.innerHTML = '';
+    var avatar = document.querySelector('.ga-avatar');
+    if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
+    var headerName = document.querySelector('.ga-header-name');
+    if (headerName) headerName.textContent = "Abhinav's Assistant";
+  }
+
+  // Defensive wrapper — forceCloseAssistant is defined later in the IIFE,
+  // so we route through a lookup at call time.
+  function forceCloseAssistantSafe() {
+    if (typeof forceCloseAssistant === 'function') {
+      forceCloseAssistant();
+    } else {
+      var ov = document.getElementById('assistantOverlay');
+      if (ov) ov.setAttribute('hidden', '');
+    }
+  }
 
   function initGoogleSignIn() {
     if (!GOOGLE_CLIENT_ID || !window.google) return;
@@ -185,6 +222,15 @@
     } catch (_) {
       hideWelcomeOverlay();
       return;
+    }
+
+    // If a different user is signing in (or this was previously a guest
+    // session), wipe any in-memory chat state so the new user starts clean.
+    var prevEmail = (siteProfile && siteProfile.email) || '';
+    if (prevEmail && prevEmail !== profile.email) {
+      resetChatState();
+      var ov = document.getElementById('assistantOverlay');
+      if (ov && !ov.hasAttribute('hidden')) forceCloseAssistantSafe();
     }
 
     hideWelcomeOverlay();
@@ -531,30 +577,64 @@
   }
 
   // ── Resizable chat panel ──────────────────────────────────────
+  // Persisted in localStorage so the user's preferred width survives reloads.
+  // Supports both mouse and touch (Pointer Events).
   (function () {
     var handle  = document.getElementById('gaResizeHandle');
     var overlay = document.getElementById('assistantOverlay');
     if (!handle || !overlay) return;
-    var dragging = false, startX, startW;
 
-    handle.addEventListener('mousedown', function (e) {
+    var MIN_W = 300;
+    var MAX_W = 680;
+    var STORAGE_KEY = 'portfolio_chat_width';
+
+    // Restore saved width on init
+    try {
+      var saved = parseInt(localStorage.getItem(STORAGE_KEY) || '', 10);
+      if (saved && saved >= MIN_W && saved <= MAX_W) {
+        overlay.style.width = saved + 'px';
+      }
+    } catch (_) {}
+
+    var dragging = false, startX = 0, startW = 0;
+
+    function onDown(e) {
       dragging = true;
-      startX = e.clientX;
+      startX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX);
       startW = overlay.offsetWidth;
+      handle.classList.add('dragging');
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'ew-resize';
       e.preventDefault();
-    });
-    document.addEventListener('mousemove', function (e) {
+    }
+
+    function onMove(e) {
       if (!dragging) return;
-      var newW = Math.min(680, Math.max(300, startW + (startX - e.clientX)));
+      var clientX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX);
+      var newW = Math.min(MAX_W, Math.max(MIN_W, startW + (startX - clientX)));
       overlay.style.width = newW + 'px';
-    });
-    document.addEventListener('mouseup', function () {
+    }
+
+    function onUp() {
       if (!dragging) return;
       dragging = false;
+      handle.classList.remove('dragging');
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
+      try { localStorage.setItem(STORAGE_KEY, String(overlay.offsetWidth)); } catch (_) {}
+    }
+
+    handle.addEventListener('mousedown',  onDown);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+    handle.addEventListener('touchstart', onDown, { passive: false });
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend',  onUp);
+
+    // Double-click to reset to default width
+    handle.addEventListener('dblclick', function () {
+      overlay.style.width = '';
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
     });
   }());
 
