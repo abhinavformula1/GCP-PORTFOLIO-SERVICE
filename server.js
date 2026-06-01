@@ -9,6 +9,7 @@ const config       = require('./src/config');
 const hireRoute       = require('./src/routes/hire');
 const summariseRoute  = require('./src/routes/summarise');
 const salesforceRoute = require('./src/routes/salesforce');
+const sessionRoute    = require('./src/routes/session');
 const { errorHandler } = require('./src/middleware/errorHandler');
 
 const app  = express();
@@ -33,6 +34,7 @@ app.get('/health', (_req, res) => {
 app.use('/api', hireRoute);
 app.use('/api', summariseRoute);
 app.use('/api', salesforceRoute);
+app.use('/api', sessionRoute);
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (_req, res) => {

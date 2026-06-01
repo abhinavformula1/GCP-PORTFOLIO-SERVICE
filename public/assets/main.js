@@ -104,22 +104,38 @@
   }
 
   function handleGoogleSignIn(response) {
+    var profile;
     try {
       var payload = JSON.parse(atob(response.credential.split('.')[1]));
-      var profile = { name: payload.name, email: payload.email, picture: payload.picture };
-      saveSiteProfile(profile);
-
-      // Close welcome overlay if open
+      profile = { name: payload.name, email: payload.email, picture: payload.picture };
+    } catch (_) {
       hideWelcomeOverlay();
-
-      // If chat is currently open, apply profile to it
-      var chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
-      if (chatOpen) {
-        applyGoogleProfileToChat(profile);
-      }
-    } catch (e) {
-      hideWelcomeOverlay();
+      return;
     }
+
+    hideWelcomeOverlay();
+
+    // Ask the backend whether this is a returning visitor. We do this in
+    // parallel with the rest of the UI flow — if the call fails we still
+    // sign the user in, just without the "welcome back" personalisation.
+    fetch('/api/session/start', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ credential: response.credential }),
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (data) {
+        if (data && data.success) {
+          profile.isReturning = !!data.isReturning;
+          profile.visitCount  = data.visitCount  || 1;
+          profile.lastSeenAt  = data.lastSeenAt  || null;
+        }
+        saveSiteProfile(profile);
+
+        var chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
+        if (chatOpen) applyGoogleProfileToChat(profile);
+      });
   }
 
   function applyGoogleProfileToChat(profile) {
@@ -143,7 +159,10 @@
       state.step = 2;
       document.getElementById('gaMessages').innerHTML = '';
       var first = profile.name.split(' ')[0];
-      addBotMessage('Welcome, ' + first + '! I have your details from Google. Just a few more questions.');
+      var greeting = profile.isReturning
+        ? t().botWelcomeBack(first)
+        : t().botWelcomeNew(first);
+      addBotMessage(greeting);
       renderStep();
     }
     // If already mid-conversation, just silently update name/email in answers — don't disrupt
@@ -235,6 +254,9 @@
       botSlot: 'Great! Pick a time slot that works for you.',
       botConfirm: "Perfect! I've noted everything. Click \"Confirm & Schedule\" to lock in your slot.",
       botDone: function (name, email) { return 'All set, ' + name + "! Your slot is confirmed. I'll send a calendar invite to " + email + '. Looking forward to speaking!'; },
+      botDuplicate: function (name) { return "Looks like you've already reached out, " + name + " — thanks! I'll get back to you within 1\u20132 business days."; },
+      botWelcomeNew:  function (name) { return 'Welcome, ' + name + '! I have your details from Google. Just a few more questions.'; },
+      botWelcomeBack: function (name) { return 'Welcome back, ' + name + '! Good to see you again \u2014 a couple of quick questions and we\u2019re set.'; },
       choices: {
         roles: ['SF Developer', 'SF Architect', 'Tech Lead', 'Consulting', 'Other'],
         contracts: ['Permanent', 'Contract', 'Freelance'],
@@ -268,6 +290,9 @@
       botSlot: 'Parfait! Choisissez un créneau qui vous convient.',
       botConfirm: 'Parfait! Cliquez sur "Confirmer" pour valider votre créneau.',
       botDone: function (name, email) { return 'Tout est prêt, ' + name + '! Votre créneau est confirmé. Je vous enverrai une invitation à ' + email + '. À bientôt!'; },
+      botDuplicate: function (name) { return 'Vous nous avez déjà contactés, ' + name + ' \u2014 merci! Je vous répondrai sous 1 à 2 jours ouvrés.'; },
+      botWelcomeNew:  function (name) { return 'Bienvenue, ' + name + ' ! J\u2019ai vos informations Google. Encore quelques questions.'; },
+      botWelcomeBack: function (name) { return 'Bon retour, ' + name + ' ! Ravi de vous revoir \u2014 quelques questions rapides et nous sommes prêts.'; },
       choices: {
         roles: ['Développeur SF', 'Architecte SF', 'Tech Lead', 'Conseil', 'Autre'],
         contracts: ['CDI', 'CDD / Contrat', 'Freelance'],
@@ -796,7 +821,7 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        renderDone();
+        renderDone(!!data.alreadySubmitted);
       } else {
         document.getElementById('gaSubmitErr').textContent = (data && data.error) || 'Something went wrong. Please try again.';
         btn.disabled = false;
@@ -809,20 +834,28 @@
     }
   }
 
-  function renderDone() {
+  function renderDone(alreadySubmitted) {
     document.getElementById('gaProgressBar').style.width = '100%';
     var area = document.getElementById('gaInputArea');
     area.innerHTML = '';
-    addBotMessage(
-      t().botDone(state.answers.name.split(' ')[0], state.answers.email),
-      function () {
-        var done = document.createElement('div');
-        done.className = 'ga-done';
 
-        var checkEl = document.createElement('div');
-        checkEl.className = 'ga-done-check';
-        checkEl.innerHTML = '&#10003;';
+    var firstName = state.answers.name.split(' ')[0];
+    var message = alreadySubmitted
+      ? t().botDuplicate(firstName)
+      : t().botDone(firstName, state.answers.email);
 
+    addBotMessage(message, function () {
+      var done = document.createElement('div');
+      done.className = 'ga-done';
+
+      var checkEl = document.createElement('div');
+      checkEl.className = 'ga-done-check';
+      checkEl.innerHTML = '&#10003;';
+      done.appendChild(checkEl);
+
+      // Skip the slot/summary widgets for duplicate submissions — there's
+      // no new booking to confirm or summarise.
+      if (!alreadySubmitted) {
         var slotEl = document.createElement('div');
         slotEl.className = 'ga-done-slot';
         slotEl.textContent = state.answers.slot;
@@ -836,19 +869,19 @@
         summaryOut.className = 'ga-summary-out';
         summaryOut.id = 'gaSummaryOut';
 
-        var closeBtn = document.createElement('button');
-        closeBtn.className = 'ga-done-close';
-        closeBtn.textContent = t().closeBtn;
-        closeBtn.onclick = closeAssistant;
-
-        done.appendChild(checkEl);
         done.appendChild(slotEl);
         done.appendChild(summaryBtn);
         done.appendChild(summaryOut);
-        done.appendChild(closeBtn);
-        area.appendChild(done);
       }
-    );
+
+      var closeBtn = document.createElement('button');
+      closeBtn.className = 'ga-done-close';
+      closeBtn.textContent = t().closeBtn;
+      closeBtn.onclick = closeAssistant;
+      done.appendChild(closeBtn);
+
+      area.appendChild(done);
+    });
   }
 
   async function requestSummary(btn) {
@@ -996,6 +1029,12 @@
       var data = await res.json();
       if (res.ok && data.success) {
         document.getElementById('hireMeForm').hidden = true;
+        var successTextEl = document.getElementById('hm-success-text');
+        if (successTextEl) {
+          successTextEl.textContent = data.alreadySubmitted
+            ? "✓ You've already reached out — thanks! I'll get back to you within 1–2 business days."
+            : "✓ Message sent! I'll be in touch soon.";
+        }
         document.getElementById('hm-success').hidden = false;
       } else {
         globalErr.textContent = (data && data.error) || t().errors.generic;
