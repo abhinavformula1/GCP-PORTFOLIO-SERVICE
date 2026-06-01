@@ -8,10 +8,40 @@
   ─────────────────────────────────────────────────────────── */
   var GOOGLE_CLIENT_ID = '647206478056-rd95imm61c309o4tc5ekddgkmk50fdvp.apps.googleusercontent.com';
 
+  /* ── Google ID-token cache ───────────────────────────────────
+     We hold the credential after sign-in so subsequent API calls
+     (chat history, etc.) can authenticate as the user. Tokens are
+     1-hour valid; on 401 we surface that to the caller and the
+     user signs in again on next interaction.
+  ─────────────────────────────────────────────────────────── */
+  var googleCredential = sessionStorage.getItem('portfolio_credential') || null;
+  function setGoogleCredential(token) {
+    googleCredential = token || null;
+    try {
+      if (token) sessionStorage.setItem('portfolio_credential', token);
+      else       sessionStorage.removeItem('portfolio_credential');
+    } catch (_) {}
+  }
+
+  function authedFetch(url, opts) {
+    opts = opts || {};
+    if (!googleCredential) return Promise.resolve(null);
+    var headers = Object.assign({}, opts.headers || {}, {
+      'Authorization': 'Bearer ' + googleCredential,
+      'Content-Type':  'application/json',
+    });
+    return fetch(url, Object.assign({}, opts, { headers: headers }))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+  }
+
   // Persisted site-level profile (survives tab session)
   var siteProfile = (function () {
     try { return JSON.parse(sessionStorage.getItem('portfolio_profile') || 'null'); } catch (_) { return null; }
   }());
+
+  // Pending chat history loaded after sign-in — applied when chat opens
+  var pendingChatHistory = null;
 
   function saveSiteProfile(p) {
     siteProfile = p;
@@ -57,6 +87,8 @@
     saveSiteProfile(null);
     try { sessionStorage.removeItem('portfolio_profile'); } catch (_) {}
     try { sessionStorage.removeItem('welcome_toast_shown'); } catch (_) {}
+    setGoogleCredential(null);
+    pendingChatHistory = null;
     siteProfile = null;
     updateTopbarUser(null);
     closeUserMenu();
@@ -229,9 +261,13 @@
     var prevEmail = (siteProfile && siteProfile.email) || '';
     if (prevEmail && prevEmail !== profile.email) {
       resetChatState();
+      pendingChatHistory = null;
       var ov = document.getElementById('assistantOverlay');
       if (ov && !ov.hasAttribute('hidden')) forceCloseAssistantSafe();
     }
+
+    // Cache the credential — chat APIs use it as a Bearer token
+    setGoogleCredential(response.credential);
 
     hideWelcomeOverlay();
 
@@ -257,6 +293,14 @@
         try { sessionStorage.removeItem('welcome_toast_shown'); } catch (_) {}
         showWelcomeToast(profile, { force: true });
 
+        // Fetch the user's in-progress chat (if any) so we can resume
+        // exactly where they left off when they next open the assistant.
+        return authedFetch('/api/chat/active');
+      })
+      .then(function (chatRes) {
+        if (chatRes && chatRes.success && chatRes.chat) {
+          pendingChatHistory = chatRes.chat;
+        }
         var chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
         if (chatOpen) applyGoogleProfileToChat(profile);
       });
@@ -280,16 +324,58 @@
 
     // Only restart the chat if we're still at the very beginning (pre-step or name/email)
     if (state.step <= 1) {
-      state.step = 2;
-      document.getElementById('gaMessages').innerHTML = '';
       var first = profile.name.split(' ')[0];
-      var greeting = profile.isReturning
-        ? t().botWelcomeBack(first)
-        : t().botWelcomeNew(first);
-      addBotMessage(greeting);
-      renderStep();
+
+      // Resume from saved history if the user has an active chat in Firestore
+      if (pendingChatHistory && pendingChatHistory.step > 1) {
+        document.getElementById('gaMessages').innerHTML = '';
+        var resumeMsg = (profile.isReturning ? t().botWelcomeBack(first) : t().botWelcomeNew(first))
+                        + ' ' + (t().botResume || '(picking up where we left off)');
+        addBotMessage(resumeMsg, function () {
+          renderRestoredMessages(pendingChatHistory.messages || []);
+          state.step    = Math.min(pendingChatHistory.step, STEPS.length);
+          state.answers = mergeAnswers(state.answers, pendingChatHistory.answers || {});
+          // Always trust Google's verified name/email over saved values
+          state.answers.name  = profile.name;
+          state.answers.email = profile.email;
+          pendingChatHistory = null;
+          renderStep();
+        });
+      } else {
+        state.step = 2;
+        document.getElementById('gaMessages').innerHTML = '';
+        var greeting = profile.isReturning
+          ? t().botWelcomeBack(first)
+          : t().botWelcomeNew(first);
+        addBotMessage(greeting);
+        pendingChatHistory = null;
+        renderStep();
+      }
     }
     // If already mid-conversation, just silently update name/email in answers — don't disrupt
+  }
+
+  // Append saved messages without animation — used when restoring history.
+  function renderRestoredMessages(messages) {
+    var msgs = document.getElementById('gaMessages');
+    if (!msgs || !messages || !messages.length) return;
+    messages.forEach(function (m) {
+      if (!m || !m.text) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'ga-msg ' + (m.role === 'user' ? 'ga-msg-user' : 'ga-msg-bot');
+      var bubbleCls = m.role === 'user' ? 'ga-bubble-user' : 'ga-bubble-bot';
+      wrap.innerHTML = '<div class="ga-bubble ' + bubbleCls + '">' + escHtml(m.text) + '</div>';
+      msgs.appendChild(wrap);
+    });
+    scrollMessages();
+  }
+
+  function mergeAnswers(target, source) {
+    target = target || {};
+    Object.keys(source || {}).forEach(function (k) {
+      if (source[k] !== undefined && source[k] !== null && source[k] !== '') target[k] = source[k];
+    });
+    return target;
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -381,6 +467,7 @@
       botDuplicate: function (name) { return "Looks like you've already reached out, " + name + " — thanks! I'll get back to you within 1\u20132 business days."; },
       botWelcomeNew:  function (name) { return 'Welcome, ' + name + '! I have your details from Google. Just a few more questions.'; },
       botWelcomeBack: function (name) { return 'Welcome back, ' + name + '! Good to see you again \u2014 a couple of quick questions and we\u2019re set.'; },
+      botResume:      'Picking up where we left off.',
       toastWelcomeBack: 'Welcome back!',
       toastWelcomeNew:  'Welcome!',
       choices: {
@@ -419,6 +506,7 @@
       botDuplicate: function (name) { return 'Vous nous avez déjà contactés, ' + name + ' \u2014 merci! Je vous répondrai sous 1 à 2 jours ouvrés.'; },
       botWelcomeNew:  function (name) { return 'Bienvenue, ' + name + ' ! J\u2019ai vos informations Google. Encore quelques questions.'; },
       botWelcomeBack: function (name) { return 'Bon retour, ' + name + ' ! Ravi de vous revoir \u2014 quelques questions rapides et nous sommes prêts.'; },
+      botResume:      'Reprenons o\u00f9 nous en \u00e9tions.',
       toastWelcomeBack: 'Bon retour !',
       toastWelcomeNew:  'Bienvenue !',
       choices: {
@@ -697,6 +785,11 @@
     document.getElementById('gaMessages').innerHTML = '';
     document.getElementById('assistantOverlay').removeAttribute('hidden');
     hideTeaser();
+
+    // Show the "Start over" button only for signed-in users (it operates
+    // on Firestore-backed history, which guests don't have).
+    setStartOverBtnVisible(!!(siteProfile && siteProfile.type !== 'guest'));
+
     // If already signed in from welcome screen, skip sign-in step
     if (siteProfile && siteProfile.type !== 'guest') {
       applyGoogleProfileToChat(siteProfile);
@@ -759,6 +852,34 @@
     document.querySelector('.chat-fab-icon-close').style.display = 'none';
   }
   window.minimiseAssistant = minimiseAssistant;
+
+  /**
+   * "Start over" — clears the in-memory chat, deletes the active chat
+   * from Firestore, then re-opens fresh. Only meaningful for signed-in users.
+   */
+  function restartAssistant() {
+    if (googleCredential) {
+      authedFetch('/api/chat/active', { method: 'DELETE' });
+    }
+    pendingChatHistory = null;
+    resetChatState();
+    var ov = document.getElementById('assistantOverlay');
+    if (ov && !ov.hasAttribute('hidden')) {
+      // Re-render: openAssistant() will run the greeting + step 0 again
+      forceCloseAssistantSafe();
+      setTimeout(function () {
+        if (typeof openAssistant === 'function') openAssistant();
+      }, 0);
+    }
+  }
+  window.restartAssistant = restartAssistant;
+
+  function setStartOverBtnVisible(visible) {
+    var btn = document.getElementById('gaStartOverBtn');
+    if (!btn) return;
+    if (visible) btn.removeAttribute('hidden');
+    else         btn.setAttribute('hidden', '');
+  }
 
   function resumeAssistant() {
     state.minimised = false;
@@ -836,6 +957,7 @@
     wrap.innerHTML = '<div class="ga-bubble ga-bubble-bot">' + escHtml(text) + '</div>';
     msgs.appendChild(wrap);
     scrollMessages();
+    persistChatTurn('bot', text);
     setTimeout(function () { wrap.classList.remove('ga-msg-enter'); if (cb) cb(); }, 300);
   }
 
@@ -846,7 +968,29 @@
     wrap.innerHTML = '<div class="ga-bubble ga-bubble-user">' + escHtml(text) + '</div>';
     msgs.appendChild(wrap);
     scrollMessages();
+    persistChatTurn('user', text);
     setTimeout(function () { wrap.classList.remove('ga-msg-enter'); }, 300);
+  }
+
+  /**
+   * Fire-and-forget: persists the latest turn + current chat state to
+   * Firestore via /api/chat/active. Only runs for signed-in users with a
+   * cached Google credential. Silent on failure (chat UX never blocks).
+   */
+  function persistChatTurn(role, text) {
+    if (!googleCredential) return;
+    if (!siteProfile || siteProfile.type === 'guest') return;
+    try {
+      authedFetch('/api/chat/active', {
+        method: 'POST',
+        body:   JSON.stringify({
+          step:    state && typeof state.step === 'number' ? state.step : 0,
+          answers: state && state.answers ? state.answers : {},
+          locale:  (typeof currentLang === 'string' ? currentLang : 'en'),
+          message: { role: role === 'user' ? 'user' : 'bot', text: String(text || '') },
+        }),
+      });
+    } catch (_) {}
   }
 
   function renderInputArea(stepDef) {
@@ -988,6 +1132,16 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
+        // Move active chat → completed-inquiries history (signed-in users only)
+        if (googleCredential) {
+          authedFetch('/api/chat/complete', {
+            method: 'POST',
+            body:   JSON.stringify({
+              salesforceId:     data.recordId || null,
+              alreadySubmitted: !!data.alreadySubmitted,
+            }),
+          });
+        }
         renderDone(!!data.alreadySubmitted);
       } else {
         document.getElementById('gaSubmitErr').textContent = (data && data.error) || 'Something went wrong. Please try again.';

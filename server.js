@@ -10,6 +10,7 @@ const hireRoute       = require('./src/routes/hire');
 const summariseRoute  = require('./src/routes/summarise');
 const salesforceRoute = require('./src/routes/salesforce');
 const sessionRoute    = require('./src/routes/session');
+const chatRoute       = require('./src/routes/chat');
 const { errorHandler } = require('./src/middleware/errorHandler');
 
 const app  = express();
@@ -35,6 +36,7 @@ app.use('/api', hireRoute);
 app.use('/api', summariseRoute);
 app.use('/api', salesforceRoute);
 app.use('/api', sessionRoute);
+app.use('/api', chatRoute);
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (_req, res) => {
