@@ -22,28 +22,11 @@
  */
 
 const express                        = require('express');
-const { OAuth2Client }                = require('google-auth-library');
-const config                         = require('../config');
 const firestore                      = require('../services/firestore');
+const googleAuth                     = require('../services/googleAuth');
 const { ValidationError, AppError }  = require('../errors');
 
 const router = express.Router();
-
-// Cached verifier — initialised on first request, reused after.
-let _oauth = null;
-function getOauth() {
-  if (_oauth) return _oauth;
-  if (!config.google.clientId) {
-    const err = new AppError(
-      'Google Sign-In is not configured on the server.',
-      503,
-      'GOOGLE_NOT_CONFIGURED'
-    );
-    throw err;
-  }
-  _oauth = new OAuth2Client(config.google.clientId);
-  return _oauth;
-}
 
 // POST /api/session/start
 // Body:    { credential: "<google id token>" }
@@ -56,16 +39,7 @@ router.post('/session/start', async (req, res, next) => {
     }
 
     // 1. Verify the ID token (signature + audience + expiry)
-    const ticket = await getOauth().verifyIdToken({
-      idToken:  credential,
-      audience: config.google.clientId,
-    });
-    const payload = ticket.getPayload() || {};
-    const { sub: uid, email, name, picture } = payload;
-
-    if (!uid || !email) {
-      throw new ValidationError('Invalid Google credential — missing sub or email.');
-    }
+    const { uid, email, name, picture } = await googleAuth.verifyIdToken(credential);
 
     // 2. Upsert the user document — degrade gracefully if Firestore is down
     let visit = { isReturning: false, visitCount: 1, firstSeenAt: null, lastSeenAt: null };
@@ -87,10 +61,6 @@ router.post('/session/start', async (req, res, next) => {
       lastSeenAt:  visit.lastSeenAt  && visit.lastSeenAt.toMillis  ? visit.lastSeenAt.toMillis()  : null,
     });
   } catch (err) {
-    if (err instanceof AppError) return next(err);
-    if (err && err.message && err.message.toLowerCase().includes('token')) {
-      return next(new AppError('Invalid Google credential.', 401, 'INVALID_GOOGLE_TOKEN'));
-    }
     return next(err);
   }
 });
