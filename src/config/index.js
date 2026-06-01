@@ -44,6 +44,19 @@ const config = {
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
   },
+
+  google: {
+    // Required to verify Google ID tokens server-side. Must match the
+    // OAuth Client ID used by the frontend's Google Sign-In button.
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+  },
+
+  firestore: {
+    // Optional override — defaults to Firestore Native in the GCP project
+    // tied to the runtime service account.
+    projectId:  process.env.FIRESTORE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || '',
+    databaseId: process.env.FIRESTORE_DATABASE_ID || '(default)',
+  },
 };
 
 module.exports = config;

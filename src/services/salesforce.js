@@ -153,13 +153,24 @@ async function createInquiry(data, retry = true) {
     return createInquiry(data, false);
   }
 
+  // Salesforce Duplicate Rule blocked the create — treat as a soft success
+  // ("we've already heard from you"), not an error. The route layer turns
+  // this into a friendly "alreadySubmitted: true" response to the caller.
+  if (status === 400 && Array.isArray(result)) {
+    const isDuplicate = result.some((e) => e?.errorCode === 'DUPLICATES_DETECTED');
+    if (isDuplicate) {
+      console.log(`[salesforce] Duplicate inquiry blocked for ${data.email}`);
+      return { id: null, duplicate: true };
+    }
+  }
+
   if (status !== 201) {
     const msg = Array.isArray(result) ? result[0]?.message : JSON.stringify(result);
     throw new SalesforceError(`Record creation failed (HTTP ${status})`, msg);
   }
 
   console.log(`[salesforce] Recruiter_Inquiry__c created: ${result.id}`);
-  return { id: result.id };
+  return { id: result.id, duplicate: false };
 }
 
 module.exports = { createInquiry };

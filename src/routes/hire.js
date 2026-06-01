@@ -59,16 +59,21 @@ router.post('/hire', hireLimiter, validateHire, async (req, res, next) => {
     const sfConfigured = !!(process.env.SF_CLIENT_ID && process.env.SF_USERNAME && process.env.SF_PRIVATE_KEY);
 
     let recordId = null;
+    let alreadySubmitted = false;
     if (sfConfigured) {
       const result = await salesforce.createInquiry({ name, email, company, notes });
-      recordId = result.id;
+      recordId         = result.id;
+      alreadySubmitted = !!result.duplicate;
     } else {
       console.log('[hire] Salesforce not configured — logging inquiry:', { name, email, company, notes });
     }
 
     return res.status(200).json({
-      success:  true,
-      message:  'Inquiry submitted successfully.',
+      success:          true,
+      alreadySubmitted,
+      message:          alreadySubmitted
+        ? "Looks like you've already reached out — thanks! I'll get back to you within 1–2 business days."
+        : 'Inquiry submitted successfully.',
       recordId,
     });
   } catch (err) {
