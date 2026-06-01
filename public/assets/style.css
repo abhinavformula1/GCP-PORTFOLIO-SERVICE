@@ -1269,6 +1269,103 @@ a:hover { text-decoration: underline; }
   height: 24px;
   background: var(--border);
 }
+/* ── Welcome-Back Toast ─────────────────────────────────────── */
+.welcome-toast {
+  position: fixed;
+  top: 56px;
+  right: 24px;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 12px 12px;
+  min-width: 240px;
+  max-width: 340px;
+  background: rgba(26, 29, 39, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transform: translateY(-12px);
+  opacity: 0;
+  transition: transform 0.28s ease, opacity 0.28s ease;
+  pointer-events: auto;
+}
+.welcome-toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+.welcome-toast[hidden] {
+  display: none;
+}
+.welcome-toast-photo {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #4f8ef7, #7aadff);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+}
+.welcome-toast-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.welcome-toast-text {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.welcome-toast-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+.welcome-toast-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.welcome-toast-close {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.welcome-toast-close:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+@media (max-width: 540px) {
+  .welcome-toast {
+    top: 52px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+  }
+}
 /* ═══════════════════════════════════════════════════════════ */
 
 @media print {

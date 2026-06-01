@@ -8,6 +8,16 @@
 </head>
 <body>
 
+  <!-- ── Welcome-Back Toast (transient, auto-dismisses) ── -->
+  <div id="welcomeToast" class="welcome-toast" hidden role="status" aria-live="polite">
+    <div class="welcome-toast-photo" id="welcomeToastPhoto"></div>
+    <div class="welcome-toast-text">
+      <div class="welcome-toast-title" id="welcomeToastTitle">Welcome back!</div>
+      <div class="welcome-toast-name"  id="welcomeToastName"></div>
+    </div>
+    <button class="welcome-toast-close" id="welcomeToastClose" aria-label="Dismiss">&times;</button>
+  </div>
+
   <!-- ── Welcome / Login Overlay ── -->
   <div id="welcomeOverlay" class="welcome-overlay" hidden>
     <div class="welcome-card">
