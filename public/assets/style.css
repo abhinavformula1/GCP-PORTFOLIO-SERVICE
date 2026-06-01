@@ -1166,19 +1166,41 @@ a:hover { text-decoration: underline; }
 /* ── Resize handle ───────────────────────────────────────────── */
 .ga-resize-handle {
   position: absolute;
-  left: 0;
+  left: -6px;
   top: 0;
   bottom: 0;
-  width: 5px;
+  width: 12px;
   cursor: ew-resize;
-  background: transparent;
   z-index: 10;
-  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: background 0.15s ease;
+  touch-action: none;
 }
-.ga-resize-handle:hover,
-.ga-resize-handle:active {
+.ga-resize-handle::before {
+  content: '';
+  width: 2px;
+  height: 36px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.15s ease, height 0.15s ease;
+}
+.ga-resize-handle:hover::before,
+.ga-resize-handle:active::before,
+.ga-resize-handle.dragging::before {
   background: var(--accent);
-  opacity: 0.4;
+  height: 64px;
+}
+.ga-resize-handle:hover {
+  background: rgba(79, 142, 247, 0.06);
+}
+.ga-resize-handle.dragging {
+  background: rgba(79, 142, 247, 0.10);
+}
+@media (max-width: 540px) {
+  .ga-resize-handle { display: none; }
 }
 
 /* ── Google Sign-In pre-step ─────────────────────────────────── */
