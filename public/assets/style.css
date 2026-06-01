@@ -1409,12 +1409,23 @@ a:hover { text-decoration: underline; }
    the rest of the dark site theme is untouched.
 ══════════════════════════════════════════════════════════ */
 
-.ga-overlay { width: 360px; }
+/* Float as a widget (bottom-right) instead of a full-height side panel */
+.ga-overlay {
+  top: auto;
+  right: 16px;
+  bottom: 16px;
+  width: 360px;
+  height: 600px;
+  max-height: calc(100vh - 32px);
+  max-width: calc(100vw - 32px);
+}
 
 .ga-modal {
   background: #ffffff;
-  border-left: 1px solid #e5e7eb;
-  box-shadow: -10px 0 28px rgba(15, 23, 42, 0.18);
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
 }
 
 /* Header — dark slate strip with title + subtitle */
@@ -1441,7 +1452,16 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.4px;
   text-transform: uppercase;
 }
-.ga-status-dot { display: none; }
+.ga-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  margin-right: 5px;
+  vertical-align: middle;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.22);
+}
 
 .ga-header-btn {
   color: rgba(255, 255, 255, 0.85);
@@ -1614,7 +1634,9 @@ a:hover { text-decoration: underline; }
 }
 .ga-done-close:hover { border-color: #6c4dff; color: #6c4dff; }
 
-/* Resize handle — light theme */
+/* Resize handle — light theme; sit flush inside the rounded modal so
+   overflow:hidden doesn't clip half of it */
+.ga-resize-handle { left: 0; width: 10px; }
 .ga-resize-handle::before { background: #d1d5db; }
 .ga-resize-handle:hover::before,
 .ga-resize-handle:active::before,
