@@ -14,6 +14,29 @@
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
 
   <link rel="stylesheet" href="/assets/style.css" />
+
+  <!-- ── Theme boot (pre-paint) ──
+       Pin [data-theme] on <html> before stylesheets compute, so M3 tokens
+       resolve to the right scheme on first paint and we don't flash. -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('portfolio_theme');
+        var theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) { /* localStorage may be blocked in privacy mode */ }
+    })();
+  </script>
+
+  <!-- ── Material Design 3: Web Components (Google's official @material/web) ──
+       Pinned to 1.5.1 — v2.x has a regression in <md-dialog> modal centering
+       (native <dialog> opens with margin:0 instead of margin:auto in shadow DOM).
+       Single ESM import registers all custom elements (<md-dialog>, <md-filled-button>,
+       <md-outlined-text-field>, <md-fab>, etc.). Components inherit theme from
+       --md-sys-color-* tokens already defined in style.css. -->
+  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
 </head>
 <body>
 
@@ -27,33 +50,60 @@
     <button class="welcome-toast-close" id="welcomeToastClose" aria-label="Dismiss">&times;</button>
   </div>
 
-  <!-- ── Welcome / Login Overlay ── -->
-  <div id="welcomeOverlay" class="welcome-overlay" hidden>
-    <div class="welcome-card">
-      <button class="welcome-close" id="welcomeCloseBtn" aria-label="Close">&times;</button>
+  <!-- ── Welcome / Login Dialog (M3 <md-dialog>) ── -->
+  <md-dialog id="welcomeOverlay" aria-labelledby="welcomeTitleId">
+    <div slot="headline" class="welcome-headline">
       <div class="welcome-brand">
         <div class="welcome-avatar">AK</div>
         <div>
-          <div class="welcome-title" data-i18n="welcomeTitle">Abhinav's Portfolio</div>
+          <div class="welcome-title" id="welcomeTitleId" data-i18n="welcomeTitle">Abhinav's Portfolio</div>
           <div class="welcome-sub" data-i18n="welcomeSub">Senior Salesforce Application Engineer</div>
         </div>
       </div>
-      <p class="welcome-desc" data-i18n="welcomeDesc">Sign in with Google for a personalised experience, or continue as a guest.</p>
+      <button type="button" class="welcome-close" id="welcomeCloseBtn" aria-label="Close">&times;</button>
+    </div>
+
+    <div slot="content" class="welcome-content">
       <div id="welcomeGoogleBtn" class="welcome-google-wrap"></div>
       <div class="welcome-sep"><span data-i18n="welcomeOr">or</span></div>
-      <button class="welcome-guest-btn" id="welcomeGuestBtn" data-i18n="welcomeGuestBtn">Maybe later</button>
+      <md-outlined-button id="welcomeGuestBtn" class="welcome-guest-btn">
+        <span data-i18n="welcomeGuestBtn">Maybe later</span>
+      </md-outlined-button>
       <p class="welcome-note" data-i18n="welcomeNote">Your details are only used to personalise the scheduling assistant.</p>
     </div>
-  </div>
+  </md-dialog>
 
   <!-- ── Top bar ── -->
   <div class="topbar">
     <div class="topbar-inner">
-      <div class="lang-toggle">
-        <button class="lang-btn lang-active" id="langEN" onclick="setLang('en')">EN</button>
-        <span class="lang-sep">|</span>
-        <button class="lang-btn" id="langFR" onclick="setLang('fr')">FR</button>
-      </div>
+      <!-- M3 outlined select — floating "Language" label, dropdown menu -->
+      <md-outlined-select
+        id="langSelect"
+        class="lang-select"
+        label="Language"
+        value="en"
+        aria-label="Language"
+      >
+        <md-select-option value="en" selected>
+          <div slot="headline">English</div>
+        </md-select-option>
+        <md-select-option value="fr">
+          <div slot="headline">Français</div>
+        </md-select-option>
+      </md-outlined-select>
+
+      <!-- M3 outlined icon button — circular outline + filled-on-toggle state.
+           Mirrors the Google reference (Material Components -> outlined icon button). -->
+      <md-outlined-icon-button
+        id="themeToggleBtn"
+        class="theme-toggle"
+        toggle
+        aria-label="Switch to light mode"
+        title="Switch theme"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
+        <span class="material-symbols-outlined" slot="selected" aria-hidden="true">dark_mode</span>
+      </md-outlined-icon-button>
 
       <!-- Sign-in button (right side, shown for guests / signed-out users) -->
       <button class="topbar-signin-btn" id="topbarSignInBtn" hidden aria-label="Sign in">
@@ -86,28 +136,59 @@
             <span class="material-symbols-outlined meta-icon" aria-hidden="true">mail</span>
             <a href="mailto:abhinavformula1@gmail.com">abhinavformula1@gmail.com</a>
           </span>
-          <span class="meta-item">
+          <!-- Phone — gated by server policy (see contactPolicy.js).
+               Default state is masked + non-clickable. After Google Sign-In
+               with an allow-listed org domain, applyContactPolicy() in
+               main.js swaps the text to the real number and adds an href. -->
+          <a class="meta-item meta-item-link"
+             id="contactPhone"
+             aria-disabled="true"
+             aria-describedby="contactPhoneBadge">
             <span class="material-symbols-outlined meta-icon" aria-hidden="true">call</span>
-            +91-xxxxxxxxxx
-          </span>
+            <span id="contactPhoneText">+91-xxxxxxxxxx</span>
+            <span class="contact-reveal-badge" id="contactPhoneBadge" hidden></span>
+          </a>
           <span class="meta-item">
             <!-- LinkedIn brand icon — kept as SVG (no Material Symbol equivalent) -->
             <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
             <a href="https://linkedin.com/in/abhinavformula1" target="_blank">linkedin.com/in/abhinavformula1</a>
           </span>
-          <span class="meta-item">
+          <!-- Location with timezone-aware hover popover. Renders Abhinav's
+               local time, the delta vs the viewer's TZ, and a working-hours
+               status pill — wired up by initLocationPopover() in main.js. -->
+          <span class="meta-item meta-item-location" id="contactLocation" tabindex="0">
             <span class="material-symbols-outlined meta-icon" aria-hidden="true">place</span>
-            Bengaluru, India
+            <span class="meta-location-label">Bengaluru, India</span>
+            <span class="loc-popover" role="tooltip" aria-hidden="true">
+              <span class="loc-popover-row loc-popover-time">
+                <span class="material-symbols-outlined loc-popover-icon" aria-hidden="true">schedule</span>
+                <span id="locPopoverTime">--:--</span>
+                <span class="loc-popover-tz">IST</span>
+              </span>
+              <span class="loc-popover-row loc-popover-delta" id="locPopoverDelta">
+                computing time difference…
+              </span>
+              <span class="loc-popover-row loc-popover-status" id="locPopoverStatus">
+                <span class="loc-popover-dot" aria-hidden="true"></span>
+                <span id="locPopoverStatusText">checking…</span>
+              </span>
+              <a class="loc-popover-link"
+                 href="https://www.google.com/maps/place/Bengaluru,+Karnataka,+India"
+                 target="_blank" rel="noopener">
+                Open in Google Maps
+                <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+              </a>
+            </span>
           </span>
           <span class="meta-item">
-            <span class="material-symbols-outlined meta-icon" aria-hidden="true">schedule</span>
+            <span class="material-symbols-outlined meta-icon" aria-hidden="true">verified</span>
             <a href="https://trailblazer.me/id/abhinavformula1" target="_blank">Trailblazer Profile</a>
           </span>
         </div>
-        <button class="hire-me-btn" onclick="document.getElementById('hireMeOverlay').removeAttribute('hidden')">
-          <span class="material-symbols-outlined" aria-hidden="true">waving_hand</span>
+        <md-filled-button class="hire-me-btn" onclick="window.openHireMe && window.openHireMe()">
+          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">waving_hand</span>
           <span data-i18n="getInTouch">Get In Touch</span>
-        </button>
+        </md-filled-button>
       </div>
       <div class="exp-badge">
         <div class="years">12+</div>
@@ -333,54 +414,56 @@
     </div>
   </div>
 
-  <!-- ── Hire Me Modal (from Figma: Hire Me — v1.0, node 1-38) ── -->
-  <div id="hireMeOverlay" class="hm-overlay" hidden
-       role="dialog" aria-modal="true" aria-labelledby="hm-title-text">
-    <div class="hm-modal">
-      <button class="hm-close" aria-label="Close"
-              onclick="closeHireMe()">&times;</button>
+  <!-- ── Hire Me Dialog (M3 <md-dialog>) ── -->
+  <md-dialog id="hireMeOverlay" aria-labelledby="hm-title-text">
+    <div slot="headline" class="hm-headline">
+      <span id="hm-title-text">Get In Touch</span>
+      <button type="button" class="hm-close" aria-label="Close" onclick="closeHireMe()">&times;</button>
+    </div>
 
-      <!-- Title (Figma: Inter Bold 20px, #E8EAF0) -->
-      <h2 class="hm-title" id="hm-title-text">Get In Touch</h2>
-
-      <!-- Subtitle (Figma: Inter Bold 13px, #7A8A9E) -->
+    <form id="hireMeForm" slot="content" novalidate>
       <p class="hm-subtitle">Interested in working together? Fill in your details.</p>
 
-      <form id="hireMeForm" novalidate>
-        <!-- Full Name (Figma: label #C0CDD8, input #111827 / stroke #2E3A50) -->
-        <div class="hm-field">
-          <label for="hm-name">Full Name <span>*</span></label>
-          <input id="hm-name" type="text" placeholder="e.g. Jane Smith" autocomplete="name" />
-          <span class="hm-error" id="hm-name-err"></span>
-        </div>
-
-        <!-- Work Email (Figma: label #C0CDD8) -->
-        <div class="hm-field">
-          <label for="hm-email">Work Email <span>*</span></label>
-          <input id="hm-email" type="email" placeholder="jane@company.com" autocomplete="email" />
-          <span class="hm-error" id="hm-email-err"></span>
-        </div>
-
-        <!-- Company (Figma: label #C0CDD8) -->
-        <div class="hm-field">
-          <label for="hm-company">Company <span>*</span></label>
-          <input id="hm-company" type="text" placeholder="e.g. Acme Corp" autocomplete="organization" />
-          <span class="hm-error" id="hm-company-err"></span>
-        </div>
-
-        <p class="hm-privacy">Your details are used only to respond to your inquiry. No spam, ever.</p>
-
-        <!-- Send Message button (Figma: 416×44, #0070D2, radius 6px, Inter Bold 13px) -->
-        <button class="hm-submit" id="hm-submit-btn" type="submit">Send Message</button>
-
-        <div class="hm-global-error" id="hm-global-error" hidden></div>
-      </form>
-
-      <div class="hm-success" id="hm-success" hidden>
-        <span id="hm-success-text">✓ Message sent! I'll be in touch soon.</span>
+      <div class="hm-field">
+        <md-outlined-text-field
+          id="hm-name"
+          label="Full Name"
+          type="text"
+          required
+          autocomplete="name"></md-outlined-text-field>
       </div>
+
+      <div class="hm-field">
+        <md-outlined-text-field
+          id="hm-email"
+          label="Work Email"
+          type="email"
+          required
+          autocomplete="email"></md-outlined-text-field>
+      </div>
+
+      <div class="hm-field">
+        <md-outlined-text-field
+          id="hm-company"
+          label="Company"
+          type="text"
+          required
+          autocomplete="organization"></md-outlined-text-field>
+      </div>
+
+      <p class="hm-privacy">Your details are used only to respond to your inquiry. No spam, ever.</p>
+
+      <md-filled-button class="hm-submit" id="hm-submit-btn" type="submit">
+        <span id="hm-submit-label">Send Message</span>
+      </md-filled-button>
+
+      <div class="hm-global-error" id="hm-global-error" hidden></div>
+    </form>
+
+    <div class="hm-success" id="hm-success" hidden slot="content">
+      <span id="hm-success-text">✓ Message sent! I'll be in touch soon.</span>
     </div>
-  </div>
+  </md-dialog>
 
   <!-- ── Sponsors Footer ── -->
   <footer class="sponsors-footer">
@@ -432,11 +515,12 @@
       <div class="chat-teaser-text">Hi! Looking to hire a Salesforce engineer?</div>
       <button class="chat-teaser-cta" onclick="openAssistant()">Let's talk</button>
     </div>
-    <button class="chat-fab" id="chatFab" onclick="toggleChatTeaser()" aria-label="Open assistant">
-      <span class="material-symbols-outlined chat-fab-icon chat-fab-icon-open" aria-hidden="true">chat</span>
-      <span class="material-symbols-outlined chat-fab-icon chat-fab-icon-close" style="display:none" aria-hidden="true">close</span>
-      <span class="chat-fab-ping"></span>
-    </button>
+    <div class="chat-fab-wrap">
+      <md-fab id="chatFab" variant="primary" aria-label="Open assistant" onclick="toggleChatTeaser()">
+        <span class="material-symbols-outlined" slot="icon" id="chatFabIcon" aria-hidden="true">chat</span>
+      </md-fab>
+      <span class="chat-fab-ping" aria-hidden="true"></span>
+    </div>
   </div>
 
   <!-- ── Guided Assistant Overlay ── -->

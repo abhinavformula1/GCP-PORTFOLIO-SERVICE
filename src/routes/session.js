@@ -25,6 +25,7 @@ const express                        = require('express');
 const firestore                      = require('../services/firestore');
 const salesforce                     = require('../services/salesforce');
 const googleAuth                     = require('../services/googleAuth');
+const contactPolicy                  = require('../services/contactPolicy');
 const { ValidationError, AppError }  = require('../errors');
 
 const router = express.Router();
@@ -71,7 +72,12 @@ router.post('/session/start', async (req, res, next) => {
         console.error('[session] Salesforce Site_Visitor upsert failed (non-fatal):', sfErr.message);
       });
 
-    // 4. Respond with the bits the frontend needs to greet the user.
+    // 4. Apply the contact-reveal policy. The phone number lives only on
+    //    the server; it's returned to the client only when the verified
+    //    email is in an allow-listed domain.
+    const contact = contactPolicy.resolveContactView({ email });
+
+    // 5. Respond with the bits the frontend needs to greet the user.
     //    firstSeenAt/lastSeenAt come back as Firestore Timestamps — convert.
     return res.status(200).json({
       success:     true,
@@ -82,6 +88,9 @@ router.post('/session/start', async (req, res, next) => {
       visitCount:  visit.visitCount,
       firstSeenAt: visit.firstSeenAt && visit.firstSeenAt.toMillis ? visit.firstSeenAt.toMillis() : null,
       lastSeenAt:  visit.lastSeenAt  && visit.lastSeenAt.toMillis  ? visit.lastSeenAt.toMillis()  : null,
+      // Server-side decision — frontend never has to ask "should I show this?",
+      // it just renders whatever the server gave it.
+      contact,
     });
   } catch (err) {
     return next(err);
