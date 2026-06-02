@@ -3,7 +3,7 @@
 const express                    = require('express');
 const { body, validationResult } = require('express-validator');
 const { hireLimiter }            = require('../middleware/rateLimiter');
-const salesforce                 = require('../services/salesforce');
+const salesforce                 = require('../services/salesforceClient');
 const { ValidationError }        = require('../errors');
 
 const router = express.Router();
