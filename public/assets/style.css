@@ -1,27 +1,96 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ──────────────────────────────────────────────────────────────────
+   Material Design 3 — design tokens
+   ──────────────────────────────────────────────────────────────────
+   Reference: https://m3.material.io/styles/color/system/overview
+   Source palette: blue (close to existing brand accent #4f8ef7)
+   Scheme: dark
+   ────────────────────────────────────────────────────────────────── */
 :root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --surface-2: #222536;
-  --border: #2e3248;
-  --accent: #4f8ef7;
-  --accent-soft: #1e2d4f;
-  --text: #e8eaf2;
-  --text-secondary: #8b90a8;
-  --text-muted: #555870;
-  --success: #3ecf8e;
-  --tag-bg: #1e2d4f;
-  --tag-text: #7aadff;
+  /* M3 dark color scheme (subset — only what we use) */
+  --md-sys-color-primary:                  #abc7ff;
+  --md-sys-color-on-primary:               #002c71;
+  --md-sys-color-primary-container:        #0f448a;
+  --md-sys-color-on-primary-container:     #d8e2ff;
+  --md-sys-color-surface:                  #111318;
+  --md-sys-color-surface-container-low:    #181b1f;
+  --md-sys-color-surface-container:        #1d2024;
+  --md-sys-color-surface-container-high:   #272a2f;
+  --md-sys-color-surface-container-highest:#32353a;
+  --md-sys-color-on-surface:               #e2e2e9;
+  --md-sys-color-on-surface-variant:       #c5c6d0;
+  --md-sys-color-outline:                  #8e909a;
+  --md-sys-color-outline-variant:          #44474e;
+  --md-sys-color-error:                    #ffb4ab;
+  --md-sys-color-on-error:                 #690005;
+  --md-sys-color-success:                  #3ecf8e; /* not in M3 spec — kept for existing UX */
+
+  /* M3 motion tokens
+     https://m3.material.io/styles/motion/easing-and-duration/tokens-specs */
+  --md-sys-motion-easing-standard:                cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized:              cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate:   cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate:   cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-sys-motion-duration-short1:                50ms;
+  --md-sys-motion-duration-short2:                100ms;
+  --md-sys-motion-duration-short3:                150ms;
+  --md-sys-motion-duration-short4:                200ms;
+  --md-sys-motion-duration-medium1:               250ms;
+  --md-sys-motion-duration-medium2:               300ms;
+  --md-sys-motion-duration-long1:                 450ms;
+
+  /* M3 state-layer opacities (translucent overlay on hover/focus/press) */
+  --md-sys-state-hover-opacity:    0.08;
+  --md-sys-state-focus-opacity:    0.10;
+  --md-sys-state-pressed-opacity:  0.10;
+
+  /* ── Legacy aliases — existing custom CSS continues to work,
+        now driven by M3 tokens underneath. */
+  --bg:              var(--md-sys-color-surface);
+  --surface:         var(--md-sys-color-surface-container);
+  --surface-2:       var(--md-sys-color-surface-container-high);
+  --border:          var(--md-sys-color-outline-variant);
+  --accent:          var(--md-sys-color-primary);
+  --accent-soft:     var(--md-sys-color-primary-container);
+  --text:            var(--md-sys-color-on-surface);
+  --text-secondary:  var(--md-sys-color-on-surface-variant);
+  --text-muted:      var(--md-sys-color-outline);
+  --success:         var(--md-sys-color-success);
+  --tag-bg:          var(--md-sys-color-primary-container);
+  --tag-text:        var(--md-sys-color-primary);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Roboto Flex', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-optical-sizing: auto;
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
 }
+
+/* Material Symbols Outlined — Google's official icon set
+   https://fonts.google.com/icons */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+/* meta-icon: smaller variant used inside profile metadata rows */
+.meta-icon { font-size: 14px; }
 
 /* ── Top bar ── */
 .topbar {
@@ -47,6 +116,25 @@ body {
   position: relative;
 }
 .topbar-user[hidden] { display: none; }
+.topbar-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.topbar-signin-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.topbar-signin-btn[hidden] { display: none; }
 .topbar-avatar-btn {
   background: none;
   border: none;
@@ -172,7 +260,8 @@ a:hover { text-decoration: underline; }
   color: var(--text-secondary);
 }
 
-.meta-item svg { flex-shrink: 0; }
+.meta-item svg,
+.meta-item .material-symbols-outlined { flex-shrink: 0; }
 
 .exp-badge {
   background: var(--accent-soft);
@@ -399,12 +488,6 @@ a:hover { text-decoration: underline; }
   border: 1px solid #2b3d6b;
 }
 
-.tag.green {
-  background: #0d2b1f;
-  color: var(--success);
-  border-color: #1a4a33;
-}
-
 /* ── Education ── */
 .edu-name { font-size: 13px; font-weight: 600; }
 .edu-degree { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
@@ -585,6 +668,10 @@ a:hover { text-decoration: underline; }
   transition: background 0.2s, transform 0.2s;
 }
 .chat-fab:hover { background: #005fb2; transform: scale(1.06); }
+.chat-fab .chat-fab-icon { font-size: 24px; }
+.chat-fab .chat-fab-icon-close { font-size: 22px; font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24; }
+.chat-fab { transition: background var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+                        transform  var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard); }
 
 /* ping animation on FAB */
 .chat-fab-ping {
@@ -796,7 +883,8 @@ a:hover { text-decoration: underline; }
 .ga-msg {
   display: flex;
   opacity: 1;
-  transition: opacity 0.25s, transform 0.25s;
+  transition: opacity   var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+              transform var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate);
 }
 .ga-msg-enter {
   opacity: 0;
@@ -1024,6 +1112,7 @@ a:hover { text-decoration: underline; }
 }
 .welcome-overlay[hidden] { display: none; }
 .welcome-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1034,6 +1123,24 @@ a:hover { text-decoration: underline; }
   flex-direction: column;
   align-items: center;
   gap: 16px;
+}
+.welcome-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.welcome-close:hover {
+  color: var(--text);
+  background: var(--surface-2);
 }
 .welcome-brand {
   display: flex;
@@ -1311,7 +1418,8 @@ a:hover { text-decoration: underline; }
   -webkit-backdrop-filter: blur(8px);
   transform: translateY(-12px);
   opacity: 0;
-  transition: transform 0.28s ease, opacity 0.28s ease;
+  transition: transform var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate),
+              opacity   var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate);
   pointer-events: auto;
 }
 .welcome-toast.show {

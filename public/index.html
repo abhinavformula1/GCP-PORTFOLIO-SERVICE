@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Abhinav Kumar — Senior Salesforce Application Engineer</title>
+
+  <!-- ── Material Design 3: Google Fonts (Roboto Flex + Material Symbols) ── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap" />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+
   <link rel="stylesheet" href="/assets/style.css" />
 </head>
 <body>
@@ -21,18 +30,19 @@
   <!-- ── Welcome / Login Overlay ── -->
   <div id="welcomeOverlay" class="welcome-overlay" hidden>
     <div class="welcome-card">
+      <button class="welcome-close" id="welcomeCloseBtn" aria-label="Close">&times;</button>
       <div class="welcome-brand">
         <div class="welcome-avatar">AK</div>
         <div>
-          <div class="welcome-title">Abhinav's Portfolio</div>
-          <div class="welcome-sub">Senior Salesforce Application Engineer</div>
+          <div class="welcome-title" data-i18n="welcomeTitle">Abhinav's Portfolio</div>
+          <div class="welcome-sub" data-i18n="welcomeSub">Senior Salesforce Application Engineer</div>
         </div>
       </div>
-      <p class="welcome-desc">Sign in with Google for a personalised experience, or continue as a guest.</p>
+      <p class="welcome-desc" data-i18n="welcomeDesc">Sign in with Google for a personalised experience, or continue as a guest.</p>
       <div id="welcomeGoogleBtn" class="welcome-google-wrap"></div>
-      <div class="welcome-sep"><span>or</span></div>
-      <button class="welcome-guest-btn" id="welcomeGuestBtn">Continue as Guest</button>
-      <p class="welcome-note">Your details are only used to personalise the scheduling assistant.</p>
+      <div class="welcome-sep"><span data-i18n="welcomeOr">or</span></div>
+      <button class="welcome-guest-btn" id="welcomeGuestBtn" data-i18n="welcomeGuestBtn">Maybe later</button>
+      <p class="welcome-note" data-i18n="welcomeNote">Your details are only used to personalise the scheduling assistant.</p>
     </div>
   </div>
 
@@ -44,6 +54,12 @@
         <span class="lang-sep">|</span>
         <button class="lang-btn" id="langFR" onclick="setLang('fr')">FR</button>
       </div>
+
+      <!-- Sign-in button (right side, shown for guests / signed-out users) -->
+      <button class="topbar-signin-btn" id="topbarSignInBtn" hidden aria-label="Sign in">
+        <span class="material-symbols-outlined" aria-hidden="true">login</span>
+        <span data-i18n="topbarSignIn">Sign in</span>
+      </button>
 
       <!-- Signed-in user avatar (right side) -->
       <div class="topbar-user" id="topbarUser" hidden>
@@ -67,30 +83,29 @@
         <div class="header-title" data-i18n="headerTitle">Senior Salesforce Application Engineer</div>
         <div class="header-meta">
           <span class="meta-item">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M16 2v4M8 2v4M4 10h16"/></svg>
-            <!-- email icon replaced with envelope -->
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg>
+            <span class="material-symbols-outlined meta-icon" aria-hidden="true">mail</span>
             <a href="mailto:abhinavformula1@gmail.com">abhinavformula1@gmail.com</a>
           </span>
           <span class="meta-item">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.8 19.8 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.8 12.8 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.78a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45 12.8 12.8 0 0 0 2.81.7A2 2 0 0 1 21.5 16z"/></svg>
+            <span class="material-symbols-outlined meta-icon" aria-hidden="true">call</span>
             +91-xxxxxxxxxx
           </span>
           <span class="meta-item">
-            <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+            <!-- LinkedIn brand icon — kept as SVG (no Material Symbol equivalent) -->
+            <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
             <a href="https://linkedin.com/in/abhinavformula1" target="_blank">linkedin.com/in/abhinavformula1</a>
           </span>
           <span class="meta-item">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            <span class="material-symbols-outlined meta-icon" aria-hidden="true">place</span>
             Bengaluru, India
           </span>
           <span class="meta-item">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            <span class="material-symbols-outlined meta-icon" aria-hidden="true">schedule</span>
             <a href="https://trailblazer.me/id/abhinavformula1" target="_blank">Trailblazer Profile</a>
           </span>
         </div>
         <button class="hire-me-btn" onclick="document.getElementById('hireMeOverlay').removeAttribute('hidden')">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span class="material-symbols-outlined" aria-hidden="true">waving_hand</span>
           <span data-i18n="getInTouch">Get In Touch</span>
         </button>
       </div>
@@ -167,12 +182,21 @@
           </div>
 
           <div class="skill-group">
+            <div class="skill-group-label">Google Cloud</div>
+            <div class="tags">
+              <span class="tag">Cloud Run</span>
+              <span class="tag">Firestore</span>
+              <span class="tag">Secret Manager</span>
+              <span class="tag">Gemini API</span>
+            </div>
+          </div>
+
+          <div class="skill-group">
             <div class="skill-group-label">DevOps & Tools</div>
             <div class="tags">
-              <span class="tag green">Copado</span>
-              <span class="tag green">GitHub Actions</span>
-              <span class="tag green">Jenkins</span>
-              <span class="tag green">Cursor AI</span>
+              <span class="tag">Copado</span>
+              <span class="tag">GitHub Actions</span>
+              <span class="tag">Cursor AI</span>
             </div>
           </div>
 
@@ -180,7 +204,6 @@
             <div class="skill-group-label">Data Migration</div>
             <div class="tags">
               <span class="tag">Data Loader</span>
-              <span class="tag">Talend Open Studio</span>
             </div>
           </div>
         </div>
@@ -410,8 +433,8 @@
       <button class="chat-teaser-cta" onclick="openAssistant()">Let's talk</button>
     </div>
     <button class="chat-fab" id="chatFab" onclick="toggleChatTeaser()" aria-label="Open assistant">
-      <svg class="chat-fab-icon chat-fab-icon-open" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <svg class="chat-fab-icon chat-fab-icon-close" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="display:none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <span class="material-symbols-outlined chat-fab-icon chat-fab-icon-open" aria-hidden="true">chat</span>
+      <span class="material-symbols-outlined chat-fab-icon chat-fab-icon-close" style="display:none" aria-hidden="true">close</span>
       <span class="chat-fab-ping"></span>
     </button>
   </div>
