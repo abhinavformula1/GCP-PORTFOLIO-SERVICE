@@ -23,6 +23,7 @@
 
 const express                        = require('express');
 const firestore                      = require('../services/firestore');
+const salesforce                     = require('../services/salesforce');
 const googleAuth                     = require('../services/googleAuth');
 const { ValidationError, AppError }  = require('../errors');
 
@@ -49,7 +50,29 @@ router.post('/session/start', async (req, res, next) => {
       console.error('[session] Firestore upsert failed (continuing without persistence):', fsErr.message);
     }
 
-    // 3. Respond with the bits the frontend needs to greet the user
+    // 3. Mirror the visitor into Salesforce as a Site_Visitor__c record so
+    //    visits show up alongside Recruiter_Inquiry__c in SF reports. We
+    //    fire-and-forget so SF latency / availability never affects sign-in.
+    //
+    //    firstSeenAt:
+    //      - null on returning visits → SF leaves the existing value alone
+    //        (Salesforce upsert semantics: omitted fields aren't touched)
+    //      - now() on first visit → SF stamps a new record
+    Promise.resolve()
+      .then(() => salesforce.upsertSiteVisitor({
+        uid,
+        email,
+        name,
+        firstSeenAt: visit.isReturning ? null : Date.now(),
+        lastSeenAt:  Date.now(),
+        visitCount:  visit.visitCount,
+      }))
+      .catch((sfErr) => {
+        console.error('[session] Salesforce Site_Visitor upsert failed (non-fatal):', sfErr.message);
+      });
+
+    // 4. Respond with the bits the frontend needs to greet the user.
+    //    firstSeenAt/lastSeenAt come back as Firestore Timestamps — convert.
     return res.status(200).json({
       success:     true,
       isReturning: visit.isReturning,
