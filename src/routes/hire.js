@@ -26,6 +26,13 @@ const validateHire = [
     .notEmpty().withMessage('Company name is required.')
     .isLength({ max: 255 }).withMessage('Company must be 255 characters or fewer.'),
 
+  // Free-form recruiter message — lands in Recruiter_Inquiry__c.Description__c
+  // Salesforce field is Text(255), so the cap matches the storage limit.
+  body('description')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 255 }).withMessage('Message must be 255 characters or fewer.'),
+
   // Guided assistant fields (optional — not sent by legacy modal)
   body('role').optional().trim().isLength({ max: 100 }),
   body('contractType').optional().trim().isLength({ max: 50 }),
@@ -44,15 +51,25 @@ router.post('/hire', hireLimiter, validateHire, async (req, res, next) => {
     ));
   }
 
-  const { name, email, company, role, contractType, urgency, slot } = req.body;
+  const { name, email, company, description, role, contractType, urgency, slot } = req.body;
 
-  // Build a rich description from guided assistant answers (if present)
-  const notes = [
+  // Build the Description__c payload. The form's free-form "Message" field
+  // (description) is the primary content; structured guided-assistant fields,
+  // when present, are appended below a separator so a single SF text-area
+  // surface holds both. Result is the same Description__c everyone reads.
+  const guided = [
     role         && `Role: ${role}`,
     contractType && `Type: ${contractType}`,
     urgency      && `Urgency: ${urgency}`,
     slot         && `Requested slot: ${slot}`,
   ].filter(Boolean).join('\n');
+
+  // Description__c is Text(255) in Salesforce. Per-field validation already
+  // caps `description` at 255, but combining it with guided-assistant fields
+  // could overflow — so we hard-truncate the merged string here as a final
+  // safety net (avoids STRING_TOO_LONG errors at the SF API).
+  const SF_DESCRIPTION_MAX = 255;
+  const notes = [description, guided].filter(Boolean).join('\n\n—\n').slice(0, SF_DESCRIPTION_MAX);
 
   try {
     // 2. Create Salesforce record (skip gracefully if SF not configured yet)
