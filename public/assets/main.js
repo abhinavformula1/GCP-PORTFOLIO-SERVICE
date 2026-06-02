@@ -50,17 +50,24 @@
   }
 
   function updateTopbarUser(p) {
-    var el    = document.getElementById('topbarUser');
-    var photo = document.getElementById('topbarUserPhoto');
-    var name  = document.getElementById('topbarUserName');
+    var el       = document.getElementById('topbarUser');
+    var photo    = document.getElementById('topbarUserPhoto');
+    var name     = document.getElementById('topbarUserName');
+    var signInEl = document.getElementById('topbarSignInBtn');
     if (!el) return;
-    if (p && p.type !== 'guest' && p.picture) {
+
+    var signedIn = !!(p && p.type !== 'guest' && p.picture);
+
+    if (signedIn) {
       photo.src = p.picture;
       photo.alt = p.name;
       if (name) name.textContent = p.name;
       el.removeAttribute('hidden');
+      if (signInEl) signInEl.setAttribute('hidden', '');
     } else {
       el.setAttribute('hidden', '');
+      // Show "Sign in" in the top bar for guests / signed-out users
+      if (signInEl) signInEl.removeAttribute('hidden');
     }
   }
 
@@ -166,6 +173,7 @@
       initGoogleSignIn();
     }
   }
+  window.showWelcomeOverlay = showWelcomeOverlay;
 
   function hideWelcomeOverlay() {
     var overlay = document.getElementById('welcomeOverlay');
@@ -538,6 +546,14 @@
       headerTitle: 'Senior Salesforce Application Engineer',
       getInTouch: 'Get In Touch',
       yearsExp: 'Years Experience',
+      // Welcome / Login overlay
+      welcomeTitle:    "Abhinav's Portfolio",
+      welcomeSub:      'Senior Salesforce Application Engineer',
+      welcomeDesc:     'Sign in with Google for a personalised experience, or continue as a guest.',
+      welcomeOr:       'or',
+      welcomeGuestBtn: 'Maybe later',
+      welcomeNote:     'Your details are only used to personalise the scheduling assistant.',
+      topbarSignIn:    'Sign in',
       aboutMe: 'About Me',
       about1: 'Senior Salesforce Application Engineer with <strong style="color:var(--text)">12+ years of experience</strong> across Salesforce development, architecture, and DevOps, building scalable enterprise applications using Apex, Lightning Web Components, and API-driven integrations.',
       about2: 'Experienced across Sales Cloud, Service Cloud, Experience Cloud, and Salesforce Communications Cloud, with deep expertise in CPQ, Contract Lifecycle Management, and Order Management.',
@@ -561,6 +577,14 @@
       headerTitle: 'Ingénieur Senior en Applications Salesforce',
       getInTouch: 'Me Contacter',
       yearsExp: "Ans d'Expérience",
+      // Welcome / Login overlay
+      welcomeTitle:    "Le Portfolio d'Abhinav",
+      welcomeSub:      'Ingénieur Senior en Applications Salesforce',
+      welcomeDesc:     "Connectez-vous avec Google pour une expérience personnalisée, ou continuez en tant qu'invité.",
+      welcomeOr:       'ou',
+      welcomeGuestBtn: 'Plus tard, peut-être',
+      welcomeNote:     "Vos informations sont uniquement utilisées pour personnaliser l'assistant de planification.",
+      topbarSignIn:    'Se connecter',
       aboutMe: 'À Propos',
       about1: 'Ingénieur Senior en Applications Salesforce avec <strong style="color:var(--text)">plus de 12 ans d\'expérience</strong> en développement, architecture et DevOps Salesforce, spécialisé dans la création d\'applications d\'entreprise évolutives avec Apex, Lightning Web Components et des intégrations API.',
       about2: 'Expérimenté sur Sales Cloud, Service Cloud, Experience Cloud et Salesforce Communications Cloud, avec une expertise approfondie en CPQ, gestion du cycle de vie des contrats et gestion des commandes.',
@@ -653,6 +677,23 @@
     saveSiteProfile({ type: 'guest' });
     hideWelcomeOverlay();
   });
+
+  // Close (X) button on welcome overlay — same effect as "Continue as Guest"
+  // (dismiss the modal, browse anonymously, signin remains available in the topbar).
+  var welcomeCloseBtn = document.getElementById('welcomeCloseBtn');
+  if (welcomeCloseBtn) {
+    welcomeCloseBtn.addEventListener('click', function () {
+      saveSiteProfile({ type: 'guest' });
+      hideWelcomeOverlay();
+    });
+  }
+
+  // Top-bar "Sign in" button — re-opens the welcome overlay so guests can
+  // upgrade to a signed-in session at any time.
+  var topbarSignInBtn = document.getElementById('topbarSignInBtn');
+  if (topbarSignInBtn) {
+    topbarSignInBtn.addEventListener('click', showWelcomeOverlay);
+  }
 
   // Init Google Sign-In once the GIS library has loaded
   if (GOOGLE_CLIENT_ID) {
