@@ -23,7 +23,7 @@
 
 const express                        = require('express');
 const firestore                      = require('../services/firestore');
-const salesforce                     = require('../services/salesforce');
+const salesforce                     = require('../services/salesforceClient');
 const googleAuth                     = require('../services/googleAuth');
 const { ValidationError, AppError }  = require('../errors');
 
