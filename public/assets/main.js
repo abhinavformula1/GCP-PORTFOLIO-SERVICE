@@ -1631,7 +1631,7 @@
     if (typeof overlay.close === 'function') overlay.close();
     else overlay.setAttribute('hidden', '');
     document.getElementById('hireMeForm').reset();
-    ['hm-name', 'hm-email', 'hm-company'].forEach(function (id) {
+    ['hm-name', 'hm-email', 'hm-company', 'hm-description'].forEach(function (id) {
       clearErr(id);
     });
     document.getElementById('hm-global-error').hidden = true;
@@ -1647,7 +1647,7 @@
   // Listen for its `close` event to clean up form state.
   document.getElementById('hireMeOverlay').addEventListener('close', function () {
     document.getElementById('hireMeForm').reset();
-    ['hm-name', 'hm-email', 'hm-company'].forEach(clearErr);
+    ['hm-name', 'hm-email', 'hm-company', 'hm-description'].forEach(clearErr);
     document.getElementById('hm-global-error').hidden = true;
     document.getElementById('hm-success').hidden = true;
     document.getElementById('hireMeForm').hidden = false;
@@ -1671,11 +1671,12 @@
   }
 
   function validate() {
-    var name    = document.getElementById('hm-name').value.trim();
-    var email   = document.getElementById('hm-email').value.trim();
-    var company = document.getElementById('hm-company').value.trim();
+    var name        = document.getElementById('hm-name').value.trim();
+    var email       = document.getElementById('hm-email').value.trim();
+    var company     = document.getElementById('hm-company').value.trim();
+    var description = document.getElementById('hm-description').value.trim();
     var ok = true;
-    ['hm-name', 'hm-email', 'hm-company'].forEach(clearErr);
+    ['hm-name', 'hm-email', 'hm-company', 'hm-description'].forEach(clearErr);
 
     if (!name)    { setErr('hm-name', 'Full name is required.'); ok = false; }
     if (!email)   { setErr('hm-email', 'Work email is required.'); ok = false; }
@@ -1683,6 +1684,10 @@
       setErr('hm-email', 'Enter a valid email address.'); ok = false;
     }
     if (!company) { setErr('hm-company', 'Company name is required.'); ok = false; }
+    if (description.length > 255) {
+      setErr('hm-description', 'Message must be 255 characters or fewer.');
+      ok = false;
+    }
 
     return ok;
   }
@@ -1699,9 +1704,10 @@
     globalErr.hidden = true;
 
     var payload = {
-      name:    document.getElementById('hm-name').value.trim(),
-      email:   document.getElementById('hm-email').value.trim(),
-      company: document.getElementById('hm-company').value.trim(),
+      name:        document.getElementById('hm-name').value.trim(),
+      email:       document.getElementById('hm-email').value.trim(),
+      company:     document.getElementById('hm-company').value.trim(),
+      description: document.getElementById('hm-description').value.trim(),
     };
 
     try {
