@@ -36,7 +36,10 @@ const { SalesforceError }                         = require('../../errors');
  * configured locally. Never throws unexpectedly — Cloud Run sign-in must
  * not fail just because Salesforce is unreachable.
  */
-async function upsertSiteVisitor({ uid, email, name, firstSeenAt, lastSeenAt, visitCount }, retry = true) {
+async function upsertSiteVisitor(
+  { uid, email, name, firstSeenAt, lastSeenAt, visitCount, transactionId },
+  retry = true
+) {
   if (!isConfigured()) {
     console.log('[salesforce] SF not configured — skipping Site_Visitor upsert');
     return { skipped: true };
@@ -61,12 +64,17 @@ async function upsertSiteVisitor({ uid, email, name, firstSeenAt, lastSeenAt, vi
   }
 
   const path = `Site_Visitor__c/Google_UID__c/${encodeURIComponent(uid)}`;
-  const { status, data: result } = await sfPatch(instanceUrl, accessToken, path, payload);
+  const meta = {
+    apiName:       'Site_Visitor__c.upsert',
+    className:     'siteVisitor.js',
+    transactionId: transactionId || '',
+  };
+  const { status, data: result } = await sfPatch(instanceUrl, accessToken, path, payload, meta);
 
   if (status === 401 && retry) {
     invalidateToken();
     return upsertSiteVisitor(
-      { uid, email, name, firstSeenAt, lastSeenAt, visitCount },
+      { uid, email, name, firstSeenAt, lastSeenAt, visitCount, transactionId },
       false
     );
   }

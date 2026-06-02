@@ -21,6 +21,7 @@
  *     and return isReturning=false so the UI does not break).
  */
 
+const crypto                         = require('crypto');
 const express                        = require('express');
 const firestore                      = require('../services/firestore');
 const salesforce                     = require('../services/salesforce');
@@ -59,6 +60,7 @@ router.post('/session/start', async (req, res, next) => {
     //      - null on returning visits → SF leaves the existing value alone
     //        (Salesforce upsert semantics: omitted fields aren't touched)
     //      - now() on first visit → SF stamps a new record
+    const transactionId = crypto.randomUUID();
     Promise.resolve()
       .then(() => salesforce.upsertSiteVisitor({
         uid,
@@ -67,6 +69,7 @@ router.post('/session/start', async (req, res, next) => {
         firstSeenAt: visit.isReturning ? null : Date.now(),
         lastSeenAt:  Date.now(),
         visitCount:  visit.visitCount,
+        transactionId,
       }))
       .catch((sfErr) => {
         console.error('[session] Salesforce Site_Visitor upsert failed (non-fatal):', sfErr.message);

@@ -24,8 +24,15 @@ const { SalesforceError }           = require('../../errors');
 /**
  * Creates a Recruiter_Inquiry__c record in Salesforce.
  * Retries once on 401 (expired token).
+ *
+ * @param {object} data  { name, email, company, notes }
+ * @param {object} [opts]
+ *   @param {string} opts.transactionId  Correlation ID stamped on the
+ *     resulting Integration_Log__c row so the audit trail can be joined
+ *     back to the originating /api/hire request.
+ * @param {boolean} [retry=true]  Internal: token-refresh retry guard.
  */
-async function createInquiry(data, retry = true) {
+async function createInquiry(data, opts = {}, retry = true) {
   const { accessToken, instanceUrl } = await getToken();
 
   const payload = {
@@ -35,13 +42,19 @@ async function createInquiry(data, retry = true) {
     Description__c:  data.notes || '',
   };
 
+  const meta = {
+    apiName:       'Recruiter_Inquiry__c.create',
+    className:     'recruiterInquiry.js',
+    transactionId: opts.transactionId || '',
+  };
+
   const { status, data: result } = await sfPost(
-    instanceUrl, accessToken, 'Recruiter_Inquiry__c', payload
+    instanceUrl, accessToken, 'Recruiter_Inquiry__c', payload, meta
   );
 
   if (status === 401 && retry) {
     invalidateToken();
-    return createInquiry(data, false);
+    return createInquiry(data, opts, false);
   }
 
   // Salesforce Duplicate Rule blocked the create — treat as a soft success
