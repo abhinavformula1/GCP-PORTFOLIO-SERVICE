@@ -3,15 +3,19 @@
 /**
  * Salesforce HTTP transport — STABLE layer.
  *
- * Generic JSON request to a /services/data/<ver>/sobjects/... endpoint.
- * Used by every domain operation (createInquiry, upsertSiteVisitor, …).
+ * Generic JSON request to a Salesforce REST endpoint. Two URL families
+ * are supported, both routed through the same logged transport:
+ *
+ *   sObject REST  → /services/data/<ver>/sobjects/<Object>     (sfPost / sfPatch)
+ *   Apex  REST    → /services/apexrest/<your-path>             (sfApexPost)
  *
  * Layer above (auth.js) provides the access token and instance URL.
  * Layer below is plain Node's https module.
  *
  * This file rarely changes — it implements the Salesforce REST envelope
- * (URL pattern, Bearer header, JSON body) and would only be edited if
- * Salesforce changed its REST conventions.
+ * (Bearer header, JSON body, fire-and-forget audit log) and would only
+ * be edited if Salesforce changed its REST conventions or we added a
+ * new URL family (e.g. /services/data/<ver>/composite).
  */
 
 const https  = require('https');
@@ -19,11 +23,15 @@ const config = require('../../config');
 const { SalesforceError } = require('../../errors');
 
 /**
- * Generic JSON request. Returns { status, data } where data is the
- * parsed JSON body (or {} for empty 204 responses).
+ * Internal: send `body` to `fullPath` on `instanceUrl`, parse the response,
+ * fire-and-forget an Integration_Log__c row, and resolve with { status, data }.
  *
- * Side-effect: fires-and-forgets a write to Integration_Log__c via
- * `integrationLog.writeLog` after every response, unless:
+ * `fullPath` is the absolute Salesforce path including `/services/...`.
+ * The two public helper families (sObject + Apex REST) build it before
+ * calling here, so this function is URL-family-agnostic.
+ *
+ * Side-effect: writes to Integration_Log__c via `integrationLog.writeLog`
+ * after every response, unless:
  *   - meta.skipLogging is true (used by integrationLog itself to avoid
  *     infinite recursion — its own writes can't be logged)
  *   - the request target IS Integration_Log__c (defence-in-depth, so even
@@ -36,7 +44,7 @@ const { SalesforceError } = require('../../errors');
  * @param {'GET'|'POST'|'PATCH'|'DELETE'} method
  * @param {string} instanceUrl    e.g. https://orgfarm-xxx.my.salesforce.com
  * @param {string} accessToken    Bearer token from auth.js
- * @param {string} sobjectPath    e.g. "Site_Visitor__c/Google_UID__c/abc"
+ * @param {string} fullPath       Absolute path, e.g. "/services/data/v60.0/sobjects/Foo"
  * @param {object} [payload]      Optional JSON body
  * @param {object} [meta]         Optional audit-log metadata
  *   @param {string} meta.apiName       e.g. "Recruiter_Inquiry__c.create"
@@ -44,9 +52,8 @@ const { SalesforceError } = require('../../errors');
  *   @param {string} meta.transactionId UUID per /api request — correlation key
  *   @param {boolean} meta.skipLogging  set by integrationLog to break recursion
  */
-function sfRequest(method, instanceUrl, accessToken, sobjectPath, payload, meta) {
+function sfRawRequest(method, instanceUrl, accessToken, fullPath, payload, meta) {
   const body = payload ? JSON.stringify(payload) : '';
-  const fullPath = `/services/data/${config.salesforce.apiVersion}/sobjects/${sobjectPath}`;
   const url  = new URL(fullPath, instanceUrl);
 
   return new Promise((resolve, reject) => {
@@ -76,9 +83,9 @@ function sfRequest(method, instanceUrl, accessToken, sobjectPath, payload, meta)
 
           // Fire-and-forget audit log. Recursion guard:
           //   - skipLogging:true → caller (integrationLog) opted out
-          //   - sobjectPath starts with Integration_Log__c → defence-in-depth
+          //   - fullPath contains Integration_Log__c → defence-in-depth
           const skip = (meta && meta.skipLogging)
-            || sobjectPath.startsWith('Integration_Log__c');
+            || fullPath.indexOf('/Integration_Log__c') !== -1;
           if (!skip) {
             // Lazy require breaks the integrationLog ⇄ httpClient cycle —
             // by the time this fires, both modules have finished loading.
@@ -87,7 +94,7 @@ function sfRequest(method, instanceUrl, accessToken, sobjectPath, payload, meta)
             // affects the response. .catch is for belt-and-braces; writeLog
             // already swallows errors internally.
             Promise.resolve().then(() => writeLog({
-              apiName:        (meta && meta.apiName)   || `${method} ${sobjectPath}`,
+              apiName:        (meta && meta.apiName)   || `${method} ${fullPath}`,
               className:      (meta && meta.className) || 'httpClient',
               transactionId:  (meta && meta.transactionId) || '',
               endpoint:       fullPath,
@@ -110,9 +117,41 @@ function sfRequest(method, instanceUrl, accessToken, sobjectPath, payload, meta)
   });
 }
 
+// ── sObject REST family ──────────────────────────────────────────────────────
+// /services/data/<ver>/sobjects/<sobjectPath>
+//
+// `sobjectPath` examples:
+//   "Recruiter_Inquiry__c"
+//   "Site_Visitor__c/Google_UID__c/<external-id>"
+function sfRequest(method, instanceUrl, accessToken, sobjectPath, payload, meta) {
+  const fullPath = `/services/data/${config.salesforce.apiVersion}/sobjects/${sobjectPath}`;
+  return sfRawRequest(method, instanceUrl, accessToken, fullPath, payload, meta);
+}
+
 const sfPost  = (instanceUrl, accessToken, path, payload, meta) =>
   sfRequest('POST',  instanceUrl, accessToken, path, payload, meta);
 const sfPatch = (instanceUrl, accessToken, path, payload, meta) =>
   sfRequest('PATCH', instanceUrl, accessToken, path, payload, meta);
 
-module.exports = { sfRequest, sfPost, sfPatch };
+// ── Apex REST family ─────────────────────────────────────────────────────────
+// /services/apexrest/<apexPath>
+//
+// Used to call custom @RestResource(urlMapping='/...') Apex classes — gives
+// us atomic multi-object writes and stable contracts independent of sObject
+// schema. Same auth, same JSON envelope, same audit-log pipeline as sObject
+// REST — only the URL prefix differs.
+//
+// `apexPath` example: "inquiry"  →  /services/apexrest/inquiry
+function sfApexRequest(method, instanceUrl, accessToken, apexPath, payload, meta) {
+  const trimmed  = String(apexPath || '').replace(/^\/+/, '');
+  const fullPath = `/services/apexrest/${trimmed}`;
+  return sfRawRequest(method, instanceUrl, accessToken, fullPath, payload, meta);
+}
+
+const sfApexPost = (instanceUrl, accessToken, path, payload, meta) =>
+  sfApexRequest('POST', instanceUrl, accessToken, path, payload, meta);
+
+module.exports = {
+  sfRequest, sfPost, sfPatch,
+  sfApexRequest, sfApexPost,
+};
