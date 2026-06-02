@@ -51,6 +51,34 @@ const config = {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
   },
 
+  // ── Contact-reveal policy ──────────────────────────────────────────
+  // The portfolio masks the phone number by default. When a viewer signs
+  // in with Google, the server checks whether their verified email belongs
+  // to an allow-listed organisation and, if so, returns the unmasked phone
+  // number alongside the rest of the session payload.
+  //
+  // Trust model:
+  //   - Email is read from a Google-signed ID token (we cannot forge it).
+  //   - The phone number itself is never present in HTML source — clients
+  //     that don't prove allow-listed identity never see it.
+  //   - This is identity-aware authorisation, the same pattern used by
+  //     Google IAP / Cloud Endpoints (audience claim → policy decision).
+  contactPolicy: {
+    // Comma-separated list of trusted email domains. Override via env in
+    // production. Defaults are the only two orgs the portfolio targets.
+    //
+    // Nullish coalescing (??) — not || — so that explicitly setting the
+    // env var to '' is honoured as a "deny all" override rather than
+    // silently falling back to the defaults.
+    allowedDomains: (process.env.CONTACT_ALLOWED_DOMAINS ?? 'google.com,salesforce.com')
+      .split(',')
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean),
+    // Real phone number — never inlined in HTML. Falls back to a sentinel
+    // so the policy remains testable in dev without leaking real PII.
+    privatePhone: process.env.PRIVATE_PHONE || '+91 XXXX XXX XXX',
+  },
+
   firestore: {
     // Optional override — defaults to Firestore Native in the GCP project
     // tied to the runtime service account.

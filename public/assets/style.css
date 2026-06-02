@@ -59,6 +59,57 @@
   --success:         var(--md-sys-color-success);
   --tag-bg:          var(--md-sys-color-primary-container);
   --tag-text:        var(--md-sys-color-primary);
+
+  color-scheme: dark;
+}
+
+/* ── M3 light scheme ──
+   Activated by the theme toggle (sets [data-theme="light"] on <html>).
+   Same Salesforce-blue brand seed, generated via M3 Material Theme Builder. */
+:root[data-theme="light"] {
+  --md-sys-color-primary:                  #0061a4;
+  --md-sys-color-on-primary:               #ffffff;
+  --md-sys-color-primary-container:        #d1e4ff;
+  --md-sys-color-on-primary-container:     #001d36;
+  --md-sys-color-surface:                  #fdfcff;
+  --md-sys-color-surface-container-low:    #f3f3fa;
+  --md-sys-color-surface-container:        #edeef4;
+  --md-sys-color-surface-container-high:   #e7e8ee;
+  --md-sys-color-surface-container-highest:#e1e2e8;
+  --md-sys-color-on-surface:               #1a1c1e;
+  --md-sys-color-on-surface-variant:       #43474e;
+  --md-sys-color-outline:                  #73777f;
+  --md-sys-color-outline-variant:          #c3c7cf;
+  --md-sys-color-error:                    #ba1a1a;
+  --md-sys-color-on-error:                 #ffffff;
+  --md-sys-color-success:                  #146c43;
+
+  color-scheme: light;
+}
+
+/* Honour OS preference for first-time visitors who haven't toggled yet.
+   Once they pick a theme, JS pins [data-theme="dark"|"light"] on <html>
+   and overrides this. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    --md-sys-color-primary:                  #0061a4;
+    --md-sys-color-on-primary:               #ffffff;
+    --md-sys-color-primary-container:        #d1e4ff;
+    --md-sys-color-on-primary-container:     #001d36;
+    --md-sys-color-surface:                  #fdfcff;
+    --md-sys-color-surface-container-low:    #f3f3fa;
+    --md-sys-color-surface-container:        #edeef4;
+    --md-sys-color-surface-container-high:   #e7e8ee;
+    --md-sys-color-surface-container-highest:#e1e2e8;
+    --md-sys-color-on-surface:               #1a1c1e;
+    --md-sys-color-on-surface-variant:       #43474e;
+    --md-sys-color-outline:                  #73777f;
+    --md-sys-color-outline-variant:          #c3c7cf;
+    --md-sys-color-error:                    #ba1a1a;
+    --md-sys-color-on-error:                 #ffffff;
+    --md-sys-color-success:                  #146c43;
+    color-scheme: light;
+  }
 }
 
 body {
@@ -92,11 +143,25 @@ body {
 /* meta-icon: smaller variant used inside profile metadata rows */
 .meta-icon { font-size: 14px; }
 
+/* <md-dialog> uses native <dialog> internally with `margin: inherit`
+   on the inner dialog, so modal centering depends on the HOST element
+   having `margin: auto`. Our `* { margin: 0 }` reset above breaks that —
+   restore it explicitly. */
+md-dialog { margin: auto; }
+
+/* Hide slotted children of <md-dialog> until the custom element upgrades,
+   to prevent the slot content flashing in the light DOM. */
+md-dialog:not(:defined) > * { visibility: hidden; }
+md-filled-button:not(:defined),
+md-outlined-button:not(:defined),
+md-outlined-text-field:not(:defined),
+md-fab:not(:defined) { visibility: hidden; }
+
 /* ── Top bar ── */
 .topbar {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 6px 24px;
+  padding: 10px 24px;
 }
 .topbar-inner {
   max-width: 1040px;
@@ -104,8 +169,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 16px;
+  gap: 12px;
 }
+/* keep the FOUC guard from earlier — extend it for the new components */
+md-outlined-select:not(:defined),
+md-select-option:not(:defined),
+md-icon-button:not(:defined),
+md-outlined-icon-button:not(:defined) { visibility: hidden; }
 .topbar-label {
   font-size: 11px;
   color: var(--text-muted);
@@ -116,23 +186,32 @@ body {
   position: relative;
 }
 .topbar-user[hidden] { display: none; }
+/* Sign-in: matches the 40px height of the language select + theme toggle
+   for visual rhythm in the topbar. M3 outlined-button shape (8px radius)
+   and on-surface-variant outline mirror the language-select chrome. */
 .topbar-signin-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  height: 40px;
   background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 5px 12px;
-  border-radius: 6px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 16px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    border-color     var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    color            var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
+.topbar-signin-btn .material-symbols-outlined { font-size: 18px; }
 .topbar-signin-btn:hover {
-  border-color: var(--accent);
-  color: var(--text);
+  border-color: var(--md-sys-color-on-surface-variant);
+  color: var(--md-sys-color-on-surface);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
 }
 .topbar-signin-btn[hidden] { display: none; }
 .topbar-avatar-btn {
@@ -186,29 +265,50 @@ body {
   transition: border-color 0.15s, color 0.15s;
 }
 .topbar-signout:hover { border-color: var(--accent); color: var(--accent); }
-.lang-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+/* ── M3 outlined select for language ──
+   In @material/web 1.5.1, <md-outlined-select> wraps an internal
+   <md-outlined-field>, so the *field-level* tokens are what actually
+   drive the visible chrome. The `--md-outlined-select-text-field-*`
+   names from the docs are aliases that don't fully reach the inner
+   field-height token; we set both for safety. */
+.lang-select {
+  /* Field-level tokens (the ones that actually take effect in 1.5.1) */
+  --md-outlined-field-container-height:                       40px;
+  --md-outlined-field-container-shape:                        8px;
+  --md-outlined-field-label-text-size:                        11px;
+  --md-outlined-field-content-text-size:                      13px;
+  --md-outlined-field-outline-color:                          var(--md-sys-color-outline-variant);
+  --md-outlined-field-hover-outline-color:                    var(--md-sys-color-outline);
+  --md-outlined-field-content-color:                          var(--md-sys-color-on-surface);
+  --md-outlined-field-label-text-color:                       var(--md-sys-color-on-surface-variant);
+  /* Belt-and-braces alias — kept for forward-compat with future M3 versions */
+  --md-outlined-select-text-field-container-height:           40px;
+  --md-outlined-select-text-field-container-shape:            8px;
+  --md-outlined-select-text-field-label-text-size:            11px;
+  --md-outlined-select-text-field-input-text-size:            13px;
+  --md-outlined-select-text-field-trailing-icon-color:        var(--md-sys-color-on-surface-variant);
+  --md-outlined-select-text-field-focus-trailing-icon-color:  var(--md-sys-color-primary);
+  width: 144px;
 }
-.lang-btn {
-  background: none;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.5px;
-  transition: color 0.15s, background 0.15s;
+
+/* ── M3 outlined icon button for theme toggle ──
+   Visible circular outline; flips to filled "selected" state when light mode
+   is active (matches the Google Material reference). */
+.theme-toggle {
+  --md-outlined-icon-button-icon-size:                          20px;
+  --md-outlined-icon-button-container-shape:                    50%;
+  --md-outlined-icon-button-container-width:                    40px;
+  --md-outlined-icon-button-container-height:                   40px;
+  --md-outlined-icon-button-outline-color:                      var(--md-sys-color-outline);
+  --md-outlined-icon-button-icon-color:                         var(--md-sys-color-on-surface-variant);
+  --md-outlined-icon-button-hover-icon-color:                   var(--md-sys-color-on-surface);
+  --md-outlined-icon-button-selected-container-color:           var(--md-sys-color-primary);
+  --md-outlined-icon-button-selected-icon-color:                var(--md-sys-color-on-primary);
+  --md-outlined-icon-button-selected-hover-icon-color:          var(--md-sys-color-on-primary);
+  --md-outlined-icon-button-selected-focus-icon-color:          var(--md-sys-color-on-primary);
+  --md-outlined-icon-button-selected-pressed-icon-color:        var(--md-sys-color-on-primary);
 }
-.lang-btn:hover { color: var(--text); }
-.lang-btn.lang-active {
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-.lang-sep { color: var(--border); font-size: 12px; }
+.theme-toggle .material-symbols-outlined { font-size: 20px; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -263,6 +363,151 @@ a:hover { text-decoration: underline; }
 .meta-item svg,
 .meta-item .material-symbols-outlined { flex-shrink: 0; }
 
+/* ── Phone reveal (server-policy gated) ──
+   Default: masked + non-clickable + muted. After Google Sign-In with an
+   allow-listed domain, .contact-revealed flips it to a clickable link. */
+.meta-item-link {
+  text-decoration: none;
+  color: var(--text-secondary);
+  cursor: default;
+  transition: color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+.meta-item-link[aria-disabled="true"] {
+  cursor: help;
+  opacity: 0.85;
+}
+.meta-item-link.contact-revealed {
+  color: var(--accent);
+  cursor: pointer;
+}
+.meta-item-link.contact-revealed:hover { text-decoration: underline; }
+.contact-reveal-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-radius: 999px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.contact-reveal-badge[hidden] { display: none; }
+
+/* ── Location popover ──
+   Pure CSS hover/focus reveal. Content is populated and ticked by
+   initLocationPopover() in main.js. */
+.meta-item-location {
+  position: relative;
+  cursor: help;
+  outline: none;
+}
+.meta-item-location .meta-location-label {
+  border-bottom: 1px dotted var(--md-sys-color-outline-variant);
+}
+.meta-item-location:hover .meta-location-label,
+.meta-item-location:focus-visible .meta-location-label {
+  border-bottom-color: var(--md-sys-color-on-surface-variant);
+}
+.loc-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  min-width: 240px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized-decelerate),
+              transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized-decelerate);
+  z-index: 50;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.meta-item-location:hover .loc-popover,
+.meta-item-location:focus-visible .loc-popover,
+.loc-popover:hover {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+/* Tiny arrow pointing back at the location label. */
+.loc-popover::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: var(--md-sys-color-surface-container-highest);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  border-left: 1px solid var(--md-sys-color-outline-variant);
+}
+.loc-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.loc-popover-icon { font-size: 16px; color: var(--md-sys-color-on-surface-variant); }
+.loc-popover-time {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.loc-popover-tz {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-transform: uppercase;
+  margin-left: 2px;
+}
+.loc-popover-delta {
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.loc-popover-status {
+  font-size: 12px;
+  font-weight: 500;
+}
+.loc-popover-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--md-sys-color-outline);
+}
+.loc-popover-status[data-status="working"]   .loc-popover-dot { background: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18); }
+.loc-popover-status[data-status="late"]      .loc-popover-dot { background: #ffb74d; box-shadow: 0 0 0 3px rgba(255, 183, 77, 0.18); }
+.loc-popover-status[data-status="asleep"]    .loc-popover-dot { background: #8e909a; }
+.loc-popover-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--md-sys-color-primary);
+  text-decoration: none;
+}
+.loc-popover-link .material-symbols-outlined { font-size: 14px; }
+.loc-popover-link:hover { text-decoration: underline; }
+
 .exp-badge {
   background: var(--accent-soft);
   border: 1px solid var(--accent);
@@ -287,112 +532,107 @@ a:hover { text-decoration: underline; }
   margin-top: 4px;
 }
 
-/* ── Hire Me Button (from Figma: #0070D2) ── */
-.hire-me-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-  padding: 10px 24px;
-  background: #0070D2;
-  color: #FFFFFF;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
+/* ── Filled buttons — branded colors ──
+   M3 dark theme defaults to a pale primary container which looks washed out
+   for our primary CTAs. Override the M3 tokens (still going through <md-filled-button>)
+   to use the vibrant Salesforce-blue brand color with white label + icon. */
+.hire-me-btn,
+.hm-submit {
+  --md-filled-button-container-height: 48px;
+  --md-filled-button-container-color: #0070D2;
+  --md-filled-button-label-text-color: #ffffff;
+  --md-filled-button-icon-color: #ffffff;
+  --md-filled-button-hover-label-text-color: #ffffff;
+  --md-filled-button-hover-icon-color: #ffffff;
+  --md-filled-button-pressed-label-text-color: #ffffff;
+  --md-filled-button-pressed-icon-color: #ffffff;
+  --md-filled-button-focus-label-text-color: #ffffff;
+  --md-filled-button-focus-icon-color: #ffffff;
+  --md-filled-button-hover-state-layer-color: #ffffff;
+  --md-filled-button-pressed-state-layer-color: #ffffff;
+  --md-filled-button-label-text-weight: 600;
+  --md-filled-button-label-text-size: 14px;
+  /* Generous horizontal padding — M3 default crams icon+label tightly.
+     Bumped further so the button has visible breathing room around both
+     the icon and the label. */
+  --md-filled-button-leading-space: 28px;
+  --md-filled-button-trailing-space: 28px;
+  --md-filled-button-with-leading-icon-leading-space: 24px;
+  --md-filled-button-with-leading-icon-trailing-space: 28px;
+  /* Gap between the leading icon and the label text (M3 default is 8px) */
+  --md-filled-button-with-icon-spacing: 12px;
+  --md-filled-button-icon-size: 20px;
+  /* Slotted content (the inner <span>) inherits color from the host. */
+  color: #ffffff;
 }
-.hire-me-btn:hover { background: #005fb2; }
+/* Belt-and-braces — some 1.x builds slot the icon container with its own
+   margin instead of honouring --md-filled-button-with-icon-spacing.
+   This selector pads any [slot="icon"] inside our brand buttons. */
+.hire-me-btn [slot="icon"],
+.hm-submit  [slot="icon"] { margin-inline-end: 4px; }
 
-/* ── Modal Overlay (from Figma: #000000 at 60% opacity) ── */
-.hm-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+.hire-me-btn { margin-top: 20px; }
+
+/* ── Hire-Me <md-dialog> sizing ── */
+#hireMeOverlay {
+  --md-dialog-container-color: var(--md-sys-color-surface-container-high);
+  --md-dialog-headline-color: var(--md-sys-color-on-surface);
+  --md-dialog-headline-size: 22px;
+  --md-dialog-headline-weight: 600;
+  --md-dialog-supporting-text-color: var(--md-sys-color-on-surface-variant);
+  min-width: 420px;
+}
+/* Pad the slotted headline + content for breathing room
+   (M3 default content padding is fairly tight). */
+#hireMeOverlay [slot="headline"] { padding: 8px 8px 4px; }
+#hireMeOverlay [slot="content"]  { padding: 8px 8px 16px; }
+
+/* Headline row (title + close button) */
+.hm-headline {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 16px;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 4px;
 }
-.hm-overlay[hidden] { display: none; }
-
-/* ── Modal Card (from Figma: 480×600, #1C2333, radius 12px) ── */
-.hm-modal {
-  background: #1C2333;
-  border-radius: 12px;
-  padding: 32px;
-  width: 100%;
-  max-width: 480px;
-  position: relative;
-  max-height: 90vh;
-  overflow-y: auto;
+#hm-title-text {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  letter-spacing: -0.01em;
 }
-
-/* ── Close button ── */
 .hm-close {
-  position: absolute;
-  top: 16px;
-  right: 20px;
   background: none;
   border: none;
-  color: #7A8A9E;
+  color: var(--md-sys-color-on-surface-variant);
   font-size: 22px;
   cursor: pointer;
   line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+              color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
-.hm-close:hover { color: #E8EAF0; }
-
-/* ── Title (from Figma: Inter Bold 20px, #E8EAF0) ── */
-.hm-title {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  color: #E8EAF0;
-  margin: 0 0 8px;
+.hm-close:hover {
+  color: var(--md-sys-color-on-surface);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
 
-/* ── Subtitle (from Figma: Inter Bold 13px, #7A8A9E) ── */
 .hm-subtitle {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 13px;
-  font-weight: 700;
-  color: #7A8A9E;
-  margin: 0 0 24px;
+  font-weight: 400;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 4px 0 20px;
+  line-height: 1.5;
 }
 
-/* ── Field wrapper ── */
-.hm-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
-.hm-field label {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: #C0CDD8;
-}
-.hm-field label span { color: #E05252; }
-
-/* ── Inputs (from Figma: 416×40, #111827, stroke #2E3A50 1px) ── */
-.hm-field input,
-.hm-field textarea {
-  width: 100%;
-  height: 40px;
-  background: #111827;
-  border: 1px solid #2E3A50;
-  border-radius: 6px;
-  padding: 0 12px;
-  color: #E8EAF0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 13px;
-  transition: border-color 0.15s;
-}
-.hm-field textarea { height: 80px; padding: 10px 12px; resize: none; }
-.hm-field input:focus,
-.hm-field textarea:focus { outline: none; border-color: #0070D2; }
-.hm-field input.hm-err { border-color: #E05252; }
-
-.hm-error { font-size: 11px; color: #E05252; min-height: 14px; }
+/* Field wrapper — provides spacing around <md-outlined-text-field> instances. */
+.hm-field { margin-bottom: 16px; }
+.hm-field md-outlined-text-field { width: 100%; }
 
 /* ── Privacy notice ── */
 .hm-privacy {
@@ -402,22 +642,9 @@ a:hover { text-decoration: underline; }
   line-height: 1.5;
 }
 
-/* ── Send Message button (from Figma: 416×44, #0070D2, radius 6px, Inter Bold 13px) ── */
-.hm-submit {
-  width: 100%;
-  height: 44px;
-  background: #0070D2;
-  color: #FFFFFF;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.hm-submit:hover:not(:disabled) { background: #005fb2; }
-.hm-submit:disabled { background: #2E3A50; color: #7A8A9E; cursor: not-allowed; }
+/* "Send Message" stretches across the form; brand colors come from
+   the shared .hire-me-btn / .hm-submit rule above. */
+.hm-submit { width: 100%; }
 
 /* ── Success + Global Error ── */
 .hm-success { text-align: center; padding: 24px 0; color: #4CAF8A; font-size: 15px; font-weight: 600; }
@@ -600,17 +827,19 @@ a:hover { text-decoration: underline; }
 }
 
 .project-tag {
-  display: inline-block;
-  background: #1e2d4f;
-  color: var(--accent);
-  border-radius: 4px;
-  padding: 1px 7px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: 8px;
+  padding: 4px 10px;
   font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  margin-bottom: 8px;
-  border: 1px solid #2b3d6b;
+  margin-bottom: 10px;
+  border: none;
+  line-height: 1.3;
 }
 
 /* ── Timeline connector ── */
@@ -652,28 +881,15 @@ a:hover { text-decoration: underline; }
 }
 .chat-launcher[hidden] { display: none; }
 
-/* FAB button */
-.chat-fab {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #0070D2;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
+/* FAB wrapper — anchors the "online" ping dot on top of the <md-fab>.
+   Sizing/color/elevation come from <md-fab> itself (M3 defaults). */
+.chat-fab-wrap {
   position: relative;
-  transition: background 0.2s, transform 0.2s;
+  display: inline-block;
+  line-height: 0;
 }
-.chat-fab:hover { background: #005fb2; transform: scale(1.06); }
-.chat-fab .chat-fab-icon { font-size: 24px; }
-.chat-fab .chat-fab-icon-close { font-size: 22px; font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24; }
-.chat-fab { transition: background var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
-                        transform  var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard); }
 
-/* ping animation on FAB */
+/* "online" ping animation, positioned over the FAB */
 .chat-fab-ping {
   position: absolute;
   top: 4px;
@@ -681,8 +897,9 @@ a:hover { text-decoration: underline; }
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #3ecf8e;
-  border: 2px solid #0f1117;
+  background: var(--md-sys-color-success);
+  border: 2px solid var(--md-sys-color-surface);
+  pointer-events: none;
   animation: ping 2s ease-in-out 5.5s 3;
 }
 @keyframes ping {
@@ -690,16 +907,18 @@ a:hover { text-decoration: underline; }
   50%       { transform: scale(1.5); opacity: 0.6; }
 }
 
-/* Teaser bubble */
+/* Teaser bubble — themed via M3 tokens so it adapts to light/dark. */
 .chat-teaser {
-  background: #1C2333;
-  border: 1px solid var(--border);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 12px;
   padding: 14px 16px;
   max-width: 240px;
   position: relative;
   animation: teaserIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: bottom right;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
 .chat-teaser[hidden] { display: none; }
 
@@ -715,9 +934,9 @@ a:hover { text-decoration: underline; }
   right: 20px;
   width: 12px;
   height: 12px;
-  background: #1C2333;
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  background: var(--md-sys-color-surface-container-highest);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   transform: rotate(45deg);
 }
 
@@ -736,7 +955,7 @@ a:hover { text-decoration: underline; }
 
 .chat-teaser-text {
   font-size: 13px;
-  color: var(--text);
+  color: var(--md-sys-color-on-surface);
   line-height: 1.5;
   margin-bottom: 10px;
   padding-right: 16px;
@@ -744,14 +963,14 @@ a:hover { text-decoration: underline; }
 
 .chat-teaser-cta {
   background: #0070D2;
-  color: #fff;
+  color: #ffffff;
   border: none;
   border-radius: 6px;
-  padding: 7px 16px;
+  padding: 8px 16px;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
   width: 100%;
 }
 .chat-teaser-cta:hover { background: #005fb2; }
@@ -1097,100 +1316,86 @@ a:hover { text-decoration: underline; }
   font-size: 11.5px;
 }
 
-/* ── Welcome / Login Overlay ────────────────────────────────── */
-.welcome-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 12, 18, 0.88);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  z-index: 11000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+/* ── Welcome / Login <md-dialog> ─────────────────────────────── */
+#welcomeOverlay {
+  --md-dialog-container-color: var(--md-sys-color-surface-container-high);
+  min-width: 360px;
 }
-.welcome-overlay[hidden] { display: none; }
-.welcome-card {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 36px 32px 28px;
-  width: 100%;
-  max-width: 380px;
+/* Inner padding around slotted regions for breathing room. */
+#welcomeOverlay [slot="headline"] { padding: 12px 8px 8px; }
+#welcomeOverlay [slot="content"]  { padding: 8px 8px 16px; }
+.welcome-headline {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
 }
 .welcome-close {
-  position: absolute;
-  top: 10px;
-  right: 12px;
   background: transparent;
   border: 0;
-  color: var(--text-muted);
+  color: var(--md-sys-color-on-surface-variant);
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 6px;
-  transition: color 0.15s ease, background 0.15s ease;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 .welcome-close:hover {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--md-sys-color-on-surface);
+  background: rgba(255, 255, 255, var(--md-sys-state-hover-opacity));
 }
 .welcome-brand {
   display: flex;
   align-items: center;
   gap: 14px;
-  width: 100%;
 }
 .welcome-avatar {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: var(--accent-soft);
-  border: 2px solid var(--accent);
+  background: var(--md-sys-color-primary-container);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--md-sys-color-on-primary-container);
   flex-shrink: 0;
 }
 .welcome-title {
   font-size: 16px;
   font-weight: 700;
-  color: var(--text);
+  line-height: 1.25;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
 }
 .welcome-sub {
   font-size: 11.5px;
-  color: var(--text-muted);
-  margin-top: 2px;
+  line-height: 1.3;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-top: 4px;
 }
-.welcome-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  text-align: center;
-  line-height: 1.5;
-  margin: 0;
+.welcome-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-top: 4px;
 }
 .welcome-google-wrap {
-  width: 100%;
+  width: 280px; /* matches Google's renderButton({ width: 280 }) */
   display: flex;
   justify-content: center;
   min-height: 44px;
 }
 .welcome-sep {
-  width: 100%;
+  width: 280px;
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--text-muted);
+  color: var(--md-sys-color-on-surface-variant);
   font-size: 11px;
 }
 .welcome-sep::before,
@@ -1198,24 +1403,20 @@ a:hover { text-decoration: underline; }
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--border);
+  background: var(--md-sys-color-outline-variant);
 }
+/* "Maybe later" — exact same footprint as the Google sign-in button above. */
 .welcome-guest-btn {
-  width: 100%;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
+  width: 280px;
+  --md-outlined-button-container-height: 44px;
+  --md-outlined-button-label-text-color: var(--md-sys-color-on-surface);
+  --md-outlined-button-outline-color: var(--md-sys-color-outline);
+  --md-outlined-button-label-text-weight: 600;
 }
-.welcome-guest-btn:hover { border-color: var(--accent); color: var(--text); }
 .welcome-note {
-  font-size: 10.5px;
-  color: var(--text-muted);
+  width: 280px;
+  font-size: 11px;
+  color: var(--md-sys-color-on-surface-variant);
   text-align: center;
   margin: 0;
   line-height: 1.5;

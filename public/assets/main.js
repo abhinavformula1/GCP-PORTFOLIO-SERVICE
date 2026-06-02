@@ -47,6 +47,44 @@
     siteProfile = p;
     try { sessionStorage.setItem('portfolio_profile', JSON.stringify(p)); } catch (_) {}
     updateTopbarUser(p);
+    // The contact reveal lives in sessionStorage too — on reload we want the
+    // phone to stay revealed without re-asking the server until the token
+    // expires. We re-apply whatever the server last decided.
+    applyContactPolicy(p && p.contact);
+  }
+
+  /**
+   * Apply the server's contact-reveal decision to the DOM.
+   *
+   * Privacy note: the phone number itself only enters the page when the
+   * server explicitly returned it (i.e. the verified email matches an
+   * allow-listed domain). Any other path keeps the masked placeholder.
+   *
+   * @param {{canSeePhone: boolean, phone: string|null, matchedDomain: string|null}|null|undefined} contact
+   */
+  function applyContactPolicy(contact) {
+    var phoneRow   = document.getElementById('contactPhone');
+    var phoneText  = document.getElementById('contactPhoneText');
+    var phoneBadge = document.getElementById('contactPhoneBadge');
+    if (!phoneRow || !phoneText) return;
+
+    if (contact && contact.canSeePhone && contact.phone) {
+      phoneText.textContent = contact.phone;
+      phoneRow.setAttribute('href', 'tel:' + contact.phone.replace(/[^+\d]/g, ''));
+      phoneRow.classList.add('contact-revealed');
+      phoneRow.removeAttribute('aria-disabled');
+      if (phoneBadge) {
+        phoneBadge.textContent = 'Verified ' + contact.matchedDomain;
+        phoneBadge.hidden = false;
+      }
+    } else {
+      // Reset to the masked, non-clickable placeholder.
+      phoneText.textContent = '+91-xxxxxxxxxx';
+      phoneRow.removeAttribute('href');
+      phoneRow.classList.remove('contact-revealed');
+      phoneRow.setAttribute('aria-disabled', 'true');
+      if (phoneBadge) phoneBadge.hidden = true;
+    }
   }
 
   function updateTopbarUser(p) {
@@ -167,8 +205,16 @@
   function showWelcomeOverlay() {
     var overlay = document.getElementById('welcomeOverlay');
     if (!overlay) return;
-    overlay.removeAttribute('hidden');
-    // Render Google button once GIS loads
+    // <md-dialog> may not be upgraded yet (ESM module loads async from CDN).
+    if (customElements.get('md-dialog')) {
+      if (typeof overlay.show === 'function') overlay.show();
+      else overlay.removeAttribute('hidden');
+    } else {
+      customElements.whenDefined('md-dialog').then(function () {
+        if (typeof overlay.show === 'function') overlay.show();
+        else overlay.removeAttribute('hidden');
+      });
+    }
     if (window.google && window.google.accounts) {
       initGoogleSignIn();
     }
@@ -177,7 +223,9 @@
 
   function hideWelcomeOverlay() {
     var overlay = document.getElementById('welcomeOverlay');
-    if (overlay) overlay.setAttribute('hidden', '');
+    if (!overlay) return;
+    if (typeof overlay.close === 'function') overlay.close();
+    else overlay.setAttribute('hidden', '');
   }
 
   /* ── Welcome-Back Toast ──────────────────────────────────────
@@ -294,6 +342,14 @@
           profile.isReturning = !!data.isReturning;
           profile.visitCount  = data.visitCount  || 1;
           profile.lastSeenAt  = data.lastSeenAt  || null;
+          // Apply the server's contact-reveal decision. The phone number
+          // never lived in HTML — the server only returns it when the
+          // verified email belongs to an allow-listed org (google.com,
+          // salesforce.com). Any other path (guest / @gmail / random)
+          // gets contact.canSeePhone === false and the masked placeholder
+          // remains in place.
+          profile.contact = data.contact || null;
+          applyContactPolicy(profile.contact);
         }
         saveSiteProfile(profile);
 
@@ -637,16 +693,13 @@
 
   function setLang(lang) {
     currentLang = lang;
-    document.getElementById('langEN').classList.toggle('lang-active', lang === 'en');
-    document.getElementById('langFR').classList.toggle('lang-active', lang === 'fr');
-    // Update page content
+    var langSelect = document.getElementById('langSelect');
+    if (langSelect && langSelect.value !== lang) langSelect.value = lang;
     applyPageLang(lang);
-    // Update teaser bubble text
     var teaserText = document.querySelector('.chat-teaser-text');
     var teaserCta  = document.querySelector('.chat-teaser-cta');
     if (teaserText) teaserText.textContent = t().teaserText;
     if (teaserCta)  teaserCta.textContent  = t().teaserCta;
-    // If assistant is open, restart it in the new language
     var overlay = document.getElementById('assistantOverlay');
     if (!overlay.hasAttribute('hidden')) {
       openAssistant();
@@ -654,15 +707,249 @@
   }
   window.setLang = setLang;
 
+  /**
+   * Inject a stylesheet into a custom element's shadow root.
+   *
+   * Several @material/web@1.5.1 components (notably <md-outlined-select>'s
+   * internal field height and <md-filled-button>'s internal padding) have
+   * baked-in values that the *public* CSS custom-property tokens don't
+   * actually override. We reach into the shadow DOM via `adoptedStyleSheets`
+   * — the modern Web-Components-friendly equivalent of `!important` — and
+   * fall back to a plain <style> on browsers without constructable
+   * stylesheet support.
+   *
+   * Idempotent and silent on failure: each call still works if a previous
+   * sheet was already adopted.
+   */
+  function injectShadowStyle(host, css) {
+    if (!host || !host.shadowRoot) return;
+    var sr = host.shadowRoot;
+    try {
+      if (typeof CSSStyleSheet === 'function' && Array.isArray(sr.adoptedStyleSheets)) {
+        var sheet = new CSSStyleSheet();
+        sheet.replaceSync(css);
+        sr.adoptedStyleSheets = sr.adoptedStyleSheets.concat([sheet]);
+        return;
+      }
+    } catch (_) { /* fall through to <style> fallback */ }
+    var style = document.createElement('style');
+    style.textContent = css;
+    sr.appendChild(style);
+  }
+
+  // Wire the M3 outlined-select to setLang. Listen on `change` (fires when
+  // the user picks an option from the dropdown menu).
+  //
+  // Also: force the inner <md-outlined-field>'s height to 40px so the
+  // select harmonises with the 40px theme-toggle and Sign-in button. The
+  // public --md-outlined-field-container-height token *is* set on the
+  // host, but @material/web@1.5.1 hard-codes a `min-height: 56px` on the
+  // internal field that the token doesn't override.
+  customElements.whenDefined('md-outlined-select').then(function () {
+    var langSelect = document.getElementById('langSelect');
+    if (!langSelect) return;
+    langSelect.addEventListener('change', function () {
+      setLang(langSelect.value);
+    });
+    injectShadowStyle(
+      langSelect,
+      'md-outlined-field { min-height: 40px !important; height: 40px !important; }'
+    );
+  });
+
+  // Force breathing space inside <md-filled-button> for our two brand
+  // buttons (.hire-me-btn and .hm-submit). In @material/web@1.5.1, the
+  // inner `<button class="button">` rendered into the shadow DOM has zero
+  // horizontal padding and an 8px icon-label gap baked into the component
+  // stylesheet — the public --md-filled-button-leading-space / -with-icon-
+  // spacing tokens don't actually reach it. We use the same shadow-DOM
+  // injection trick as the language select to add real padding + a wider
+  // icon-label gap, so our primary CTA reads as substantial instead of
+  // cramped.
+  var BRAND_BUTTON_CSS = [
+    '.button {',
+    '  padding-inline: 28px !important;',
+    '  gap: 12px !important;',
+    '}',
+    '.label { white-space: nowrap; }',
+  ].join('\n');
+  customElements.whenDefined('md-filled-button').then(function () {
+    document.querySelectorAll('.hire-me-btn, .hm-submit').forEach(function (btn) {
+      injectShadowStyle(btn, BRAND_BUTTON_CSS);
+    });
+  });
+
+  /* ── Theme toggle (light / dark) ──
+     Honours OS preference on first visit, then pins user choice in
+     localStorage. Driven by [data-theme="light"|"dark"] on <html>;
+     CSS swaps M3 color tokens which cascade to every brand alias. */
+  var THEME_KEY = 'portfolio_theme';
+  function applyTheme(theme) {
+    var root = document.documentElement;
+    if (theme === 'light' || theme === 'dark') {
+      root.setAttribute('data-theme', theme);
+    } else {
+      root.removeAttribute('data-theme');
+    }
+  }
+  function currentTheme() {
+    var stored = localStorage.getItem(THEME_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+  // Apply on boot (defensive — the boot script in index.html already does this
+  // pre-paint, but we re-sync in case the toggle's `selected` state changes).
+  applyTheme(currentTheme());
+
+  customElements.whenDefined('md-outlined-icon-button').then(function () {
+    var btn = document.getElementById('themeToggleBtn');
+    if (!btn) return;
+    var isLight = currentTheme() === 'light';
+    btn.selected = isLight;
+    btn.setAttribute('aria-label', isLight ? 'Switch to dark mode' : 'Switch to light mode');
+    btn.addEventListener('change', function () {
+      var nextTheme = btn.selected ? 'light' : 'dark';
+      applyTheme(nextTheme);
+      localStorage.setItem(THEME_KEY, nextTheme);
+      btn.setAttribute(
+        'aria-label',
+        btn.selected ? 'Switch to dark mode' : 'Switch to light mode'
+      );
+    });
+  });
+
   /* ── Chat Launcher ── */
   var teaserShown = false;
+
+  /* ── Location popover (timezone-aware) ──
+     Shows Abhinav's current local time, the delta vs the viewer's resolved
+     timezone, and a working-hours status pill. Pure browser primitives —
+     Intl + Date + setInterval, no API keys, no network calls.
+
+     Why this matters for a recruiter: timezone is the first practical
+     question on every remote-hire conversation. Answering it inline
+     removes a step from their workflow. */
+  function initLocationPopover() {
+    var el = document.getElementById('contactLocation');
+    if (!el) return;
+
+    var timeEl   = document.getElementById('locPopoverTime');
+    var deltaEl  = document.getElementById('locPopoverDelta');
+    var statusEl = document.getElementById('locPopoverStatus');
+    var statusTextEl = document.getElementById('locPopoverStatusText');
+    if (!timeEl || !deltaEl || !statusEl || !statusTextEl) return;
+
+    var IST_TZ = 'Asia/Kolkata';
+    // 9 AM – 8 PM IST = comfortable working window.
+    var WORKING_START_HOUR = 9;
+    var WORKING_END_HOUR   = 20;
+
+    // Resolve the viewer's timezone via Intl. Falls back gracefully on
+    // ancient browsers; on undetectable TZs we just hide the delta line.
+    var viewerTz = '';
+    try { viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_) {}
+
+    /** Format the IST hour:minute as HH:MM (24h, locale-stable). */
+    function formatIstHHMM(now) {
+      try {
+        return new Intl.DateTimeFormat('en-GB', {
+          timeZone: IST_TZ, hour: '2-digit', minute: '2-digit', hour12: false,
+        }).format(now);
+      } catch (_) {
+        return '--:--';
+      }
+    }
+
+    /** Returns the integer "hour" in the IST timezone for status logic. */
+    function istHour(now) {
+      try {
+        return parseInt(new Intl.DateTimeFormat('en-GB', {
+          timeZone: IST_TZ, hour: '2-digit', hour12: false,
+        }).format(now), 10);
+      } catch (_) {
+        return -1;
+      }
+    }
+
+    /** Compute the offset (in hours, signed) between IST and the viewer's TZ.
+     *  Uses the formatToParts trick to ask Intl for the IST time and the
+     *  viewer's local time at the same instant, then diffs them.
+     *  Stable across DST transitions — we recompute on every tick. */
+    function computeDeltaHours(now) {
+      if (!viewerTz) return null;
+      try {
+        function localOffsetMinutes(tz) {
+          // Build a "wall clock" Date as if the instant were in `tz`, then
+          // diff it from the actual UTC instant to recover the offset.
+          var dtf = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz, hourCycle: 'h23',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+          });
+          var parts = dtf.formatToParts(now).reduce(function (acc, p) {
+            if (p.type !== 'literal') acc[p.type] = p.value; return acc;
+          }, {});
+          var asUTC = Date.UTC(
+            +parts.year, +parts.month - 1, +parts.day,
+            +parts.hour, +parts.minute, +parts.second
+          );
+          return (asUTC - now.getTime()) / 60000;
+        }
+        var istMin    = localOffsetMinutes(IST_TZ);
+        var viewerMin = localOffsetMinutes(viewerTz);
+        return (istMin - viewerMin) / 60;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function formatDelta(hours) {
+      if (hours == null) return '';
+      if (Math.abs(hours) < 0.01) return 'Same timezone as you';
+      var rounded = Math.round(hours * 2) / 2;
+      var abs = Math.abs(rounded);
+      var label = (abs % 1 === 0 ? abs.toFixed(0) : abs.toFixed(1)) + ' h';
+      return rounded > 0
+        ? label + ' ahead of you'
+        : label + ' behind you';
+    }
+
+    function updateStatus(hour) {
+      var status, label;
+      if (hour < 0) {                                 status = 'asleep';  label = '—'; }
+      else if (hour >= WORKING_START_HOUR && hour < WORKING_END_HOUR) { status = 'working'; label = 'Working hours'; }
+      else if (hour >= WORKING_END_HOUR  && hour < 23) { status = 'late';    label = 'Late evening'; }
+      else                                            { status = 'asleep';  label = 'Likely asleep'; }
+      statusEl.setAttribute('data-status', status);
+      statusTextEl.textContent = label;
+    }
+
+    function tick() {
+      var now = new Date();
+      timeEl.textContent  = formatIstHHMM(now);
+      deltaEl.textContent = formatDelta(computeDeltaHours(now));
+      updateStatus(istHour(now));
+    }
+
+    tick();
+    // Update once a minute. setInterval is fine here — the page lives for
+    // the duration of a recruiter's visit, no need for visibilitychange games.
+    setInterval(tick, 60 * 1000);
+  }
 
   // Populate page content in default language on load
   applyPageLang('en');
 
+  // Initialise the location popover (independent of sign-in state).
+  initLocationPopover();
+
   // Restore topbar user if session exists
   if (siteProfile) {
     updateTopbarUser(siteProfile);
+    // Re-apply the cached server contact-reveal decision so a returning
+    // signed-in viewer's phone stays revealed across reloads (until token
+    // expiry / sign-out clears the profile).
+    applyContactPolicy(siteProfile.contact);
     // Show the once-per-session welcome toast for signed-in (non-guest) users
     if (siteProfile.type !== 'guest' && siteProfile.name) {
       // Defer to next tick so DOM/CSS are settled before the slide-in
@@ -687,6 +974,19 @@
       hideWelcomeOverlay();
     });
   }
+
+  // Catch-all: if the welcome <md-dialog> closes for ANY reason (Esc key,
+  // scrim click, Maybe later, X) and we still don't have a profile, default
+  // to a guest session so the topbar Sign-in button reveals itself.
+  customElements.whenDefined('md-dialog').then(function () {
+    var welcomeOverlay = document.getElementById('welcomeOverlay');
+    if (!welcomeOverlay) return;
+    welcomeOverlay.addEventListener('close', function () {
+      if (!siteProfile) {
+        saveSiteProfile({ type: 'guest' });
+      }
+    });
+  });
 
   // Top-bar "Sign in" button — re-opens the welcome overlay so guests can
   // upgrade to a signed-in session at any time.
@@ -776,22 +1076,20 @@
     }, 600);
   }, 5000);
 
+  function setFabIcon(name) {
+    var icon = document.getElementById('chatFabIcon');
+    if (icon) icon.textContent = name;
+  }
+
   function showTeaser() {
     teaserShown = true;
-    var teaser = document.getElementById('chatTeaser');
-    teaser.removeAttribute('hidden');
-    var openIcon  = document.querySelector('.chat-fab-icon-open');
-    var closeIcon = document.querySelector('.chat-fab-icon-close');
-    openIcon.style.display  = 'none';
-    closeIcon.style.display = '';
+    document.getElementById('chatTeaser').removeAttribute('hidden');
+    setFabIcon('close');
   }
 
   function hideTeaser() {
     document.getElementById('chatTeaser').setAttribute('hidden', '');
-    var openIcon  = document.querySelector('.chat-fab-icon-open');
-    var closeIcon = document.querySelector('.chat-fab-icon-close');
-    openIcon.style.display  = '';
-    closeIcon.style.display = 'none';
+    setFabIcon('chat');
   }
 
   function toggleChatTeaser() {
@@ -889,8 +1187,7 @@
     document.getElementById('assistantOverlay').setAttribute('hidden', '');
     var launcher = document.getElementById('chatLauncher');
     launcher.removeAttribute('hidden');
-    document.querySelector('.chat-fab-icon-open').style.display = '';
-    document.querySelector('.chat-fab-icon-close').style.display = 'none';
+    setFabIcon('chat');
   }
   window.minimiseAssistant = minimiseAssistant;
 
@@ -1311,9 +1608,28 @@
      LEGACY HIRE ME MODAL (kept as-is)
   ═══════════════════════════════════════════════════════════ */
 
+  // Open an <md-dialog>, waiting for the custom element to be upgraded
+  // (the @material/web ESM script loads asynchronously from CDN, so
+  // .show() may not yet exist on first render).
+  function whenMdDialogReady(cb) {
+    if (customElements.get('md-dialog')) { cb(); return; }
+    customElements.whenDefined('md-dialog').then(cb);
+  }
+
+  function openHireMe() {
+    var overlay = document.getElementById('hireMeOverlay');
+    if (!overlay) return;
+    whenMdDialogReady(function () {
+      if (typeof overlay.show === 'function') overlay.show();
+      else overlay.removeAttribute('hidden');
+    });
+  }
+  window.openHireMe = openHireMe;
+
   function closeHireMe() {
-    const overlay = document.getElementById('hireMeOverlay');
-    overlay.setAttribute('hidden', '');
+    var overlay = document.getElementById('hireMeOverlay');
+    if (typeof overlay.close === 'function') overlay.close();
+    else overlay.setAttribute('hidden', '');
     document.getElementById('hireMeForm').reset();
     ['hm-name', 'hm-email', 'hm-company'].forEach(function (id) {
       clearErr(id);
@@ -1322,31 +1638,36 @@
     document.getElementById('hm-success').hidden = true;
     document.getElementById('hireMeForm').hidden = false;
     document.getElementById('hm-submit-btn').disabled = false;
+    var lbl = document.getElementById('hm-submit-label');
+    if (lbl) lbl.textContent = 'Send Message';
   }
   window.closeHireMe = closeHireMe;
 
-  // Close on overlay background click
-  document.getElementById('hireMeOverlay').addEventListener('click', function (e) {
-    if (e.target === this) closeHireMe();
-  });
-
-  // Close on Escape key
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeHireMe();
+  // <md-dialog> handles outside-click (scrim) and Escape key natively.
+  // Listen for its `close` event to clean up form state.
+  document.getElementById('hireMeOverlay').addEventListener('close', function () {
+    document.getElementById('hireMeForm').reset();
+    ['hm-name', 'hm-email', 'hm-company'].forEach(clearErr);
+    document.getElementById('hm-global-error').hidden = true;
+    document.getElementById('hm-success').hidden = true;
+    document.getElementById('hireMeForm').hidden = false;
+    document.getElementById('hm-submit-btn').disabled = false;
+    var lbl = document.getElementById('hm-submit-label');
+    if (lbl) lbl.textContent = 'Send Message';
   });
 
   function setErr(fieldId, msg) {
-    var input = document.getElementById(fieldId);
-    var errEl = document.getElementById(fieldId + '-err');
-    if (input) input.classList.add('hm-err');
-    if (errEl) errEl.textContent = msg;
+    var field = document.getElementById(fieldId);
+    if (!field) return;
+    field.error = true;
+    field.errorText = msg;
   }
 
   function clearErr(fieldId) {
-    var input = document.getElementById(fieldId);
-    var errEl = document.getElementById(fieldId + '-err');
-    if (input) input.classList.remove('hm-err');
-    if (errEl) errEl.textContent = '';
+    var field = document.getElementById(fieldId);
+    if (!field) return;
+    field.error = false;
+    field.errorText = '';
   }
 
   function validate() {
@@ -1371,9 +1692,10 @@
     if (!validate()) return;
 
     var btn       = document.getElementById('hm-submit-btn');
+    var btnLabel  = document.getElementById('hm-submit-label');
     var globalErr = document.getElementById('hm-global-error');
     btn.disabled = true;
-    btn.textContent = 'Sending\u2026';
+    if (btnLabel) btnLabel.textContent = 'Sending\u2026';
     globalErr.hidden = true;
 
     var payload = {
@@ -1402,13 +1724,13 @@
         globalErr.textContent = (data && data.error) || t().errors.generic;
         globalErr.hidden = false;
         btn.disabled = false;
-        btn.textContent = 'Send Message';
+        if (btnLabel) btnLabel.textContent = 'Send Message';
       }
     } catch (_) {
       globalErr.textContent = 'Network error. Please check your connection and try again.';
       globalErr.hidden = false;
       btn.disabled = false;
-      btn.textContent = 'Send Message';
+      if (btnLabel) btnLabel.textContent = 'Send Message';
     }
   });
 })();
