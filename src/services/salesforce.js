@@ -85,9 +85,13 @@ async function getToken() {
   return _tokenCache;
 }
 
-// ── Salesforce REST POST ──────────────────────────────────────────────────────
-function sfPost(instanceUrl, accessToken, sobjectPath, payload) {
-  const body = JSON.stringify(payload);
+// ── Salesforce REST helper ────────────────────────────────────────────────────
+//
+// Generic JSON request to a /sobjects/... endpoint. Used for both POST (create)
+// and PATCH (External-ID upsert). Returns { status, data } where data is the
+// parsed JSON body (or {} for empty 204 responses).
+function sfRequest(method, instanceUrl, accessToken, sobjectPath, payload) {
+  const body = payload ? JSON.stringify(payload) : '';
   const url  = new URL(
     `/services/data/${config.salesforce.apiVersion}/sobjects/${sobjectPath}`,
     instanceUrl
@@ -98,7 +102,7 @@ function sfPost(instanceUrl, accessToken, sobjectPath, payload) {
       {
         hostname: url.hostname,
         path:     url.pathname,
-        method:   'POST',
+        method,
         headers:  {
           'Authorization':  `Bearer ${accessToken}`,
           'Content-Type':   'application/json',
@@ -109,6 +113,8 @@ function sfPost(instanceUrl, accessToken, sobjectPath, payload) {
         let raw = '';
         res.on('data', (chunk) => (raw += chunk));
         res.on('end', () => {
+          // 204 No Content → upsert updated existing record, no body
+          if (!raw) return resolve({ status: res.statusCode, data: {} });
           try {
             resolve({ status: res.statusCode, data: JSON.parse(raw) });
           } catch (e) {
@@ -118,10 +124,15 @@ function sfPost(instanceUrl, accessToken, sobjectPath, payload) {
       }
     );
     req.on('error', (e) => reject(new SalesforceError(`SF network error: ${e.message}`)));
-    req.write(body);
+    if (body) req.write(body);
     req.end();
   });
 }
+
+const sfPost  = (instanceUrl, accessToken, path, payload) =>
+  sfRequest('POST',  instanceUrl, accessToken, path, payload);
+const sfPatch = (instanceUrl, accessToken, path, payload) =>
+  sfRequest('PATCH', instanceUrl, accessToken, path, payload);
 
 // ── Public API ────────────────────────────────────────────────────────────────
 /**
@@ -173,4 +184,84 @@ async function createInquiry(data, retry = true) {
   return { id: result.id, duplicate: false };
 }
 
-module.exports = { createInquiry };
+/**
+ * Upserts a Site_Visitor__c record keyed by the Google `sub` (uid).
+ *
+ *   PATCH /sobjects/Site_Visitor__c/Google_UID__c/{uid}
+ *
+ * The External-ID upsert pattern is idempotent — Salesforce creates the
+ * record if no match is found, otherwise updates the existing one. Same
+ * uid signing in 50 times → still exactly one record.
+ *
+ * Inputs:
+ *   uid          (string)  Google sub claim — partition key
+ *   email        (string)
+ *   name         (string)
+ *   firstSeenAt  (number, epoch-ms or null)
+ *   lastSeenAt   (number, epoch-ms or null)
+ *   visitCount   (number)
+ *
+ * Returns: { id, created } or { skipped: true } when SF auth isn't
+ * configured locally. Never throws — Cloud Run sign-in must not fail
+ * just because Salesforce is unreachable.
+ */
+async function upsertSiteVisitor({ uid, email, name, firstSeenAt, lastSeenAt, visitCount }, retry = true) {
+  if (!isConfigured()) {
+    console.log('[salesforce] SF not configured — skipping Site_Visitor upsert');
+    return { skipped: true };
+  }
+  if (!uid) {
+    throw new SalesforceError('upsertSiteVisitor requires a uid');
+  }
+
+  const { accessToken, instanceUrl } = await getToken();
+
+  const payload = {
+    Email__c:        email || null,
+    Name__c:         name  || null,
+    Last_Seen__c:    lastSeenAt  ? new Date(lastSeenAt).toISOString()  : new Date().toISOString(),
+    Visit_Count__c:  typeof visitCount === 'number' ? visitCount : 1,
+  };
+  // Only set First_Seen__c on first sight — never overwrite it on later upserts.
+  // Salesforce upsert semantics: omitted fields are left untouched, so we send
+  // it only when we know this is the first visit.
+  if (firstSeenAt) {
+    payload.First_Seen__c = new Date(firstSeenAt).toISOString();
+  }
+
+  const path = `Site_Visitor__c/Google_UID__c/${encodeURIComponent(uid)}`;
+  const { status, data: result } = await sfPatch(instanceUrl, accessToken, path, payload);
+
+  if (status === 401 && retry) {
+    _tokenCache = null;
+    return upsertSiteVisitor(
+      { uid, email, name, firstSeenAt, lastSeenAt, visitCount },
+      false
+    );
+  }
+
+  // 201 Created (new) or 204 No Content (updated existing) are both success.
+  if (status === 201) {
+    console.log(`[salesforce] Site_Visitor__c created for uid=${uid} (id=${result.id})`);
+    return { id: result.id, created: true };
+  }
+  if (status === 204 || status === 200) {
+    console.log(`[salesforce] Site_Visitor__c updated for uid=${uid}`);
+    return { id: null, created: false };
+  }
+
+  const msg = Array.isArray(result) ? result[0]?.message : JSON.stringify(result);
+  throw new SalesforceError(`Site_Visitor upsert failed (HTTP ${status})`, msg);
+}
+
+// Lightweight check — used by routes to decide whether to even try SF.
+// Reads raw env (not the config getters, which throw on missing values).
+function isConfigured() {
+  return !!(
+    process.env.SF_CLIENT_ID &&
+    process.env.SF_USERNAME &&
+    process.env.SF_PRIVATE_KEY
+  );
+}
+
+module.exports = { createInquiry, upsertSiteVisitor, isConfigured };
