@@ -88,14 +88,16 @@ const config = {
 
   // ── Salesforce → GCP callback secret ───────────────────────────────
   // The Apex trigger on Recommendation__c calls back into Cloud Run via
-  // a Named Credential when I post a reply. Cloud Run authenticates that
-  // call by comparing the X-SF-Callback-Secret header to this value.
+  // the SF Named Credential `Portfolio_Service` when I post a reply. The
+  // linked External Credential `GCP` sends the secret in the X-API-Key
+  // header on every callout — Cloud Run authenticates by constant-time
+  // compare against this value.
   //
   // Setup:
-  //   1. Generate once:   openssl rand -hex 32
-  //   2. Set on Cloud Run as SF_CALLBACK_SECRET
-  //   3. Set the SAME value on the Salesforce Named Credential's custom
-  //      header. The trigger sends it on every callout.
+  //   1. Copy the existing X-API-Key value off the SF External
+  //      Credential `GCP` → Custom Headers → X-API-Key.
+  //   2. Set it on Cloud Run as SF_CALLBACK_SECRET.
+  //   (Both sides MUST hold the exact same hex string.)
   //
   // If unset → the callback handler refuses every request (locked by default).
   sfCallback: {

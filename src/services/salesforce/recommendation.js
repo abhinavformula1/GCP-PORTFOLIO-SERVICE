@@ -3,7 +3,7 @@
 /**
  * Recommendation domain operation — VOLATILE layer.
  *
- * Calls the custom Apex REST endpoint at /services/apexrest/recommendation.
+ * Calls the custom Apex REST endpoint at /services/apexrest/testimonial.
  *
  * Dual-write context:
  *
@@ -21,13 +21,16 @@
  * Idempotency:
  *
  *   The submitter's Google uid is the External ID on
- *   Recommendation__c.Google_UID__c. Same person re-submitting → in-place
+ *   Testimonial__c.Google_UID__c. Same person re-submitting → in-place
  *   UPDATE, never a duplicate. This is the same pattern as siteVisitor.js
  *   but with a different external-id source (Google sub vs uid).
  *
- * Apex REST contract (mirrors RecommendationService.cls):
+ * Apex REST contract (mirrors TestimonialService.cls — note: the SF object
+ * is named Testimonial__c to avoid collision with the standard `Recommendation`
+ * sObject Salesforce ships for Einstein Next Best Action; the user-facing
+ * copy on the portfolio page still says "Recommendations"):
  *
- *   POST /services/apexrest/recommendation
+ *   POST /services/apexrest/testimonial
  *   {
  *     "googleUid":     "<google sub — REQUIRED, External Id>",
  *     "name":          "<full name>",
@@ -38,8 +41,8 @@
  *     "transactionId": "<correlation UUID>"
  *   }
  *
- *   → 201 { success:true, created:true,  recommendationId, googleUid }
- *   → 200 { success:true, created:false, recommendationId, googleUid }
+ *   → 201 { success:true, created:true,  testimonialId, googleUid }
+ *   → 200 { success:true, created:false, testimonialId, googleUid }
  *   → 400 { success:false, errorCode:"VALIDATION_ERROR" | "BAD_JSON" }
  *   → 502 { success:false, errorCode:"DML_ERROR" }
  *   → 500 { success:false, errorCode:"UNEXPECTED_ERROR" }
@@ -95,13 +98,13 @@ async function upsertRecommendation(data, opts = {}) {
     };
 
     const meta = {
-      apiName:       'Apex.RecommendationService.upsertRecommendation',
+      apiName:       'Apex.TestimonialService.upsertTestimonial',
       className:     'recommendation.js',
       transactionId: opts.transactionId || '',
     };
 
     const { status, data: result } = await sfApexPost(
-      instanceUrl, accessToken, 'recommendation', payload, meta
+      instanceUrl, accessToken, 'testimonial', payload, meta
     );
 
     if (status === 401 && allowTokenRetry) {
@@ -111,11 +114,11 @@ async function upsertRecommendation(data, opts = {}) {
 
     if ((status === 201 || status === 200) && result && result.success === true) {
       console.log(
-        `[salesforce] Recommendation__c ${result.created ? 'created' : 'updated'} ` +
-        `(id=${result.recommendationId} googleUid=${result.googleUid})`
+        `[salesforce] Testimonial__c ${result.created ? 'created' : 'updated'} ` +
+        `(id=${result.testimonialId} googleUid=${result.googleUid})`
       );
       return {
-        id:        result.recommendationId,
+        id:        result.testimonialId,
         googleUid: result.googleUid,
         created:   !!result.created,
       };
