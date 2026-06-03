@@ -1,0 +1,810 @@
+/**
+ * Guided assistant — the chat panel that captures hire-me leads.
+ *
+ * This is the largest extracted module because the chat is a state
+ * machine (STEPS array) that drives a render pipeline (renderStep →
+ * renderInputArea / renderConfirm / renderDone) coupled to a few
+ * orthogonal concerns (FAB launcher + teaser, panel resize, persistence
+ * to /api/chat/active, AI summarisation). They share enough closure
+ * state (`state`, message history, persistence guards) that splitting
+ * them into separate files would mean threading state through arguments
+ * everywhere — net loss in readability.
+ *
+ * Module shape:
+ *   - public functions: `openAssistant`, `closeAssistant`,
+ *     `forceCloseAssistant`, `minimiseAssistant`, `restartAssistant`,
+ *     `resumeAssistant`, `toggleChatTeaser`, `resetChatState`,
+ *     `applyGoogleProfileToChat`, `initChat`.
+ *   - private state: `state` (step + answers + minimised flag),
+ *     `STEPS`, `SLOTS`, `TOTAL_STEPS`, `teaserShown`. None of these
+ *     leak — main.js can't and doesn't reach in.
+ *
+ * main.js re-exports the inline-onclick'd functions onto `window` so
+ * the HTML still resolves them by global name.
+ */
+
+import { t, currentLang } from '../core/i18n.js';
+import {
+  siteProfile,
+  googleCredential,
+  pendingChatHistory, setPendingChatHistory,
+} from '../core/state.js';
+import { authedFetch }     from '../core/auth.js';
+import { GOOGLE_CLIENT_ID } from '../core/config.js';
+
+/* ═══════════════════════════════════════════════════════════
+   GUIDED ASSISTANT — state machine
+═══════════════════════════════════════════════════════════ */
+
+var SLOTS = [
+  'Mon 28 Apr · 10:00 AM IST',
+  'Mon 28 Apr · 3:00 PM IST',
+  'Tue 29 Apr · 11:00 AM IST',
+  'Wed 30 Apr · 2:00 PM IST',
+  'Thu 1 May · 4:00 PM IST',
+];
+
+var TOTAL_STEPS = 7;
+
+var state = {
+  step: 0,
+  answers: { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' },
+  googleProfile: null,
+  showGoogleStep: false,
+  minimised: false,
+};
+
+var STEPS = [
+  {
+    key: 'name',
+    bot: function () { return t().botGreeting; },
+    inputType: 'text',
+    placeholder: function () { return t().namePlaceholder; },
+    validate: function (v) { return v.trim().length > 0 ? null : t().errors.name; },
+  },
+  {
+    key: 'email',
+    bot: function (a) { return t().botEmail(a.name.split(' ')[0]); },
+    inputType: 'text',
+    placeholder: function () { return t().emailPlaceholder; },
+    validate: function (v) {
+      if (!v.trim()) return t().errors.emailRequired;
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) ? null : t().errors.emailInvalid;
+    },
+  },
+  {
+    key: 'company',
+    bot: function () { return t().botCompany; },
+    inputType: 'text',
+    placeholder: function () { return t().companyPlaceholder; },
+    validate: function (v) { return v.trim().length > 0 ? null : t().errors.company; },
+  },
+  {
+    key: 'role',
+    bot: function () { return t().botRole; },
+    inputType: 'choice',
+    choices: function () { return t().choices.roles; },
+  },
+  {
+    key: 'contractType',
+    bot: function () { return t().botContract; },
+    inputType: 'choice',
+    choices: function () { return t().choices.contracts; },
+  },
+  {
+    key: 'urgency',
+    bot: function () { return t().botUrgency; },
+    inputType: 'choice',
+    choices: function () { return t().choices.urgency; },
+  },
+  {
+    key: 'slot',
+    bot: function () { return t().botSlot; },
+    inputType: 'slots',
+  },
+];
+
+/* ── Chat Launcher (FAB + teaser bubble) ─────────────────────────────────── */
+var teaserShown = false;
+
+function setFabIcon(name) {
+  var icon = document.getElementById('chatFabIcon');
+  if (icon) icon.textContent = name;
+}
+
+function showTeaser() {
+  teaserShown = true;
+  document.getElementById('chatTeaser').removeAttribute('hidden');
+  setFabIcon('close');
+}
+
+function hideTeaser() {
+  document.getElementById('chatTeaser').setAttribute('hidden', '');
+  setFabIcon('chat');
+}
+
+export function toggleChatTeaser() {
+  if (state.minimised) {
+    resumeAssistant();
+    return;
+  }
+  var teaser = document.getElementById('chatTeaser');
+  if (teaser.hasAttribute('hidden')) {
+    showTeaser();
+  } else {
+    hideTeaser();
+  }
+}
+
+/* ── Open / close / minimise / restart ───────────────────────────────────── */
+
+export function openAssistant() {
+  state.step = 0;
+  state.answers  = { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' };
+  state.googleProfile  = null;
+  state.showGoogleStep = false;
+  // Reset avatar and header
+  var avatar = document.querySelector('.ga-avatar');
+  if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
+  var headerName = document.querySelector('.ga-header-name');
+  if (headerName) headerName.textContent = "Abhinav's Assistant";
+  document.getElementById('gaMessages').innerHTML = '';
+  document.getElementById('assistantOverlay').removeAttribute('hidden');
+  hideTeaser();
+
+  // Show the "Start over" button only for signed-in users (it operates
+  // on Firestore-backed history, which guests don't have).
+  setStartOverBtnVisible(!!(siteProfile && siteProfile.type !== 'guest'));
+
+  // If already signed in from welcome screen, skip sign-in step
+  if (siteProfile && siteProfile.type !== 'guest') {
+    applyGoogleProfileToChat(siteProfile);
+  } else {
+    state.showGoogleStep = !!(GOOGLE_CLIENT_ID && window.google && (!siteProfile));
+    renderStep();
+  }
+}
+
+export function closeAssistant() {
+  // Mid-conversation — ask for confirmation
+  if (state.step > 0 && state.step < STEPS.length) {
+    showCloseConfirm();
+    return;
+  }
+  forceCloseAssistant();
+}
+
+export function forceCloseAssistant() {
+  state.minimised = false;
+  document.getElementById('assistantOverlay').setAttribute('hidden', '');
+  // Remove confirm dialog if present
+  var existing = document.getElementById('gaCloseConfirm');
+  if (existing) existing.remove();
+}
+
+function showCloseConfirm() {
+  // Don't stack multiple dialogs
+  if (document.getElementById('gaCloseConfirm')) return;
+
+  var dialog = document.createElement('div');
+  dialog.id = 'gaCloseConfirm';
+  dialog.className = 'ga-close-confirm';
+  dialog.innerHTML =
+    '<p class="ga-confirm-msg">End this conversation? Your progress will be lost.</p>' +
+    '<div class="ga-confirm-btns">' +
+      '<button class="ga-confirm-stay">Keep chatting</button>' +
+      '<button class="ga-confirm-end">End conversation</button>' +
+    '</div>';
+
+  dialog.querySelector('.ga-confirm-stay').onclick = function () {
+    dialog.remove();
+  };
+  dialog.querySelector('.ga-confirm-end').onclick = function () {
+    dialog.remove();
+    forceCloseAssistant();
+  };
+
+  document.querySelector('.ga-modal').appendChild(dialog);
+}
+
+export function minimiseAssistant() {
+  state.minimised = true;
+  document.getElementById('assistantOverlay').setAttribute('hidden', '');
+  var launcher = document.getElementById('chatLauncher');
+  launcher.removeAttribute('hidden');
+  setFabIcon('chat');
+}
+
+/**
+ * "Start over" — clears the in-memory chat, deletes the active chat
+ * from Firestore, then re-opens fresh. Only meaningful for signed-in users.
+ */
+export function restartAssistant() {
+  if (googleCredential) {
+    authedFetch('/api/chat/active', { method: 'DELETE' });
+  }
+  setPendingChatHistory(null);
+  resetChatState();
+  var ov = document.getElementById('assistantOverlay');
+  if (ov && !ov.hasAttribute('hidden')) {
+    // Re-render: openAssistant() will run the greeting + step 0 again
+    forceCloseAssistant();
+    setTimeout(function () { openAssistant(); }, 0);
+  }
+}
+
+function setStartOverBtnVisible(visible) {
+  var btn = document.getElementById('gaStartOverBtn');
+  if (!btn) return;
+  if (visible) btn.removeAttribute('hidden');
+  else         btn.setAttribute('hidden', '');
+}
+
+export function resumeAssistant() {
+  state.minimised = false;
+  document.getElementById('assistantOverlay').removeAttribute('hidden');
+  hideTeaser();
+}
+
+/**
+ * Wipes the in-memory chat state and any DOM mirrors so a new user
+ * starts from a clean slate. Safe to call even if the chat panel
+ * isn't open.
+ */
+export function resetChatState() {
+  state.step = 0;
+  state.answers = { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' };
+  state.googleProfile  = null;
+  state.showGoogleStep = false;
+  state.minimised      = false;
+  var msgs = document.getElementById('gaMessages');
+  if (msgs) msgs.innerHTML = '';
+  var avatar = document.querySelector('.ga-avatar');
+  if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
+  var headerName = document.querySelector('.ga-header-name');
+  if (headerName) headerName.textContent = "Abhinav's Assistant";
+}
+
+/**
+ * Apply a freshly signed-in Google profile to the chat: pre-fill name +
+ * email, swap the avatar/header, and either resume from saved history
+ * or start the guided flow at step 2 (since we already have the first
+ * two answers).
+ */
+export function applyGoogleProfileToChat(profile) {
+  state.googleProfile  = profile;
+  state.answers.name   = profile.name;
+  state.answers.email  = profile.email;
+  state.showGoogleStep = false;
+
+  // Always update the avatar and header name
+  var avatar = document.querySelector('.ga-avatar');
+  if (avatar && profile.picture) {
+    avatar.innerHTML = '<img src="' + profile.picture + '" alt="' + profile.name + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
+    avatar.style.background = 'none';
+    avatar.style.padding = '0';
+  }
+  var headerName = document.querySelector('.ga-header-name');
+  if (headerName) headerName.textContent = profile.name.split(' ')[0] + "'s session";
+
+  // Only restart the chat if we're still at the very beginning (pre-step or name/email)
+  if (state.step <= 1) {
+    var first = profile.name.split(' ')[0];
+
+    // Resume from saved history if the user has an active chat in Firestore
+    if (pendingChatHistory && pendingChatHistory.step > 1) {
+      document.getElementById('gaMessages').innerHTML = '';
+      var resumeMsg = (profile.isReturning ? t().botWelcomeBack(first) : t().botWelcomeNew(first))
+                      + ' ' + (t().botResume || '(picking up where we left off)');
+      addBotMessage(resumeMsg, function () {
+        renderRestoredMessages(pendingChatHistory.messages || []);
+        state.step    = Math.min(pendingChatHistory.step, STEPS.length);
+        state.answers = mergeAnswers(state.answers, pendingChatHistory.answers || {});
+        // Always trust Google's verified name/email over saved values
+        state.answers.name  = profile.name;
+        state.answers.email = profile.email;
+        setPendingChatHistory(null);
+        renderStep();
+      });
+    } else {
+      state.step = 2;
+      document.getElementById('gaMessages').innerHTML = '';
+      var greeting = profile.isReturning
+        ? t().botWelcomeBack(first)
+        : t().botWelcomeNew(first);
+      addBotMessage(greeting);
+      setPendingChatHistory(null);
+      renderStep();
+    }
+  }
+  // If already mid-conversation, just silently update name/email in answers — don't disrupt
+}
+
+// Append saved messages without animation — used when restoring history.
+function renderRestoredMessages(messages) {
+  var msgs = document.getElementById('gaMessages');
+  if (!msgs || !messages || !messages.length) return;
+  messages.forEach(function (m) {
+    if (!m || !m.text) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'ga-msg ' + (m.role === 'user' ? 'ga-msg-user' : 'ga-msg-bot');
+    var bubbleCls = m.role === 'user' ? 'ga-bubble-user' : 'ga-bubble-bot';
+    wrap.innerHTML = '<div class="ga-bubble ' + bubbleCls + '">' + escHtml(m.text) + '</div>';
+    msgs.appendChild(wrap);
+  });
+  scrollMessages();
+}
+
+function mergeAnswers(target, source) {
+  target = target || {};
+  Object.keys(source || {}).forEach(function (k) {
+    if (source[k] !== undefined && source[k] !== null && source[k] !== '') target[k] = source[k];
+  });
+  return target;
+}
+
+/* ── Render pipeline ─────────────────────────────────────────────────────── */
+
+function updateProgress() {
+  var pct = Math.round((state.step / TOTAL_STEPS) * 100);
+  document.getElementById('gaProgressBar').style.width = pct + '%';
+}
+
+function renderGoogleStep() {
+  var area = document.getElementById('gaInputArea');
+  area.innerHTML = '';
+
+  addBotMessage("Hi! To save time, you can sign in with Google — I'll auto-fill your name and email. Or continue as a guest and I'll ask you a couple of questions.");
+
+  var wrap = document.createElement('div');
+  wrap.className = 'ga-google-step';
+
+  var googleBtnDiv = document.createElement('div');
+  googleBtnDiv.id = 'googleSignInBtn';
+  googleBtnDiv.className = 'ga-google-btn-wrap';
+
+  var sep = document.createElement('div');
+  sep.className = 'ga-google-sep';
+  sep.textContent = 'or';
+
+  var guestBtn = document.createElement('button');
+  guestBtn.className = 'ga-guest-btn';
+  guestBtn.textContent = 'Continue as Guest';
+  guestBtn.onclick = function () {
+    state.showGoogleStep = false;
+    document.getElementById('gaMessages').innerHTML = '';
+    renderStep();
+  };
+
+  wrap.appendChild(googleBtnDiv);
+  wrap.appendChild(sep);
+  wrap.appendChild(guestBtn);
+  area.appendChild(wrap);
+
+  if (window.google && window.google.accounts && GOOGLE_CLIENT_ID) {
+    google.accounts.id.renderButton(googleBtnDiv, {
+      theme: 'filled_black',
+      size: 'large',
+      text: 'continue_with',
+      shape: 'rectangular',
+      width: 260,
+    });
+  }
+}
+
+function renderStep() {
+  if (state.showGoogleStep) { renderGoogleStep(); return; }
+  updateProgress();
+  if (state.step >= STEPS.length) { renderConfirm(); return; }
+  var stepDef = STEPS[state.step];
+  var botText = stepDef.bot(state.answers);
+  addBotMessage(botText, function () {
+    renderInputArea(stepDef);
+  });
+}
+
+function addBotMessage(text, cb) {
+  var msgs = document.getElementById('gaMessages');
+  var wrap = document.createElement('div');
+  wrap.className = 'ga-msg ga-msg-bot ga-msg-enter';
+  wrap.innerHTML = '<div class="ga-bubble ga-bubble-bot">' + escHtml(text) + '</div>';
+  msgs.appendChild(wrap);
+  scrollMessages();
+  persistChatTurn('bot', text);
+  setTimeout(function () { wrap.classList.remove('ga-msg-enter'); if (cb) cb(); }, 300);
+}
+
+function addUserMessage(text) {
+  var msgs = document.getElementById('gaMessages');
+  var wrap = document.createElement('div');
+  wrap.className = 'ga-msg ga-msg-user ga-msg-enter';
+  wrap.innerHTML = '<div class="ga-bubble ga-bubble-user">' + escHtml(text) + '</div>';
+  msgs.appendChild(wrap);
+  scrollMessages();
+  persistChatTurn('user', text);
+  setTimeout(function () { wrap.classList.remove('ga-msg-enter'); }, 300);
+}
+
+/**
+ * Fire-and-forget: persists the latest turn + current chat state to
+ * Firestore via /api/chat/active. Only runs for signed-in users with a
+ * cached Google credential. Silent on failure (chat UX never blocks).
+ */
+function persistChatTurn(role, text) {
+  if (!googleCredential) return;
+  if (!siteProfile || siteProfile.type === 'guest') return;
+  try {
+    authedFetch('/api/chat/active', {
+      method: 'POST',
+      body:   JSON.stringify({
+        step:    typeof state.step === 'number' ? state.step : 0,
+        answers: state.answers || {},
+        locale:  (typeof currentLang === 'string' ? currentLang : 'en'),
+        message: { role: role === 'user' ? 'user' : 'bot', text: String(text || '') },
+      }),
+    });
+  } catch (_) {}
+}
+
+function renderInputArea(stepDef) {
+  var area = document.getElementById('gaInputArea');
+  area.innerHTML = '';
+
+  if (stepDef.inputType === 'text') {
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'ga-text-input';
+    inp.placeholder = stepDef.placeholder ? stepDef.placeholder() : '';
+    var err = document.createElement('div');
+    err.className = 'ga-input-err';
+    var btn = document.createElement('button');
+    btn.className = 'ga-send-btn';
+    btn.textContent = t().continueBtn;
+    btn.onclick = function () {
+      var val = inp.value;
+      var e = stepDef.validate(val);
+      if (e) { err.textContent = e; return; }
+      err.textContent = '';
+      state.answers[stepDef.key] = val.trim();
+      addUserMessage(val.trim());
+      area.innerHTML = '';
+      state.step++;
+      setTimeout(renderStep, 400);
+    };
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') btn.onclick(); });
+    area.appendChild(inp);
+    area.appendChild(err);
+    area.appendChild(btn);
+    setTimeout(function () { inp.focus(); }, 50);
+
+  } else if (stepDef.inputType === 'choice') {
+    var grid = document.createElement('div');
+    grid.className = 'ga-choice-grid';
+    stepDef.choices().forEach(function (choice) {
+      var btn = document.createElement('button');
+      btn.className = 'ga-choice-btn';
+      btn.textContent = choice;
+      btn.onclick = function () {
+        state.answers[stepDef.key] = choice;
+        addUserMessage(choice);
+        area.innerHTML = '';
+        state.step++;
+        setTimeout(renderStep, 400);
+      };
+      grid.appendChild(btn);
+    });
+    area.appendChild(grid);
+
+  } else if (stepDef.inputType === 'slots') {
+    var slotGrid = document.createElement('div');
+    slotGrid.className = 'ga-slot-grid';
+    SLOTS.forEach(function (slot) {
+      var btn = document.createElement('button');
+      btn.className = 'ga-slot-btn';
+      btn.textContent = slot;
+      btn.onclick = function () {
+        state.answers.slot = slot;
+        addUserMessage(slot);
+        area.innerHTML = '';
+        state.step++;
+        setTimeout(renderStep, 400);
+      };
+      slotGrid.appendChild(btn);
+    });
+    area.appendChild(slotGrid);
+  }
+}
+
+function renderConfirm() {
+  updateProgress();
+  var a = state.answers;
+  addBotMessage(
+    t().botConfirm,
+    function () {
+      var area = document.getElementById('gaInputArea');
+      area.innerHTML = '';
+
+      var summary = document.createElement('div');
+      summary.className = 'ga-confirm-summary';
+      summary.innerHTML =
+        '<div class="ga-summary-row"><span>Name</span><strong>' + escHtml(a.name) + '</strong></div>' +
+        '<div class="ga-summary-row"><span>Email</span><strong>' + escHtml(a.email) + '</strong></div>' +
+        '<div class="ga-summary-row"><span>Company</span><strong>' + escHtml(a.company) + '</strong></div>' +
+        '<div class="ga-summary-row"><span>Role</span><strong>' + escHtml(a.role) + '</strong></div>' +
+        '<div class="ga-summary-row"><span>Type</span><strong>' + escHtml(a.contractType) + '</strong></div>' +
+        '<div class="ga-summary-row"><span>Urgency</span><strong>' + escHtml(a.urgency) + '</strong></div>' +
+        '<div class="ga-summary-row"><span>Slot</span><strong>' + escHtml(a.slot) + '</strong></div>';
+
+      var summaryBtn = document.createElement('button');
+      summaryBtn.className = 'ga-summary-btn';
+      summaryBtn.textContent = 'Get AI Summary';
+      summaryBtn.onclick = function () { requestSummary(summaryBtn); };
+
+      var summaryOut = document.createElement('div');
+      summaryOut.className = 'ga-summary-out';
+      summaryOut.id = 'gaSummaryOut';
+
+      var confirmBtn = document.createElement('button');
+      confirmBtn.className = 'ga-send-btn';
+      confirmBtn.style.marginTop = '4px';
+      confirmBtn.textContent = t().confirmBtn;
+      confirmBtn.onclick = function () { submitAssistant(confirmBtn); };
+
+      var errDiv = document.createElement('div');
+      errDiv.className = 'ga-input-err';
+      errDiv.id = 'gaSubmitErr';
+
+      area.appendChild(summary);
+      area.appendChild(summaryBtn);
+      area.appendChild(summaryOut);
+      area.appendChild(confirmBtn);
+      area.appendChild(errDiv);
+    }
+  );
+}
+
+async function submitAssistant(btn) {
+  btn.disabled = true;
+  btn.textContent = t().confirmBtnBusy;
+  document.getElementById('gaSubmitErr').textContent = '';
+
+  var a = state.answers;
+  try {
+    var res = await fetch('/api/hire', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: a.name,
+        email: a.email,
+        company: a.company,
+        role: a.role,
+        contractType: a.contractType,
+        urgency: a.urgency,
+        slot: a.slot,
+      }),
+    });
+    var data = await res.json();
+    if (res.ok && data.success) {
+      // Move active chat → completed-inquiries history (signed-in users only)
+      if (googleCredential) {
+        authedFetch('/api/chat/complete', {
+          method: 'POST',
+          body:   JSON.stringify({
+            salesforceId:     data.recordId || null,
+            alreadySubmitted: !!data.alreadySubmitted,
+          }),
+        });
+      }
+      renderDone(!!data.alreadySubmitted);
+    } else {
+      document.getElementById('gaSubmitErr').textContent = (data && data.error) || 'Something went wrong. Please try again.';
+      btn.disabled = false;
+      btn.textContent = 'Confirm & Schedule';
+    }
+  } catch (_) {
+    document.getElementById('gaSubmitErr').textContent = 'Network error. Please try again.';
+    btn.disabled = false;
+    btn.textContent = 'Confirm & Schedule';
+  }
+}
+
+function renderDone(alreadySubmitted) {
+  document.getElementById('gaProgressBar').style.width = '100%';
+  var area = document.getElementById('gaInputArea');
+  area.innerHTML = '';
+
+  var firstName = state.answers.name.split(' ')[0];
+  var message = alreadySubmitted
+    ? t().botDuplicate(firstName)
+    : t().botDone(firstName, state.answers.email);
+
+  addBotMessage(message, function () {
+    var done = document.createElement('div');
+    done.className = 'ga-done';
+
+    var checkEl = document.createElement('div');
+    checkEl.className = 'ga-done-check';
+    checkEl.innerHTML = '&#10003;';
+    done.appendChild(checkEl);
+
+    // Skip the slot/summary widgets for duplicate submissions — there's
+    // no new booking to confirm or summarise.
+    if (!alreadySubmitted) {
+      var slotEl = document.createElement('div');
+      slotEl.className = 'ga-done-slot';
+      slotEl.textContent = state.answers.slot;
+
+      var summaryBtn = document.createElement('button');
+      summaryBtn.className = 'ga-summary-btn';
+      summaryBtn.textContent = 'Get AI Summary';
+      summaryBtn.onclick = function () { requestSummary(summaryBtn); };
+
+      var summaryOut = document.createElement('div');
+      summaryOut.className = 'ga-summary-out';
+      summaryOut.id = 'gaSummaryOut';
+
+      done.appendChild(slotEl);
+      done.appendChild(summaryBtn);
+      done.appendChild(summaryOut);
+    }
+
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'ga-done-close';
+    closeBtn.textContent = t().closeBtn;
+    closeBtn.onclick = closeAssistant;
+    done.appendChild(closeBtn);
+
+    area.appendChild(done);
+  });
+}
+
+async function requestSummary(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Generating\u2026';
+  var out = document.getElementById('gaSummaryOut');
+  out.textContent = '';
+  out.className = 'ga-summary-out';
+
+  try {
+    var res = await fetch('/api/summarise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:         state.answers.name,
+        company:      state.answers.company,
+        role:         state.answers.role,
+        contractType: state.answers.contractType,
+        urgency:      state.answers.urgency,
+        slot:         state.answers.slot,
+      }),
+    });
+    var data = await res.json();
+    if (res.ok && data.summary) {
+      out.textContent = data.summary;
+      out.className = 'ga-summary-out ga-summary-ready';
+      btn.textContent = 'Copy Summary';
+      btn.disabled = false;
+      btn.onclick = function () {
+        navigator.clipboard.writeText(data.summary).then(function () {
+          btn.textContent = 'Copied!';
+          setTimeout(function () { btn.textContent = 'Copy Summary'; }, 2000);
+        });
+      };
+    } else {
+      out.textContent = data.error || 'Could not generate summary.';
+      out.className = 'ga-summary-out ga-summary-err';
+      btn.textContent = 'Retry';
+      btn.disabled = false;
+      btn.onclick = function () { requestSummary(btn); };
+    }
+  } catch (_) {
+    out.textContent = 'Network error. Please try again.';
+    out.className = 'ga-summary-out ga-summary-err';
+    btn.textContent = 'Retry';
+    btn.disabled = false;
+    btn.onclick = function () { requestSummary(btn); };
+  }
+}
+
+function scrollMessages() {
+  var msgs = document.getElementById('gaMessages');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ── Resizable panel (mouse + touch via Pointer Events) ──────────────────── */
+
+function initChatResize() {
+  var handle  = document.getElementById('gaResizeHandle');
+  var overlay = document.getElementById('assistantOverlay');
+  if (!handle || !overlay) return;
+
+  var MIN_W = 300;
+  var MAX_W = 680;
+  var STORAGE_KEY = 'portfolio_chat_width';
+
+  // Restore saved width on init
+  try {
+    var saved = parseInt(localStorage.getItem(STORAGE_KEY) || '', 10);
+    if (saved && saved >= MIN_W && saved <= MAX_W) {
+      overlay.style.width = saved + 'px';
+    }
+  } catch (_) {}
+
+  var dragging = false, startX = 0, startW = 0;
+
+  function onDown(e) {
+    dragging = true;
+    startX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX);
+    startW = overlay.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'ew-resize';
+    e.preventDefault();
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    var clientX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX);
+    var newW = Math.min(MAX_W, Math.max(MIN_W, startW + (startX - clientX)));
+    overlay.style.width = newW + 'px';
+  }
+
+  function onUp() {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    try { localStorage.setItem(STORAGE_KEY, String(overlay.offsetWidth)); } catch (_) {}
+  }
+
+  handle.addEventListener('mousedown',  onDown);
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup',   onUp);
+  handle.addEventListener('touchstart', onDown, { passive: false });
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('touchend',  onUp);
+
+  // Double-click to reset to default width
+  handle.addEventListener('dblclick', function () {
+    overlay.style.width = '';
+    try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+  });
+}
+
+/* ── Boot ────────────────────────────────────────────────────────────────── */
+
+export function initChat() {
+  // Reveal the FAB launcher 5s after page load + nudge teaser bubble 600ms later
+  setTimeout(function () {
+    var launcher = document.getElementById('chatLauncher');
+    if (!launcher) return;
+    launcher.removeAttribute('hidden');
+    setTimeout(function () {
+      if (!teaserShown) showTeaser();
+    }, 600);
+  }, 5000);
+
+  var teaserClose = document.getElementById('chatTeaserClose');
+  if (teaserClose) {
+    teaserClose.addEventListener('click', function (e) {
+      e.stopPropagation();
+      hideTeaser();
+    });
+  }
+
+  // Esc key closes the chat panel (with confirmation if mid-conversation)
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAssistant();
+  });
+
+  initChatResize();
+}
