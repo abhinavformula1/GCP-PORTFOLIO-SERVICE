@@ -199,9 +199,14 @@ router.post('/recommendation', recommendationLimiter, validateRecommendation, as
 // SF → GCP callback handler. Apex trigger fires this when I write a Reply
 // on the Recommendation__c record in Salesforce.
 //
-// Auth: shared secret in the X-SF-Callback-Secret header. The Salesforce
-// Named Credential is configured to send this on every callout, so a
-// rogue caller without the secret cannot inject a reply onto a recommendation.
+// Auth: shared secret in the X-API-Key header. The Salesforce External
+// Credential `GCP` is configured to send this on every callout via the
+// linked Named Credential `Portfolio_Service`, so a rogue caller without
+// the secret cannot inject a reply onto a recommendation.
+//
+// Why X-API-Key (not the original X-SF-Callback-Secret): the SF org's
+// External Credential already uses X-API-Key as a convention across
+// integrations. We match it here rather than force a rename.
 //
 // Why a constant-time comparison: a naive `===` allows a timing attack
 // where an attacker can guess the secret one character at a time by
@@ -217,7 +222,7 @@ router.post('/recommendation/:uid/reply', async (req, res, next) => {
         503, 'SF_CALLBACK_NOT_CONFIGURED'
       );
     }
-    const provided = (req.get('X-SF-Callback-Secret') || '').trim();
+    const provided = (req.get('X-API-Key') || '').trim();
     const ok =
       provided.length === expected.length &&
       crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
