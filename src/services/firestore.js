@@ -322,17 +322,31 @@ async function listActiveRecommendations() {
  * than create a partial row — the reply will be re-applied on the next
  * trigger fire. Safe by construction.
  *
+ * Note on `repliedAt`: we deliberately ignore whatever timestamp the
+ * Apex callout sent in the body and use the Firestore server clock
+ * instead. Two reasons:
+ *   1. Trust — the callback is authenticated by a shared secret, but
+ *      the body itself is still client-supplied data; "when did this
+ *      happen" is the kind of field we don't want a bug (or attacker)
+ *      able to spoof.
+ *   2. Consistency — `submittedAt` and `updatedAt` are also server
+ *      timestamps, so all three fields share a single clock and stay
+ *      monotonically ordered. Salesforce stamps its own `Replied_At__c`
+ *      on its end, so each system is the source of truth for its own
+ *      copy of the timestamp; they don't need to be byte-equal.
+ *
  * Returns { applied: boolean } so the caller can choose how to respond.
  */
-async function writeRecommendationReply(uid, { reply, repliedAt }) {
+async function writeRecommendationReply(uid, { reply /* repliedAt ignored — see above */ }) {
   const ref = recommendationDocRef(uid);
   const snap = await ref.get();
   if (!snap.exists) return { applied: false, reason: 'not_found' };
 
+  const now = FieldValue.serverTimestamp();
   await ref.update({
     reply:     String(reply || '').slice(0, 1000),
-    repliedAt: repliedAt ? FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
+    repliedAt: now,
+    updatedAt: now,
   });
   return { applied: true };
 }
