@@ -1,0 +1,35 @@
+{
+  "//": [
+    "Source-of-truth declaration for Firestore composite indexes.",
+    "",
+    "Single-field indexes are auto-created by Firestore on first write, so",
+    "we only declare composite (multi-field) indexes here. Each entry below",
+    "exists because a query in src/ uses a `where(...).orderBy(...)` pattern",
+    "across two different fields, which Firestore cannot satisfy without",
+    "an explicit composite index.",
+    "",
+    "Deploy commands (run from repo root):",
+    "  # via Firebase CLI (cleanest):",
+    "  firebase deploy --only firestore:indexes",
+    "",
+    "  # or imperatively via gcloud (no Firebase CLI required):",
+    "  gcloud firestore indexes composite create \\",
+    "    --collection-group=recommendations --query-scope=COLLECTION \\",
+    "    --field-config=field-path=status,order=ascending \\",
+    "    --field-config=field-path=submittedAt,order=descending"
+  ],
+
+  "indexes": [
+    {
+      "//": "Powers GET /api/recommendations — listActiveRecommendations() in src/services/firestore.js. Filters by status=Active and orders by submittedAt desc. Without this index that query throws (the GET handler degrades to an empty list, which renders as 'Be the first to leave a recommendation' even when records exist).",
+      "collectionGroup": "recommendations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",      "order": "ASCENDING"  },
+        { "fieldPath": "submittedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+
+  "fieldOverrides": []
+}
