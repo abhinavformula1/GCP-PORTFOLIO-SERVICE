@@ -302,7 +302,12 @@ async function listActiveRecommendations() {
       avatarUrl:   v.avatarUrl   || null,
       text:        v.text        || '',
       reply:       v.reply       || null,
+      // Both timestamps flow to the client so the UI can show either
+      // "submitted 3h ago" (first write) or "updated 1m ago" (a later
+      // edit). The list ordering still uses submittedAt — we don't want
+      // editing an old recommendation to bump it to the top of the page.
       submittedAt: v.submittedAt && v.submittedAt.toMillis ? v.submittedAt.toMillis() : null,
+      updatedAt:   v.updatedAt   && v.updatedAt.toMillis   ? v.updatedAt.toMillis()   : null,
       repliedAt:   v.repliedAt   && v.repliedAt.toMillis   ? v.repliedAt.toMillis()   : null,
     };
   });
