@@ -1,28 +1,65 @@
 /**
- * Runtime resume generator — first ES module extracted from main.js.
+ * Runtime resume generator + preview modal.
  *
  * The "Download Resume" button doesn't link to a static PDF anywhere. It
  * builds one on demand by scraping the live portfolio DOM (About Me,
  * Skills, Experience, Projects, Education, Certifications) and laying
  * the content out as a clean A4 document via jsPDF.
  *
- * Why runtime:
- *   1. Single source of truth — the resume is whatever the portfolio
- *      page currently renders. Edit one section, the next download
- *      reflects it. No "remember to update the PDF too" foot-gun.
- *   2. Locale-aware — i18n changes the DOM, the resume changes with it.
- *      A French recruiter who flips the language gets a French resume.
- *   3. Always selectable text (vector PDF, not a rasterized screenshot)
- *      — recruiter ATS systems can paste the content into structured
- *      fields without OCR.
+ * Layout — modeled on the ATS-passing reference resume
+ * (`Abhinav_Kumar_Senior_Salesforce_Application_Engineer.pdf`):
+ *
+ *   ┌──────────────────────────────────────────────────────────┐
+ *   │  Name                          email | phone             │  Header band
+ *   │  Title                         linkedin                  │  (full-width)
+ *   │                                trailblazer               │
+ *   │                                Location                  │
+ *   ├──────────────────────────────┬───────────────────────────┤
+ *   │  About Me                    │  Work Experience          │
+ *   │  …                           │  Senior Technical …       │
+ *   │  Skills                      │  …                        │
+ *   │  …                           │                           │  Two-column body
+ *   │  Education                   │                           │
+ *   │  …                           │                           │
+ *   │  Certifications              │                           │
+ *   │  …                           │                           │
+ *   ├──────────────────────────────┴───────────────────────────┤
+ *   │  Projects                                                │  Full-width footer
+ *   │  …                                                       │
+ *   └──────────────────────────────────────────────────────────┘
+ *
+ * The two columns flow independently — left column page-breaks when it
+ * fills up, right column page-breaks when it fills up, both append
+ * pages to the same document. After both columns finish, the Projects
+ * section starts below whichever column is "deepest" and flows
+ * full-width across one or more additional pages.
+ *
+ * Flow:
+ *   1. Click "Download Resume" → `generateResumePdf()` lazy-loads jsPDF,
+ *      scrapes the DOM, renders the PDF to a blob, and opens a preview
+ *      modal with the PDF embedded in an iframe.
+ *   2. Inside the modal: "Download" saves the file via the browser save
+ *      dialog. "Close" dismisses the modal. The visitor sees exactly
+ *      what's getting downloaded before committing the file.
+ *
+ * Why runtime + preview:
+ *   - Single source of truth: the resume is whatever the page currently
+ *     renders. Edit one section, the next download reflects it.
+ *   - Locale-aware: i18n changes the DOM → resume changes with it. A
+ *     French recruiter who flips the language gets a French resume.
+ *   - Selectable text (vector PDF) — ATS-friendly, no OCR needed.
+ *   - Preview catches generation bugs before download. jsPDF rebuilds
+ *     layout from scratch (no CSS, manual page breaks), so what looks
+ *     fine on the page can still render badly in the PDF.
  *
  * jsPDF is loaded from a CDN on first click (lazy), so visitors who
  * never download pay zero bytes for it.
  *
- * Module shape: only `generateResumePdf` is exported. Everything else
- * is private to this file (the loader, the DOM scraper, the layout
- * engine). main.js re-exports the function onto `window` so the inline
- * onclick="…" attribute in index.html keeps working.
+ * Module shape: `generateResumePdf` (open the preview modal),
+ * `downloadResumePdf` (save the previewed PDF to disk), and
+ * `closeResumePreview` (dismiss the modal, revoke the blob URL).
+ * main.js re-exports all three onto `window` so the inline onclick
+ * handlers in index.html resolve.
  */
 
 var JSPDF_CDN = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
@@ -52,10 +89,26 @@ function getResumeData() {
   function txt(el) { return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : ''; }
   function arr(sel, el) { return [].slice.call((el || document).querySelectorAll(sel)); }
 
+  // Contact identity is hardcoded — these are stable canonical fields,
+  // not user-editable, so DOM scraping for them is overkill (and the
+  // page-rendered phone is gated on a verified-org reveal that doesn't
+  // apply to the resume context).
+  //
+  // ATS parsers look for these specific fields to populate candidate
+  // profiles: phone, LinkedIn, Salesforce ecosystem credential
+  // (Trailblazer), and location. Missing any of them means the
+  // recruiter has to type them in manually before forwarding — a
+  // friction point worth eliminating in a runtime resume.
   var data = {
     name:     'Abhinav Kumar',
     title:    txt(document.querySelector('[data-i18n="headerTitle"]')),
-    contact:  { email: 'abhinavformula1@gmail.com' },
+    contact:  {
+      email:       'abhinavformula1@gmail.com',
+      phone:       '+91-9527506880',
+      linkedin:    'linkedin.com/in/abhinavformula1',
+      trailblazer: 'trailblazer.me/id/abhinavformula1',
+      location:    'Bengaluru, India',
+    },
     summary:  arr('.about-text').map(txt).filter(Boolean),
     skills:   [],
     experience: [],
@@ -72,11 +125,26 @@ function getResumeData() {
 
   arr('.job').forEach(function (j) {
     var bullets = arr('.job-bullets li', j).map(txt).filter(Boolean);
+    // The on-page `.job-company` element bundles the company name with a
+    // ` · India` style location span. The reference resume layout splits
+    // those onto two lines (`Senior …, <Company>` then `<Period>, <Location>`),
+    // so we extract the location separately and strip it from the company
+    // string. The middle-dot separator is the visual cue we look for.
+    var companyEl   = j.querySelector('.job-company');
+    var locationEl  = companyEl && companyEl.querySelector('.location');
+    var locationStr = locationEl ? txt(locationEl).replace(/^[·•\s]+/, '').trim() : '';
+    var companyOnly = companyEl ? txt(companyEl) : '';
+    if (locationStr && companyOnly) {
+      // Trim "Salesforce · India" → "Salesforce".
+      var idx = companyOnly.indexOf(locationStr);
+      if (idx > 0) companyOnly = companyOnly.slice(0, idx).replace(/[·•\s]+$/, '').trim();
+    }
     data.experience.push({
-      title:   txt(j.querySelector('.job-title')),
-      period:  txt(j.querySelector('.job-period')),
-      company: txt(j.querySelector('.job-company')),
-      bullets: bullets,
+      title:    txt(j.querySelector('.job-title')),
+      period:   txt(j.querySelector('.job-period')),
+      company:  companyOnly,
+      location: locationStr,
+      bullets:  bullets,
     });
   });
 
@@ -94,10 +162,14 @@ function getResumeData() {
     return t === 'education' || t === 'formation' || t.indexOf('educat') === 0;
   });
   if (eduSection) {
+    var rawYear = txt(eduSection.querySelector('.edu-year'));
+    // Reference resume shows just the year (e.g. "2012"), not "Graduated 2012".
+    // Strip everything before the first 4-digit year for ATS-friendly format.
+    var yearMatch = rawYear.match(/(\d{4})/);
     data.education = {
       name:   txt(eduSection.querySelector('.edu-name')),
       degree: arr('.edu-degree', eduSection).map(txt).filter(Boolean),
-      year:   txt(eduSection.querySelector('.edu-year')),
+      year:   yearMatch ? yearMatch[1] : rawYear,
     };
   }
 
@@ -115,192 +187,395 @@ function getResumeData() {
 }
 
 /**
- * Render `data` into a jsPDF document. All layout is single-column,
- * margin = 40pt on A4 (595×842). The y cursor is tracked manually so
- * we can page-break when content runs past the bottom margin.
+ * Render `data` into a jsPDF document.
+ *
+ * Layout is two-column on A4 (595 × 842 pt) with a full-width header
+ * band on top of page 1 and a full-width Projects footer at the end.
+ * The two columns flow independently — each tracks its own page index
+ * and y cursor, and we use `doc.setPage(N)` to alternate which page we
+ * draw on. Pages added by the left column are reused by the right
+ * column, so the document never has phantom blank pages.
+ *
+ * All y-coordinates in this function represent the BASELINE of the next
+ * line to draw (jsPDF's default text origin), not the top of the line.
+ * `lineHeight = size + 3` is the unit we advance after each line.
  */
 function renderResumePdf(jsPDF, data) {
   var doc = new jsPDF({ unit: 'pt', format: 'a4' });
-  var W = doc.internal.pageSize.getWidth();
-  var H = doc.internal.pageSize.getHeight();
-  var MARGIN = 40;
-  var COL = W - 2 * MARGIN;
-  var y = MARGIN;
+  var W = doc.internal.pageSize.getWidth();   // 595 pt
+  var H = doc.internal.pageSize.getHeight();  // 842 pt
+  var MARGIN = 36;
 
-  function ensureSpace(needed) {
-    if (y + needed > H - MARGIN) {
-      doc.addPage();
-      y = MARGIN;
-    }
-  }
+  // Column geometry — the ~40/60 split with an 18pt gutter mirrors the
+  // visual proportions of the reference resume.
+  var LEFT_W  = 200;
+  var GUTTER  = 18;
+  var LEFT_X  = MARGIN;
+  var RIGHT_X = MARGIN + LEFT_W + GUTTER;       // 254
+  var RIGHT_W = W - RIGHT_X - MARGIN;            // 305
+  var FULL_W  = W - 2 * MARGIN;                  // 523
+  var BOTTOM  = H - MARGIN;                      // baseline below which we page-break
+  var BLUE    = [60, 90, 200];                   // hyperlink colour
+  var TEXT    = [20, 20, 20];                    // body text colour
+  var GREY    = [110, 110, 110];                 // muted captions
+
   function setBody(opts) {
     opts = opts || {};
     doc.setFont('helvetica', opts.bold ? 'bold' : (opts.italic ? 'italic' : 'normal'));
     doc.setFontSize(opts.size || 10);
-    doc.setTextColor.apply(doc, opts.color || [20, 20, 20]);
+    var c = opts.color || TEXT;
+    doc.setTextColor(c[0], c[1], c[2]);
   }
-  function sectionHeader(label) {
-    ensureSpace(36);
-    y += 10;
-    setBody({ bold: true, size: 11, color: [60, 90, 200] });
-    doc.text(label.toUpperCase(), MARGIN, y);
-    doc.setDrawColor(220);
-    doc.setLineWidth(0.5);
-    doc.line(MARGIN, y + 4, W - MARGIN, y + 4);
-    y += 18;
-    setBody();
+
+  // ── Header band (full-width, page 1 only) ───────────────────────────
+  // Left side: name (large bold) + title (smaller bold).
+  // Right side: contact info stacked right-aligned. Email + phone share
+  // the first line; LinkedIn and Trailblazer are clickable blue links;
+  // location anchors the bottom in bold (geographic signal for ATS).
+  doc.setPage(1);
+  setBody({ bold: true, size: 14 });
+  doc.text(data.name || '', LEFT_X, MARGIN + 14);
+  if (data.title) {
+    setBody({ bold: true, size: 11 });
+    doc.text(data.title, LEFT_X, MARGIN + 30);
   }
-  function paragraph(text, opts) {
-    opts = opts || {};
-    var size = opts.size || 10;
-    setBody(opts);
-    var lines = doc.splitTextToSize(text, COL);
-    lines.forEach(function (line) {
-      ensureSpace(size + 4);
-      doc.text(line, MARGIN, y);
-      y += size + 3;
-    });
-  }
-  function bullets(items) {
-    if (!items || !items.length) return;
-    setBody();
-    items.forEach(function (item) {
-      var lines = doc.splitTextToSize(item, COL - 14);
-      lines.forEach(function (line, i) {
-        ensureSpace(14);
-        if (i === 0) doc.text('•', MARGIN, y);
-        doc.text(line, MARGIN + 12, y);
-        y += 13;
-      });
-      y += 1;
-    });
-  }
-  function rightAligned(text, baselineY, opts) {
+
+  var c = data.contact || {};
+  var rY = MARGIN + 14;  // align first contact line with the name baseline
+  function rText(text, baselineY, opts) {
     setBody(opts);
     var w = doc.getTextWidth(text);
     doc.text(text, W - MARGIN - w, baselineY);
-    setBody();
+  }
+  function rLink(text, baselineY, url, opts) {
+    setBody(opts);
+    var w = doc.getTextWidth(text);
+    doc.textWithLink(text, W - MARGIN - w, baselineY, { url: url });
   }
 
-  // ── Header ──────────────────────────────────────────────────────────────
-  setBody({ bold: true, size: 22 });
-  doc.text(data.name, MARGIN, y + 22);
-  y += 30;
-  if (data.title)         { paragraph(data.title, { size: 11, color: [80, 80, 80] }); }
-  if (data.contact.email) {
-    setBody({ size: 10, color: [60, 90, 200] });
-    doc.textWithLink(data.contact.email, MARGIN, y, { url: 'mailto:' + data.contact.email });
-    y += 14;
-    setBody();
+  if (c.email && c.phone) {
+    var line = c.email + ' | ' + c.phone;
+    setBody({ size: 10 });
+    var w = doc.getTextWidth(line);
+    // Whole line is hot — clicking anywhere fires the mailto:. We
+    // don't try to split the link target by character because jsPDF
+    // doesn't support partial-line link rectangles.
+    doc.textWithLink(line, W - MARGIN - w, rY, { url: 'mailto:' + c.email });
+    rY += 13;
+  } else if (c.email) {
+    rLink(c.email, rY, 'mailto:' + c.email, { size: 10 }); rY += 13;
+  } else if (c.phone) {
+    rLink(c.phone, rY, 'tel:' + c.phone.replace(/[^+\d]/g, ''), { size: 10 }); rY += 13;
+  }
+  if (c.linkedin)    { rLink(c.linkedin,    rY, 'https://' + c.linkedin,    { size: 10, color: BLUE }); rY += 13; }
+  if (c.trailblazer) { rLink(c.trailblazer, rY, 'https://' + c.trailblazer, { size: 10, color: BLUE }); rY += 13; }
+  if (c.location)    { rText(c.location,    rY, { bold: true, size: 10 });                              rY += 13; }
+  setBody();
+
+  // Where the body content starts (max of the deepest header line on
+  // either side, plus a small gap). Both columns begin from this y on
+  // page 1; on subsequent pages, columns start from MARGIN + 12 because
+  // the header is page-1 only.
+  var leftHeaderBottom  = data.title ? MARGIN + 30 + 4 : MARGIN + 14 + 4;
+  var rightHeaderBottom = rY;
+  var BODY_TOP = Math.max(leftHeaderBottom, rightHeaderBottom) + 14;
+  var SUBSEQUENT_PAGE_TOP = MARGIN + 12;
+
+  // ── Column flow primitive ──────────────────────────────────────────
+  // Each column owns its current page + y cursor. Drawing methods all
+  // start by calling activate() so jsPDF writes to the column's page
+  // (since the two columns interleave on the same physical pages).
+  function makeColumn(x, w) {
+    return {
+      page: 1,
+      x:    x,
+      w:    w,
+      y:    BODY_TOP,
+      ensure: function (needed) {
+        if (this.y + needed > BOTTOM) this.advancePage();
+      },
+      advancePage: function () {
+        var totalPages = doc.internal.getNumberOfPages();
+        if (this.page < totalPages) this.page += 1;
+        else { doc.addPage(); this.page = totalPages + 1; }
+        doc.setPage(this.page);
+        this.y = SUBSEQUENT_PAGE_TOP;
+      },
+      activate: function () { doc.setPage(this.page); },
+      paragraph: function (text, opts) {
+        opts = opts || {};
+        var size = opts.size || 10;
+        var lh   = opts.lineHeight || (size + 3);
+        setBody(opts);
+        var lines = doc.splitTextToSize(text, this.w);
+        for (var i = 0; i < lines.length; i++) {
+          this.ensure(lh);
+          this.activate();
+          doc.text(lines[i], this.x, this.y);
+          this.y += lh;
+        }
+        setBody();
+      },
+      bullet: function (text, opts) {
+        opts = opts || {};
+        var size = opts.size || 10;
+        var lh   = size + 3;
+        var indent = 12;
+        setBody(opts);
+        var lines = doc.splitTextToSize(text, this.w - indent);
+        for (var i = 0; i < lines.length; i++) {
+          this.ensure(lh);
+          this.activate();
+          if (i === 0) doc.text('•', this.x, this.y);
+          doc.text(lines[i], this.x + indent, this.y);
+          this.y += lh;
+        }
+        setBody();
+      },
+      sectionHeader: function (label) {
+        // Add air above (skipped if we're already at the top of a column
+        // on its current page — i.e. this is the first section here).
+        var atTop = (this.y <= BODY_TOP + 1) || (this.y <= SUBSEQUENT_PAGE_TOP + 1);
+        this.ensure(20);
+        if (!atTop) this.y += 6;
+        this.activate();
+        setBody({ bold: true, size: 12 });
+        doc.text(label, this.x, this.y);
+        this.y += 16;
+        setBody();
+      },
+      // Inline-bold-label line (used for skill rows).
+      // First line: "<label>: <body fragment that fits beside label>".
+      // Continuation lines wrap back to the column left edge — matches
+      // how the reference resume lays out skill rows.
+      labeledLine: function (label, body, opts) {
+        opts = opts || {};
+        var size = opts.size || 10;
+        var lh   = size + 3;
+        var labelStr = label + ': ';
+        setBody({ bold: true, size: size });
+        var labelW = doc.getTextWidth(labelStr);
+        setBody({ size: size });
+        var firstSplit = doc.splitTextToSize(body, this.w - labelW);
+        var firstLine  = firstSplit[0] || '';
+        var rest       = body.slice(firstLine.length).trimStart();
+        var restLines  = rest ? doc.splitTextToSize(rest, this.w) : [];
+
+        this.ensure(lh);
+        this.activate();
+        setBody({ bold: true, size: size });
+        doc.text(labelStr, this.x, this.y);
+        setBody({ size: size });
+        if (firstLine) doc.text(firstLine, this.x + labelW, this.y);
+        this.y += lh;
+        for (var i = 0; i < restLines.length; i++) {
+          this.ensure(lh);
+          this.activate();
+          doc.text(restLines[i], this.x, this.y);
+          this.y += lh;
+        }
+        setBody();
+      },
+      gap: function (amount) { this.y += amount; },
+    };
   }
 
-  // ── Summary ─────────────────────────────────────────────────────────────
-  if (data.summary.length) {
-    sectionHeader('Summary');
-    data.summary.forEach(function (p) { paragraph(p); y += 4; });
+  var leftCol  = makeColumn(LEFT_X,  LEFT_W);
+  var rightCol = makeColumn(RIGHT_X, RIGHT_W);
+
+  // ── LEFT COLUMN ────────────────────────────────────────────────────
+  if (data.summary && data.summary.length) {
+    leftCol.sectionHeader('About Me');
+    data.summary.forEach(function (p) {
+      leftCol.paragraph(p);
+      leftCol.gap(2);
+    });
   }
 
-  // ── Skills ──────────────────────────────────────────────────────────────
-  if (data.skills.length) {
-    sectionHeader('Skills');
+  if (data.skills && data.skills.length) {
+    leftCol.sectionHeader('Skills');
     data.skills.forEach(function (g) {
-      ensureSpace(18);
-      var label = g.label + ': ';
-      setBody({ bold: true });
-      doc.text(label, MARGIN, y);
-      var labelW = doc.getTextWidth(label);
-      setBody();
-      var tagsText = g.tags.join(', ');
-      var lines = doc.splitTextToSize(tagsText, COL - labelW);
-      if (lines.length) doc.text(lines[0], MARGIN + labelW, y);
-      y += 13;
-      for (var i = 1; i < lines.length; i++) {
-        ensureSpace(13); doc.text(lines[i], MARGIN, y); y += 13;
-      }
-      y += 3;
+      leftCol.labeledLine(g.label, g.tags.join(', '));
+      leftCol.gap(3);
     });
   }
 
-  // ── Experience ──────────────────────────────────────────────────────────
-  if (data.experience.length) {
-    sectionHeader('Experience');
-    data.experience.forEach(function (j) {
-      ensureSpace(48);
-      setBody({ bold: true, size: 11 });
-      doc.text(j.title, MARGIN, y);
-      if (j.period) rightAligned(j.period, y, { size: 10, color: [110, 110, 110] });
-      y += 13;
-      if (j.company) paragraph(j.company, { italic: true, color: [80, 80, 80] });
-      bullets(j.bullets);
-      y += 4;
-    });
-  }
-
-  // ── Projects ────────────────────────────────────────────────────────────
-  if (data.projects.length) {
-    sectionHeader('Key Projects');
-    data.projects.forEach(function (p) {
-      ensureSpace(36);
-      setBody({ bold: true, size: 11 });
-      doc.text(p.title, MARGIN, y);
-      y += 13;
-      if (p.tag) paragraph(p.tag, { italic: true, size: 9, color: [110, 110, 110] });
-      bullets(p.bullets);
-      y += 4;
-    });
-  }
-
-  // ── Education ───────────────────────────────────────────────────────────
   if (data.education) {
-    sectionHeader('Education');
-    ensureSpace(40);
-    setBody({ bold: true, size: 11 });
-    doc.text(data.education.name, MARGIN, y);
-    if (data.education.year) rightAligned(data.education.year, y, { size: 10, color: [110, 110, 110] });
-    y += 13;
-    data.education.degree.forEach(function (d) {
-      ensureSpace(12);
-      setBody();
-      doc.text(d, MARGIN, y); y += 12;
-    });
-    y += 4;
+    leftCol.sectionHeader('Education');
+    var degree0 = (data.education.degree && data.education.degree[0]) || '';
+    var firstLine = degree0 + (data.education.year ? ', ' + data.education.year : '');
+    if (firstLine.trim()) leftCol.paragraph(firstLine, { bold: true });
+    if (data.education.name) leftCol.paragraph(data.education.name);
+    // Any further `.edu-degree` entries (e.g. "Indore, Madhya Pradesh")
+    // become institution-location lines below the name.
+    (data.education.degree || []).slice(1).forEach(function (d) { leftCol.paragraph(d); });
   }
 
-  // ── Certifications ──────────────────────────────────────────────────────
-  if (data.certifications.length) {
-    sectionHeader('Certifications');
-    data.certifications.forEach(function (g) {
-      ensureSpace(20);
+  if (data.certifications && data.certifications.length) {
+    leftCol.sectionHeader('Certifications');
+    data.certifications.forEach(function (g, idx) {
+      // Orphan prevention: keep the subgroup title and at least its first
+      // bullet on the same page. Without this, small groups can split.
+      leftCol.ensure((g.title ? 14 : 0) + 13 + 2);
       if (g.title) {
-        setBody({ bold: true });
-        doc.text(g.title, MARGIN, y);
-        y += 13;
+        leftCol.activate();
+        setBody({ bold: true, size: 10 });
+        doc.text(g.title, leftCol.x, leftCol.y);
+        leftCol.y += 13;
+        setBody();
       }
-      setBody();
       g.items.forEach(function (item) {
-        // The rendered DOM nodes include a leading bullet glyph; strip it
-        // so the PDF doesn't end up with double bullets.
+        // The DOM nodes ship a leading bullet glyph for visual styling;
+        // strip it so we don't double-bullet in the PDF.
+        // Reference resume renders cert items as plain lines under
+        // each subgroup title (no bullet glyph), so we do the same — it
+        // packs more density into the sidebar without looking like a
+        // checklist.
         var clean = item.replace(/^[\u2022\u00B7•]\s*/, '');
-        var lines = doc.splitTextToSize(clean, COL - 14);
-        lines.forEach(function (line, i) {
-          ensureSpace(12);
-          if (i === 0) doc.text('•', MARGIN, y);
-          doc.text(line, MARGIN + 12, y);
-          y += 12;
+        leftCol.paragraph(clean, { size: 9.5, lineHeight: 12 });
+      });
+      if (idx < data.certifications.length - 1) leftCol.gap(3);
+    });
+  }
+
+  // ── RIGHT COLUMN ───────────────────────────────────────────────────
+  if (data.experience && data.experience.length) {
+    rightCol.sectionHeader('Work Experience');
+    data.experience.forEach(function (j) {
+      // Keep job title + first dateline together — orphaned headers
+      // look broken at a column boundary.
+      rightCol.ensure(28);
+      rightCol.activate();
+      // Line 1: "<role>, <company>" (bold)
+      setBody({ bold: true, size: 11 });
+      var titleLine = j.title + (j.company ? ', ' + j.company : '');
+      var titleLines = doc.splitTextToSize(titleLine, rightCol.w);
+      for (var ti = 0; ti < titleLines.length; ti++) {
+        rightCol.ensure(13);
+        rightCol.activate();
+        doc.text(titleLines[ti], rightCol.x, rightCol.y);
+        rightCol.y += 13;
+      }
+      // Line 2: "<period>, <location>" (bold, slightly smaller)
+      if (j.period || j.location) {
+        var dateLine = j.period + (j.location ? ', ' + j.location : '');
+        rightCol.ensure(12);
+        rightCol.activate();
+        setBody({ bold: true, size: 10 });
+        doc.text(dateLine, rightCol.x, rightCol.y);
+        rightCol.y += 12;
+        setBody();
+      }
+      (j.bullets || []).forEach(function (b) { rightCol.bullet(b); });
+      rightCol.gap(6);
+    });
+  }
+
+  // ── PROJECTS (full-width footer) ───────────────────────────────────
+  // Place below whichever column ended deeper. If neither column
+  // reached the last page, project section may need its own pages.
+  if (data.projects && data.projects.length) {
+    var lastPage = Math.max(leftCol.page, rightCol.page);
+    var leftY    = (leftCol.page  === lastPage) ? leftCol.y  : MARGIN;
+    var rightY   = (rightCol.page === lastPage) ? rightCol.y : MARGIN;
+    var projY    = Math.max(leftY, rightY) + 14;
+
+    doc.setPage(lastPage);
+    var projPage = lastPage;
+
+    // If we're nearly at page bottom, push to a new page.
+    if (projY + 50 > BOTTOM) {
+      doc.addPage();
+      projPage = doc.internal.getNumberOfPages();
+      doc.setPage(projPage);
+      projY = SUBSEQUENT_PAGE_TOP;
+    }
+
+    setBody({ bold: true, size: 12 });
+    doc.text('Projects', LEFT_X, projY);
+    projY += 16;
+    setBody();
+
+    function ensureFull(needed) {
+      if (projY + needed > BOTTOM) {
+        doc.addPage();
+        projPage = doc.internal.getNumberOfPages();
+        doc.setPage(projPage);
+        projY = SUBSEQUENT_PAGE_TOP;
+      }
+    }
+
+    data.projects.forEach(function (p, idx) {
+      ensureFull(28);
+      // "Project N: <title>" prefix matches the reference resume's
+      // numbered projects pattern. ATS parsers latch onto the prefix
+      // as a project boundary which makes downstream extraction more
+      // reliable than free-form titles.
+      // Joiner is a comma rather than an em-dash because most page
+      // titles already contain an em-dash (e.g. "PLDT — Order
+      // Management") — using "—" again would produce an awkward
+      // double-dash line.
+      var projTitle = 'Project ' + (idx + 1) + ': ' + p.title;
+      var titleLine = p.tag ? projTitle + ', ' + p.tag : projTitle;
+      setBody({ bold: true, size: 11 });
+      var titleLines = doc.splitTextToSize(titleLine, FULL_W);
+      titleLines.forEach(function (tl) {
+        ensureFull(13);
+        doc.text(tl, LEFT_X, projY);
+        projY += 13;
+      });
+      setBody();
+      (p.bullets || []).forEach(function (b) {
+        var lines = doc.splitTextToSize(b, FULL_W - 14);
+        lines.forEach(function (ln, i) {
+          ensureFull(12);
+          if (i === 0) doc.text('•', LEFT_X, projY);
+          doc.text(ln, LEFT_X + 12, projY);
+          projY += 12;
         });
       });
-      y += 4;
+      if (idx < data.projects.length - 1) projY += 6;
     });
   }
 
   return doc;
 }
 
+// ── Preview-modal state ──
+// We hold the rendered jsPDF document and a derived blob URL between
+// "preview is open" and "user clicks Download". Both get cleared on
+// close so we don't leak object URLs across multiple opens.
+var _currentDoc      = null;
+var _currentBlobUrl  = null;
+// Filename mirrors the canonical, ATS-passing reference resume so a
+// recruiter who searches their inbox/downloads for either spelling
+// finds the same document.
+var _currentFilename = 'Abhinav_Kumar_Senior_Salesforce_Application_Engineer.pdf';
+
+function whenMdDialogReady(cb) {
+  if (customElements.get('md-dialog')) { cb(); return; }
+  customElements.whenDefined('md-dialog').then(cb);
+}
+
+function clearPreviewState() {
+  if (_currentBlobUrl) {
+    try { URL.revokeObjectURL(_currentBlobUrl); } catch (_) {}
+  }
+  _currentDoc     = null;
+  _currentBlobUrl = null;
+  var iframe = document.getElementById('resumePreviewFrame');
+  if (iframe) iframe.removeAttribute('src');
+}
+
 /**
- * Public API — call from the Download Resume button click handler.
- * Manages button loading state, lazy-loads jsPDF on first call, scrapes
- * the live page, renders, triggers the browser save dialog. Errors
- * surface as a single user-visible alert; everything else is silent.
+ * Public API — opens the preview modal. Lazy-loads jsPDF, renders the
+ * PDF from the live DOM, embeds the resulting blob in an iframe inside
+ * <md-dialog id="resumePreviewOverlay">. The visitor reviews, then
+ * clicks Download (→ `downloadResumePdf`) or Close (→ `closeResumePreview`).
+ *
+ * Manages the trigger button's loading state during generation.
+ * Errors surface as a single user-visible alert; everything else is
+ * silent so we don't spam the console for non-developers.
  */
 export function generateResumePdf() {
   var btn = document.querySelector('.download-resume-btn');
@@ -312,8 +587,12 @@ export function generateResumePdf() {
 
   return loadJsPDF()
     .then(function (jsPDF) {
-      var doc = renderResumePdf(jsPDF, getResumeData());
-      doc.save('Abhinav-Kumar-Resume.pdf');
+      // If a previous preview was open we revoke its blob URL before
+      // creating a new one — otherwise repeated clicks leak memory.
+      clearPreviewState();
+      _currentDoc     = renderResumePdf(jsPDF, getResumeData());
+      _currentBlobUrl = URL.createObjectURL(_currentDoc.output('blob'));
+      openResumePreview(_currentBlobUrl);
     })
     .catch(function (err) {
       console.error('[resume] generation failed:', err);
@@ -324,4 +603,52 @@ export function generateResumePdf() {
       if (btn) btn.disabled = false;
       if (btn) btn.removeAttribute('aria-busy');
     });
+}
+
+function openResumePreview(blobUrl) {
+  var overlay = document.getElementById('resumePreviewOverlay');
+  var iframe  = document.getElementById('resumePreviewFrame');
+  if (!overlay || !iframe) {
+    // Modal markup missing — fall back to direct save so the click still
+    // delivers the file. Defensive only; index.html ships the markup.
+    if (_currentDoc) _currentDoc.save(_currentFilename);
+    return;
+  }
+  // #toolbar=0 hides the browser PDF chrome on Chromium so the preview
+  // looks framed by *our* modal, not by the browser. Honoured by Chrome,
+  // Edge, Opera; harmless elsewhere.
+  iframe.src = blobUrl + '#toolbar=0';
+  whenMdDialogReady(function () {
+    if (typeof overlay.show === 'function') overlay.show();
+    else overlay.removeAttribute('hidden');
+  });
+}
+
+/**
+ * Save the currently-previewed PDF to disk. Called from the modal's
+ * primary "Download" button. Idempotent — clicking twice just saves
+ * twice. We close the modal after a successful save so the visitor
+ * isn't left staring at a now-stale preview.
+ */
+export function downloadResumePdf() {
+  if (!_currentDoc) {
+    // Modal somehow open without a doc (e.g. user opened devtools and
+    // poked at things) — bail gracefully rather than crashing.
+    closeResumePreview();
+    return;
+  }
+  _currentDoc.save(_currentFilename);
+  closeResumePreview();
+}
+
+export function closeResumePreview() {
+  var overlay = document.getElementById('resumePreviewOverlay');
+  if (overlay) {
+    if (typeof overlay.close === 'function') overlay.close();
+    else overlay.setAttribute('hidden', '');
+  }
+  // Clear blob URL + doc on close. If md-dialog fires its own `close`
+  // event later, the listener wired up in index.html will call this
+  // again; clearPreviewState is idempotent so double-close is safe.
+  clearPreviewState();
 }
