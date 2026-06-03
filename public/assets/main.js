@@ -15,7 +15,11 @@
 // public functions, then add an `import` + `window.X = X` here.
 // Resist the urge to dump anything else into this file.
 // ─────────────────────────────────────────────────────────────────────────────
-import { generateResumePdf } from './refer/resume-pdf.js';
+import {
+  generateResumePdf,
+  downloadResumePdf,
+  closeResumePreview,
+} from './refer/resume-pdf.js';
 import { initTheme }         from './core/theme.js';
 import { initLocationPopover } from './ui/location.js';
 import {
@@ -409,9 +413,20 @@ import {
   window.closeHireMe       = closeHireMe;
   window.openReferMe       = openReferMe;
   window.closeReferMe      = closeReferMe;
-  window.generateResumePdf = generateResumePdf;
+  window.generateResumePdf  = generateResumePdf;
+  window.downloadResumePdf  = downloadResumePdf;
+  window.closeResumePreview = closeResumePreview;
   initHireMe();
   initRefer();
+
+  // Catch-all close hook: if md-dialog fires its `close` event for any
+  // reason (Esc key, scrim click, programmatic) we want the blob URL
+  // revoked. closeResumePreview is idempotent, so calling it again
+  // after the X button already fired it is harmless.
+  customElements.whenDefined('md-dialog').then(function () {
+    var preview = document.getElementById('resumePreviewOverlay');
+    if (preview) preview.addEventListener('close', closeResumePreview);
+  });
 
   /* ── Recommendations section ──
      Render, gate (sign-in required), submit handler, edit handler →

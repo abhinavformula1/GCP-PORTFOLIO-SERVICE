@@ -545,6 +545,41 @@
     </div>
   </md-dialog>
 
+  <!-- ── Resume Preview Dialog (M3 <md-dialog>) ──
+       Opened by the "Download Resume" button. Renders the runtime-built
+       PDF in an iframe so the visitor can review the result before
+       committing a file to their downloads folder. The actual save is
+       gated behind the primary button below — this is a quality-check
+       step, not just a viewer.
+       Blob URL lifecycle (create on open / revoke on close) is owned by
+       refer/resume-pdf.js. -->
+  <md-dialog id="resumePreviewOverlay" aria-labelledby="resume-preview-title-text">
+    <div slot="headline" class="hm-headline">
+      <span id="resume-preview-title-text" data-i18n="resumePreviewTitle">Resume Preview</span>
+      <button type="button" class="hm-close" aria-label="Close" onclick="window.closeResumePreview && window.closeResumePreview()">&times;</button>
+    </div>
+
+    <div slot="content" class="resume-preview-content">
+      <p class="hm-subtitle" data-i18n="resumePreviewIntro">This PDF is generated live from the page above. Review it below, then download.</p>
+
+      <iframe
+        id="resumePreviewFrame"
+        class="resume-preview-frame"
+        title="Resume PDF preview"
+        loading="lazy"></iframe>
+    </div>
+
+    <div slot="actions" class="resume-preview-actions">
+      <md-text-button type="button" onclick="window.closeResumePreview && window.closeResumePreview()">
+        <span data-i18n="resumePreviewClose">Close</span>
+      </md-text-button>
+      <md-filled-button class="resume-preview-download" type="button" onclick="window.downloadResumePdf && window.downloadResumePdf()">
+        <span class="material-symbols-outlined" slot="icon" aria-hidden="true">download</span>
+        <span data-i18n="resumePreviewDownload">Download PDF</span>
+      </md-filled-button>
+    </div>
+  </md-dialog>
+
   <!-- ── Recommendations Section ──
        Public read of /api/recommendations populates this list on page load.
        Submission requires Google Sign-In; the modal below only opens for
