@@ -6,11 +6,13 @@ require('dotenv').config();
 const express      = require('express');
 const path         = require('path');
 const config       = require('./src/config');
-const hireRoute       = require('./src/routes/hire');
-const summariseRoute  = require('./src/routes/summarise');
-const salesforceRoute = require('./src/routes/salesforce');
-const sessionRoute    = require('./src/routes/session');
-const chatRoute       = require('./src/routes/chat');
+const hireRoute           = require('./src/routes/hire');
+const questionRoute       = require('./src/routes/question');
+const recommendationRoute = require('./src/routes/recommendation');
+const summariseRoute      = require('./src/routes/summarise');
+const salesforceRoute     = require('./src/routes/salesforce');
+const sessionRoute        = require('./src/routes/session');
+const chatRoute           = require('./src/routes/chat');
 const { errorHandler } = require('./src/middleware/errorHandler');
 
 const app  = express();
@@ -33,6 +35,8 @@ app.get('/health', (_req, res) => {
 
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use('/api', hireRoute);
+app.use('/api', questionRoute);
+app.use('/api', recommendationRoute);
 app.use('/api', summariseRoute);
 app.use('/api', salesforceRoute);
 app.use('/api', sessionRoute);

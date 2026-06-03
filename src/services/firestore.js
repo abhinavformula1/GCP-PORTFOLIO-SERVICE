@@ -207,6 +207,131 @@ async function completeActiveChat(uid, { salesforceId, alreadySubmitted } = {}) 
   await ref.delete();
 }
 
+// ── Recommendation operations ────────────────────────────────────────────────
+//
+// /recommendations/{uid} — one document per Google-authenticated submitter.
+//
+// Why Firestore is the public read model (not Salesforce):
+//   - The portfolio page renders the recommendation list on every load.
+//   - Hitting Salesforce on every page load would burn API request budget
+//     and add 300–800ms of latency to first contentful paint.
+//   - Firestore reads are <50ms, free up to 50K/day, and globally cached.
+//
+// Salesforce stays the system of record (the writes go there too on POST,
+// see services/salesforce/recommendation.js). The reply path is the
+// inverse: I write the reply in Salesforce, an Apex trigger calls back
+// into Cloud Run via Named Credential, and that handler updates the
+// document here. So Firestore is always converging to mirror Salesforce.
+//
+// The doc id IS the Google sub claim (uid). That makes recommendations
+// idempotent for free — same person re-submits → same doc → updates in
+// place. No client-side Idempotency-Key plumbing needed.
+
+const RECOMMENDATIONS_COLLECTION = 'recommendations';
+
+function recommendationDocRef(uid) {
+  return getDb().collection(RECOMMENDATIONS_COLLECTION).doc(uid);
+}
+
+/**
+ * Upsert a recommendation. The document id is the submitter's Google uid,
+ * so calling this twice for the same uid updates the existing row.
+ *
+ * On first write, sets `submittedAt`. On subsequent writes, only `updatedAt`
+ * advances — the original submission timestamp is preserved.
+ *
+ * The reply / repliedAt fields are NEVER touched here. They flow in only
+ * via writeRecommendationReply() (called from the SF → GCP callback).
+ */
+async function upsertRecommendation({
+  uid, email, emailVerified, hostedDomain, name, company, avatarUrl, text,
+}) {
+  const ref = recommendationDocRef(uid);
+  return getDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const now  = FieldValue.serverTimestamp();
+
+    const base = {
+      uid,
+      email:         email || '',
+      emailVerified: !!emailVerified,
+      hostedDomain:  hostedDomain || '',
+      name:          name || '',
+      company:       company || '',
+      avatarUrl:     avatarUrl || null,
+      text:          String(text || '').slice(0, 5000),
+      status:        'Active',
+      updatedAt:     now,
+    };
+
+    if (snap.exists) {
+      tx.update(ref, base);
+      return { isNew: false };
+    }
+    tx.set(ref, Object.assign({}, base, {
+      submittedAt: now,
+      reply:       null,
+      repliedAt:   null,
+    }));
+    return { isNew: true };
+  });
+}
+
+/**
+ * Public read — returns recommendations for the page.
+ *
+ * - Filters by status === 'Active' so hidden ones never reach the client.
+ * - Strips PII (raw email, hostedDomain) — only company is public.
+ * - Newest first by submittedAt.
+ * - Caps at 100 to bound payload size.
+ */
+async function listActiveRecommendations() {
+  const snap = await getDb()
+    .collection(RECOMMENDATIONS_COLLECTION)
+    .where('status', '==', 'Active')
+    .orderBy('submittedAt', 'desc')
+    .limit(100)
+    .get();
+
+  return snap.docs.map((d) => {
+    const v = d.data() || {};
+    return {
+      id:          d.id,
+      name:        v.name        || '',
+      company:     v.company     || '',
+      avatarUrl:   v.avatarUrl   || null,
+      text:        v.text        || '',
+      reply:       v.reply       || null,
+      submittedAt: v.submittedAt && v.submittedAt.toMillis ? v.submittedAt.toMillis() : null,
+      repliedAt:   v.repliedAt   && v.repliedAt.toMillis   ? v.repliedAt.toMillis()   : null,
+    };
+  });
+}
+
+/**
+ * Write a reply onto an existing recommendation. Called from the SF → GCP
+ * callback handler when I update Reply__c on the SF record.
+ *
+ * If the recommendation doesn't exist yet (e.g. this fires before the
+ * recommendation arrived in Firestore for some reason), we no-op rather
+ * than create a partial row — the reply will be re-applied on the next
+ * trigger fire. Safe by construction.
+ *
+ * Returns { applied: boolean } so the caller can choose how to respond.
+ */
+async function writeRecommendationReply(uid, { reply, repliedAt }) {
+  const ref = recommendationDocRef(uid);
+  const snap = await ref.get();
+  if (!snap.exists) return { applied: false, reason: 'not_found' };
+
+  await ref.update({
+    reply:     String(reply || '').slice(0, 1000),
+    repliedAt: repliedAt ? FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { applied: true };
+}
+
 module.exports = {
   getDb,
   getUser,
@@ -215,4 +340,7 @@ module.exports = {
   upsertActiveChat,
   clearActiveChat,
   completeActiveChat,
+  upsertRecommendation,
+  listActiveRecommendations,
+  writeRecommendationReply,
 };

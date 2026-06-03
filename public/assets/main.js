@@ -601,6 +601,10 @@
     en: {
       headerTitle: 'Senior Salesforce Application Engineer',
       getInTouch: 'Get In Touch',
+      askQuestion: 'Ask a Question',
+      recoTitle: 'Recommendations',
+      recoSubtitle: "What people I've worked with — and recruiters I've spoken with — have to say.",
+      recoCta: 'Leave a Recommendation',
       yearsExp: 'Years Experience',
       // Welcome / Login overlay
       welcomeTitle:    "Abhinav's Portfolio",
@@ -632,6 +636,10 @@
     fr: {
       headerTitle: 'Ingénieur Senior en Applications Salesforce',
       getInTouch: 'Me Contacter',
+      askQuestion: 'Poser une Question',
+      recoTitle: 'Recommandations',
+      recoSubtitle: "Ce que les personnes avec qui j'ai travaillé — et les recruteurs avec qui j'ai échangé — disent.",
+      recoCta: 'Laisser une Recommandation',
       yearsExp: "Ans d'Expérience",
       // Welcome / Login overlay
       welcomeTitle:    "Le Portfolio d'Abhinav",
@@ -775,6 +783,15 @@
   ].join('\n');
   customElements.whenDefined('md-filled-button').then(function () {
     document.querySelectorAll('.hire-me-btn, .hm-submit').forEach(function (btn) {
+      injectShadowStyle(btn, BRAND_BUTTON_CSS);
+    });
+  });
+  // The "Ask a Question" CTA is an <md-outlined-button>, which uses a
+  // separate custom element. Same horizontal-padding fix applies — without
+  // it the icon and label crash into each other. Wait until the outlined
+  // variant is registered before injecting.
+  customElements.whenDefined('md-outlined-button').then(function () {
+    document.querySelectorAll('.ask-q-btn').forEach(function (btn) {
       injectShadowStyle(btn, BRAND_BUTTON_CSS);
     });
   });
@@ -1737,6 +1754,483 @@
       globalErr.hidden = false;
       btn.disabled = false;
       if (btnLabel) btnLabel.textContent = 'Send Message';
+    }
+  });
+
+  /* ── "Ask a Question" modal ──────────────────────────────────────────────
+     Single-modal flow that demonstrates the client-side half of the
+     idempotency contract:
+
+       1. When the modal opens we mint a fresh idempotencyKey (UUID v4) and
+          stash it on the form. EVERY submission for this open-instance of
+          the modal uses that SAME key.
+       2. The key is sent both as the `Idempotency-Key` header (Stripe-style)
+          AND as `gcpQuestionId` in the body, for non-browser clients.
+       3. If the user clicks Send, the request fails (network blip), and they
+          click again — the SAME key flows through. The Apex REST endpoint
+          UPSERTs by that External ID, so even on the second click we end up
+          with exactly one Recruiter_Question__c row.
+       4. After a successful submit we BURN the key (set to null) so a new
+          question — even from the same modal session — gets a fresh key.
+
+     Closing the modal also rotates the key on next open. ───────────────── */
+  var askQ = {
+    idempotencyKey: null,
+    submitting:     false,
+  };
+
+  // crypto.randomUUID is available in all modern browsers and Cloud Run.
+  // Fallback for very old browsers — never used in our supported matrix
+  // but cheap insurance.
+  function newIdempotencyKey() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0;
+      var v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  function openAskQuestion() {
+    var overlay = document.getElementById('askQuestionOverlay');
+    if (!overlay) return;
+    askQ.idempotencyKey = newIdempotencyKey();
+    askQ.submitting     = false;
+    whenMdDialogReady(function () {
+      if (typeof overlay.show === 'function') overlay.show();
+      else overlay.removeAttribute('hidden');
+    });
+  }
+  window.openAskQuestion = openAskQuestion;
+
+  function closeAskQuestion() {
+    var overlay = document.getElementById('askQuestionOverlay');
+    if (!overlay) return;
+    if (typeof overlay.close === 'function') overlay.close();
+    else overlay.setAttribute('hidden', '');
+    resetAskQuestionForm();
+  }
+  window.closeAskQuestion = closeAskQuestion;
+
+  function resetAskQuestionForm() {
+    var form = document.getElementById('askQuestionForm');
+    if (form) form.reset();
+    ['aq-name', 'aq-email', 'aq-company', 'aq-question'].forEach(clearErr);
+    var globalErr = document.getElementById('aq-global-error');
+    if (globalErr) globalErr.hidden = true;
+    var success = document.getElementById('aq-success');
+    if (success) success.hidden = true;
+    if (form) form.hidden = false;
+    var btn = document.getElementById('aq-submit-btn');
+    if (btn) btn.disabled = false;
+    var lbl = document.getElementById('aq-submit-label');
+    if (lbl) lbl.textContent = 'Send Question';
+    askQ.idempotencyKey = null;
+    askQ.submitting     = false;
+  }
+
+  // <md-dialog> handles outside-click + Escape natively. Mirror the close
+  // behaviour we use for the Hire-Me dialog.
+  var aqOverlay = document.getElementById('askQuestionOverlay');
+  if (aqOverlay) {
+    aqOverlay.addEventListener('close', resetAskQuestionForm);
+  }
+
+  function validateAskQuestion() {
+    var email    = document.getElementById('aq-email').value.trim();
+    var question = document.getElementById('aq-question').value.trim();
+    var ok = true;
+    ['aq-name', 'aq-email', 'aq-company', 'aq-question'].forEach(clearErr);
+
+    if (!email) { setErr('aq-email', 'Email is required.'); ok = false; }
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErr('aq-email', 'Enter a valid email address.'); ok = false;
+    }
+    if (!question) { setErr('aq-question', 'Please type a question.'); ok = false; }
+    else if (question.length > 4000) {
+      setErr('aq-question', 'Question must be 4000 characters or fewer.'); ok = false;
+    }
+    return ok;
+  }
+
+  var askForm = document.getElementById('askQuestionForm');
+  if (askForm) askForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (askQ.submitting) return;             // guard double-click during in-flight req
+    if (!validateAskQuestion()) return;
+
+    var btn       = document.getElementById('aq-submit-btn');
+    var btnLabel  = document.getElementById('aq-submit-label');
+    var globalErr = document.getElementById('aq-global-error');
+    btn.disabled = true;
+    if (btnLabel) btnLabel.textContent = 'Sending\u2026';
+    globalErr.hidden = true;
+    askQ.submitting = true;
+
+    // Lazy-mint a key if the modal was opened before our handler ran for
+    // some reason — defensive, never expected in practice.
+    if (!askQ.idempotencyKey) askQ.idempotencyKey = newIdempotencyKey();
+
+    var payload = {
+      gcpQuestionId: askQ.idempotencyKey,
+      name:          document.getElementById('aq-name').value.trim(),
+      email:         document.getElementById('aq-email').value.trim(),
+      company:       document.getElementById('aq-company').value.trim(),
+      question:      document.getElementById('aq-question').value.trim(),
+    };
+
+    try {
+      var res = await fetch('/api/question', {
+        method:  'POST',
+        headers: {
+          'Content-Type':    'application/json',
+          'Idempotency-Key': askQ.idempotencyKey,
+        },
+        body: JSON.stringify(payload),
+      });
+      var data = await res.json();
+
+      if (res.status === 429) {
+        // Rate-limited. Server returns the structured rate-limit message.
+        globalErr.textContent = (data && (data.error || data.message))
+          || "You've reached the question limit. Please try again in an hour.";
+        globalErr.hidden = false;
+        btn.disabled = false;
+        askQ.submitting = false;
+        if (btnLabel) btnLabel.textContent = 'Send Question';
+        return;
+      }
+
+      if (res.ok && data.success) {
+        // Burn the key — a follow-up question opens a fresh modal session
+        // and gets a new key.
+        askQ.idempotencyKey = null;
+        askQ.submitting     = false;
+        document.getElementById('askQuestionForm').hidden = true;
+        var successText = document.getElementById('aq-success-text');
+        if (successText) {
+          successText.textContent = data.idempotent
+            ? "✓ Updated — your latest question replaces the previous version."
+            : "✓ Question sent! I'll respond by email shortly.";
+        }
+        // Surface the reference ID so the recruiter can quote it in follow-up.
+        var refWrap = document.getElementById('aq-reference');
+        var refId   = document.getElementById('aq-reference-id');
+        if (refWrap && refId && data.gcpQuestionId) {
+          refId.textContent = data.gcpQuestionId;
+          refWrap.hidden = false;
+        }
+        document.getElementById('aq-success').hidden = false;
+      } else {
+        globalErr.textContent = (data && (data.error || data.message))
+          || 'Submission failed. Please try again.';
+        globalErr.hidden = false;
+        btn.disabled = false;
+        askQ.submitting = false;
+        if (btnLabel) btnLabel.textContent = 'Send Question';
+      }
+    } catch (_) {
+      // Network failure — keep the key so a manual retry from the same
+      // modal collapses to the same Recruiter_Question__c row.
+      globalErr.textContent = 'Network error. Please check your connection and try again.';
+      globalErr.hidden = false;
+      btn.disabled = false;
+      askQ.submitting = false;
+      if (btnLabel) btnLabel.textContent = 'Send Question';
+    }
+  });
+
+  /* ── Recommendations section ─────────────────────────────────────────────
+     Three concerns colocated:
+       1. RENDER  — fetch /api/recommendations on load, hydrate cards.
+       2. GATE    — the "Leave a Recommendation" CTA only opens the modal
+                    for Google-signed-in users; otherwise prompt sign-in.
+       3. SUBMIT  — POST to /api/recommendation with the cached Google
+                    credential as Bearer; on success, optimistically
+                    re-render so the new card shows immediately. ────────── */
+  function renderRecommendation(item) {
+    var card = document.createElement('article');
+    card.className = 'reco-card';
+    card.setAttribute('data-uid', item.id);
+
+    // Header: avatar + name @ company + when
+    var header = document.createElement('header');
+    header.className = 'reco-card-header';
+
+    if (item.avatarUrl) {
+      var img = document.createElement('img');
+      img.className = 'reco-avatar';
+      img.src   = item.avatarUrl;
+      img.alt   = '';
+      img.loading = 'lazy';
+      img.referrerPolicy = 'no-referrer';
+      header.appendChild(img);
+    } else {
+      var initials = document.createElement('div');
+      initials.className = 'reco-avatar reco-avatar-initials';
+      initials.textContent = (item.name || '?').slice(0, 1).toUpperCase();
+      header.appendChild(initials);
+    }
+
+    var who = document.createElement('div');
+    who.className = 'reco-who';
+    var nameEl = document.createElement('div');
+    nameEl.className = 'reco-name';
+    nameEl.textContent = item.name || 'Anonymous';
+    var compEl = document.createElement('div');
+    compEl.className = 'reco-company';
+    compEl.textContent = item.company || '';
+    who.appendChild(nameEl);
+    if (item.company) who.appendChild(compEl);
+    header.appendChild(who);
+
+    var when = document.createElement('time');
+    when.className = 'reco-when';
+    when.textContent = formatRecoTimestamp(item.submittedAt);
+    if (item.submittedAt) when.dateTime = new Date(item.submittedAt).toISOString();
+    header.appendChild(when);
+
+    card.appendChild(header);
+
+    // Body: recommendation text
+    var text = document.createElement('p');
+    text.className = 'reco-text';
+    text.textContent = item.text || '';
+    card.appendChild(text);
+
+    // Reply (only if Abhinav has replied — flowed in via SF → GCP callback)
+    if (item.reply) {
+      var reply = document.createElement('div');
+      reply.className = 'reco-reply';
+
+      var replyHead = document.createElement('div');
+      replyHead.className = 'reco-reply-head';
+      var icon = document.createElement('span');
+      icon.className = 'material-symbols-outlined reco-reply-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = 'reply';
+      replyHead.appendChild(icon);
+      var replyAuthor = document.createElement('span');
+      replyAuthor.className = 'reco-reply-author';
+      replyAuthor.textContent = 'Abhinav';
+      replyHead.appendChild(replyAuthor);
+      if (item.repliedAt) {
+        var replyWhen = document.createElement('time');
+        replyWhen.className = 'reco-reply-when';
+        replyWhen.textContent = formatRecoTimestamp(item.repliedAt);
+        replyWhen.dateTime = new Date(item.repliedAt).toISOString();
+        replyHead.appendChild(replyWhen);
+      }
+      reply.appendChild(replyHead);
+
+      var replyText = document.createElement('p');
+      replyText.className = 'reco-reply-text';
+      replyText.textContent = item.reply;
+      reply.appendChild(replyText);
+
+      card.appendChild(reply);
+    }
+
+    return card;
+  }
+
+  // Friendly relative-time. "just now" / "5m" / "3h" / "2d" / "Jan 12".
+  function formatRecoTimestamp(ms) {
+    if (!ms) return '';
+    var diff = Date.now() - ms;
+    if (diff < 60 * 1000)             return 'just now';
+    if (diff < 60 * 60 * 1000)        return Math.floor(diff / 60000) + 'm';
+    if (diff < 24 * 60 * 60 * 1000)   return Math.floor(diff / 3600000) + 'h';
+    if (diff < 7  * 24 * 60 * 60 * 1000) return Math.floor(diff / 86400000) + 'd';
+    var d = new Date(ms);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function refreshRecommendations() {
+    var grid  = document.getElementById('recosGrid');
+    var empty = document.getElementById('recosEmpty');
+    if (!grid) return;
+    fetch('/api/recommendations', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || !Array.isArray(data.recommendations)) return;
+        grid.innerHTML = '';
+        if (data.recommendations.length === 0) {
+          if (empty) empty.hidden = false;
+          return;
+        }
+        if (empty) empty.hidden = true;
+        data.recommendations.forEach(function (item) {
+          grid.appendChild(renderRecommendation(item));
+        });
+      })
+      .catch(function () { /* silent — section just stays empty */ });
+  }
+  refreshRecommendations();
+  // Re-fetch when the user comes back to the tab (covers replies arriving
+  // while they were in another tab — cheap, debounced by the 30s s-maxage).
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') refreshRecommendations();
+  });
+
+  // ── Gate the CTA on Google sign-in state ───────────────────────────────
+  function isSignedIn() { return !!googleCredential; }
+
+  function openLeaveRecommendation() {
+    if (!isSignedIn()) {
+      // Not signed in — redirect them through the existing welcome flow.
+      // It already handles Google Sign-In + remembers them, so by the time
+      // they come back to click the CTA we'll have a credential cached.
+      var welcome = document.getElementById('welcomeOverlay');
+      if (welcome && typeof welcome.show === 'function') {
+        welcome.show();
+        return;
+      }
+      // Fallback for an exotic state — prompt and bail.
+      alert('Please sign in with Google first to leave a recommendation.');
+      return;
+    }
+
+    // Hydrate the identity preview from cached profile so the user sees
+    // exactly what their card will look like before they hit submit.
+    var profile = siteProfile || {};
+    var avatar = document.getElementById('lr-avatar');
+    var name   = document.getElementById('lr-name');
+    var comp   = document.getElementById('lr-company');
+    if (avatar && profile.picture) avatar.src = profile.picture;
+    if (avatar) avatar.alt = profile.name || '';
+    if (name)   name.textContent = profile.name || '';
+    if (comp)   comp.textContent = (profile.email || '').split('@')[1] || '';
+
+    var overlay = document.getElementById('leaveRecoOverlay');
+    if (!overlay) return;
+    whenMdDialogReady(function () {
+      if (typeof overlay.show === 'function') overlay.show();
+      else overlay.removeAttribute('hidden');
+    });
+  }
+  window.openLeaveRecommendation = openLeaveRecommendation;
+
+  function closeLeaveRecommendation() {
+    var overlay = document.getElementById('leaveRecoOverlay');
+    if (!overlay) return;
+    if (typeof overlay.close === 'function') overlay.close();
+    else overlay.setAttribute('hidden', '');
+    resetLeaveRecoForm();
+  }
+  window.closeLeaveRecommendation = closeLeaveRecommendation;
+
+  function resetLeaveRecoForm() {
+    var form = document.getElementById('leaveRecoForm');
+    if (form) form.reset();
+    clearErr('lr-text');
+    var globalErr = document.getElementById('lr-global-error');
+    if (globalErr) globalErr.hidden = true;
+    var success = document.getElementById('lr-success');
+    if (success) success.hidden = true;
+    if (form) form.hidden = false;
+    var btn = document.getElementById('lr-submit-btn');
+    if (btn) btn.disabled = false;
+    var lbl = document.getElementById('lr-submit-label');
+    if (lbl) lbl.textContent = 'Post Recommendation';
+  }
+
+  var lrOverlay = document.getElementById('leaveRecoOverlay');
+  if (lrOverlay) lrOverlay.addEventListener('close', resetLeaveRecoForm);
+
+  function validateLeaveReco() {
+    var text = document.getElementById('lr-text').value.trim();
+    clearErr('lr-text');
+    if (!text) { setErr('lr-text', 'Please share a recommendation.'); return false; }
+    if (text.length > 2000) {
+      setErr('lr-text', 'Recommendation must be 2000 characters or fewer.');
+      return false;
+    }
+    return true;
+  }
+
+  var lrForm = document.getElementById('leaveRecoForm');
+  if (lrForm) lrForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (!isSignedIn()) {
+      // Edge case: token expired between modal-open and submit. Bail to
+      // sign-in so the next attempt has a fresh credential.
+      closeLeaveRecommendation();
+      openLeaveRecommendation();
+      return;
+    }
+    if (!validateLeaveReco()) return;
+
+    var btn       = document.getElementById('lr-submit-btn');
+    var btnLabel  = document.getElementById('lr-submit-label');
+    var globalErr = document.getElementById('lr-global-error');
+    btn.disabled = true;
+    if (btnLabel) btnLabel.textContent = 'Posting\u2026';
+    globalErr.hidden = true;
+
+    var payload = { text: document.getElementById('lr-text').value.trim() };
+
+    try {
+      var res = await fetch('/api/recommendation', {
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': 'Bearer ' + googleCredential,
+        },
+        body: JSON.stringify(payload),
+      });
+      var data = await res.json();
+
+      if (res.status === 401) {
+        // Token expired or invalid — clear and reprompt.
+        setGoogleCredential(null);
+        globalErr.textContent = 'Your session expired. Please sign in again.';
+        globalErr.hidden = false;
+        btn.disabled = false;
+        if (btnLabel) btnLabel.textContent = 'Post Recommendation';
+        return;
+      }
+
+      if (res.status === 429) {
+        globalErr.textContent = (data && (data.error || data.message))
+          || "You've reached the recommendation limit for now. Try again in an hour.";
+        globalErr.hidden = false;
+        btn.disabled = false;
+        if (btnLabel) btnLabel.textContent = 'Post Recommendation';
+        return;
+      }
+
+      if (res.ok && data.success) {
+        document.getElementById('leaveRecoForm').hidden = true;
+        var successText = document.getElementById('lr-success-text');
+        if (successText) {
+          successText.textContent = data.isNew
+            ? "✓ Recommendation posted! Refreshing the list\u2026"
+            : "✓ Recommendation updated! Refreshing the list\u2026";
+        }
+        document.getElementById('lr-success').hidden = false;
+        // Refresh the list so the new card shows; close after a moment.
+        refreshRecommendations();
+        setTimeout(function () {
+          closeLeaveRecommendation();
+          // Scroll to the section so the user sees their card land.
+          var section = document.getElementById('recosSection');
+          if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 1400);
+      } else {
+        globalErr.textContent = (data && (data.error || data.message))
+          || 'Submission failed. Please try again.';
+        globalErr.hidden = false;
+        btn.disabled = false;
+        if (btnLabel) btnLabel.textContent = 'Post Recommendation';
+      }
+    } catch (_) {
+      globalErr.textContent = 'Network error. Please check your connection and try again.';
+      globalErr.hidden = false;
+      btn.disabled = false;
+      if (btnLabel) btnLabel.textContent = 'Post Recommendation';
     }
   });
 })();

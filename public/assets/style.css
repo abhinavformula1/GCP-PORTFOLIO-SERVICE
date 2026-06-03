@@ -573,8 +573,50 @@ a:hover { text-decoration: underline; }
 
 .hire-me-btn { margin-top: 20px; }
 
-/* ── Hire-Me <md-dialog> sizing ── */
-#hireMeOverlay {
+/* ── Hero CTA row ──
+   Wraps the primary "Get In Touch" filled-button and the secondary
+   "Ask a Question" outlined-button so they sit side-by-side on desktop
+   and stack with consistent spacing on narrow screens. */
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.hero-actions .hire-me-btn { margin-top: 0; }
+
+/* ── Secondary CTA: "Ask a Question" outlined button ──
+   Salesforce-blue text + matching outline; same padding tokens as the
+   filled brand button so the two CTAs read as a balanced pair. */
+.ask-q-btn {
+  --md-outlined-button-container-height: 48px;
+  --md-outlined-button-outline-color: #0070D2;
+  --md-outlined-button-label-text-color: #0070D2;
+  --md-outlined-button-icon-color: #0070D2;
+  --md-outlined-button-hover-label-text-color: #0070D2;
+  --md-outlined-button-hover-icon-color: #0070D2;
+  --md-outlined-button-pressed-label-text-color: #0070D2;
+  --md-outlined-button-pressed-icon-color: #0070D2;
+  --md-outlined-button-focus-label-text-color: #0070D2;
+  --md-outlined-button-focus-icon-color: #0070D2;
+  --md-outlined-button-hover-state-layer-color: #0070D2;
+  --md-outlined-button-pressed-state-layer-color: #0070D2;
+  --md-outlined-button-label-text-weight: 600;
+  --md-outlined-button-label-text-size: 14px;
+  --md-outlined-button-leading-space: 28px;
+  --md-outlined-button-trailing-space: 28px;
+  --md-outlined-button-with-leading-icon-leading-space: 24px;
+  --md-outlined-button-with-leading-icon-trailing-space: 28px;
+  --md-outlined-button-with-icon-spacing: 12px;
+  --md-outlined-button-icon-size: 20px;
+  --md-outlined-button-outline-width: 1.5px;
+  color: #0070D2;
+}
+.ask-q-btn [slot="icon"] { margin-inline-end: 4px; }
+
+/* ── Modal dialog sizing (shared by Hire-Me + Ask-Question) ── */
+#hireMeOverlay,
+#askQuestionOverlay {
   --md-dialog-container-color: var(--md-sys-color-surface-container-high);
   --md-dialog-headline-color: var(--md-sys-color-on-surface);
   --md-dialog-headline-size: 22px;
@@ -584,8 +626,10 @@ a:hover { text-decoration: underline; }
 }
 /* Pad the slotted headline + content for breathing room
    (M3 default content padding is fairly tight). */
-#hireMeOverlay [slot="headline"] { padding: 8px 8px 4px; }
-#hireMeOverlay [slot="content"]  { padding: 8px 8px 16px; }
+#hireMeOverlay     [slot="headline"],
+#askQuestionOverlay [slot="headline"] { padding: 8px 8px 4px; }
+#hireMeOverlay     [slot="content"],
+#askQuestionOverlay [slot="content"]  { padding: 8px 8px 16px; }
 
 /* Headline row (title + close button) */
 .hm-headline {
@@ -648,6 +692,34 @@ a:hover { text-decoration: underline; }
 
 /* ── Success + Global Error ── */
 .hm-success { text-align: center; padding: 24px 0; color: #4CAF8A; font-size: 15px; font-weight: 600; }
+
+/* Reference-ID block shown in the "Ask a Question" success state.
+   Surfaces the gcpQuestionId (External ID on Recruiter_Question__c) so
+   the recruiter can quote it in any follow-up email. The mono font + tinted
+   background mark it as a copy-pastable token rather than prose. */
+.aq-reference {
+  margin: 12px auto 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.aq-reference-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+.aq-reference-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--md-sys-color-on-surface);
+  user-select: all;
+}
 .hm-global-error {
   background: rgba(224, 82, 82, 0.1);
   border: 1px solid #E05252;
@@ -1973,3 +2045,253 @@ a:hover { text-decoration: underline; }
   color: #b91c1c;
 }
 .ga-confirm-end:hover { background: #fecaca; }
+
+/* ── Recommendations Section ──────────────────────────────────────────────
+   Sits between the main two-column body and the sponsors footer. Same
+   max-width as the page container so it lines up flush. */
+.recos-section {
+  background: var(--md-sys-color-surface);
+  padding: 64px 24px 48px;
+  border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent);
+}
+.recos-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.recos-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.recos-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--md-sys-color-on-surface);
+  margin: 0 0 6px;
+}
+.recos-subtitle {
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 0;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+/* Reuse the same brand outlined-button styling as the hero "Ask a Question"
+   CTA so the two visually rhyme. */
+.recos-cta {
+  --md-outlined-button-container-height: 44px;
+  --md-outlined-button-outline-color: #0070D2;
+  --md-outlined-button-label-text-color: #0070D2;
+  --md-outlined-button-icon-color: #0070D2;
+  --md-outlined-button-hover-label-text-color: #0070D2;
+  --md-outlined-button-hover-icon-color: #0070D2;
+  --md-outlined-button-pressed-label-text-color: #0070D2;
+  --md-outlined-button-pressed-icon-color: #0070D2;
+  --md-outlined-button-focus-label-text-color: #0070D2;
+  --md-outlined-button-focus-icon-color: #0070D2;
+  --md-outlined-button-hover-state-layer-color: #0070D2;
+  --md-outlined-button-pressed-state-layer-color: #0070D2;
+  --md-outlined-button-label-text-weight: 600;
+  --md-outlined-button-label-text-size: 13px;
+  --md-outlined-button-leading-space: 20px;
+  --md-outlined-button-trailing-space: 20px;
+  --md-outlined-button-with-leading-icon-leading-space: 18px;
+  --md-outlined-button-with-leading-icon-trailing-space: 20px;
+  --md-outlined-button-with-icon-spacing: 10px;
+  --md-outlined-button-icon-size: 18px;
+  --md-outlined-button-outline-width: 1.5px;
+  color: #0070D2;
+  flex-shrink: 0;
+}
+.recos-cta [slot="icon"] { margin-inline-end: 4px; }
+
+/* ── Empty state ── */
+.recos-empty {
+  text-align: center;
+  padding: 48px 24px;
+  border: 1.5px dashed color-mix(in srgb, var(--md-sys-color-outline) 35%, transparent);
+  border-radius: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.recos-empty-icon {
+  font-size: 40px;
+  color: color-mix(in srgb, var(--md-sys-color-outline) 70%, transparent);
+}
+.recos-empty-text { margin: 8px 0 0; font-size: 14px; }
+
+/* ── Cards grid ──
+   Auto-fit lets cards reflow from 3-up on desktop down to 1-up on mobile
+   without media queries. minmax(300px,1fr) sets the floor so cards never
+   get smaller than 300px wide before wrapping. */
+.recos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.reco-card {
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 18%, transparent);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+              transform var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+.reco-card:hover {
+  border-color: color-mix(in srgb, var(--md-sys-color-outline) 35%, transparent);
+  transform: translateY(-1px);
+}
+
+.reco-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.reco-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--md-sys-color-surface-container-high);
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.reco-avatar-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0070D2, #4A9DEC);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 16px;
+}
+.reco-who {
+  flex: 1;
+  min-width: 0; /* allow truncation */
+}
+.reco-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reco-company {
+  display: block;
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reco-when {
+  font-size: 11px;
+  color: var(--md-sys-color-on-surface-variant);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.reco-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--md-sys-color-on-surface);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Reply block ──
+   Visually nested under the recommendation. Subtle left-border accent
+   + slightly inset background mark it as Abhinav's response. Only renders
+   when `reply` is non-null on the card data, which only happens after
+   the SF → GCP callback has flowed in. */
+.reco-reply {
+  margin-top: 4px;
+  padding: 10px 12px 10px 14px;
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+  border-left: 3px solid var(--md-sys-color-primary);
+  border-radius: 6px;
+}
+.reco-reply-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.reco-reply-icon { font-size: 14px; color: var(--md-sys-color-primary); }
+.reco-reply-author {
+  font-weight: 600;
+  color: var(--md-sys-color-primary);
+}
+.reco-reply-when { color: var(--md-sys-color-on-surface-variant); }
+.reco-reply-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--md-sys-color-on-surface);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Leave-a-Recommendation Dialog ── */
+#leaveRecoOverlay {
+  --md-dialog-container-color: var(--md-sys-color-surface-container-high);
+  --md-dialog-headline-color: var(--md-sys-color-on-surface);
+  --md-dialog-headline-size: 22px;
+  --md-dialog-headline-weight: 600;
+  --md-dialog-supporting-text-color: var(--md-sys-color-on-surface-variant);
+  min-width: 460px;
+}
+#leaveRecoOverlay [slot="headline"] { padding: 8px 8px 4px; }
+#leaveRecoOverlay [slot="content"]  { padding: 8px 8px 16px; }
+
+/* Identity preview in the modal — shows the user exactly what their card
+   will look like (avatar + name + company) before they hit submit. */
+.lr-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.lr-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.lr-identity-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.lr-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+.lr-company {
+  font-size: 11px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Mobile: stack the section header */
+@media (max-width: 640px) {
+  .recos-section { padding: 40px 16px 32px; }
+  .recos-title   { font-size: 22px; }
+  .recos-header  { flex-direction: column; align-items: stretch; }
+  #leaveRecoOverlay { min-width: 0; }
+}
