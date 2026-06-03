@@ -585,10 +585,10 @@ a:hover { text-decoration: underline; }
 }
 .hero-actions .hire-me-btn { margin-top: 0; }
 
-/* ── Secondary CTA: "Ask a Question" outlined button ──
+/* ── Secondary CTA: "Refer Me" outlined button ──
    Salesforce-blue text + matching outline; same padding tokens as the
    filled brand button so the two CTAs read as a balanced pair. */
-.ask-q-btn {
+.refer-btn {
   --md-outlined-button-container-height: 48px;
   --md-outlined-button-outline-color: #0070D2;
   --md-outlined-button-label-text-color: #0070D2;
@@ -612,11 +612,44 @@ a:hover { text-decoration: underline; }
   --md-outlined-button-outline-width: 1.5px;
   color: #0070D2;
 }
-.ask-q-btn [slot="icon"] { margin-inline-end: 4px; }
+.refer-btn [slot="icon"] { margin-inline-end: 4px; }
 
-/* ── Modal dialog sizing (shared by Hire-Me + Ask-Question) ── */
+/* ── Tertiary CTA: "Download Resume" plain anchor ──
+   Plain `<a download>` is the right primitive here — no JS, no fetch, no
+   blob URL. We dress it up to match the .refer-btn outlined style so the
+   hero row reads as a coherent group of three CTAs. */
+.download-resume-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 999px;
+  border: 1px solid var(--md-sys-color-outline);
+  color: var(--md-sys-color-on-surface);
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--md-sys-motion-duration-short3, 150ms) var(--md-sys-motion-easing-standard, ease),
+              border-color var(--md-sys-motion-duration-short3, 150ms) var(--md-sys-motion-easing-standard, ease);
+}
+.download-resume-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  border-color: var(--md-sys-color-on-surface);
+}
+.download-resume-btn:active {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+}
+.download-resume-btn .material-symbols-outlined { font-size: 20px; }
+
+/* ── Modal dialog sizing (shared by Hire-Me + Refer-Me) ── */
 #hireMeOverlay,
-#askQuestionOverlay {
+#referMeOverlay {
   --md-dialog-container-color: var(--md-sys-color-surface-container-high);
   --md-dialog-headline-color: var(--md-sys-color-on-surface);
   --md-dialog-headline-size: 22px;
@@ -624,12 +657,52 @@ a:hover { text-decoration: underline; }
   --md-dialog-supporting-text-color: var(--md-sys-color-on-surface-variant);
   min-width: 420px;
 }
+#referMeOverlay { min-width: 480px; max-width: 560px; }
+
 /* Pad the slotted headline + content for breathing room
    (M3 default content padding is fairly tight). */
-#hireMeOverlay     [slot="headline"],
-#askQuestionOverlay [slot="headline"] { padding: 8px 8px 4px; }
-#hireMeOverlay     [slot="content"],
-#askQuestionOverlay [slot="content"]  { padding: 8px 8px 16px; }
+#hireMeOverlay  [slot="headline"],
+#referMeOverlay [slot="headline"] { padding: 8px 8px 4px; }
+#hireMeOverlay  [slot="content"],
+#referMeOverlay [slot="content"]  { padding: 8px 8px 16px; }
+
+/* ── Refer Me dialog content ──
+   Reuses .hm-* shell (headline / close / privacy / field). The flow is
+   intentionally flat: subtitle → subject → body → action row. We dropped
+   the original two-step "download then copy" layout once the email body
+   started embedding the Drive link directly — no more attach step means
+   no step structure to render. */
+.refer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Action row — Copy (filled) + Open in client (outlined). */
+.refer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.refer-copy-btn {
+  --md-filled-button-container-height: 44px;
+  --md-filled-button-container-color: #0070D2;
+  --md-filled-button-label-text-color: #ffffff;
+}
+.refer-mailto-btn {
+  --md-outlined-button-container-height: 44px;
+  --md-outlined-button-outline-color: #0070D2;
+  --md-outlined-button-label-text-color: #0070D2;
+}
+
+/* Mobile: collapse the modal min-width and stack the action buttons. */
+@media (max-width: 540px) {
+  #referMeOverlay { min-width: 0; max-width: calc(100vw - 32px); }
+  .refer-actions { flex-direction: column; }
+  .refer-copy-btn,
+  .refer-mailto-btn { width: 100%; }
+}
 
 /* Headline row (title + close button) */
 .hm-headline {
@@ -693,33 +766,6 @@ a:hover { text-decoration: underline; }
 /* ── Success + Global Error ── */
 .hm-success { text-align: center; padding: 24px 0; color: #4CAF8A; font-size: 15px; font-weight: 600; }
 
-/* Reference-ID block shown in the "Ask a Question" success state.
-   Surfaces the gcpQuestionId (External ID on Recruiter_Question__c) so
-   the recruiter can quote it in any follow-up email. The mono font + tinted
-   background mark it as a copy-pastable token rather than prose. */
-.aq-reference {
-  margin: 12px auto 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--md-sys-color-on-surface-variant);
-}
-.aq-reference-label {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 10px;
-}
-.aq-reference-id {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  color: var(--md-sys-color-on-surface);
-  user-select: all;
-}
 .hm-global-error {
   background: rgba(224, 82, 82, 0.1);
   border: 1px solid #E05252;
