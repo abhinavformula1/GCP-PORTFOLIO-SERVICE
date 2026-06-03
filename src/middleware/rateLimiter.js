@@ -37,17 +37,22 @@ const questionLimiter = rateLimit({
   skip: () => config.server.env === 'test',
 });
 
-// "Leave a Recommendation": 3/hour/IP. Even with Google Sign-In gating
-// the form, IP-level limit catches abuse from a script automating accounts.
-// Per-Google-UID limit happens at the route level (the doc-id IS the uid,
-// so SF/Firestore upserts collapse to in-place updates — there's no way
-// to spam-create rows).
+// "Leave a Recommendation": 50/hour/IP — TEMPORARILY RAISED FROM 3 for
+// end-to-end testing. Revert to `max: 3` before the interview demo (or
+// before any real recruiter traffic) so the public-write surface stays
+// abuse-resistant. The original ceiling existed because:
+//   - IP-level limit catches abuse from a script automating accounts even
+//     with Google Sign-In gating the form.
+//   - Per-Google-UID dedup happens at the route level (the doc-id IS the
+//     uid, so SF/Firestore upserts collapse to in-place updates — there's
+//     no way to spam-create rows, but spam-edit churn is still possible).
+//   - A recommendation is a public artefact; damage radius of one bad
+//     write is wider than a private question.
 //
-// Why tighter than questions: a recommendation is a public artefact; the
-// damage radius of one bad write is wider than a private question.
+// TODO: revert to `max: 3` once smoke-testing is complete.
 const recommendationLimiter = rateLimit({
   windowMs:       60 * 60 * 1000,  // 1 hour
-  max:            3,
+  max:            50,
   standardHeaders: 'draft-7',
   legacyHeaders:  false,
   message: {
