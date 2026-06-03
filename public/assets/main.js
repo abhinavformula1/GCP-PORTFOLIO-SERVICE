@@ -2309,9 +2309,6 @@
     clearErr('lr-text');
     var globalErr = document.getElementById('lr-global-error');
     if (globalErr) globalErr.hidden = true;
-    var success = document.getElementById('lr-success');
-    if (success) success.hidden = true;
-    if (form) form.hidden = false;
     var btn = document.getElementById('lr-submit-btn');
     if (btn) btn.disabled = false;
     // Reset the chrome back to "new" defaults — openLeaveRecommendation()
@@ -2351,11 +2348,27 @@
     var btn       = document.getElementById('lr-submit-btn');
     var btnLabel  = document.getElementById('lr-submit-label');
     var globalErr = document.getElementById('lr-global-error');
+
+    // Mode is fixed at submit time — myRecommendation reflects what was
+    // shown to the user when they opened the modal. We capture it locally
+    // so the loading / error labels stay coherent even if a background
+    // refresh changes myRecommendation while the request is in flight.
+    var isEdit      = !!myRecommendation;
+    var idleLabel   = isEdit ? 'Update Recommendation' : 'Post Recommendation';
+    var loadingLbl  = isEdit ? 'Updating\u2026'         : 'Posting\u2026';
+
     btn.disabled = true;
-    if (btnLabel) btnLabel.textContent = 'Posting\u2026';
+    if (btnLabel) btnLabel.textContent = loadingLbl;
     globalErr.hidden = true;
 
     var payload = { text: document.getElementById('lr-text').value.trim() };
+
+    function fail(msg) {
+      globalErr.textContent = msg;
+      globalErr.hidden = false;
+      btn.disabled = false;
+      if (btnLabel) btnLabel.textContent = idleLabel;
+    }
 
     try {
       var res = await fetch('/api/recommendation', {
@@ -2371,52 +2384,29 @@
       if (res.status === 401) {
         // Token expired or invalid — clear and reprompt.
         setGoogleCredential(null);
-        globalErr.textContent = 'Your session expired. Please sign in again.';
-        globalErr.hidden = false;
-        btn.disabled = false;
-        if (btnLabel) btnLabel.textContent = 'Post Recommendation';
-        return;
+        return fail('Your session expired. Please sign in again.');
       }
 
       if (res.status === 429) {
-        globalErr.textContent = (data && (data.error || data.message))
-          || "You've reached the recommendation limit for now. Try again in an hour.";
-        globalErr.hidden = false;
-        btn.disabled = false;
-        if (btnLabel) btnLabel.textContent = 'Post Recommendation';
-        return;
+        return fail((data && (data.error || data.message))
+          || "You've reached the recommendation limit for now. Try again in an hour.");
       }
 
       if (res.ok && data.success) {
-        document.getElementById('leaveRecoForm').hidden = true;
-        var successText = document.getElementById('lr-success-text');
-        if (successText) {
-          successText.textContent = data.isNew
-            ? "✓ Recommendation posted! Refreshing the list\u2026"
-            : "✓ Recommendation updated! Refreshing the list\u2026";
-        }
-        document.getElementById('lr-success').hidden = false;
-        // Bypass the 30s public/CDN cache — the submitter has earned the
-        // right to see their own change reflected immediately.
+        // Streamlined success path: close the modal immediately, refresh
+        // the public list (cache-busted), and scroll the user to their
+        // card. The card itself — with its "Updated just now" pill — is
+        // the confirmation. No success banner, no timeout, no flicker.
+        closeLeaveRecommendation();
         refreshRecommendations({ bustCache: true });
-        setTimeout(function () {
-          closeLeaveRecommendation();
-          // Scroll to the section so the user sees their card land.
-          var section = document.getElementById('recosSection');
-          if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 1400);
-      } else {
-        globalErr.textContent = (data && (data.error || data.message))
-          || 'Submission failed. Please try again.';
-        globalErr.hidden = false;
-        btn.disabled = false;
-        if (btnLabel) btnLabel.textContent = 'Post Recommendation';
+        var section = document.getElementById('recosSection');
+        if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
       }
+
+      fail((data && (data.error || data.message)) || 'Submission failed. Please try again.');
     } catch (_) {
-      globalErr.textContent = 'Network error. Please check your connection and try again.';
-      globalErr.hidden = false;
-      btn.disabled = false;
-      if (btnLabel) btnLabel.textContent = 'Post Recommendation';
+      fail('Network error. Please check your connection and try again.');
     }
   });
 })();
