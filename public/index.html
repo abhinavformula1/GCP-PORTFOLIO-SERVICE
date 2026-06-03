@@ -190,14 +190,24 @@
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">waving_hand</span>
             <span data-i18n="getInTouch">Get In Touch</span>
           </md-filled-button>
-          <!-- "Ask a Question" — secondary CTA. The modal collects a free-form
-               question; submission goes through POST /api/question with an
-               Idempotency-Key header so a network retry can never create a
-               duplicate Recruiter_Question__c row. -->
-          <md-outlined-button class="ask-q-btn" onclick="window.openAskQuestion && window.openAskQuestion()">
-            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">help_outline</span>
-            <span data-i18n="askQuestion">Ask a Question</span>
+          <!-- "Refer Me" — secondary CTA. Pure client-side: the modal hands
+               the visitor a ready-to-send email body and a one-click resume
+               download. Sending happens from the visitor's own email account
+               so we don't become an outbound spam vector and don't need a
+               verified sender domain. The Recommendations feature already
+               carries the SF integration narrative; this stays deliberately
+               backend-free. -->
+          <md-outlined-button class="refer-btn" onclick="window.openReferMe && window.openReferMe()">
+            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">forward_to_inbox</span>
+            <span data-i18n="referMe">Refer Me</span>
           </md-outlined-button>
+          <!-- Direct resume download — no form, no friction. Highest-frequency
+               recruiter action; placing it inline in the hero converts more
+               than hiding it behind a modal. -->
+          <a class="download-resume-btn" href="/resume.pdf" download="Abhinav-Kumar-Resume.pdf">
+            <span class="material-symbols-outlined" aria-hidden="true">download</span>
+            <span data-i18n="downloadResume">Download Resume</span>
+          </a>
         </div>
       </div>
       <div class="exp-badge">
@@ -485,74 +495,49 @@
     </div>
   </md-dialog>
 
-  <!-- ── Ask Question Dialog (M3 <md-dialog>) ──
-       Mirrors the Hire-Me dialog shell so styling stays consistent. The form
-       posts to /api/question with an `Idempotency-Key` header generated when
-       the modal opens, so retries never create duplicate Recruiter_Question__c
-       records. The header is what makes this endpoint truly idempotent. -->
-  <md-dialog id="askQuestionOverlay" aria-labelledby="aq-title-text">
+  <!-- ── Refer Me Dialog (M3 <md-dialog>) ──
+       Pure client-side: hand the visitor an editable email template and a
+       one-click resume download. Copy → clipboard. Open in client → mailto:
+       launches their default email app with subject + body pre-filled. The
+       actual send happens from the visitor's own account, which is why we
+       don't need a verified sender domain or a backend mailer here. -->
+  <md-dialog id="referMeOverlay" aria-labelledby="refer-title-text">
     <div slot="headline" class="hm-headline">
-      <span id="aq-title-text">Ask a Question</span>
-      <button type="button" class="hm-close" aria-label="Close" onclick="closeAskQuestion()">&times;</button>
+      <span id="refer-title-text">Refer Me</span>
+      <button type="button" class="hm-close" aria-label="Close" onclick="closeReferMe()">&times;</button>
     </div>
 
-    <form id="askQuestionForm" slot="content" novalidate>
-      <p class="hm-subtitle">Curious about my experience, a project, or how I'd approach a problem? Drop your question below — I'll respond by email.</p>
+    <div slot="content" class="refer-content">
+      <p class="hm-subtitle" data-i18n="referMeIntro">Thanks for thinking of referring me — copy the email below, edit, and send. The resume link is included in the body so you don't have to attach anything.</p>
 
       <div class="hm-field">
         <md-outlined-text-field
-          id="aq-name"
-          label="Your Name"
-          type="text"
-          autocomplete="name"></md-outlined-text-field>
+          id="refer-subject"
+          label="Subject"
+          type="text"></md-outlined-text-field>
       </div>
 
       <div class="hm-field">
         <md-outlined-text-field
-          id="aq-email"
-          label="Email"
-          type="email"
-          required
-          autocomplete="email"></md-outlined-text-field>
-      </div>
-
-      <div class="hm-field">
-        <md-outlined-text-field
-          id="aq-company"
-          label="Company"
-          type="text"
-          autocomplete="organization"></md-outlined-text-field>
-      </div>
-
-      <div class="hm-field">
-        <md-outlined-text-field
-          id="aq-question"
-          label="Your Question"
+          id="refer-body"
+          label="Email body"
           type="textarea"
-          rows="5"
-          maxlength="4000"
-          required
-          supporting-text="Up to 4000 characters."></md-outlined-text-field>
+          rows="13"
+          supporting-text="Tip: replace the {{...}} placeholders before sending."></md-outlined-text-field>
       </div>
 
-      <p class="hm-privacy">Your question is stored securely and used only to follow up with you.</p>
+      <div class="refer-actions">
+        <md-filled-button class="refer-copy-btn" id="refer-copy-btn" type="button">
+          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">content_copy</span>
+          <span id="refer-copy-label" data-i18n="referMeCopy">Copy email</span>
+        </md-filled-button>
+        <md-outlined-button class="refer-mailto-btn" id="refer-mailto-btn" type="button">
+          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">open_in_new</span>
+          <span data-i18n="referMeOpen">Open in email client</span>
+        </md-outlined-button>
+      </div>
 
-      <md-filled-button class="hm-submit" id="aq-submit-btn" type="submit">
-        <span id="aq-submit-label">Send Question</span>
-      </md-filled-button>
-
-      <div class="hm-global-error" id="aq-global-error" hidden></div>
-    </form>
-
-    <div class="hm-success" id="aq-success" hidden slot="content">
-      <span id="aq-success-text">✓ Question sent! I'll respond by email shortly.</span>
-      <!-- Reference ID is the gcpQuestionId — the External ID we used to UPSERT
-           into Salesforce. Surfacing it lets the recruiter quote it in any
-           follow-up so we can join the conversation back to the right record. -->
-      <p class="aq-reference" id="aq-reference" hidden>
-        <span class="aq-reference-label">Reference ID</span>
-        <code class="aq-reference-id" id="aq-reference-id"></code>
-      </p>
+      <p class="hm-privacy" data-i18n="referMePrivacy">Nothing leaves your device until you hit Send in your own email. No tracking, no backend processing.</p>
     </div>
   </md-dialog>
 

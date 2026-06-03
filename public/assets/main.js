@@ -601,7 +601,12 @@
     en: {
       headerTitle: 'Senior Salesforce Application Engineer',
       getInTouch: 'Get In Touch',
-      askQuestion: 'Ask a Question',
+      referMe: 'Refer Me',
+      downloadResume: 'Download Resume',
+      referMeIntro: "Thanks for thinking of referring me — copy the email below, edit, and send. The resume link is included in the body so you don't have to attach anything.",
+      referMeCopy: 'Copy email',
+      referMeOpen: 'Open in email client',
+      referMePrivacy: 'Nothing leaves your device until you hit Send in your own email. No tracking, no backend processing.',
       recoTitle: 'Recommendations',
       recoSubtitle: "What people I've worked with — and recruiters I've spoken with — have to say.",
       recoCta: 'Leave a Recommendation',
@@ -636,7 +641,12 @@
     fr: {
       headerTitle: 'Ingénieur Senior en Applications Salesforce',
       getInTouch: 'Me Contacter',
-      askQuestion: 'Poser une Question',
+      referMe: 'Me Recommander',
+      downloadResume: 'Télécharger le CV',
+      referMeIntro: "Merci d'envisager de me recommander — copiez l'e-mail ci-dessous, modifiez-le et envoyez-le. Le lien du CV est inclus dans le corps du message, vous n'avez donc rien à joindre.",
+      referMeCopy: "Copier l'e-mail",
+      referMeOpen: 'Ouvrir dans la messagerie',
+      referMePrivacy: "Rien ne quitte votre appareil tant que vous n'avez pas cliqué sur Envoyer dans votre propre messagerie. Pas de traçage, pas de traitement côté serveur.",
       recoTitle: 'Recommandations',
       recoSubtitle: "Ce que les personnes avec qui j'ai travaillé — et les recruteurs avec qui j'ai échangé — disent.",
       recoCta: 'Laisser une Recommandation',
@@ -782,16 +792,17 @@
     '.label { white-space: nowrap; }',
   ].join('\n');
   customElements.whenDefined('md-filled-button').then(function () {
-    document.querySelectorAll('.hire-me-btn, .hm-submit').forEach(function (btn) {
+    document.querySelectorAll('.hire-me-btn, .hm-submit, .refer-copy-btn').forEach(function (btn) {
       injectShadowStyle(btn, BRAND_BUTTON_CSS);
     });
   });
-  // The "Ask a Question" CTA is an <md-outlined-button>, which uses a
-  // separate custom element. Same horizontal-padding fix applies — without
-  // it the icon and label crash into each other. Wait until the outlined
-  // variant is registered before injecting.
+  // The "Refer Me" CTA is an <md-outlined-button>, which uses a separate
+  // custom element. Same horizontal-padding fix applies — without it the
+  // icon and label crash into each other. Wait until the outlined variant
+  // is registered before injecting. We also extend this to .refer-mailto-btn
+  // (the "Open in email client" button inside the Refer Me dialog).
   customElements.whenDefined('md-outlined-button').then(function () {
-    document.querySelectorAll('.ask-q-btn').forEach(function (btn) {
+    document.querySelectorAll('.refer-btn, .refer-mailto-btn').forEach(function (btn) {
       injectShadowStyle(btn, BRAND_BUTTON_CSS);
     });
   });
@@ -1757,188 +1768,226 @@
     }
   });
 
-  /* ── "Ask a Question" modal ──────────────────────────────────────────────
-     Single-modal flow that demonstrates the client-side half of the
-     idempotency contract:
+  /* ── "Refer Me" modal ────────────────────────────────────────────────────
+     Pure client-side. Renders an editable email template, supports copy-
+     to-clipboard and a `mailto:` launch for the visitor's default email
+     client. No POST to the backend, no rate limit, no Salesforce write.
+     The visitor sends from their own account, so we don't carry the abuse
+     risk or sender-verification overhead a server-side mailer would.
 
-       1. When the modal opens we mint a fresh idempotencyKey (UUID v4) and
-          stash it on the form. EVERY submission for this open-instance of
-          the modal uses that SAME key.
-       2. The key is sent both as the `Idempotency-Key` header (Stripe-style)
-          AND as `gcpQuestionId` in the body, for non-browser clients.
-       3. If the user clicks Send, the request fails (network blip), and they
-          click again — the SAME key flows through. The Apex REST endpoint
-          UPSERTs by that External ID, so even on the second click we end up
-          with exactly one Recruiter_Question__c row.
-       4. After a successful submit we BURN the key (set to null) so a new
-          question — even from the same modal session — gets a fresh key.
+     Why no backend tracking? The Recommendations feature already carries
+     the SF integration narrative (custom object + Apex REST + trigger +
+     callout). Forcing every UI feature through Salesforce dilutes that
+     story; this stays deliberately lean. ─────────────────────────────── */
 
-     Closing the modal also rotates the key on next open. ───────────────── */
-  var askQ = {
-    idempotencyKey: null,
-    submitting:     false,
-  };
-
-  // crypto.randomUUID is available in all modern browsers and Cloud Run.
-  // Fallback for very old browsers — never used in our supported matrix
-  // but cheap insurance.
-  function newIdempotencyKey() {
-    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-      return window.crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      var r = (Math.random() * 16) | 0;
-      var v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+  function getReferEmailSubject() {
+    return 'Referral — Abhinav Kumar for Senior Salesforce Engineer';
   }
 
-  function openAskQuestion() {
-    var overlay = document.getElementById('askQuestionOverlay');
+  /**
+   * Canonical public URL of the deployed portfolio. Used in the Refer Me
+   * email body so the link the recruiter sees is always one they can
+   * actually open — even when the visitor is previewing the page on
+   * localhost or a private IP.
+   *
+   * Update this if you ever point a custom domain at the Cloud Run service.
+   */
+  var PORTFOLIO_PUBLIC_URL = 'https://portfolio-service-647206478056.asia-southeast1.run.app';
+
+  /**
+   * Public Google Drive shareable URL of the resume.
+   *
+   * We embed this in the Refer Me email body instead of asking the referrer
+   * to download the PDF and re-attach it themselves — copy + send is faster
+   * than copy + download + attach + send. The recipient clicks the link and
+   * gets Drive's inline preview (no Drive account required if the file is
+   * shared with "Anyone with the link can view").
+   *
+   * Setup (one-time):
+   *   1. Upload your resume PDF to Google Drive.
+   *   2. Right-click → "Get link" → set access to "Anyone with the link"
+   *      with "Viewer" permission.
+   *   3. Copy the URL Drive shows you (looks like
+   *      https://drive.google.com/file/d/<FILE_ID>/view?usp=sharing) and
+   *      paste it below, replacing the placeholder.
+   *
+   * If left as the placeholder, the email body still works — the recruiter
+   * just sees a non-functional URL. Update before deploying.
+   */
+  var RESUME_DRIVE_URL = 'https://drive.google.com/file/d/REPLACE_WITH_YOUR_DRIVE_FILE_ID/view?usp=sharing';
+
+  /**
+   * Resolve the URL to embed in the email body.
+   *
+   * On a real public origin (e.g. the Cloud Run hostname or a custom
+   * domain) we just use what the visitor is looking at — keeps things in
+   * sync if you rename the service or move to a custom domain. On
+   * localhost / private network ranges / file:// we fall back to the
+   * canonical public URL, otherwise the recipient's inbox renders an
+   * unreachable link.
+   */
+  function getPortfolioPublicUrl() {
+    var origin = (window.location && window.location.origin) || '';
+    var isUnreachable = !origin
+      || /^https?:\/\/(localhost|127\.|192\.168\.|10\.|0\.0\.0\.0)/.test(origin)
+      || origin.indexOf('file://') === 0;
+    return isUnreachable ? PORTFOLIO_PUBLIC_URL : origin;
+  }
+
+  /**
+   * Build the default email body. Three pieces of personalisation:
+   *
+   *   1. The portfolio URL is resolved via getPortfolioPublicUrl() — never
+   *      a localhost / private-net link in the rendered template.
+   *   2. The resume URL is the public Google Drive link (RESUME_DRIVE_URL),
+   *      so the referrer doesn't need to download and re-attach a PDF —
+   *      they just copy the email and hit Send.
+   *   3. The signer name (the closing "Best, …") auto-fills from the
+   *      cached Google profile when the visitor is signed in. Falls back
+   *      to the {{your name}} placeholder for guests / signed-out users
+   *      so they can swap in their own name inline before sending.
+   *
+   * The {{their first name}} placeholder stays unfilled — that's the
+   * recruiter on the receiving end, which the referrer needs to type in
+   * themselves.
+   */
+  function getReferEmailBody() {
+    var origin = getPortfolioPublicUrl();
+    var signerName = (siteProfile && siteProfile.type !== 'guest' && siteProfile.name)
+      ? siteProfile.name
+      : '{{your name}}';
+    return [
+      'Hi {{their first name}},',
+      '',
+      "I came across Abhinav Kumar's portfolio and thought he'd be a strong",
+      'fit for a Senior Salesforce Engineer role on your team. He has 12+',
+      'years of depth across Apex, LWC, OmniStudio, and CPQ, with production',
+      'work at Salesforce, TCS, Cognizant, and Mindtree.',
+      '',
+      'His resume:',
+      '  ' + RESUME_DRIVE_URL,
+      '',
+      'Full portfolio with project breakdowns and recommendations:',
+      '  ' + origin,
+      '',
+      "If there's a fit, you can reach him directly at:",
+      '  abhinavformula1@gmail.com',
+      '',
+      'Best,',
+      signerName,
+    ].join('\n');
+  }
+
+  function openReferMe() {
+    var overlay = document.getElementById('referMeOverlay');
     if (!overlay) return;
-    askQ.idempotencyKey = newIdempotencyKey();
-    askQ.submitting     = false;
-    whenMdDialogReady(function () {
+    // Wait for both the dialog AND the inner text fields to upgrade before
+    // setting .value — M3 components can drop early property writes if the
+    // ESM bundle hasn't registered the custom element yet.
+    Promise.all([
+      customElements.whenDefined('md-dialog'),
+      customElements.whenDefined('md-outlined-text-field'),
+    ]).then(function () {
+      var subjectEl = document.getElementById('refer-subject');
+      var bodyEl    = document.getElementById('refer-body');
+      if (subjectEl) subjectEl.value = getReferEmailSubject();
+      if (bodyEl)    bodyEl.value    = getReferEmailBody();
       if (typeof overlay.show === 'function') overlay.show();
       else overlay.removeAttribute('hidden');
     });
   }
-  window.openAskQuestion = openAskQuestion;
+  window.openReferMe = openReferMe;
 
-  function closeAskQuestion() {
-    var overlay = document.getElementById('askQuestionOverlay');
+  function closeReferMe() {
+    var overlay = document.getElementById('referMeOverlay');
     if (!overlay) return;
     if (typeof overlay.close === 'function') overlay.close();
     else overlay.setAttribute('hidden', '');
-    resetAskQuestionForm();
   }
-  window.closeAskQuestion = closeAskQuestion;
+  window.closeReferMe = closeReferMe;
 
-  function resetAskQuestionForm() {
-    var form = document.getElementById('askQuestionForm');
-    if (form) form.reset();
-    ['aq-name', 'aq-email', 'aq-company', 'aq-question'].forEach(clearErr);
-    var globalErr = document.getElementById('aq-global-error');
-    if (globalErr) globalErr.hidden = true;
-    var success = document.getElementById('aq-success');
-    if (success) success.hidden = true;
-    if (form) form.hidden = false;
-    var btn = document.getElementById('aq-submit-btn');
-    if (btn) btn.disabled = false;
-    var lbl = document.getElementById('aq-submit-label');
-    if (lbl) lbl.textContent = 'Send Question';
-    askQ.idempotencyKey = null;
-    askQ.submitting     = false;
+  // Compose the canonical "Subject: ...\n\nBody" string used by both the
+  // clipboard path and as the source-of-truth render of the user's edits.
+  function buildReferComposed() {
+    var subjectEl = document.getElementById('refer-subject');
+    var bodyEl    = document.getElementById('refer-body');
+    var subject = (subjectEl && subjectEl.value) || getReferEmailSubject();
+    var body    = (bodyEl && bodyEl.value)       || getReferEmailBody();
+    return { subject: subject, body: body, combined: 'Subject: ' + subject + '\n\n' + body };
   }
 
-  // <md-dialog> handles outside-click + Escape natively. Mirror the close
-  // behaviour we use for the Hire-Me dialog.
-  var aqOverlay = document.getElementById('askQuestionOverlay');
-  if (aqOverlay) {
-    aqOverlay.addEventListener('close', resetAskQuestionForm);
+  // Flash a transient label change on the copy button. Cheap, no toast
+  // infrastructure needed.
+  function flashCopyLabel(msg) {
+    var labelEl = document.getElementById('refer-copy-label');
+    if (!labelEl) return;
+    if (labelEl._restoreTimer) clearTimeout(labelEl._restoreTimer);
+    var prev = labelEl._originalText || labelEl.textContent;
+    labelEl._originalText = prev;
+    labelEl.textContent = msg;
+    labelEl._restoreTimer = setTimeout(function () {
+      labelEl.textContent = labelEl._originalText;
+    }, 1800);
   }
 
-  function validateAskQuestion() {
-    var email    = document.getElementById('aq-email').value.trim();
-    var question = document.getElementById('aq-question').value.trim();
-    var ok = true;
-    ['aq-name', 'aq-email', 'aq-company', 'aq-question'].forEach(clearErr);
-
-    if (!email) { setErr('aq-email', 'Email is required.'); ok = false; }
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setErr('aq-email', 'Enter a valid email address.'); ok = false;
+  function handleReferCopy() {
+    var msg = buildReferComposed().combined;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(msg)
+        .then(function () { flashCopyLabel('Copied \u2713'); })
+        .catch(function () { fallbackCopy(msg); });
+    } else {
+      fallbackCopy(msg);
     }
-    if (!question) { setErr('aq-question', 'Please type a question.'); ok = false; }
-    else if (question.length > 4000) {
-      setErr('aq-question', 'Question must be 4000 characters or fewer.'); ok = false;
-    }
-    return ok;
   }
 
-  var askForm = document.getElementById('askQuestionForm');
-  if (askForm) askForm.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    if (askQ.submitting) return;             // guard double-click during in-flight req
-    if (!validateAskQuestion()) return;
-
-    var btn       = document.getElementById('aq-submit-btn');
-    var btnLabel  = document.getElementById('aq-submit-label');
-    var globalErr = document.getElementById('aq-global-error');
-    btn.disabled = true;
-    if (btnLabel) btnLabel.textContent = 'Sending\u2026';
-    globalErr.hidden = true;
-    askQ.submitting = true;
-
-    // Lazy-mint a key if the modal was opened before our handler ran for
-    // some reason — defensive, never expected in practice.
-    if (!askQ.idempotencyKey) askQ.idempotencyKey = newIdempotencyKey();
-
-    var payload = {
-      gcpQuestionId: askQ.idempotencyKey,
-      name:          document.getElementById('aq-name').value.trim(),
-      email:         document.getElementById('aq-email').value.trim(),
-      company:       document.getElementById('aq-company').value.trim(),
-      question:      document.getElementById('aq-question').value.trim(),
-    };
-
+  // Legacy fallback for browsers where the async clipboard API is blocked
+  // (older Safari/WebViews, restricted iframes). Synchronous execCommand
+  // still works there.
+  function fallbackCopy(text) {
     try {
-      var res = await fetch('/api/question', {
-        method:  'POST',
-        headers: {
-          'Content-Type':    'application/json',
-          'Idempotency-Key': askQ.idempotencyKey,
-        },
-        body: JSON.stringify(payload),
-      });
-      var data = await res.json();
-
-      if (res.status === 429) {
-        // Rate-limited. Server returns the structured rate-limit message.
-        globalErr.textContent = (data && (data.error || data.message))
-          || "You've reached the question limit. Please try again in an hour.";
-        globalErr.hidden = false;
-        btn.disabled = false;
-        askQ.submitting = false;
-        if (btnLabel) btnLabel.textContent = 'Send Question';
-        return;
-      }
-
-      if (res.ok && data.success) {
-        // Burn the key — a follow-up question opens a fresh modal session
-        // and gets a new key.
-        askQ.idempotencyKey = null;
-        askQ.submitting     = false;
-        document.getElementById('askQuestionForm').hidden = true;
-        var successText = document.getElementById('aq-success-text');
-        if (successText) {
-          successText.textContent = data.idempotent
-            ? "✓ Updated — your latest question replaces the previous version."
-            : "✓ Question sent! I'll respond by email shortly.";
-        }
-        // Surface the reference ID so the recruiter can quote it in follow-up.
-        var refWrap = document.getElementById('aq-reference');
-        var refId   = document.getElementById('aq-reference-id');
-        if (refWrap && refId && data.gcpQuestionId) {
-          refId.textContent = data.gcpQuestionId;
-          refWrap.hidden = false;
-        }
-        document.getElementById('aq-success').hidden = false;
-      } else {
-        globalErr.textContent = (data && (data.error || data.message))
-          || 'Submission failed. Please try again.';
-        globalErr.hidden = false;
-        btn.disabled = false;
-        askQ.submitting = false;
-        if (btnLabel) btnLabel.textContent = 'Send Question';
-      }
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity  = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      flashCopyLabel(ok ? 'Copied \u2713' : 'Copy failed');
     } catch (_) {
-      // Network failure — keep the key so a manual retry from the same
-      // modal collapses to the same Recruiter_Question__c row.
-      globalErr.textContent = 'Network error. Please check your connection and try again.';
-      globalErr.hidden = false;
-      btn.disabled = false;
-      askQ.submitting = false;
-      if (btnLabel) btnLabel.textContent = 'Send Question';
+      flashCopyLabel('Copy failed');
+    }
+  }
+
+  function handleReferMailto() {
+    var c = buildReferComposed();
+    // mailto:?subject=...&body=... — recipient is intentionally left empty
+    // so the visitor types the recruiter's address into their own email
+    // client. Body is URL-encoded so newlines survive into Gmail / Outlook
+    // / Apple Mail.
+    var href = 'mailto:?subject=' + encodeURIComponent(c.subject)
+             + '&body='          + encodeURIComponent(c.body);
+    // Most browsers cap mailto: URLs ~2 KB. Our default body is ~600 chars,
+    // so we're comfortably under. If the visitor edits heavily and overflows,
+    // the Copy button is the always-works fallback.
+    window.location.href = href;
+  }
+
+  // Wire the action buttons once their custom elements have upgraded.
+  // We guard with `_wired` so re-opening the dialog doesn't stack listeners.
+  customElements.whenDefined('md-filled-button').then(function () {
+    var btn = document.getElementById('refer-copy-btn');
+    if (btn && !btn._wired) {
+      btn._wired = true;
+      btn.addEventListener('click', handleReferCopy);
+    }
+  });
+  customElements.whenDefined('md-outlined-button').then(function () {
+    var btn = document.getElementById('refer-mailto-btn');
+    if (btn && !btn._wired) {
+      btn._wired = true;
+      btn.addEventListener('click', handleReferMailto);
     }
   });
 
