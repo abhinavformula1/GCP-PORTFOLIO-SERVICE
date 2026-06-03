@@ -585,10 +585,13 @@ a:hover { text-decoration: underline; }
 }
 .hero-actions .hire-me-btn { margin-top: 0; }
 
-/* ── Secondary CTA: "Refer Me" outlined button ──
-   Salesforce-blue text + matching outline; same padding tokens as the
-   filled brand button so the two CTAs read as a balanced pair. */
-.refer-btn {
+/* ── Outlined brand CTA (Refer Me, Leave a Recommendation) ──
+   Salesforce-blue text + matching outline; same height + padding tokens
+   as the filled brand button (.hire-me-btn) so all three CTAs read as a
+   balanced set. Both selectors share one token block so the styling
+   can't drift between the hero row and the recommendations section. */
+.refer-btn,
+.recos-cta {
   --md-outlined-button-container-height: 48px;
   --md-outlined-button-outline-color: #0070D2;
   --md-outlined-button-label-text-color: #0070D2;
@@ -612,26 +615,31 @@ a:hover { text-decoration: underline; }
   --md-outlined-button-outline-width: 1.5px;
   color: #0070D2;
 }
-.refer-btn [slot="icon"] { margin-inline-end: 4px; }
+.refer-btn [slot="icon"],
+.recos-cta [slot="icon"] { margin-inline-end: 4px; }
 
-/* ── Tertiary CTA: "Download Resume" plain anchor ──
-   Plain `<a download>` is the right primitive here — no JS, no fetch, no
-   blob URL. We dress it up to match the .refer-btn outlined style so the
-   hero row reads as a coherent group of three CTAs. */
+/* ── Tertiary CTA: "Download Resume" runtime PDF ──
+   The PDF is generated client-side from the live portfolio DOM (see
+   generateResumePdf in main.js) — no static asset, no Drive dep. Styled
+   as an outlined chip in Salesforce-blue so the hero row reads as a
+   coherent group of three CTAs alongside Hire Me + Refer Me. We use a
+   plain <button> (not <md-outlined-button>) because this CTA needs an
+   aria-busy spinner state during PDF generation, which is easier to
+   wire up without the shadow-DOM indirection. */
 .download-resume-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   height: 48px;
-  padding: 0 24px;
+  padding: 0 28px;
   border-radius: 999px;
-  border: 1px solid var(--md-sys-color-outline);
-  color: var(--md-sys-color-on-surface);
+  border: 1.5px solid #0070D2;
+  color: #0070D2;
   background: transparent;
   font-family: inherit;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.1px;
   text-decoration: none;
   cursor: pointer;
@@ -639,11 +647,17 @@ a:hover { text-decoration: underline; }
               border-color var(--md-sys-motion-duration-short3, 150ms) var(--md-sys-motion-easing-standard, ease);
 }
 .download-resume-btn:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
-  border-color: var(--md-sys-color-on-surface);
+  background: color-mix(in srgb, #0070D2 8%, transparent);
 }
 .download-resume-btn:active {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  background: color-mix(in srgb, #0070D2 12%, transparent);
+}
+/* Generation in flight — visual cue that we're working, plus blocks
+   double-clicks (the JS handler also disables the button). */
+.download-resume-btn[aria-busy="true"],
+.download-resume-btn:disabled {
+  opacity: 0.7;
+  cursor: progress;
 }
 .download-resume-btn .material-symbols-outlined { font-size: 20px; }
 
@@ -2128,34 +2142,10 @@ a:hover { text-decoration: underline; }
   line-height: 1.5;
 }
 
-/* Reuse the same brand outlined-button styling as the hero "Ask a Question"
-   CTA so the two visually rhyme. */
-.recos-cta {
-  --md-outlined-button-container-height: 44px;
-  --md-outlined-button-outline-color: #0070D2;
-  --md-outlined-button-label-text-color: #0070D2;
-  --md-outlined-button-icon-color: #0070D2;
-  --md-outlined-button-hover-label-text-color: #0070D2;
-  --md-outlined-button-hover-icon-color: #0070D2;
-  --md-outlined-button-pressed-label-text-color: #0070D2;
-  --md-outlined-button-pressed-icon-color: #0070D2;
-  --md-outlined-button-focus-label-text-color: #0070D2;
-  --md-outlined-button-focus-icon-color: #0070D2;
-  --md-outlined-button-hover-state-layer-color: #0070D2;
-  --md-outlined-button-pressed-state-layer-color: #0070D2;
-  --md-outlined-button-label-text-weight: 600;
-  --md-outlined-button-label-text-size: 13px;
-  --md-outlined-button-leading-space: 20px;
-  --md-outlined-button-trailing-space: 20px;
-  --md-outlined-button-with-leading-icon-leading-space: 18px;
-  --md-outlined-button-with-leading-icon-trailing-space: 20px;
-  --md-outlined-button-with-icon-spacing: 10px;
-  --md-outlined-button-icon-size: 18px;
-  --md-outlined-button-outline-width: 1.5px;
-  color: #0070D2;
-  flex-shrink: 0;
-}
-.recos-cta [slot="icon"] { margin-inline-end: 4px; }
+/* The visual styling for .recos-cta is shared with .refer-btn — see the
+   "Outlined brand CTA" block earlier in this file. We only add layout
+   tweaks specific to the recommendations section here. */
+.recos-cta { flex-shrink: 0; }
 
 /* ── Empty state ── */
 .recos-empty {

@@ -203,11 +203,15 @@
           </md-outlined-button>
           <!-- Direct resume download — no form, no friction. Highest-frequency
                recruiter action; placing it inline in the hero converts more
-               than hiding it behind a modal. -->
-          <a class="download-resume-btn" href="/resume.pdf" download="Abhinav-Kumar-Resume.pdf">
+               than hiding it behind a modal.
+               The PDF is built at click time from this very page's DOM
+               (see generateResumePdf in main.js) — no static asset to keep
+               in sync, and language toggle (EN/FR) carries through. -->
+          <button type="button" class="download-resume-btn"
+                  onclick="window.generateResumePdf && window.generateResumePdf()">
             <span class="material-symbols-outlined" aria-hidden="true">download</span>
             <span data-i18n="downloadResume">Download Resume</span>
-          </a>
+          </button>
         </div>
       </div>
       <div class="exp-badge">
@@ -713,7 +717,10 @@
   </div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="/assets/main.js" defer></script>
+  <!-- type="module" enables ES `import`/`export` so main.js can pull in
+       focused modules under /assets/{core,ui,chat,refer,recommendations}/.
+       Modules are deferred by spec — no need for an explicit `defer`. -->
+  <script type="module" src="/assets/main.js"></script>
 
 </body>
 </html>
