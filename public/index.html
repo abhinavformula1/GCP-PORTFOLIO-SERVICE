@@ -185,10 +185,20 @@
             <a href="https://trailblazer.me/id/abhinavformula1" target="_blank">Trailblazer Profile</a>
           </span>
         </div>
-        <md-filled-button class="hire-me-btn" onclick="window.openHireMe && window.openHireMe()">
-          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">waving_hand</span>
-          <span data-i18n="getInTouch">Get In Touch</span>
-        </md-filled-button>
+        <div class="hero-actions">
+          <md-filled-button class="hire-me-btn" onclick="window.openHireMe && window.openHireMe()">
+            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">waving_hand</span>
+            <span data-i18n="getInTouch">Get In Touch</span>
+          </md-filled-button>
+          <!-- "Ask a Question" — secondary CTA. The modal collects a free-form
+               question; submission goes through POST /api/question with an
+               Idempotency-Key header so a network retry can never create a
+               duplicate Recruiter_Question__c row. -->
+          <md-outlined-button class="ask-q-btn" onclick="window.openAskQuestion && window.openAskQuestion()">
+            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">help_outline</span>
+            <span data-i18n="askQuestion">Ask a Question</span>
+          </md-outlined-button>
+        </div>
       </div>
       <div class="exp-badge">
         <div class="years">12+</div>
@@ -472,6 +482,159 @@
 
     <div class="hm-success" id="hm-success" hidden slot="content">
       <span id="hm-success-text">✓ Message sent! I'll be in touch soon.</span>
+    </div>
+  </md-dialog>
+
+  <!-- ── Ask Question Dialog (M3 <md-dialog>) ──
+       Mirrors the Hire-Me dialog shell so styling stays consistent. The form
+       posts to /api/question with an `Idempotency-Key` header generated when
+       the modal opens, so retries never create duplicate Recruiter_Question__c
+       records. The header is what makes this endpoint truly idempotent. -->
+  <md-dialog id="askQuestionOverlay" aria-labelledby="aq-title-text">
+    <div slot="headline" class="hm-headline">
+      <span id="aq-title-text">Ask a Question</span>
+      <button type="button" class="hm-close" aria-label="Close" onclick="closeAskQuestion()">&times;</button>
+    </div>
+
+    <form id="askQuestionForm" slot="content" novalidate>
+      <p class="hm-subtitle">Curious about my experience, a project, or how I'd approach a problem? Drop your question below — I'll respond by email.</p>
+
+      <div class="hm-field">
+        <md-outlined-text-field
+          id="aq-name"
+          label="Your Name"
+          type="text"
+          autocomplete="name"></md-outlined-text-field>
+      </div>
+
+      <div class="hm-field">
+        <md-outlined-text-field
+          id="aq-email"
+          label="Email"
+          type="email"
+          required
+          autocomplete="email"></md-outlined-text-field>
+      </div>
+
+      <div class="hm-field">
+        <md-outlined-text-field
+          id="aq-company"
+          label="Company"
+          type="text"
+          autocomplete="organization"></md-outlined-text-field>
+      </div>
+
+      <div class="hm-field">
+        <md-outlined-text-field
+          id="aq-question"
+          label="Your Question"
+          type="textarea"
+          rows="5"
+          maxlength="4000"
+          required
+          supporting-text="Up to 4000 characters."></md-outlined-text-field>
+      </div>
+
+      <p class="hm-privacy">Your question is stored securely and used only to follow up with you.</p>
+
+      <md-filled-button class="hm-submit" id="aq-submit-btn" type="submit">
+        <span id="aq-submit-label">Send Question</span>
+      </md-filled-button>
+
+      <div class="hm-global-error" id="aq-global-error" hidden></div>
+    </form>
+
+    <div class="hm-success" id="aq-success" hidden slot="content">
+      <span id="aq-success-text">✓ Question sent! I'll respond by email shortly.</span>
+      <!-- Reference ID is the gcpQuestionId — the External ID we used to UPSERT
+           into Salesforce. Surfacing it lets the recruiter quote it in any
+           follow-up so we can join the conversation back to the right record. -->
+      <p class="aq-reference" id="aq-reference" hidden>
+        <span class="aq-reference-label">Reference ID</span>
+        <code class="aq-reference-id" id="aq-reference-id"></code>
+      </p>
+    </div>
+  </md-dialog>
+
+  <!-- ── Recommendations Section ──
+       Public read of /api/recommendations populates this list on page load.
+       Submission requires Google Sign-In; the modal below only opens for
+       signed-in users (otherwise the CTA invites them to sign in first).
+       My replies appear under each recommendation, written into Firestore
+       by the SF → GCP callback when I post a reply in Salesforce. -->
+  <section class="recos-section" id="recosSection">
+    <div class="recos-inner">
+      <div class="recos-header">
+        <div>
+          <h2 class="recos-title" data-i18n="recoTitle">Recommendations</h2>
+          <p class="recos-subtitle" id="recosSubtitle" data-i18n="recoSubtitle">
+            What people I've worked with — and recruiters I've spoken with — have to say.
+          </p>
+        </div>
+        <md-outlined-button class="recos-cta" id="recosCtaBtn" onclick="window.openLeaveRecommendation && window.openLeaveRecommendation()">
+          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">rate_review</span>
+          <span data-i18n="recoCta">Leave a Recommendation</span>
+        </md-outlined-button>
+      </div>
+
+      <!-- Empty state — shown when there are zero recommendations to render. -->
+      <div class="recos-empty" id="recosEmpty" hidden>
+        <span class="material-symbols-outlined recos-empty-icon" aria-hidden="true">forum</span>
+        <p class="recos-empty-text">Be the first to leave a recommendation.</p>
+      </div>
+
+      <!-- Card grid — JS hydrates this on /api/recommendations success. -->
+      <div class="recos-grid" id="recosGrid"></div>
+    </div>
+  </section>
+
+  <!-- ── Leave a Recommendation Dialog (M3 <md-dialog>) ──
+       Renders ONE textarea — name / company / avatar are pulled from the
+       verified Google ID token, so there's nothing else for the user to fill.
+       The CTA gates this dialog: signed-in users open it directly; signed-out
+       users get the sign-in prompt instead. -->
+  <md-dialog id="leaveRecoOverlay" aria-labelledby="lr-title-text">
+    <div slot="headline" class="hm-headline">
+      <span id="lr-title-text">Leave a Recommendation</span>
+      <button type="button" class="hm-close" aria-label="Close" onclick="closeLeaveRecommendation()">&times;</button>
+    </div>
+
+    <form id="leaveRecoForm" slot="content" novalidate>
+      <!-- Identity preview — pulled from cached Google profile. The user
+           sees exactly what'll appear publicly (name, company, photo) so
+           nothing about their submission is a surprise. -->
+      <div class="lr-identity" id="lr-identity">
+        <img class="lr-avatar" id="lr-avatar" alt="" />
+        <div class="lr-identity-text">
+          <span class="lr-name" id="lr-name"></span>
+          <span class="lr-company" id="lr-company"></span>
+        </div>
+      </div>
+
+      <p class="hm-subtitle">Share what stood out about working with — or talking to — Abhinav. Your name, company, and photo come from your Google profile.</p>
+
+      <div class="hm-field">
+        <md-outlined-text-field
+          id="lr-text"
+          label="Your Recommendation"
+          type="textarea"
+          rows="5"
+          maxlength="2000"
+          required
+          supporting-text="Up to 2000 characters."></md-outlined-text-field>
+      </div>
+
+      <p class="hm-privacy">Your name, company and photo (from Google) are shown publicly with this recommendation. Email is not.</p>
+
+      <md-filled-button class="hm-submit" id="lr-submit-btn" type="submit">
+        <span id="lr-submit-label">Post Recommendation</span>
+      </md-filled-button>
+
+      <div class="hm-global-error" id="lr-global-error" hidden></div>
+    </form>
+
+    <div class="hm-success" id="lr-success" hidden slot="content">
+      <span id="lr-success-text">✓ Recommendation posted! Refreshing the list…</span>
     </div>
   </md-dialog>
 

@@ -85,6 +85,22 @@ const config = {
     projectId:  process.env.FIRESTORE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || '',
     databaseId: process.env.FIRESTORE_DATABASE_ID || '(default)',
   },
+
+  // ── Salesforce → GCP callback secret ───────────────────────────────
+  // The Apex trigger on Recommendation__c calls back into Cloud Run via
+  // a Named Credential when I post a reply. Cloud Run authenticates that
+  // call by comparing the X-SF-Callback-Secret header to this value.
+  //
+  // Setup:
+  //   1. Generate once:   openssl rand -hex 32
+  //   2. Set on Cloud Run as SF_CALLBACK_SECRET
+  //   3. Set the SAME value on the Salesforce Named Credential's custom
+  //      header. The trigger sends it on every callout.
+  //
+  // If unset → the callback handler refuses every request (locked by default).
+  sfCallback: {
+    secret: process.env.SF_CALLBACK_SECRET || '',
+  },
 };
 
 module.exports = config;
