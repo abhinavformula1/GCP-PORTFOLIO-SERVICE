@@ -215,7 +215,13 @@ router.post('/recommendation/:uid/reply', async (req, res, next) => {
   try {
     // 1. Authenticate the caller. If we never set a secret, refuse — that's
     //    the safest default for a public-internet-facing callback.
-    const expected = config.sfCallback.secret;
+    // Trim BOTH sides defensively. A naive `openssl rand -hex 32 |
+    // gcloud secrets create ... --data-file=-` leaves a trailing \n in the
+    // stored secret, which makes `expected` one byte longer than anything
+    // a sane HTTP client would send and the constant-time compare always
+    // fails. Trimming both sides means the route is correct regardless of
+    // whether the operator stored the secret cleanly.
+    const expected = (config.sfCallback.secret || '').trim();
     if (!expected) {
       throw new AppError(
         'Salesforce callback is not configured on this environment.',
