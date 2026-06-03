@@ -43,6 +43,13 @@
   // Pending chat history loaded after sign-in — applied when chat opens
   var pendingChatHistory = null;
 
+  // The signed-in visitor's existing recommendation, if any. Recomputed by
+  // refreshRecommendations() on every list re-fetch by matching siteProfile.sub
+  // against item.id (the Google UID is the Firestore doc id and the SF
+  // External Id, so id-equality is the source of truth for "is this mine").
+  // Null when the visitor is signed out OR signed in but hasn't posted yet.
+  var myRecommendation = null;
+
   function saveSiteProfile(p) {
     siteProfile = p;
     try { sessionStorage.setItem('portfolio_profile', JSON.stringify(p)); } catch (_) {}
@@ -135,6 +142,12 @@
     setGoogleCredential(null);
     pendingChatHistory = null;
     siteProfile = null;
+    // Drop any "edit mode" stickiness from the previous session so the CTA
+    // immediately reverts to "Leave a Recommendation" — even though the
+    // visitor's card stays public on the site, signed-out visitors aren't
+    // allowed to edit it (re-auth required, by design).
+    myRecommendation = null;
+    if (typeof updateRecommendationCta === 'function') updateRecommendationCta();
     updateTopbarUser(null);
     closeUserMenu();
     if (window.google && window.google.accounts) {
@@ -306,7 +319,16 @@
     var profile;
     try {
       var payload = JSON.parse(atob(response.credential.split('.')[1]));
-      profile = { name: payload.name, email: payload.email, picture: payload.picture };
+      // sub = Google's stable user identifier. Stored alongside the visible
+      // profile fields so the client can identify "its own" recommendation
+      // in the public list (the Firestore doc id IS this sub claim) without
+      // needing a separate /api/recommendation/me round-trip.
+      profile = {
+        sub:     payload.sub,
+        name:    payload.name,
+        email:   payload.email,
+        picture: payload.picture,
+      };
     } catch (_) {
       hideWelcomeOverlay();
       return;
@@ -367,6 +389,12 @@
         }
         var chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
         if (chatOpen) applyGoogleProfileToChat(profile);
+
+        // Now that we know the visitor's sub, re-fetch the recommendation
+        // list so myRecommendation gets populated and the section CTA can
+        // flip to "Edit your Recommendation" if they've posted before.
+        // Cheap call — Cloud Run sets s-maxage=30 on this endpoint.
+        if (typeof refreshRecommendations === 'function') refreshRecommendations();
       });
   }
 
@@ -610,6 +638,10 @@
       recoTitle: 'Recommendations',
       recoSubtitle: "What people I've worked with — and recruiters I've spoken with — have to say.",
       recoCta: 'Leave a Recommendation',
+      recoCtaEdit: 'Edit your Recommendation',
+      recoModalTitleEdit: 'Edit your Recommendation',
+      recoSubmitNew: 'Post Recommendation',
+      recoSubmitEdit: 'Update Recommendation',
       yearsExp: 'Years Experience',
       // Welcome / Login overlay
       welcomeTitle:    "Abhinav's Portfolio",
@@ -650,6 +682,10 @@
       recoTitle: 'Recommandations',
       recoSubtitle: "Ce que les personnes avec qui j'ai travaillé — et les recruteurs avec qui j'ai échangé — disent.",
       recoCta: 'Laisser une Recommandation',
+      recoCtaEdit: 'Modifier votre Recommandation',
+      recoModalTitleEdit: 'Modifier votre Recommandation',
+      recoSubmitNew: 'Publier la Recommandation',
+      recoSubmitEdit: 'Mettre à jour la Recommandation',
       yearsExp: "Ans d'Expérience",
       // Welcome / Login overlay
       welcomeTitle:    "Le Portfolio d'Abhinav",
@@ -2035,10 +2071,22 @@
     if (item.company) who.appendChild(compEl);
     header.appendChild(who);
 
+    // Pick the timestamp to render. If the recommendation has been edited
+    // since first submission, show the edit time prefixed with "Updated"
+    // so it doesn't look stale. The 60s tolerance avoids flagging the
+    // trivial submittedAt/updatedAt skew that exists on the very first
+    // write (Firestore server-timestamps land a few ms apart).
     var when = document.createElement('time');
     when.className = 'reco-when';
-    when.textContent = formatRecoTimestamp(item.submittedAt);
-    if (item.submittedAt) when.dateTime = new Date(item.submittedAt).toISOString();
+    var displayMs    = item.submittedAt;
+    var displayLabel = '';
+    if (item.updatedAt && item.submittedAt &&
+        (item.updatedAt - item.submittedAt) > 60 * 1000) {
+      displayMs    = item.updatedAt;
+      displayLabel = 'Updated ';
+    }
+    when.textContent = displayLabel + formatRecoTimestamp(displayMs);
+    if (displayMs) when.dateTime = new Date(displayMs).toISOString();
     header.appendChild(when);
 
     card.appendChild(header);
@@ -2097,14 +2145,43 @@
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
-  function refreshRecommendations() {
+  /**
+   * Re-fetch the recommendation list and re-render the grid.
+   *
+   * The endpoint sets a 30-second public + CDN cache so a recruiter
+   * refreshing the page doesn't hammer Firestore. That cache is the
+   * right default for passive page loads — but it's wrong for the
+   * RIGHT-AFTER-SUBMIT call, where the user expects to see their
+   * own card immediately.
+   *
+   * Pass `{ bustCache: true }` from the post-submit path to skip both
+   * browser and CDN caches via a unique query string. Other callers
+   * (initial page load, visibilitychange) get the cached path so the
+   * cache still does its job for everyone else.
+   */
+  function refreshRecommendations(opts) {
+    opts = opts || {};
     var grid  = document.getElementById('recosGrid');
     var empty = document.getElementById('recosEmpty');
     if (!grid) return;
-    fetch('/api/recommendations', { headers: { 'Accept': 'application/json' } })
+    var url = '/api/recommendations';
+    if (opts.bustCache) url += '?_=' + Date.now();
+    fetch(url, { headers: { 'Accept': 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data || !Array.isArray(data.recommendations)) return;
+
+        // Find the visitor's own recommendation (if any) by matching their
+        // Google sub against the public list's id field. Doing this here —
+        // inside the success handler — keeps the CTA in sync with whatever
+        // the server believes is currently active, including replies that
+        // landed while we were on another tab.
+        var mySub = (siteProfile && siteProfile.sub) || null;
+        myRecommendation = mySub
+          ? (data.recommendations.find(function (it) { return it.id === mySub; }) || null)
+          : null;
+        updateRecommendationCta();
+
         grid.innerHTML = '';
         if (data.recommendations.length === 0) {
           if (empty) empty.hidden = false;
@@ -2116,6 +2193,27 @@
         });
       })
       .catch(function () { /* silent — section just stays empty */ });
+  }
+
+  /**
+   * Re-renders the section CTA based on whether the visitor already has
+   * an active recommendation. We swap the data-i18n key so a later
+   * language toggle still picks up the right localized copy, AND we set
+   * textContent immediately for the current language. Icon ligature is
+   * also flipped for visual reinforcement.
+   */
+  function updateRecommendationCta() {
+    var btn = document.getElementById('recosCtaBtn');
+    if (!btn) return;
+    var labelEl = btn.querySelector('[data-i18n]');
+    var iconEl  = btn.querySelector('[slot="icon"]');
+    var key     = myRecommendation ? 'recoCtaEdit' : 'recoCta';
+    if (labelEl) {
+      labelEl.setAttribute('data-i18n', key);
+      var d = PAGE_LANG[currentLang] || PAGE_LANG.en;
+      if (d[key]) labelEl.textContent = d[key];
+    }
+    if (iconEl) iconEl.textContent = myRecommendation ? 'edit' : 'rate_review';
   }
   refreshRecommendations();
   // Re-fetch when the user comes back to the tab (covers replies arriving
@@ -2153,6 +2251,33 @@
     if (name)   name.textContent = profile.name || '';
     if (comp)   comp.textContent = (profile.email || '').split('@')[1] || '';
 
+    // Edit-vs-new mode. The data layer is already idempotent on Google UID
+    // (POST /api/recommendation upserts the same Firestore doc and the same
+    // SF Testimonial__c via External Id), so all we have to flip on the
+    // client is the modal chrome + textarea contents. The submit handler
+    // doesn't need to know whether it's an edit — it sends the same
+    // payload either way and the server figures out isNew.
+    var titleEl = document.getElementById('lr-title-text');
+    var lblEl   = document.getElementById('lr-submit-label');
+    var textEl  = document.getElementById('lr-text');
+    var d       = PAGE_LANG[currentLang] || PAGE_LANG.en;
+    var isEdit  = !!myRecommendation;
+
+    if (titleEl) titleEl.textContent = isEdit
+      ? (d.recoModalTitleEdit || 'Edit your Recommendation')
+      : (d.recoCta            || 'Leave a Recommendation');
+    if (lblEl)   lblEl.textContent   = isEdit
+      ? (d.recoSubmitEdit || 'Update Recommendation')
+      : (d.recoSubmitNew  || 'Post Recommendation');
+
+    // Pre-fill (or clear) the textarea. md-outlined-text-field only honours
+    // .value once the custom element has upgraded, so wait for definition
+    // before writing — otherwise the assignment can be silently dropped on
+    // a cold load.
+    customElements.whenDefined('md-outlined-text-field').then(function () {
+      if (textEl) textEl.value = isEdit ? (myRecommendation.text || '') : '';
+    });
+
     var overlay = document.getElementById('leaveRecoOverlay');
     if (!overlay) return;
     whenMdDialogReady(function () {
@@ -2174,6 +2299,13 @@
   function resetLeaveRecoForm() {
     var form = document.getElementById('leaveRecoForm');
     if (form) form.reset();
+    // form.reset() doesn't reliably clear md-outlined-text-field once we've
+    // programmatically assigned .value (edit mode pre-fills via the property,
+    // not the attribute, so the "default" is still empty in form-internals
+    // terms — but some Material versions hold on to the last property value).
+    // Clear it explicitly so the next "new" open starts clean.
+    var textEl = document.getElementById('lr-text');
+    if (textEl) textEl.value = '';
     clearErr('lr-text');
     var globalErr = document.getElementById('lr-global-error');
     if (globalErr) globalErr.hidden = true;
@@ -2182,8 +2314,12 @@
     if (form) form.hidden = false;
     var btn = document.getElementById('lr-submit-btn');
     if (btn) btn.disabled = false;
+    // Reset the chrome back to "new" defaults — openLeaveRecommendation()
+    // will re-flip to edit mode if needed on the next open.
     var lbl = document.getElementById('lr-submit-label');
     if (lbl) lbl.textContent = 'Post Recommendation';
+    var titleEl = document.getElementById('lr-title-text');
+    if (titleEl) titleEl.textContent = 'Leave a Recommendation';
   }
 
   var lrOverlay = document.getElementById('leaveRecoOverlay');
@@ -2260,8 +2396,9 @@
             : "✓ Recommendation updated! Refreshing the list\u2026";
         }
         document.getElementById('lr-success').hidden = false;
-        // Refresh the list so the new card shows; close after a moment.
-        refreshRecommendations();
+        // Bypass the 30s public/CDN cache — the submitter has earned the
+        // right to see their own change reflected immediately.
+        refreshRecommendations({ bustCache: true });
         setTimeout(function () {
           closeLeaveRecommendation();
           // Scroll to the section so the user sees their card land.
