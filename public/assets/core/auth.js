@@ -41,7 +41,14 @@ export function authedFetch(url, opts) {
  *
  * Privacy note: the phone number itself only enters the page when the
  * server explicitly returned it (i.e. the verified email matches an
- * allow-listed domain). Any other path keeps the masked placeholder.
+ * allow-listed domain). Any other path keeps the masked placeholder
+ * and keeps the copy-to-clipboard button hidden — there's no point
+ * letting visitors copy `+91-xxxxxxxxxx`.
+ *
+ * The phone elements now live inside the Contact Info <md-dialog>
+ * (used to be inline in the hero header), but the IDs are unchanged so
+ * this function continues to be a pure DOM mutation with no knowledge
+ * of where its targets render.
  *
  * @param {{canSeePhone: boolean, phone: string|null, matchedDomain: string|null}|null|undefined} contact
  */
@@ -49,6 +56,8 @@ export function applyContactPolicy(contact) {
   var phoneRow   = document.getElementById('contactPhone');
   var phoneText  = document.getElementById('contactPhoneText');
   var phoneBadge = document.getElementById('contactPhoneBadge');
+  var phoneHint  = document.getElementById('contactPhoneHint');
+  var phoneCopy  = document.getElementById('contactPhoneCopyBtn');
   if (!phoneRow || !phoneText) return;
 
   if (contact && contact.canSeePhone && contact.phone) {
@@ -60,13 +69,18 @@ export function applyContactPolicy(contact) {
       phoneBadge.textContent = 'Verified ' + contact.matchedDomain;
       phoneBadge.hidden = false;
     }
+    // The "visible after sign-in…" hint becomes redundant noise once the
+    // number is actually showing — collapse it.
+    if (phoneHint) phoneHint.hidden = true;
+    if (phoneCopy) phoneCopy.hidden = false;
   } else {
-    // Reset to the masked, non-clickable placeholder.
     phoneText.textContent = '+91-xxxxxxxxxx';
     phoneRow.removeAttribute('href');
     phoneRow.classList.remove('contact-revealed');
     phoneRow.setAttribute('aria-disabled', 'true');
     if (phoneBadge) phoneBadge.hidden = true;
+    if (phoneHint) phoneHint.hidden = false;
+    if (phoneCopy) phoneCopy.hidden = true;
   }
 }
 

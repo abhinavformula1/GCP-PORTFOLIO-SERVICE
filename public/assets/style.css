@@ -140,9 +140,6 @@ body {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   user-select: none;
 }
-/* meta-icon: smaller variant used inside profile metadata rows */
-.meta-icon { font-size: 14px; }
-
 /* <md-dialog> uses native <dialog> internally with `margin: inherit`
    on the inner dialog, so modal centering depends on the HOST element
    having `margin: auto`. Our `* { margin: 0 }` reset above breaks that —
@@ -346,41 +343,79 @@ a:hover { text-decoration: underline; }
   margin-bottom: 16px;
 }
 
-.header-meta {
+/* ── Header credential strip ──
+   The hero used to carry five inline contact rows (email, phone,
+   linkedin, location, trailblazer). That was a lot of competing visual
+   weight for what's actually an "I'll come back to this when I want to
+   copy something" interaction. Now: two link-chips for at-a-glance
+   verification (LinkedIn, Trailblazer) plus a single "Contact info"
+   action chip that opens the consolidated modal. Three chips, same
+   visual weight, single row. */
+.header-credentials {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
-.meta-item {
-  display: flex;
+/* M3-style filter chip: pill, outlined, single line. We don't reach for
+   <md-filter-chip> here because (a) we want a clickable link semantic
+   for LinkedIn / Trailblazer (anchors, not buttons) and (b) the chip
+   set is purely decorative — no selection state. Hand-rolled keeps the
+   markup honest and the hover/focus tokens consistent. */
+.cred-chip {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 6px 14px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font-family: inherit;
   font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.meta-item svg,
-.meta-item .material-symbols-outlined { flex-shrink: 0; }
-
-/* ── Phone reveal (server-policy gated) ──
-   Default: masked + non-clickable + muted. After Google Sign-In with an
-   allow-listed domain, .contact-revealed flips it to a clickable link. */
-.meta-item-link {
+  font-weight: 500;
+  line-height: 1;
   text-decoration: none;
-  color: var(--text-secondary);
-  cursor: default;
-  transition: color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
-}
-.meta-item-link[aria-disabled="true"] {
-  cursor: help;
-  opacity: 0.85;
-}
-.meta-item-link.contact-revealed {
-  color: var(--accent);
   cursor: pointer;
+  transition: background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+              border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+              color       var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
-.meta-item-link.contact-revealed:hover { text-decoration: underline; }
+.cred-chip:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+  border-color: var(--md-sys-color-outline);
+}
+.cred-chip:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+.cred-chip-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.cred-chip-icon.material-symbols-outlined { font-size: 16px; }
+
+/* The "Contact info" chip is the action chip — same shape as the link
+   chips so the row reads as a single visual unit, but with a faint
+   primary tint to telegraph "this opens something" vs "this navigates
+   away". Subtle enough to not steal focus from the CTAs below. */
+.cred-chip-action {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+  border-color: color-mix(in srgb, var(--md-sys-color-primary) 28%, transparent);
+  color: var(--md-sys-color-on-surface);
+}
+.cred-chip-action:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+  border-color: color-mix(in srgb, var(--md-sys-color-primary) 44%, transparent);
+}
+.cred-chip-action .cred-chip-icon { color: var(--md-sys-color-primary); }
+
+/* ── "Verified org" badge inside the Contact Info modal phone row ──
+   Renders only after applyContactPolicy() flips the phone to revealed
+   for an allow-listed verified email domain. */
 .contact-reveal-badge {
   display: inline-flex;
   align-items: center;
@@ -396,117 +431,6 @@ a:hover { text-decoration: underline; }
   color: var(--md-sys-color-on-primary-container);
 }
 .contact-reveal-badge[hidden] { display: none; }
-
-/* ── Location popover ──
-   Pure CSS hover/focus reveal. Content is populated and ticked by
-   initLocationPopover() in main.js. */
-.meta-item-location {
-  position: relative;
-  cursor: help;
-  outline: none;
-}
-.meta-item-location .meta-location-label {
-  border-bottom: 1px dotted var(--md-sys-color-outline-variant);
-}
-.meta-item-location:hover .meta-location-label,
-.meta-item-location:focus-visible .meta-location-label {
-  border-bottom-color: var(--md-sys-color-on-surface-variant);
-}
-.loc-popover {
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
-  transform: translate(-50%, 4px);
-  min-width: 240px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--md-sys-color-surface-container-highest);
-  color: var(--md-sys-color-on-surface);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized-decelerate),
-              transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized-decelerate);
-  z-index: 50;
-  font-size: 12.5px;
-  line-height: 1.4;
-}
-.meta-item-location:hover .loc-popover,
-.meta-item-location:focus-visible .loc-popover,
-.loc-popover:hover {
-  opacity: 1;
-  visibility: visible;
-  transform: translate(-50%, 0);
-  pointer-events: auto;
-}
-/* Tiny arrow pointing back at the location label. */
-.loc-popover::before {
-  content: '';
-  position: absolute;
-  top: -7px;
-  left: 50%;
-  transform: translateX(-50%) rotate(45deg);
-  width: 12px;
-  height: 12px;
-  background: var(--md-sys-color-surface-container-highest);
-  border-top: 1px solid var(--md-sys-color-outline-variant);
-  border-left: 1px solid var(--md-sys-color-outline-variant);
-}
-.loc-popover-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.loc-popover-icon { font-size: 16px; color: var(--md-sys-color-on-surface-variant); }
-.loc-popover-time {
-  font-size: 18px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
-.loc-popover-tz {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.6px;
-  color: var(--md-sys-color-on-surface-variant);
-  text-transform: uppercase;
-  margin-left: 2px;
-}
-.loc-popover-delta {
-  font-size: 12px;
-  color: var(--md-sys-color-on-surface-variant);
-}
-.loc-popover-status {
-  font-size: 12px;
-  font-weight: 500;
-}
-.loc-popover-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--md-sys-color-outline);
-}
-.loc-popover-status[data-status="working"]   .loc-popover-dot { background: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18); }
-.loc-popover-status[data-status="late"]      .loc-popover-dot { background: #ffb74d; box-shadow: 0 0 0 3px rgba(255, 183, 77, 0.18); }
-.loc-popover-status[data-status="asleep"]    .loc-popover-dot { background: #8e909a; }
-.loc-popover-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--md-sys-color-primary);
-  text-decoration: none;
-}
-.loc-popover-link .material-symbols-outlined { font-size: 14px; }
-.loc-popover-link:hover { text-decoration: underline; }
 
 .exp-badge {
   background: var(--accent-soft);
@@ -536,8 +460,15 @@ a:hover { text-decoration: underline; }
    M3 dark theme defaults to a pale primary container which looks washed out
    for our primary CTAs. Override the M3 tokens (still going through <md-filled-button>)
    to use the vibrant Salesforce-blue brand color with white label + icon. */
+/* Shared brand-blue filled-button rule. All three selectors
+   (Get In Touch, Hire Me submit, Download PDF) share one token block
+   so the buttons stay visually identical — same height, same padding,
+   same icon spacing — no matter where they appear. Without this
+   shared rule, .resume-preview-download had its own (smaller, less
+   padded) token set and looked cramped next to the page CTAs. */
 .hire-me-btn,
-.hm-submit {
+.hm-submit,
+.resume-preview-download {
   --md-filled-button-container-height: 48px;
   --md-filled-button-container-color: #0070D2;
   --md-filled-button-label-text-color: #ffffff;
@@ -568,8 +499,9 @@ a:hover { text-decoration: underline; }
 /* Belt-and-braces — some 1.x builds slot the icon container with its own
    margin instead of honouring --md-filled-button-with-icon-spacing.
    This selector pads any [slot="icon"] inside our brand buttons. */
-.hire-me-btn [slot="icon"],
-.hm-submit  [slot="icon"] { margin-inline-end: 4px; }
+.hire-me-btn          [slot="icon"],
+.hm-submit            [slot="icon"],
+.resume-preview-download [slot="icon"] { margin-inline-end: 4px; }
 
 .hire-me-btn { margin-top: 20px; }
 
@@ -661,10 +593,11 @@ a:hover { text-decoration: underline; }
 }
 .download-resume-btn .material-symbols-outlined { font-size: 20px; }
 
-/* ── Modal dialog sizing (shared by Hire-Me + Refer-Me + Resume-Preview) ── */
+/* ── Modal dialog sizing (shared by Hire-Me + Refer-Me + Resume-Preview + Contact-Info) ── */
 #hireMeOverlay,
 #referMeOverlay,
-#resumePreviewOverlay {
+#resumePreviewOverlay,
+#contactInfoOverlay {
   --md-dialog-container-color: var(--md-sys-color-surface-container-high);
   --md-dialog-headline-color: var(--md-sys-color-on-surface);
   --md-dialog-headline-size: 22px;
@@ -673,6 +606,7 @@ a:hover { text-decoration: underline; }
   min-width: 420px;
 }
 #referMeOverlay { min-width: 480px; max-width: 560px; }
+#contactInfoOverlay { min-width: 460px; max-width: 520px; }
 
 /* Resume preview is wider — the iframe needs real estate to render an A4
    page legibly. We constrain to viewport so it stays usable on tablets,
@@ -687,10 +621,12 @@ a:hover { text-decoration: underline; }
    (M3 default content padding is fairly tight). */
 #hireMeOverlay  [slot="headline"],
 #referMeOverlay [slot="headline"],
-#resumePreviewOverlay [slot="headline"] { padding: 8px 8px 4px; }
+#resumePreviewOverlay [slot="headline"],
+#contactInfoOverlay   [slot="headline"] { padding: 8px 8px 4px; }
 #hireMeOverlay  [slot="content"],
 #referMeOverlay [slot="content"],
-#resumePreviewOverlay [slot="content"] { padding: 8px 8px 16px; }
+#resumePreviewOverlay [slot="content"],
+#contactInfoOverlay   [slot="content"] { padding: 8px 8px 16px; }
 
 /* ── Resume Preview iframe ──
    A4 portrait is roughly 1:√2 ≈ 1:1.414 — but we trade a little
@@ -733,20 +669,12 @@ a:hover { text-decoration: underline; }
   gap: 12px;
   padding: 8px 24px 20px;
 }
-/* Inherit the same Salesforce-blue brand styling as Hire Me's submit
-   button so the primary action of every dialog reads consistently. */
-.resume-preview-download {
-  --md-filled-button-container-height: 44px;
-  --md-filled-button-container-color: #0070D2;
-  --md-filled-button-label-text-color: #ffffff;
-  --md-filled-button-icon-color: #ffffff;
-  --md-filled-button-hover-label-text-color: #ffffff;
-  --md-filled-button-hover-icon-color: #ffffff;
-  --md-filled-button-pressed-label-text-color: #ffffff;
-  --md-filled-button-pressed-icon-color: #ffffff;
-  --md-filled-button-label-text-weight: 600;
-  --md-filled-button-label-text-size: 14px;
-}
+/* The visual styling for .resume-preview-download (height, blue fill,
+   white label/icon, generous padding, icon spacing) is shared with
+   .hire-me-btn / .hm-submit — see the "Shared brand-blue filled-button
+   rule" earlier in this file. Keeping all three primary CTAs in one
+   token block guarantees they stay identical as the design system
+   evolves. */
 
 /* ── Refer Me dialog content ──
    Reuses .hm-* shell (headline / close / privacy / field). The flow is
@@ -784,6 +712,243 @@ a:hover { text-decoration: underline; }
   .refer-actions { flex-direction: column; }
   .refer-copy-btn,
   .refer-mailto-btn { width: 100%; }
+}
+
+/* ── Contact Info modal ──
+   Stacked list of contact rows. Each row is a 3-column grid: leading
+   icon (24px), flexible body (label + value + optional hint/meta),
+   trailing action button (copy / open-in-new). The grid keeps icons
+   aligned across rows even when the body spans multiple lines (e.g.
+   the location row's working-hours block). */
+.ci-content { position: relative; }
+.ci-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ci-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: start;
+  gap: 14px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  transition: background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+.ci-row + .ci-row {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 0;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+.ci-row:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent);
+}
+.ci-icon {
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.ci-icon.material-symbols-outlined { font-size: 22px; }
+.ci-icon-svg { width: 22px; height: 22px; }
+.ci-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ci-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.ci-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  word-break: break-word;
+}
+.ci-value-link {
+  text-decoration: none;
+  color: var(--md-sys-color-on-surface);
+}
+.ci-value-link:hover { text-decoration: underline; }
+/* Phone reveal: when applyContactPolicy() flips the gated link to
+   `.contact-revealed`, change the value colour to the brand accent so
+   the recruiter immediately sees that the number is now live. */
+.ci-value-link.contact-revealed {
+  color: var(--md-sys-color-primary);
+  cursor: pointer;
+}
+.ci-value-link[aria-disabled="true"] {
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: default;
+  pointer-events: none;
+}
+.ci-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--md-sys-color-on-surface-variant);
+  font-style: italic;
+}
+.ci-hint[hidden] { display: none; }
+.ci-actions {
+  align-self: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* Tertiary icon button — squarish, transparent, hover-tinted. We avoid
+   <md-icon-button> here for tighter control over the 36px size and
+   alignment with the row baseline. */
+.ci-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+              color      var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+.ci-action-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent);
+  color: var(--md-sys-color-on-surface);
+}
+.ci-action-btn:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+.ci-action-btn .material-symbols-outlined { font-size: 20px; }
+.ci-action-btn[hidden] { display: none; }
+
+/* ── Location row meta block ──
+   Lives inside the modal's location row. The IDs (`locPopoverTime`,
+   `locPopoverDay`, `locPopoverDelta`, `locPopoverStatus`) come from
+   ui/location.js and are unchanged from the previous inline-popover
+   implementation — only the visual treatment moves into the modal. */
+.ci-location-meta {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.ci-location-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--md-sys-color-on-surface);
+}
+.ci-location-tz {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.ci-location-day {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.ci-location-delta { font-size: 12px; }
+.ci-location-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.ci-location-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--md-sys-color-outline);
+}
+.ci-location-status[data-status="working"] .ci-location-dot {
+  background: #3ecf8e;
+  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18);
+}
+.ci-location-status[data-status="late"] .ci-location-dot {
+  background: #ffb74d;
+  box-shadow: 0 0 0 3px rgba(255, 183, 77, 0.18);
+}
+.ci-location-status[data-status="asleep"] .ci-location-dot {
+  background: #8e909a;
+}
+
+/* "Copied to clipboard" toast pinned to the bottom of the dialog
+   content. We avoid the page-level welcome toast here so the feedback
+   stays scoped to the modal and doesn't compete with anything outside.
+   The `is-visible` class is added/removed by ui/contact.js. */
+.ci-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translate(-50%, 4px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  font-size: 12.5px;
+  font-weight: 500;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.ci-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.ci-toast .material-symbols-outlined {
+  font-size: 16px;
+  color: #3ecf8e;
+}
+
+/* Mobile: collapse modal width, drop the action column to its own row
+   under the body so the row layout doesn't get cramped. */
+@media (max-width: 540px) {
+  #contactInfoOverlay { min-width: 0; max-width: calc(100vw - 32px); }
+  .ci-row {
+    grid-template-columns: 24px 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 8px;
+  }
+  .ci-actions {
+    grid-column: 2;
+    justify-self: end;
+  }
 }
 
 /* Headline row (title + close button) */
@@ -1799,7 +1964,13 @@ a:hover { text-decoration: underline; }
   height: 24px;
   background: var(--border);
 }
-/* ── Welcome-Back Toast ─────────────────────────────────────── */
+/* ── Welcome-Back Toast ───────────────────────────────────────
+   Theme-aware: uses the M3 surface-container-high token so the toast
+   adapts to the active theme (was hardcoded dark navy, which became
+   unreadable when the page flipped to light mode because the inner
+   text colour vars also flipped to dark). The shadow softens in
+   light mode automatically since rgba(0,0,0,…) on a light bg is
+   visually subtler than on a dark bg. */
 .welcome-toast {
   position: fixed;
   top: 56px;
@@ -1811,10 +1982,11 @@ a:hover { text-decoration: underline; }
   padding: 12px 14px 12px 12px;
   min-width: 240px;
   max-width: 340px;
-  background: rgba(26, 29, 39, 0.96);
-  border: 1px solid var(--border);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 32px color-mix(in srgb, #000 20%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   transform: translateY(-12px);
@@ -1862,13 +2034,13 @@ a:hover { text-decoration: underline; }
 .welcome-toast-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--md-sys-color-on-surface-variant);
   letter-spacing: 0.3px;
 }
 .welcome-toast-name {
   font-size: 14px;
   font-weight: 700;
-  color: var(--text);
+  color: var(--md-sys-color-on-surface);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1877,7 +2049,7 @@ a:hover { text-decoration: underline; }
   flex: 0 0 auto;
   background: transparent;
   border: 0;
-  color: var(--text-muted);
+  color: var(--md-sys-color-on-surface-variant);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -1886,8 +2058,8 @@ a:hover { text-decoration: underline; }
   transition: color 0.15s ease, background 0.15s ease;
 }
 .welcome-toast-close:hover {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--md-sys-color-on-surface);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
 @media (max-width: 540px) {
   .welcome-toast {
@@ -2187,27 +2359,33 @@ a:hover { text-decoration: underline; }
   margin: 0 auto;
 }
 
+/* Centred hero header — Google marketing-page convention.
+   Stacked column (title → subtitle → CTA) with everything centre-
+   aligned. The CTA gets its own vertical slot below the description
+   instead of being pushed into a top-right corner, which made it
+   compete with the title for attention. Vertical rhythm:
+   title (28pt) ↓ 8px ↓ subtitle ↓ 24px ↓ CTA ↓ 36px ↓ cards. */
 .recos-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 28px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+  margin-bottom: 36px;
 }
 .recos-title {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--md-sys-color-on-surface);
-  margin: 0 0 6px;
+  margin: 0 0 8px;
 }
 .recos-subtitle {
-  font-size: 14px;
-  color: var(--md-sys-color-on-surface-variant);
-  margin: 0;
-  max-width: 600px;
+  font-size: 15px;
   line-height: 1.5;
+  color: var(--md-sys-color-on-surface-variant);
+  max-width: 560px;
+  margin: 0 0 24px;
 }
 
 /* The visual styling for .recos-cta is shared with .refer-btn — see the
@@ -2392,10 +2570,12 @@ a:hover { text-decoration: underline; }
   color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Mobile: stack the section header */
+/* Mobile: tighter section padding + slightly smaller title.
+   Header is already a centred column at all viewports, so no
+   layout flip needed here. */
 @media (max-width: 640px) {
-  .recos-section { padding: 40px 16px 32px; }
-  .recos-title   { font-size: 22px; }
-  .recos-header  { flex-direction: column; align-items: stretch; }
+  .recos-section    { padding: 40px 16px 32px; }
+  .recos-title      { font-size: 26px; }
+  .recos-subtitle   { font-size: 14px; }
   #leaveRecoOverlay { min-width: 0; }
 }

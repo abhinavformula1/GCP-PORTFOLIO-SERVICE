@@ -131,59 +131,56 @@
       <div>
         <div class="header-name">Abhinav Kumar</div>
         <div class="header-title" data-i18n="headerTitle">Senior Salesforce Application Engineer</div>
-        <div class="header-meta">
-          <span class="meta-item">
-            <span class="material-symbols-outlined meta-icon" aria-hidden="true">mail</span>
-            <a href="mailto:abhinavformula1@gmail.com">abhinavformula1@gmail.com</a>
-          </span>
-          <!-- Phone — gated by server policy (see contactPolicy.js).
-               Default state is masked + non-clickable. After Google Sign-In
-               with an allow-listed org domain, applyContactPolicy() in
-               main.js swaps the text to the real number and adds an href. -->
-          <a class="meta-item meta-item-link"
-             id="contactPhone"
-             aria-disabled="true"
-             aria-describedby="contactPhoneBadge">
-            <span class="material-symbols-outlined meta-icon" aria-hidden="true">call</span>
-            <span id="contactPhoneText">+91-xxxxxxxxxx</span>
-            <span class="contact-reveal-badge" id="contactPhoneBadge" hidden></span>
+        <!-- ── Verification + contact strip ──
+             Pattern: identity / verification chips stay inline (LinkedIn
+             and Trailblazer are scanned-once social-proof signals), and
+             everything channel-shaped (email, phone, location, maps link)
+             lives behind a single "Contact Info" affordance. This trims
+             the hero from 5+ inline rows to a 3-chip strip while
+             preserving the at-a-glance verification a recruiter does in
+             the first 2 seconds. -->
+        <div class="header-credentials" aria-label="Profile credentials">
+          <a class="cred-chip cred-chip-link"
+             href="https://linkedin.com/in/abhinavformula1"
+             target="_blank"
+             rel="noopener"
+             aria-label="LinkedIn profile (opens in a new tab)">
+            <!-- LinkedIn brand mark — kept as SVG (no Material Symbol equivalent) -->
+            <svg class="cred-chip-icon" width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+            <span>LinkedIn</span>
           </a>
-          <span class="meta-item">
-            <!-- LinkedIn brand icon — kept as SVG (no Material Symbol equivalent) -->
-            <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
-            <a href="https://linkedin.com/in/abhinavformula1" target="_blank">linkedin.com/in/abhinavformula1</a>
-          </span>
-          <!-- Location with timezone-aware hover popover. Renders Abhinav's
-               local time, the delta vs the viewer's TZ, and a working-hours
-               status pill — wired up by initLocationPopover() in main.js. -->
-          <span class="meta-item meta-item-location" id="contactLocation" tabindex="0">
-            <span class="material-symbols-outlined meta-icon" aria-hidden="true">place</span>
-            <span class="meta-location-label">Bengaluru, India</span>
-            <span class="loc-popover" role="tooltip" aria-hidden="true">
-              <span class="loc-popover-row loc-popover-time">
-                <span class="material-symbols-outlined loc-popover-icon" aria-hidden="true">schedule</span>
-                <span id="locPopoverTime">--:--</span>
-                <span class="loc-popover-tz">IST</span>
-              </span>
-              <span class="loc-popover-row loc-popover-delta" id="locPopoverDelta">
-                computing time difference…
-              </span>
-              <span class="loc-popover-row loc-popover-status" id="locPopoverStatus">
-                <span class="loc-popover-dot" aria-hidden="true"></span>
-                <span id="locPopoverStatusText">checking…</span>
-              </span>
-              <a class="loc-popover-link"
-                 href="https://www.google.com/maps/place/Bengaluru,+Karnataka,+India"
-                 target="_blank" rel="noopener">
-                Open in Google Maps
-                <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
-              </a>
-            </span>
-          </span>
-          <span class="meta-item">
-            <span class="material-symbols-outlined meta-icon" aria-hidden="true">verified</span>
-            <a href="https://trailblazer.me/id/abhinavformula1" target="_blank">Trailblazer Profile</a>
-          </span>
+          <a class="cred-chip cred-chip-link"
+             href="https://trailblazer.me/id/abhinavformula1"
+             target="_blank"
+             rel="noopener"
+             aria-label="Trailblazer profile (opens in a new tab)">
+            <span class="material-symbols-outlined cred-chip-icon" aria-hidden="true">verified</span>
+            <span>Trailblazer</span>
+          </a>
+          <!-- GitHub — engineering-credibility signal. The trio
+               LinkedIn / Trailblazer / GitHub answers the recruiter's
+               three first-pass questions ("is this person real?",
+               "are the certs real?", "do they actually ship code?")
+               in three glanceable chips. Material Symbols doesn't ship
+               an octocat, so we use the official GitHub mark as inline
+               SVG. -->
+          <a class="cred-chip cred-chip-link"
+             href="https://github.com/abhinavformula1"
+             target="_blank"
+             rel="noopener"
+             aria-label="GitHub profile (opens in a new tab)">
+            <svg class="cred-chip-icon" width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-1.94c-3.2.7-3.87-1.55-3.87-1.55-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.27-5.23-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39s1.96.13 2.88.39c2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.07.78 2.16v3.2c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+            <span>GitHub</span>
+          </a>
+          <button type="button"
+                  class="cred-chip cred-chip-action"
+                  id="contactInfoBtn"
+                  onclick="window.openContactInfo && window.openContactInfo()"
+                  aria-haspopup="dialog"
+                  aria-controls="contactInfoOverlay">
+            <span class="material-symbols-outlined cred-chip-icon" aria-hidden="true">contact_page</span>
+            <span data-i18n="contactInfo">Contact info</span>
+          </button>
         </div>
         <div class="hero-actions">
           <md-filled-button class="hire-me-btn" onclick="window.openHireMe && window.openHireMe()">
@@ -580,6 +577,192 @@
     </div>
   </md-dialog>
 
+  <!-- ── Contact Info Dialog (M3 <md-dialog>) ──
+       Single source of truth for every channel a recruiter might want:
+       email, phone (server-policy gated), LinkedIn, Trailblazer, and
+       location with a live IST time + working-hours status. Each row
+       carries a copy-to-clipboard or open-in-new-tab affordance so the
+       recruiter never has to triple-click to select an address.
+
+       Why a modal instead of inline rows? The hero header used to carry
+       five separate contact rows; that's a lot of competing visual
+       weight for what's actually a "I'll come back to this when I want
+       to copy something" interaction. Behind a single button, the
+       channels get full-bleed presentation with copy buttons — the
+       glanceable verification signals (LinkedIn, Trailblazer) stay
+       inline as chips so legitimacy is still visible in 2 seconds. -->
+  <md-dialog id="contactInfoOverlay" aria-labelledby="contact-info-title-text">
+    <div slot="headline" class="hm-headline">
+      <span id="contact-info-title-text" data-i18n="contactInfoTitle">Contact Info</span>
+      <button type="button" class="hm-close" aria-label="Close" onclick="window.closeContactInfo && window.closeContactInfo()">&times;</button>
+    </div>
+
+    <div slot="content" class="ci-content">
+      <p class="hm-subtitle" data-i18n="contactInfoIntro">Reach me through any of these channels — copy is one click away.</p>
+
+      <ul class="ci-list">
+        <!-- Email -->
+        <li class="ci-row">
+          <span class="material-symbols-outlined ci-icon" aria-hidden="true">mail</span>
+          <div class="ci-body">
+            <div class="ci-label" data-i18n="contactInfoEmail">Email</div>
+            <a class="ci-value ci-value-link" href="mailto:abhinavformula1@gmail.com">abhinavformula1@gmail.com</a>
+          </div>
+          <div class="ci-actions">
+            <button type="button"
+                    class="ci-action-btn"
+                    data-copy-target="abhinavformula1@gmail.com"
+                    aria-label="Copy email address"
+                    title="Copy">
+              <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+            </button>
+          </div>
+        </li>
+
+        <!-- Phone — gated by server contact policy. Default: masked +
+             non-clickable + no copy button. After Google Sign-In with an
+             allow-listed domain, applyContactPolicy() in core/auth.js
+             swaps the text, adds a tel: href, and reveals the copy
+             button + verified badge. -->
+        <li class="ci-row" id="contactPhoneRow">
+          <span class="material-symbols-outlined ci-icon" aria-hidden="true">call</span>
+          <div class="ci-body">
+            <div class="ci-label" data-i18n="contactInfoPhone">Phone</div>
+            <a class="ci-value ci-value-link"
+               id="contactPhone"
+               aria-disabled="true"
+               aria-describedby="contactPhoneBadge">
+              <span id="contactPhoneText">+91-xxxxxxxxxx</span>
+            </a>
+            <span class="contact-reveal-badge" id="contactPhoneBadge" hidden></span>
+            <span class="ci-hint" id="contactPhoneHint" data-i18n="contactInfoPhoneHint">Visible after sign-in with a verified work email.</span>
+          </div>
+          <div class="ci-actions">
+            <button type="button"
+                    class="ci-action-btn"
+                    id="contactPhoneCopyBtn"
+                    aria-label="Copy phone number"
+                    title="Copy"
+                    hidden>
+              <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+            </button>
+          </div>
+        </li>
+
+        <!-- LinkedIn -->
+        <li class="ci-row">
+          <svg class="ci-icon ci-icon-svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+          <div class="ci-body">
+            <div class="ci-label" data-i18n="contactInfoLinkedIn">LinkedIn</div>
+            <a class="ci-value ci-value-link"
+               href="https://linkedin.com/in/abhinavformula1"
+               target="_blank"
+               rel="noopener">linkedin.com/in/abhinavformula1</a>
+          </div>
+          <div class="ci-actions">
+            <a class="ci-action-btn"
+               href="https://linkedin.com/in/abhinavformula1"
+               target="_blank"
+               rel="noopener"
+               aria-label="Open LinkedIn profile in a new tab"
+               title="Open">
+              <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+            </a>
+          </div>
+        </li>
+
+        <!-- Trailblazer -->
+        <li class="ci-row">
+          <span class="material-symbols-outlined ci-icon" aria-hidden="true">verified</span>
+          <div class="ci-body">
+            <div class="ci-label" data-i18n="contactInfoTrailblazer">Trailblazer</div>
+            <a class="ci-value ci-value-link"
+               href="https://trailblazer.me/id/abhinavformula1"
+               target="_blank"
+               rel="noopener">trailblazer.me/id/abhinavformula1</a>
+          </div>
+          <div class="ci-actions">
+            <a class="ci-action-btn"
+               href="https://trailblazer.me/id/abhinavformula1"
+               target="_blank"
+               rel="noopener"
+               aria-label="Open Trailblazer profile in a new tab"
+               title="Open">
+              <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+            </a>
+          </div>
+        </li>
+
+        <!-- GitHub — same SVG mark as the inline chip, sized larger
+             for the modal row. Grouped with the developer-credential
+             rows (LinkedIn / Trailblazer) so the modal reads as
+             [identity → channels → credentials → location]. -->
+        <li class="ci-row">
+          <svg class="ci-icon ci-icon-svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-1.94c-3.2.7-3.87-1.55-3.87-1.55-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.27-5.23-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39s1.96.13 2.88.39c2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.07.78 2.16v3.2c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+          <div class="ci-body">
+            <div class="ci-label" data-i18n="contactInfoGithub">GitHub</div>
+            <a class="ci-value ci-value-link"
+               href="https://github.com/abhinavformula1"
+               target="_blank"
+               rel="noopener">github.com/abhinavformula1</a>
+          </div>
+          <div class="ci-actions">
+            <a class="ci-action-btn"
+               href="https://github.com/abhinavformula1"
+               target="_blank"
+               rel="noopener"
+               aria-label="Open GitHub profile in a new tab"
+               title="Open">
+              <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+            </a>
+          </div>
+        </li>
+
+        <!-- Location — same IDs the location.js tick used to write to
+             when this row was inline; the module is unchanged, only the
+             container moves. Status pill + day chip + delta line all
+             render identically inside the modal. -->
+        <li class="ci-row ci-row-location">
+          <span class="material-symbols-outlined ci-icon" aria-hidden="true">place</span>
+          <div class="ci-body">
+            <div class="ci-label" data-i18n="contactInfoLocation">Location</div>
+            <div class="ci-value">Bengaluru, India</div>
+            <div class="ci-location-meta">
+              <span class="ci-location-time">
+                <span id="locPopoverTime">--:--</span>
+                <span class="ci-location-tz">IST</span>
+                <span class="ci-location-day" id="locPopoverDay" aria-label="Current day in Bengaluru"></span>
+              </span>
+              <span class="ci-location-delta" id="locPopoverDelta">computing time difference…</span>
+              <span class="ci-location-status" id="locPopoverStatus">
+                <span class="ci-location-dot" aria-hidden="true"></span>
+                <span id="locPopoverStatusText">checking…</span>
+              </span>
+            </div>
+          </div>
+          <div class="ci-actions">
+            <a class="ci-action-btn"
+               href="https://www.google.com/maps/place/Bengaluru,+Karnataka,+India"
+               target="_blank"
+               rel="noopener"
+               aria-label="Open Bengaluru in Google Maps"
+               title="Open in Maps">
+              <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+            </a>
+          </div>
+        </li>
+      </ul>
+
+      <!-- Toast-style transient feedback for "copied to clipboard". Sits
+           inside the dialog so it doesn't compete with the page-level
+           welcome toast. Hidden by default; a 2s timer reverts it. -->
+      <div class="ci-toast" id="contactInfoToast" hidden role="status" aria-live="polite">
+        <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+        <span data-i18n="contactInfoCopied">Copied to clipboard</span>
+      </div>
+    </div>
+  </md-dialog>
+
   <!-- ── Recommendations Section ──
        Public read of /api/recommendations populates this list on page load.
        Submission requires Google Sign-In; the modal below only opens for
@@ -588,13 +771,15 @@
        by the SF → GCP callback when I post a reply in Salesforce. -->
   <section class="recos-section" id="recosSection">
     <div class="recos-inner">
+      <!-- Centred hero header (Google marketing-page pattern):
+           title → muted subtitle → primary CTA, all stacked and
+           centre-aligned. The CTA sits directly under the invitation
+           text so the reading flow ends on an action. -->
       <div class="recos-header">
-        <div>
-          <h2 class="recos-title" data-i18n="recoTitle">Recommendations</h2>
-          <p class="recos-subtitle" id="recosSubtitle" data-i18n="recoSubtitle">
-            What people I've worked with — and recruiters I've spoken with — have to say.
-          </p>
-        </div>
+        <h2 class="recos-title" data-i18n="recoTitle">Recommendations</h2>
+        <p class="recos-subtitle" id="recosSubtitle" data-i18n="recoSubtitle">
+          What people I've worked with — and recruiters I've spoken with — have to say.
+        </p>
         <md-outlined-button class="recos-cta" id="recosCtaBtn" onclick="window.openLeaveRecommendation && window.openLeaveRecommendation()">
           <span class="material-symbols-outlined" slot="icon" aria-hidden="true">rate_review</span>
           <span data-i18n="recoCta">Leave a Recommendation</span>

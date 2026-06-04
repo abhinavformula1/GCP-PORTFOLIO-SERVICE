@@ -44,6 +44,9 @@ import {
 } from './ui/welcome.js';
 import { openHireMe, closeHireMe, initHireMe } from './ui/hireme.js';
 import { openReferMe, closeReferMe, initRefer } from './refer/refer.js';
+import {
+  openContactInfo, closeContactInfo, initContactInfo,
+} from './ui/contact.js';
 import { GOOGLE_CLIENT_ID } from './core/config.js';
 import {
   openAssistant, closeAssistant, forceCloseAssistant,
@@ -413,11 +416,14 @@ import {
   window.closeHireMe       = closeHireMe;
   window.openReferMe       = openReferMe;
   window.closeReferMe      = closeReferMe;
+  window.openContactInfo   = openContactInfo;
+  window.closeContactInfo  = closeContactInfo;
   window.generateResumePdf  = generateResumePdf;
   window.downloadResumePdf  = downloadResumePdf;
   window.closeResumePreview = closeResumePreview;
   initHireMe();
   initRefer();
+  initContactInfo();
 
   // Catch-all close hook: if md-dialog fires its `close` event for any
   // reason (Esc key, scrim click, programmatic) we want the blob URL
