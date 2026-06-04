@@ -49,7 +49,7 @@
  */
 
 const { getToken, invalidateToken, isConfigured } = require('./auth');
-const { sfApexPost }                              = require('./httpClient');
+const { sfApexPost, sfApexDelete }                = require('./httpClient');
 const { withRetry, isTransientSalesforceError }   = require('./retry');
 const { SalesforceError }                         = require('../../errors');
 
@@ -143,4 +143,109 @@ async function upsertRecommendation(data, opts = {}) {
   });
 }
 
-module.exports = { upsertRecommendation };
+/**
+ * Soft-delete a recommendation in Salesforce.
+ *
+ * Apex semantics (mirrors `TestimonialService.deleteTestimonial` —
+ * see the Apex deliverable in the conversation):
+ *   - Locates the row via `Google_UID__c` (External Id) — same key the
+ *     upsert uses, so the delete is idempotent and can't hit the wrong
+ *     record.
+ *   - Sets `Status__c = 'Deleted'` rather than DELETE-ing the row, so
+ *     the audit trail is preserved (replies the user posted, history
+ *     of edits, related Integration_Log__c entries).
+ *   - Cascade-clears `Reply__c` and `Replied_At__c` so the row no
+ *     longer participates in the public read model even if a future
+ *     bug accidentally surfaces it. The reply is part of the same
+ *     "this exchange is gone" intent.
+ *
+ * Why we don't hard-delete: the recommender has the right to retract
+ * their public recommendation, but Salesforce is also a CRM record of
+ * "who said what and when" — we want that history preserved for the
+ * org owner to review.
+ *
+ * Idempotency: same retry shape as upsertRecommendation. A 404 from SF
+ * (the row never existed there — e.g. the original write failed and
+ * the recruiter is deleting via a Firestore-only doc) is treated as a
+ * silent no-op rather than an error, because the user-facing intent
+ * (make the recommendation gone) is satisfied either way.
+ *
+ * @param {{ googleUid: string }} data
+ * @param {object} [opts]
+ *   @param {string} [opts.transactionId]
+ * @returns {Promise<{ skipped?: boolean, deleted: boolean, googleUid: string }>}
+ */
+async function deleteRecommendation(data, opts = {}) {
+  if (!isConfigured()) {
+    console.log('[salesforce] SF not configured — skipping Recommendation delete');
+    return {
+      skipped:   true,
+      deleted:   false,
+      googleUid: data && data.googleUid,
+    };
+  }
+  if (!data || !data.googleUid) {
+    throw new SalesforceError('deleteRecommendation requires data.googleUid');
+  }
+
+  // googleUid is a fixed-shape Google `sub` claim (digits) so technically
+  // safe to drop into a URL. We still encode it because (a) costs nothing
+  // and (b) any future change to the claim format won't quietly become a
+  // request-smuggling vector.
+  const apexPath = `testimonial?googleUid=${encodeURIComponent(data.googleUid)}`;
+
+  const attempt = (allowTokenRetry) => async () => {
+    const { accessToken, instanceUrl } = await getToken();
+
+    const meta = {
+      apiName:       'Apex.TestimonialService.deleteTestimonial',
+      className:     'recommendation.js',
+      transactionId: opts.transactionId || '',
+    };
+
+    const { status, data: result } = await sfApexDelete(
+      instanceUrl, accessToken, apexPath, meta
+    );
+
+    if (status === 401 && allowTokenRetry) {
+      invalidateToken();
+      return attempt(false)();
+    }
+
+    // 404: row didn't exist in SF. Treat as success — the user-facing
+    // contract is "the recommendation is gone", and from their POV it
+    // already was.
+    if (status === 404) {
+      console.log(
+        `[salesforce] Testimonial__c not found for delete (googleUid=${data.googleUid}); treating as no-op`
+      );
+      return { deleted: false, googleUid: data.googleUid };
+    }
+
+    if ((status === 200 || status === 204) && (!result || result.success !== false)) {
+      console.log(
+        `[salesforce] Testimonial__c soft-deleted (googleUid=${data.googleUid})`
+      );
+      return { deleted: true, googleUid: data.googleUid };
+    }
+
+    const reason = (result && result.message)
+      || (result && result.errorCode)
+      || JSON.stringify(result || {});
+    throw new SalesforceError(
+      `Apex REST deleteRecommendation failed (HTTP ${status})`,
+      reason
+    );
+  };
+
+  return withRetry(attempt(true), {
+    label:       'deleteRecommendation',
+    attempts:    3,
+    baseMs:      200,
+    factor:      3,
+    jitterMs:    100,
+    shouldRetry: isTransientSalesforceError,
+  });
+}
+
+module.exports = { upsertRecommendation, deleteRecommendation };

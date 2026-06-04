@@ -21,16 +21,17 @@
  *   sf.isConfigured()
  */
 
-const { createInquiry }        = require('./recruiterInquiry');
-const { upsertQuestion }       = require('./recruiterQuestion');
-const { upsertRecommendation } = require('./recommendation');
-const { upsertSiteVisitor }    = require('./siteVisitor');
-const { isConfigured }         = require('./auth');
+const { createInquiry }                              = require('./recruiterInquiry');
+const { upsertQuestion }                             = require('./recruiterQuestion');
+const { upsertRecommendation, deleteRecommendation } = require('./recommendation');
+const { upsertSiteVisitor }                          = require('./siteVisitor');
+const { isConfigured }                               = require('./auth');
 
 module.exports = {
   createInquiry,
   upsertQuestion,
   upsertRecommendation,
+  deleteRecommendation,
   upsertSiteVisitor,
   isConfigured,
 };

@@ -41,6 +41,14 @@ import {
 } from '../core/state.js';
 import { PAGE_LANG, currentLang } from '../core/i18n.js';
 
+// Resolve a single i18n string for the active language with fallback to
+// English. Used for the kebab/confirm/button labels — duplicated here
+// rather than imported because i18n.js doesn't export this helper.
+function tStr(key, fallback) {
+  var d = PAGE_LANG[currentLang] || PAGE_LANG.en;
+  return d[key] || (PAGE_LANG.en && PAGE_LANG.en[key]) || fallback || '';
+}
+
 // ── Local DOM helpers ─────────────────────────────────────────────
 // Duplicated from ui/hireme.js because moving them to a shared
 // `ui/dom.js` would introduce a cross-module dependency for ~10 lines
@@ -66,6 +74,263 @@ function clearErr(fieldId) {
 }
 
 // ── Render ────────────────────────────────────────────────────────
+
+// Ownership check — the Firestore doc id IS the recommender's Google sub
+// claim, and the signed-in visitor's sub lives on siteProfile. If either
+// is missing (signed-out visitor, anonymous load) we treat the card as
+// not-owned and skip the action menu entirely.
+function isOwnerOf(item) {
+  if (!item || !item.id) return false;
+  var sub = (siteProfile && siteProfile.sub) || null;
+  return !!sub && sub === item.id;
+}
+
+// ── Owner card actions: kebab menu + inline delete confirm ───────────
+//
+// Why a kebab (not always-visible Edit / Delete buttons): the strip is
+// already busy with avatar + name + company + timestamp. Two more
+// always-visible icons would crowd the row, especially on mobile where
+// the card may already be 1-up. The kebab is the standard pattern
+// across LinkedIn / Twitter / GitHub for owner-only comment actions —
+// recruiters recognise it on sight.
+//
+// Why inline confirm (not an md-dialog modal): the destructive action
+// is small enough that a full modal feels heavy. An inline strip that
+// replaces the card's actions is also more contextually grounded —
+// the card you're about to delete stays visible while you confirm.
+
+function buildOwnerMenu(uid) {
+  var wrap = document.createElement('div');
+  wrap.className = 'reco-actions';
+
+  var trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'reco-actions-trigger';
+  trigger.setAttribute('aria-haspopup', 'menu');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.setAttribute('aria-label', tStr('recoMenuLabel', 'Recommendation actions'));
+  var triggerIcon = document.createElement('span');
+  triggerIcon.className = 'material-symbols-outlined';
+  triggerIcon.setAttribute('aria-hidden', 'true');
+  triggerIcon.textContent = 'more_vert';
+  trigger.appendChild(triggerIcon);
+
+  var menu = document.createElement('div');
+  menu.className = 'reco-actions-menu';
+  menu.setAttribute('role', 'menu');
+  menu.hidden = true;
+
+  var editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'reco-action-item';
+  editBtn.setAttribute('role', 'menuitem');
+  editBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">edit</span>'
+                    + '<span>' + tStr('recoEdit', 'Edit') + '</span>';
+
+  var deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'reco-action-item reco-action-item-destructive';
+  deleteBtn.setAttribute('role', 'menuitem');
+  deleteBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span>'
+                      + '<span>' + tStr('recoDelete', 'Delete') + '</span>';
+
+  menu.appendChild(editBtn);
+  menu.appendChild(deleteBtn);
+
+  trigger.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var willOpen = menu.hidden;
+    closeAllOwnerMenus();
+    if (willOpen) {
+      menu.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+  });
+
+  editBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    closeAllOwnerMenus();
+    // Same path the section CTA already uses — openLeaveRecommendation()
+    // checks myRecommendation and pre-fills the textarea + flips the
+    // modal copy if the visitor is editing. Free re-use.
+    openLeaveRecommendation();
+  });
+
+  deleteBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    closeAllOwnerMenus();
+    var card = wrap.closest('.reco-card');
+    if (card) showDeleteConfirm(card, uid);
+  });
+
+  wrap.appendChild(trigger);
+  wrap.appendChild(menu);
+  return wrap;
+}
+
+function closeAllOwnerMenus() {
+  document.querySelectorAll('.reco-actions-menu').forEach(function (m) {
+    m.hidden = true;
+  });
+  document.querySelectorAll('.reco-actions-trigger[aria-expanded="true"]').forEach(function (t) {
+    t.setAttribute('aria-expanded', 'false');
+  });
+}
+
+// Document-level click + Escape listeners — registered once at init,
+// not per-menu. Closes any open menu when the user clicks outside or
+// presses Escape. Kept module-private; idempotent guard via a flag.
+var _ownerMenuListenersBound = false;
+function bindOwnerMenuListeners() {
+  if (_ownerMenuListenersBound) return;
+  _ownerMenuListenersBound = true;
+  document.addEventListener('click', function () { closeAllOwnerMenus(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAllOwnerMenus();
+  });
+}
+
+/**
+ * Replace the card's text/reply with an inline "Are you sure?" strip.
+ * The header (avatar + name + timestamp) stays visible so the user
+ * keeps full context of which card they're about to delete.
+ *
+ * Cancel restores the card from the original item snapshot we cached
+ * on the card's data attributes; we don't re-fetch the list because
+ * (a) the data hasn't changed and (b) a network blip on cancel would
+ * be a worse UX than just restoring the same DOM we replaced.
+ */
+function showDeleteConfirm(card, uid) {
+  // Stash the original body so Cancel can restore it. We snapshot the
+  // outerHTML rather than the children individually so reply blocks
+  // come back exactly as they were, including any <time> elements.
+  var bodyNodes = Array.prototype.filter.call(card.children, function (c) {
+    return !c.classList || !c.classList.contains('reco-card-header');
+  });
+  var bodyBackup = bodyNodes.map(function (n) { return n.outerHTML; }).join('');
+  bodyNodes.forEach(function (n) { card.removeChild(n); });
+
+  var confirm = document.createElement('div');
+  confirm.className = 'reco-confirm';
+  confirm.setAttribute('role', 'alert');
+
+  var title = document.createElement('div');
+  title.className = 'reco-confirm-title';
+  title.textContent = tStr('recoDeleteConfirmTitle', 'Delete this recommendation?');
+  confirm.appendChild(title);
+
+  var hint = document.createElement('div');
+  hint.className = 'reco-confirm-hint';
+  hint.textContent = tStr(
+    'recoDeleteConfirmHint',
+    "Your reply from Abhinav will also be removed. This can't be undone."
+  );
+  confirm.appendChild(hint);
+
+  var actions = document.createElement('div');
+  actions.className = 'reco-confirm-actions';
+
+  var cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'reco-confirm-cancel';
+  cancelBtn.textContent = tStr('recoDeleteCancelBtn', 'Cancel');
+
+  var deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'reco-confirm-delete';
+  deleteBtn.textContent = tStr('recoDeleteConfirmBtn', 'Delete');
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(deleteBtn);
+  confirm.appendChild(actions);
+
+  card.appendChild(confirm);
+
+  cancelBtn.addEventListener('click', function () {
+    card.removeChild(confirm);
+    // Restore the original body markup. Using insertAdjacentHTML on a
+    // detached fragment loses event listeners — but this card has none
+    // attached to its body (only the header's kebab does, and that
+    // wasn't removed), so plain HTML restoration is safe and simple.
+    card.insertAdjacentHTML('beforeend', bodyBackup);
+  });
+
+  deleteBtn.addEventListener('click', function () {
+    deleteBtn.disabled = true;
+    cancelBtn.disabled = true;
+    deleteBtn.textContent = tStr('recoDeleting', 'Deleting…');
+    handleDelete(uid)
+      .then(function (ok) {
+        if (ok) {
+          // Optimistic remove — the server already cleared Firestore,
+          // and the next list fetch (or the next page load) won't
+          // include this row. Animate the card out for a nicer feel
+          // than a sudden disappearance.
+          card.classList.add('reco-card-removing');
+          setTimeout(function () {
+            if (card.parentNode) card.parentNode.removeChild(card);
+            // The visitor no longer owns a recommendation — flip the
+            // CTA back to "Leave" and reveal the empty state if this
+            // was their only card on the section.
+            setMyRecommendation(null);
+            updateRecommendationCta();
+            var grid  = document.getElementById('recosGrid');
+            var empty = document.getElementById('recosEmpty');
+            if (grid && empty && grid.children.length === 0) {
+              empty.hidden = false;
+            }
+          }, 220);
+        } else {
+          deleteBtn.disabled = false;
+          cancelBtn.disabled = false;
+          deleteBtn.textContent = tStr('recoDeleteConfirmBtn', 'Delete');
+          // Surface a non-blocking error inline. We don't lift this to a
+          // toast because the recruiter is already focused on this card.
+          var err = confirm.querySelector('.reco-confirm-error');
+          if (!err) {
+            err = document.createElement('div');
+            err.className = 'reco-confirm-error';
+            confirm.insertBefore(err, actions);
+          }
+          err.textContent = tStr(
+            'recoDeleteFailed',
+            "Couldn't delete just now. Please try again."
+          );
+        }
+      });
+  });
+}
+
+async function handleDelete(uid) {
+  if (!googleCredential) {
+    // Edge case: token expired between rendering the menu and
+    // confirming. Bail to sign-in.
+    var welcome = document.getElementById('welcomeOverlay');
+    if (welcome && typeof welcome.show === 'function') welcome.show();
+    return false;
+  }
+  try {
+    var res = await fetch('/api/recommendation', {
+      method:  'DELETE',
+      headers: {
+        'Authorization': 'Bearer ' + googleCredential,
+        // Spec says DELETE accepts no body, but we set Accept so the
+        // server can shape its 401/403 responses as JSON.
+        'Accept':        'application/json',
+      },
+    });
+    if (res.status === 401) {
+      // Stale token — clear and reprompt.
+      setGoogleCredential(null);
+      return false;
+    }
+    if (!res.ok) return false;
+    var data = await res.json().catch(function () { return null; });
+    return !!(data && data.success);
+  } catch (_) {
+    return false;
+  }
+}
 
 function renderRecommendation(item) {
   var card = document.createElement('article');
@@ -119,6 +384,15 @@ function renderRecommendation(item) {
   when.textContent = displayLabel + formatRecoTimestamp(displayMs);
   if (displayMs) when.dateTime = new Date(displayMs).toISOString();
   header.appendChild(when);
+
+  // Kebab + popover menu — only on cards the signed-in visitor owns.
+  // The server enforces ownership too (DELETE /api/recommendation
+  // pulls the uid from the verified token, never from the URL/body),
+  // so this is just hiding the affordance when it's pointless.
+  if (isOwnerOf(item)) {
+    card.classList.add('reco-card-owned');
+    header.appendChild(buildOwnerMenu(item.id));
+  }
 
   card.appendChild(header);
 
@@ -429,6 +703,11 @@ async function handleSubmit(e) {
 
 export function initRecommendations() {
   refreshRecommendations();
+
+  // Outside-click + Escape close the kebab popover globally. Bound once
+  // here rather than per-card so the listeners can't accumulate as the
+  // grid re-renders.
+  bindOwnerMenuListeners();
 
   // Re-fetch when the user comes back to the tab (covers replies arriving
   // while they were in another tab — cheap, debounced by the 30s s-maxage).

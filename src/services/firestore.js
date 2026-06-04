@@ -351,6 +351,29 @@ async function writeRecommendationReply(uid, { reply /* repliedAt ignored — se
   return { applied: true };
 }
 
+/**
+ * Hard-delete a recommendation by uid.
+ *
+ * The user explicitly asked for "soft-delete in Salesforce, hard-delete
+ * in Firestore" so the public read model goes clean immediately while
+ * SF retains the audit trail. Cascade is implicit — the reply lives on
+ * the same Firestore doc, so deleting the doc removes the reply too,
+ * matching the user's "cascade-delete the reply" intent.
+ *
+ * Idempotent: deleting a non-existent doc is silently fine (the
+ * user-facing intent is "make it gone", and from their POV it already
+ * was). The boolean lets callers distinguish for logging / telemetry.
+ *
+ * @returns {Promise<{ deleted: boolean }>}
+ */
+async function deleteRecommendation(uid) {
+  const ref = recommendationDocRef(uid);
+  const snap = await ref.get();
+  if (!snap.exists) return { deleted: false };
+  await ref.delete();
+  return { deleted: true };
+}
+
 module.exports = {
   getDb,
   getUser,
@@ -362,4 +385,5 @@ module.exports = {
   upsertRecommendation,
   listActiveRecommendations,
   writeRecommendationReply,
+  deleteRecommendation,
 };

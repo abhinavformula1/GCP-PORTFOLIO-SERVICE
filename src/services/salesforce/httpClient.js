@@ -60,7 +60,12 @@ function sfRawRequest(method, instanceUrl, accessToken, fullPath, payload, meta)
     const req = https.request(
       {
         hostname: url.hostname,
-        path:     url.pathname,
+        // Preserve the query string. Most sObject / Apex callers use
+        // path-only URLs, but some (notably DELETE on /apexrest, where
+        // the resource id is conventionally a query param rather than a
+        // body field) need ?key=value to reach the org. `url.pathname`
+        // alone drops it.
+        path:     url.pathname + url.search,
         method,
         headers:  {
           'Authorization':  `Bearer ${accessToken}`,
@@ -151,7 +156,13 @@ function sfApexRequest(method, instanceUrl, accessToken, apexPath, payload, meta
 const sfApexPost = (instanceUrl, accessToken, path, payload, meta) =>
   sfApexRequest('POST', instanceUrl, accessToken, path, payload, meta);
 
+// Apex DELETE — for resources where the operation is a soft/hard delete
+// keyed by an external id passed as a query param (no body). Mirrors
+// sfApexPost in shape so callers stay symmetrical.
+const sfApexDelete = (instanceUrl, accessToken, path, meta) =>
+  sfApexRequest('DELETE', instanceUrl, accessToken, path, null, meta);
+
 module.exports = {
   sfRequest, sfPost, sfPatch,
-  sfApexRequest, sfApexPost,
+  sfApexRequest, sfApexPost, sfApexDelete,
 };
