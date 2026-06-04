@@ -1918,12 +1918,16 @@ a:hover { text-decoration: underline; }
   padding: 20px 32px;
   margin-top: 48px;
 }
+/* Single centered row: [BUILT WITH] [GCloud logo] [Salesforce logo].
+   The label is treated as the first item in the row, so it reads as
+   an inline prefix to the centered logo group. */
 .sponsors-inner {
   max-width: 960px;
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 24px;
+  justify-content: center;
+  gap: 20px;
   flex-wrap: wrap;
 }
 .sponsors-label {
@@ -1945,15 +1949,32 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  opacity: 0.65;
+  opacity: 0.78;
   transition: opacity 0.2s;
 }
 .sponsor-link:hover { opacity: 1; }
+/* Default sizing for any sponsor mark — overridden per-brand below
+   because each official lockup has its own intrinsic aspect ratio. */
 .sponsor-logo {
-  width: 28px;
+  width: auto;
   height: 28px;
   flex-shrink: 0;
+  display: block;
 }
+/* Per-brand sizing tuned to the actual viewBox of each official asset.
+   GCP is a wide horizontal lockup (icon + "Google Cloud" wordmark, ratio
+   ~6.5:1), Salesforce is a roughly square cloud-with-text mark (ratio
+   ~1.4:1). Locking each to its proper proportion stops the browser from
+   distorting the marks when the row wraps. */
+.sponsor-link-gcp .sponsor-logo {
+  height: 22px;
+}
+.sponsor-link-sf .sponsor-logo {
+  height: 36px;
+}
+/* Legacy text label, kept for safety in case any future per-brand
+   render path still uses it. The current footer drops it because the
+   official lockups already include their own wordmarks. */
 .sponsor-name {
   font-size: 13px;
   font-weight: 600;
@@ -1963,6 +1984,18 @@ a:hover { text-decoration: underline; }
   width: 1px;
   height: 24px;
   background: var(--border);
+}
+/* Trademark / nominative-fair-use note. Quiet by design — it's there for
+   legal hygiene, not to be read every time. Kept centered + narrow so it
+   doesn't compete with the tech-stack row above. */
+.sponsors-disclaimer {
+  max-width: 720px;
+  margin: 12px auto 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+  opacity: 0.75;
 }
 /* ── Welcome-Back Toast ───────────────────────────────────────
    Theme-aware: uses the M3 surface-container-high token so the toast

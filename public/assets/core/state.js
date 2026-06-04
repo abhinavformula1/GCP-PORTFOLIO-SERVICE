@@ -69,7 +69,11 @@ export function setPendingChatHistory(h) { pendingChatHistory = h; }
 
 // ── myRecommendation (in-memory only) ────────────────────────────────────────
 // Recomputed on every refreshRecommendations() call by matching
-// siteProfile.sub against the public list. Drives the CTA flip between
-// "Leave a Recommendation" and "Edit your Recommendation".
+// siteProfile.sub against the public list. Two consumers:
+//   1. The recommendation card render path uses it to attach the kebab
+//      menu (Edit/Delete) onto the visitor's own card.
+//   2. updateRecommendationCta() hides the section-level "Leave a
+//      Recommendation" CTA when this is set, so the kebab is the sole
+//      management entry point and the CTA isn't redundant.
 export var myRecommendation = null;
 export function setMyRecommendation(r) { myRecommendation = r; }
