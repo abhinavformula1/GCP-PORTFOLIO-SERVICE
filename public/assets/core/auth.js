@@ -88,6 +88,28 @@ export function initGoogleSignIn(opts) {
     callback: onSignIn,
     auto_select: false,
     cancel_on_tap_outside: false,
+    // Use Chrome's FedCM (Federated Credential Management) API for both
+    // One Tap and the rendered "Sign in with Google" button. With FedCM
+    // the account chooser becomes a native browser overlay — no popup,
+    // no new tab, no dependency on third-party cookies. This matters
+    // especially on `*.run.app` (the Cloud Run default domain), which
+    // is on the Public Suffix List and so triggers Chrome's strict
+    // third-party storage partitioning.
+    //
+    // Without these flags, visitors with multiple Google sessions get
+    // redirected to accounts.google.com in a new tab to resolve the
+    // ambiguity — visually breaking the "click button, instantly
+    // signed in" promise of the welcome card.
+    use_fedcm_for_prompt: true,
+    use_fedcm_for_button: true,
+    // Popup mode (default) keeps the current tab; explicit so we don't
+    // accidentally inherit a redirect mode if the GSI default ever
+    // changes upstream.
+    ux_mode: 'popup',
+    // Safari ITP storage-access workaround. No effect on Chrome but
+    // saves a separate browser-specific debugging session if the
+    // resume ever ships to a Safari recruiter.
+    itp_support: true,
   });
   // Render button in welcome overlay if shown
   var welcomeBtn = document.getElementById('welcomeGoogleBtn');
