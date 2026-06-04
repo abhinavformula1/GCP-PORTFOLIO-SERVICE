@@ -194,6 +194,90 @@ router.post('/recommendation', recommendationLimiter, validateRecommendation, as
   }
 });
 
+// ── DELETE /api/recommendation ───────────────────────────────────────────────
+//
+// Recruiter retracts their own recommendation. Auth: same Google ID token
+// pattern as the POST handler — the uid is taken from the verified token,
+// never from the URL or body, so a recruiter can only ever delete THEIR
+// OWN row. There is no admin override surface here on purpose; if I (the
+// site owner) ever need to delete someone else's recommendation, I'd do
+// it from Salesforce, where I have a CRM-grade audit trail.
+//
+// Dual-delete shape mirrors the POST dual-write:
+//   - Firestore   : HARD delete (public read model goes clean immediately)
+//   - Salesforce  : SOFT delete (Status__c = 'Deleted', cascade-clear the
+//                   reply fields) — preserves the CRM audit trail
+//
+// Reply cascade: the user warned the recruiter in the confirm UI that
+// their reply would also be removed. Firestore is naturally cascading
+// (reply lives on the same doc; doc.delete() takes the reply with it).
+// Salesforce side is explicit — the Apex deleteTestimonial method sets
+// Reply__c = null and Replied_At__c = null so the row's "the conversation
+// is gone" state is consistent regardless of where we read from.
+//
+// Why not retry the SF call inline like POST does: the user already saw
+// the card disappear (Firestore is the public read model), so the SF
+// soft-delete is best-effort. If it fails after retries, we log loudly
+// and a future reconcile (the recruiter re-submitting then deleting
+// again, or a manual SF cleanup) repairs it. The audit trail on SF is
+// for the org owner; the recruiter's experience is already correct.
+router.delete('/recommendation', async (req, res, next) => {
+  try {
+    // 1. Verify Google identity. Unlike POST, we don't accept a body
+    //    fallback — DELETE has no body by HTTP convention, and we want
+    //    a single auth path here so no edge case lets the uid come from
+    //    anywhere except a verified token.
+    const auth = req.get('Authorization') || '';
+    const bearer = auth.toLowerCase().startsWith('bearer ')
+      ? auth.slice(7).trim()
+      : '';
+
+    if (!bearer) {
+      throw new AppError(
+        'Sign in with Google to delete your recommendation.',
+        401, 'UNAUTHORIZED'
+      );
+    }
+
+    const { uid } = await googleAuth.verifyIdToken(bearer);
+    const transactionId = crypto.randomUUID();
+
+    // 2. Firestore HARD delete first. This is the public read model —
+    //    once it's gone here, the card stops appearing on every page
+    //    load globally. We do this before SF so the user-visible effect
+    //    happens immediately even if the SF callout is slow.
+    const fsResult = await firestore.deleteRecommendation(uid);
+
+    // 3. Salesforce SOFT delete. Best-effort: if it fails after retries
+    //    the recruiter still got the visible deletion they asked for,
+    //    and a future reconcile cleans up the SF side.
+    let sfResult = { skipped: true, deleted: false };
+    try {
+      sfResult = await salesforce.deleteRecommendation(
+        { googleUid: uid },
+        { transactionId }
+      );
+    } catch (sfErr) {
+      console.error(
+        `[recommendation] SF soft-delete FAILED after retries (uid=${uid} txId=${transactionId}): ${sfErr.message}`
+      );
+    }
+
+    return res.status(200).json({
+      success:          true,
+      uid,
+      firestoreDeleted: fsResult.deleted,
+      salesforceSynced: !sfResult.skipped && !!sfResult.deleted,
+      transactionId,
+      message: fsResult.deleted
+        ? 'Your recommendation has been removed.'
+        : "There was nothing to delete — you didn't have an active recommendation.",
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ── POST /api/recommendation/:uid/reply ──────────────────────────────────────
 //
 // SF → GCP callback handler. Apex trigger fires this when I write a Reply
