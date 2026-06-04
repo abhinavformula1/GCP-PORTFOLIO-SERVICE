@@ -1,24 +1,30 @@
 /**
- * Timezone-aware location popover.
+ * Timezone-aware location time/day/status display.
  *
- * Shows Abhinav's current local time, the delta vs the viewer's resolved
- * timezone, and a working-hours status pill. Pure browser primitives —
- * Intl + Date + setInterval, no API keys, no network calls.
+ * Renders Abhinav's current local time, the delta vs the viewer's
+ * resolved timezone, and a working-hours status pill. Pure browser
+ * primitives — Intl + Date + setInterval, no API keys, no network calls.
  *
  * Why this matters for a recruiter: timezone is the first practical
- * question on every remote-hire conversation. Answering it inline
- * removes a step from their workflow.
+ * question on every remote-hire conversation. Answering it inside the
+ * Contact Info modal — right next to the location row — removes a
+ * mental round-trip from "where are they?" to "is this a good time to
+ * email?".
+ *
+ * The element IDs this module writes to (`locPopoverTime`,
+ * `locPopoverDay`, `locPopoverDelta`, `locPopoverStatus`,
+ * `locPopoverStatusText`) used to live in an inline hover popover; they
+ * now live inside the Contact Info dialog. The kept names are honest:
+ * the *behaviour* is still "popover-style live data", just rehoused.
  *
  * Public API: `initLocationPopover()`. Call once on boot from main.js.
  */
 
 export function initLocationPopover() {
-  var el = document.getElementById('contactLocation');
-  if (!el) return;
-
-  var timeEl   = document.getElementById('locPopoverTime');
-  var deltaEl  = document.getElementById('locPopoverDelta');
-  var statusEl = document.getElementById('locPopoverStatus');
+  var timeEl       = document.getElementById('locPopoverTime');
+  var dayEl        = document.getElementById('locPopoverDay');
+  var deltaEl      = document.getElementById('locPopoverDelta');
+  var statusEl     = document.getElementById('locPopoverStatus');
   var statusTextEl = document.getElementById('locPopoverStatusText');
   if (!timeEl || !deltaEl || !statusEl || !statusTextEl) return;
 
@@ -32,14 +38,28 @@ export function initLocationPopover() {
   var viewerTz = '';
   try { viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_) {}
 
-  /** Format the IST hour:minute as HH:MM (24h, locale-stable). */
-  function formatIstHHMM(now) {
+  /** Format the IST hour:minute as "h:mm AM/PM" (12h, locale-stable). */
+  function formatIstTime(now) {
     try {
-      return new Intl.DateTimeFormat('en-GB', {
-        timeZone: IST_TZ, hour: '2-digit', minute: '2-digit', hour12: false,
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: IST_TZ, hour: 'numeric', minute: '2-digit', hour12: true,
       }).format(now);
     } catch (_) {
       return '--:--';
+    }
+  }
+
+  /** Format the IST day-of-week ("Mon", "Tue", ...). Disambiguates the
+   *  international-date-line case where the viewer's calendar day is
+   *  different from Bengaluru's. Subtle but important — recruiters often
+   *  forget that "evening for them" is "next morning IST". */
+  function formatIstDay(now) {
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: IST_TZ, weekday: 'short',
+      }).format(now);
+    } catch (_) {
+      return '';
     }
   }
 
@@ -61,29 +81,31 @@ export function initLocationPopover() {
   function computeDeltaHours(now) {
     if (!viewerTz) return null;
     try {
-      function localOffsetMinutes(tz) {
-        // Build a "wall clock" Date as if the instant were in `tz`, then
-        // diff it from the actual UTC instant to recover the offset.
-        var dtf = new Intl.DateTimeFormat('en-US', {
-          timeZone: tz, hourCycle: 'h23',
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit',
-        });
-        var parts = dtf.formatToParts(now).reduce(function (acc, p) {
-          if (p.type !== 'literal') acc[p.type] = p.value; return acc;
-        }, {});
-        var asUTC = Date.UTC(
-          +parts.year, +parts.month - 1, +parts.day,
-          +parts.hour, +parts.minute, +parts.second
-        );
-        return (asUTC - now.getTime()) / 60000;
-      }
-      var istMin    = localOffsetMinutes(IST_TZ);
-      var viewerMin = localOffsetMinutes(viewerTz);
+      var istMin    = localOffsetMinutes(IST_TZ,   now);
+      var viewerMin = localOffsetMinutes(viewerTz, now);
       return (istMin - viewerMin) / 60;
     } catch (_) {
       return null;
     }
+  }
+
+  /** Build a "wall clock" Date as if the instant were in `tz`, then diff it
+   *  from the actual UTC instant to recover the offset. Lifted out of
+   *  computeDeltaHours so the working-window logic below can reuse it. */
+  function localOffsetMinutes(tz, now) {
+    var dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    var parts = dtf.formatToParts(now).reduce(function (acc, p) {
+      if (p.type !== 'literal') acc[p.type] = p.value; return acc;
+    }, {});
+    var asUTC = Date.UTC(
+      +parts.year, +parts.month - 1, +parts.day,
+      +parts.hour, +parts.minute, +parts.second
+    );
+    return (asUTC - now.getTime()) / 60000;
   }
 
   function formatDelta(hours) {
@@ -109,7 +131,8 @@ export function initLocationPopover() {
 
   function tick() {
     var now = new Date();
-    timeEl.textContent  = formatIstHHMM(now);
+    timeEl.textContent  = formatIstTime(now);
+    if (dayEl) dayEl.textContent = formatIstDay(now);
     deltaEl.textContent = formatDelta(computeDeltaHours(now));
     updateStatus(istHour(now));
   }

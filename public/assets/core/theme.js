@@ -40,17 +40,25 @@ export function initTheme() {
   customElements.whenDefined('md-outlined-icon-button').then(function () {
     var btn = document.getElementById('themeToggleBtn');
     if (!btn) return;
+    // Both `aria-label` (screen readers) and `title` (sighted hover
+    // tooltip) need to reflect the *next* action — i.e. when the page
+    // is in light mode, the label/tooltip says "Switch to dark mode".
+    // The HTML ships a static `title="Switch theme"` placeholder; this
+    // helper rewrites both attributes in lock-step so the tooltip a
+    // visitor sees on hover always matches the action they'll get.
+    function syncLabel(isLight) {
+      var msg = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+      btn.setAttribute('aria-label', msg);
+      btn.setAttribute('title',      msg);
+    }
     var isLight = currentTheme() === 'light';
     btn.selected = isLight;
-    btn.setAttribute('aria-label', isLight ? 'Switch to dark mode' : 'Switch to light mode');
+    syncLabel(isLight);
     btn.addEventListener('change', function () {
       var nextTheme = btn.selected ? 'light' : 'dark';
       applyTheme(nextTheme);
       localStorage.setItem(THEME_KEY, nextTheme);
-      btn.setAttribute(
-        'aria-label',
-        btn.selected ? 'Switch to dark mode' : 'Switch to light mode'
-      );
+      syncLabel(btn.selected);
     });
   });
 }
