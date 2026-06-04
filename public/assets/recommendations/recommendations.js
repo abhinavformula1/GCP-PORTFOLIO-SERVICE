@@ -500,24 +500,23 @@ export function refreshRecommendations(opts) {
 }
 
 /**
- * Re-renders the section CTA based on whether the visitor already has
- * an active recommendation. We swap the data-i18n key so a later
- * language toggle still picks up the right localized copy, AND we set
- * textContent immediately for the current language. Icon ligature is
- * also flipped for visual reinforcement.
+ * Show or hide the section-level "Leave a Recommendation" CTA based on
+ * whether the visitor already has an active recommendation.
+ *
+ * Rationale: the visitor's own card now exposes a kebab → Edit/Delete
+ * menu, which is the natural entry point for managing your own reco.
+ * Keeping a second "Edit your Recommendation" button at the section
+ * header would duplicate that affordance and force the user to think
+ * about which one to use. Instead, once you've contributed, the
+ * section CTA disappears — your card and its kebab become the single
+ * source of truth for editing. For everyone else (recruiters,
+ * visitors without a card) the CTA stays exactly as it was:
+ * "Leave a Recommendation" with the rate_review icon.
  */
 export function updateRecommendationCta() {
   var btn = document.getElementById('recosCtaBtn');
   if (!btn) return;
-  var labelEl = btn.querySelector('[data-i18n]');
-  var iconEl  = btn.querySelector('[slot="icon"]');
-  var key     = myRecommendation ? 'recoCtaEdit' : 'recoCta';
-  if (labelEl) {
-    labelEl.setAttribute('data-i18n', key);
-    var d = PAGE_LANG[currentLang] || PAGE_LANG.en;
-    if (d[key]) labelEl.textContent = d[key];
-  }
-  if (iconEl) iconEl.textContent = myRecommendation ? 'edit' : 'rate_review';
+  btn.hidden = !!myRecommendation;
 }
 
 // ── Gate the CTA on Google sign-in state ──────────────────────────

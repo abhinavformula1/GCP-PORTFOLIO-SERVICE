@@ -88,10 +88,10 @@ import {
     try { sessionStorage.removeItem('welcome_toast_shown'); } catch (_) {}
     setGoogleCredential(null);
     setPendingChatHistory(null);
-    // Drop any "edit mode" stickiness from the previous session so the CTA
-    // immediately reverts to "Leave a Recommendation" — even though the
-    // visitor's card stays public on the site, signed-out visitors aren't
-    // allowed to edit it (re-auth required, by design).
+    // Drop the previous session's myRecommendation pointer so the section
+    // CTA reappears (it was hidden because the signed-in user owned a card).
+    // The card itself stays public — signed-out visitors just can't manage
+    // it (re-auth required to access kebab actions, by design).
     setMyRecommendation(null);
     if (typeof updateRecommendationCta === 'function') updateRecommendationCta();
     updateTopbarUser(null);
@@ -213,8 +213,9 @@ import {
         if (chatOpen) applyGoogleProfileToChat(profile);
 
         // Now that we know the visitor's sub, re-fetch the recommendation
-        // list so myRecommendation gets populated and the section CTA can
-        // flip to "Edit your Recommendation" if they've posted before.
+        // list so myRecommendation gets populated. The section CTA hides
+        // itself for visitors who already have a card (the kebab on the
+        // card owns Edit/Delete from there on out).
         // Cheap call — Cloud Run sets s-maxage=30 on this endpoint.
         if (typeof refreshRecommendations === 'function') refreshRecommendations();
       });

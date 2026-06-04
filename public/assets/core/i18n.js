@@ -129,7 +129,6 @@ export var PAGE_LANG = {
     recoTitle: 'Recommendations',
     recoSubtitle: "What people I've worked with — and recruiters I've spoken with — have to say.",
     recoCta: 'Leave a Recommendation',
-    recoCtaEdit: 'Edit your Recommendation',
     recoModalTitleEdit: 'Edit your Recommendation',
     recoSubmitNew: 'Post Recommendation',
     recoSubmitEdit: 'Update Recommendation',
@@ -142,6 +141,8 @@ export var PAGE_LANG = {
     recoDeleteCancelBtn: 'Cancel',
     recoDeleting: 'Deleting\u2026',
     recoDeleteFailed: "Couldn't delete just now. Please try again.",
+    footerBuiltWith: 'Built with',
+    footerTrademarkNote: 'Trademarks are property of their respective owners. This is a personal portfolio; no endorsement or sponsorship is implied.',
     yearsExp: 'Years Experience',
     // Welcome / Login overlay
     welcomeTitle:    "Abhinav's Portfolio",
@@ -197,7 +198,6 @@ export var PAGE_LANG = {
     recoTitle: 'Recommandations',
     recoSubtitle: "Ce que les personnes avec qui j'ai travaillé — et les recruteurs avec qui j'ai échangé — disent.",
     recoCta: 'Laisser une Recommandation',
-    recoCtaEdit: 'Modifier votre Recommandation',
     recoModalTitleEdit: 'Modifier votre Recommandation',
     recoSubmitNew: 'Publier la Recommandation',
     recoSubmitEdit: 'Mettre à jour la Recommandation',
@@ -210,6 +210,8 @@ export var PAGE_LANG = {
     recoDeleteCancelBtn: 'Annuler',
     recoDeleting: 'Suppression\u2026',
     recoDeleteFailed: "Impossible de supprimer pour l'instant. Veuillez réessayer.",
+    footerBuiltWith: 'Conçu avec',
+    footerTrademarkNote: "Les marques déposées appartiennent à leurs propriétaires respectifs. Ce site est un portfolio personnel ; aucun partenariat ni parrainage n'est sous-entendu.",
     yearsExp: "Ans d'Expérience",
     // Welcome / Login overlay
     welcomeTitle:    "Le Portfolio d'Abhinav",
