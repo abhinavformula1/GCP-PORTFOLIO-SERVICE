@@ -13,7 +13,25 @@
  *     submit and dialog `close` listeners.
  */
 
-import { t } from '../core/i18n.js';
+import { t, PAGE_LANG, currentLang } from '../core/i18n.js';
+
+// Pull localized strings keyed by data-i18n. Falls back to English if the
+// current language doesn't ship the key (defensive — every key we use here
+// is defined in both en and fr at build time).
+function dict() {
+  return PAGE_LANG[currentLang] || PAGE_LANG.en;
+}
+
+// First-name extraction. The form's "Full Name" field accepts whatever the
+// visitor types, so this is best-effort: take the first whitespace-bounded
+// token. If empty (visitor left the field blank, somehow past validation),
+// the success copy falls back to the un-personalised variant.
+function firstNameOf(fullName) {
+  if (!fullName) return '';
+  var trimmed = String(fullName).trim();
+  if (!trimmed) return '';
+  return trimmed.split(/\s+/)[0];
+}
 
 // Open an <md-dialog>, waiting for the custom element to be upgraded
 // (the @material/web ESM script loads asynchronously from CDN, so
@@ -48,6 +66,63 @@ function resetHireForm() {
   document.getElementById('hm-submit-btn').disabled = false;
   var lbl = document.getElementById('hm-submit-label');
   if (lbl) lbl.textContent = 'Send Message';
+  // Restore the dialog title — it gets swapped to "Message sent" /
+  // "Already received" while the success state is showing, so reopening
+  // the form (after a close) needs to flip it back to "Get In Touch".
+  var titleEl = document.getElementById('hm-title-text');
+  if (titleEl) titleEl.textContent = dict().getInTouch || 'Get In Touch';
+}
+
+/**
+ * Render the success state in-place inside the dialog. Hides the form,
+ * swaps the dialog title to match the new state, fills in the headline
+ * + body copy (personalised with the visitor's first name when we have
+ * one), and reveals the success block — the M3 empty-state-style layout
+ * (icon → headline → body → primary action) is in the HTML and CSS.
+ *
+ * `alreadySubmitted` flips the copy to a softer "I have your message
+ * already, hang tight" variant so we don't claim success for a no-op.
+ */
+function renderHireSuccess(opts) {
+  var d = dict();
+  var alreadySubmitted = !!(opts && opts.alreadySubmitted);
+  var firstName = firstNameOf(opts && opts.fullName);
+
+  // Pick the right headline + body keys for the state
+  var titleText = alreadySubmitted
+    ? (d.hireTitleAlready || 'Already received')
+    : (d.hireTitleSent    || 'Message sent');
+  var headlineText = alreadySubmitted
+    ? (d.hireAlreadyHeadline || 'Already received')
+    : (d.hireSuccessHeadline || 'Message sent');
+  var bodyTpl;
+  if (alreadySubmitted) {
+    bodyTpl = firstName
+      ? (d.hireAlreadyBodyNamed || d.hireAlreadyBody)
+      : d.hireAlreadyBody;
+  } else {
+    bodyTpl = firstName
+      ? (d.hireSuccessBodyNamed || d.hireSuccessBody)
+      : d.hireSuccessBody;
+  }
+  // Token-replace once so we don't have to ship a templating dep.
+  var bodyText = (bodyTpl || '').replace('{name}', firstName);
+
+  var titleEl    = document.getElementById('hm-title-text');
+  var headlineEl = document.getElementById('hm-success-headline');
+  var bodyEl     = document.getElementById('hm-success-body');
+  if (titleEl)    titleEl.textContent    = titleText;
+  if (headlineEl) headlineEl.textContent = headlineText;
+  if (bodyEl)     bodyEl.textContent     = bodyText;
+
+  document.getElementById('hireMeForm').hidden = true;
+  document.getElementById('hm-success').hidden = false;
+
+  // Move keyboard focus to the primary action so Enter / Space dismisses
+  // the dialog. Defer to the next tick so md-filled-button has had a
+  // chance to upgrade.
+  var doneBtn = document.getElementById('hm-success-done');
+  if (doneBtn) setTimeout(function () { try { doneBtn.focus(); } catch (_) {} }, 0);
 }
 
 function setErr(fieldId, msg) {
@@ -123,14 +198,10 @@ export function initHireMe() {
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        document.getElementById('hireMeForm').hidden = true;
-        var successTextEl = document.getElementById('hm-success-text');
-        if (successTextEl) {
-          successTextEl.textContent = data.alreadySubmitted
-            ? "✓ You've already reached out — thanks! I'll get back to you within 1–2 business days."
-            : "✓ Message sent! I'll be in touch soon.";
-        }
-        document.getElementById('hm-success').hidden = false;
+        renderHireSuccess({
+          alreadySubmitted: data.alreadySubmitted,
+          fullName:         payload.name,
+        });
       } else {
         globalErr.textContent = (data && data.error) || t().errors.generic;
         globalErr.hidden = false;

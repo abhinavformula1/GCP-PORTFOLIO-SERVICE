@@ -491,8 +491,27 @@
       <div class="hm-global-error" id="hm-global-error" hidden></div>
     </form>
 
+    <!-- Success state. Replaces the form (which gets `hidden` on submit
+         success) and re-uses the same dialog. Layout follows M3 empty-
+         state convention: icon → headline → supporting → primary action.
+         The headline + body are i18n-keyed AND set imperatively from
+         hireme.js because the copy varies (new vs alreadySubmitted) and
+         is personalised with the visitor's first name when supplied. -->
     <div class="hm-success" id="hm-success" hidden slot="content">
-      <span id="hm-success-text">✓ Message sent! I'll be in touch soon.</span>
+      <div class="hm-success-icon" aria-hidden="true">
+        <span class="material-symbols-outlined">check</span>
+      </div>
+      <!-- Headline + body are written imperatively by renderHireSuccess()
+           because the copy is personalised with the visitor's first name
+           and varies by branch (new vs alreadySubmitted). They intentionally
+           do NOT carry data-i18n so that a mid-success language flip
+           doesn't clobber the personalised copy. The Done button below is
+           fixed text, so it does carry data-i18n. -->
+      <h3 class="hm-success-headline" id="hm-success-headline">Message sent</h3>
+      <p class="hm-success-body" id="hm-success-body">Thanks for reaching out. I usually reply within 24 hours via email.</p>
+      <md-filled-button class="hm-success-done" id="hm-success-done" type="button" onclick="closeHireMe()">
+        <span data-i18n="hireSuccessDone">Done</span>
+      </md-filled-button>
     </div>
   </md-dialog>
 
