@@ -60,6 +60,9 @@ import {
   openLeaveRecommendation, closeLeaveRecommendation,
   initRecommendations,
 } from './recommendations/recommendations.js';
+import {
+  initSystemDesign, openSystemDesign, closeSystemDesign,
+} from './ui/systemdesign.js';
 
 (function () {
   'use strict';
@@ -320,7 +323,7 @@ import {
   // .recos-cta (the "Leave a Recommendation" button) so all three outlined
   // CTAs share the same internal padding as the filled brand buttons.
   customElements.whenDefined('md-outlined-button').then(function () {
-    document.querySelectorAll('.refer-btn, .refer-mailto-btn, .recos-cta').forEach(function (btn) {
+    document.querySelectorAll('.refer-btn, .refer-mailto-btn, .recos-cta, .systemdesign-btn').forEach(function (btn) {
       injectShadowStyle(btn, BRAND_BUTTON_CSS);
     });
   });
@@ -443,5 +446,14 @@ import {
   window.openLeaveRecommendation  = openLeaveRecommendation;
   window.closeLeaveRecommendation = closeLeaveRecommendation;
   initRecommendations();
+
+  /* ── System Design view ──
+     Master/detail topic browser that swaps the body grid (resume DOM is
+     hidden, not removed, so the Download Resume scraper still works).
+     Wires its own hashchange listener for #/system-design/<id> deep
+     links. → ./ui/systemdesign.js  */
+  window.openSystemDesign  = openSystemDesign;
+  window.closeSystemDesign = closeSystemDesign;
+  initSystemDesign();
 })();
 
