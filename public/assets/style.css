@@ -517,13 +517,14 @@ a:hover { text-decoration: underline; }
 }
 .hero-actions .hire-me-btn { margin-top: 0; }
 
-/* ── Outlined brand CTA (Refer Me, Leave a Recommendation) ──
+/* ── Outlined brand CTA (Refer Me, System Design, Leave a Recommendation) ──
    Salesforce-blue text + matching outline; same height + padding tokens
-   as the filled brand button (.hire-me-btn) so all three CTAs read as a
-   balanced set. Both selectors share one token block so the styling
+   as the filled brand button (.hire-me-btn) so all four CTAs read as a
+   balanced set. All selectors share one token block so the styling
    can't drift between the hero row and the recommendations section. */
 .refer-btn,
-.recos-cta {
+.recos-cta,
+.systemdesign-btn {
   --md-outlined-button-container-height: 48px;
   --md-outlined-button-outline-color: #0070D2;
   --md-outlined-button-label-text-color: #0070D2;
@@ -548,7 +549,8 @@ a:hover { text-decoration: underline; }
   color: #0070D2;
 }
 .refer-btn [slot="icon"],
-.recos-cta [slot="icon"] { margin-inline-end: 4px; }
+.recos-cta [slot="icon"],
+.systemdesign-btn [slot="icon"] { margin-inline-end: 4px; }
 
 /* ── Tertiary CTA: "Download Resume" runtime PDF ──
    The PDF is generated client-side from the live portfolio DOM (see
@@ -1287,12 +1289,278 @@ a:hover { text-decoration: underline; }
   margin-top: 0;
 }
 
+/* ══════════════════════════════════════════════════════════
+   SYSTEM DESIGN VIEW — master/detail topic browser
+   ──────────────────────────────────────────────────────────
+   Lives inside the same .body grid (300px 1fr). The resume <aside>
+   and <main> are hidden via [hidden] (= display:none) when this
+   view is active, so .sd-topics / .sd-detail naturally take over
+   the two grid cells. See public/assets/ui/systemdesign.js for
+   the toggle + render logic.
+══════════════════════════════════════════════════════════ */
+
+/* Topics list (left column) */
+.sd-topics {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sd-topics-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sd-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+}
+
+.sd-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  margin-left: -10px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0070D2;
+  cursor: pointer;
+  transition: background var(--md-sys-motion-duration-short3, 150ms) var(--md-sys-motion-easing-standard, ease);
+}
+.sd-back:hover { background: color-mix(in srgb, #0070D2 8%, transparent); }
+.sd-back:active { background: color-mix(in srgb, #0070D2 12%, transparent); }
+.sd-back .material-symbols-outlined { font-size: 18px; }
+
+.sd-topic-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sd-topic-item { margin: 0; }
+
+.sd-topic-btn {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px 12px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+  transition: background var(--md-sys-motion-duration-short3, 150ms) var(--md-sys-motion-easing-standard, ease),
+              border-color var(--md-sys-motion-duration-short3, 150ms) var(--md-sys-motion-easing-standard, ease);
+}
+.sd-topic-btn:hover {
+  background: var(--md-sys-color-surface-container-low);
+  border-color: color-mix(in srgb, var(--md-sys-color-outline) 18%, transparent);
+}
+.sd-topic-item.sd-active .sd-topic-btn {
+  background: color-mix(in srgb, #0070D2 8%, transparent);
+  border-color: color-mix(in srgb, #0070D2 35%, transparent);
+}
+
+.sd-topic-icon {
+  font-size: 20px;
+  color: #0070D2;
+  margin-top: 1px;
+}
+
+.sd-topic-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.sd-topic-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+.sd-topic-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.sd-topic-stub {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent);
+  padding: 3px 8px;
+  border-radius: 999px;
+  align-self: center;
+  white-space: nowrap;
+}
+
+/* Detail pane (right column) */
+.sd-detail {
+  min-width: 0;
+}
+
+.sd-article {
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 18%, transparent);
+  border-radius: 16px;
+  padding: 28px 32px 32px;
+}
+
+.sd-article-head {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sd-article-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+  line-height: 1.25;
+}
+
+.sd-article-sub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.sd-article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.sd-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sd-tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #0070D2;
+  background: color-mix(in srgb, #0070D2 8%, transparent);
+  border: 1px solid color-mix(in srgb, #0070D2 25%, transparent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.sd-readtime {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.sd-readtime .material-symbols-outlined { font-size: 16px; }
+
+/* Article body — long-form prose */
+.sd-article-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.sd-article-body h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 24px 0 10px;
+}
+.sd-article-body h3:first-child { margin-top: 0; }
+.sd-article-body p {
+  margin: 0 0 14px;
+}
+.sd-article-body ul {
+  margin: 0 0 16px;
+  padding-left: 22px;
+}
+.sd-article-body li {
+  margin-bottom: 8px;
+}
+.sd-article-body strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.sd-article-body em {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.sd-article-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--md-sys-color-outline) 12%, transparent);
+  color: var(--text);
+}
+.sd-article-body pre {
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 18%, transparent);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0 0 16px;
+}
+.sd-article-body pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 12.5px;
+}
+
+.sd-detail-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
 /* ── Responsive ── */
 @media (max-width: 700px) {
   .body { grid-template-columns: 1fr; }
   .header { grid-template-columns: 1fr; }
   .exp-badge { justify-self: start; }
   .header-name { font-size: 26px; }
+  /* System Design: stack topic list on top of the article on narrow screens.
+     The .body single-column override above already does the stacking; we
+     just trim the article padding so the prose isn't cramped on mobile. */
+  .sd-article { padding: 20px 18px 22px; }
+  .sd-article-title { font-size: 19px; }
 }
 
 /* ══════════════════════════════════════════════════════════
