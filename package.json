@@ -1,7 +1,7 @@
 {
-  "name": "portfolio-service",
+  "name": "gcp-portfolio-service",
   "version": "1.0.0",
-  "description": "Abhinav Kumar — Portfolio service with Salesforce Hire Me integration",
+  "description": "Abhinav Kumar — GCP-hosted portfolio service with Salesforce integration (Cloud Run + Firestore + Apex REST callbacks)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
