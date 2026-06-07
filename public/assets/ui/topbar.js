@@ -12,13 +12,13 @@
  */
 
 export function updateTopbarUser(p) {
-  var el       = document.getElementById('topbarUser');
-  var photo    = document.getElementById('topbarUserPhoto');
-  var name     = document.getElementById('topbarUserName');
-  var signInEl = document.getElementById('topbarSignInBtn');
+  const el       = document.getElementById('topbarUser');
+  const photo    = document.getElementById('topbarUserPhoto');
+  const name     = document.getElementById('topbarUserName');
+  const signInEl = document.getElementById('topbarSignInBtn');
   if (!el) return;
 
-  var signedIn = !!(p && p.type !== 'guest' && p.picture);
+  const signedIn = !!(p && p.type !== 'guest' && p.picture);
 
   if (signedIn) {
     photo.src = p.picture;
@@ -34,7 +34,7 @@ export function updateTopbarUser(p) {
 }
 
 export function toggleUserMenu() {
-  var dd = document.getElementById('topbarDropdown');
+  const dd = document.getElementById('topbarDropdown');
   if (!dd) return;
   if (dd.hasAttribute('hidden')) {
     dd.removeAttribute('hidden');
@@ -48,6 +48,6 @@ export function toggleUserMenu() {
 }
 
 export function closeUserMenu() {
-  var dd = document.getElementById('topbarDropdown');
+  const dd = document.getElementById('topbarDropdown');
   if (dd) dd.setAttribute('hidden', '');
 }

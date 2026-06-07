@@ -32,7 +32,7 @@ function getReferEmailSubject() {
  *
  * Update this if you ever point a custom domain at the Cloud Run service.
  */
-var PORTFOLIO_PUBLIC_URL = 'https://portfolio-service-647206478056.asia-southeast1.run.app';
+const PORTFOLIO_PUBLIC_URL = 'https://portfolio-service-647206478056.asia-southeast1.run.app';
 
 /**
  * Resolve the URL to embed in the email body.
@@ -45,8 +45,8 @@ var PORTFOLIO_PUBLIC_URL = 'https://portfolio-service-647206478056.asia-southeas
  * unreachable link.
  */
 function getPortfolioPublicUrl() {
-  var origin = (window.location && window.location.origin) || '';
-  var isUnreachable = !origin
+  const origin = (window.location && window.location.origin) || '';
+  const isUnreachable = !origin
     || /^https?:\/\/(localhost|127\.|192\.168\.|10\.|0\.0\.0\.0)/.test(origin)
     || origin.indexOf('file://') === 0;
   return isUnreachable ? PORTFOLIO_PUBLIC_URL : origin;
@@ -69,8 +69,8 @@ function getPortfolioPublicUrl() {
  * themselves.
  */
 function getReferEmailBody() {
-  var origin = getPortfolioPublicUrl();
-  var signerName = (siteProfile && siteProfile.type !== 'guest' && siteProfile.name)
+  const origin = getPortfolioPublicUrl();
+  const signerName = (siteProfile && siteProfile.type !== 'guest' && siteProfile.name)
     ? siteProfile.name
     : '{{your name}}';
   return [
@@ -94,7 +94,7 @@ function getReferEmailBody() {
 }
 
 export function openReferMe() {
-  var overlay = document.getElementById('referMeOverlay');
+  const overlay = document.getElementById('referMeOverlay');
   if (!overlay) return;
   // Wait for both the dialog AND the inner text fields to upgrade before
   // setting .value — M3 components can drop early property writes if the
@@ -103,8 +103,8 @@ export function openReferMe() {
     customElements.whenDefined('md-dialog'),
     customElements.whenDefined('md-outlined-text-field'),
   ]).then(function () {
-    var subjectEl = document.getElementById('refer-subject');
-    var bodyEl    = document.getElementById('refer-body');
+    const subjectEl = document.getElementById('refer-subject');
+    const bodyEl    = document.getElementById('refer-body');
     if (subjectEl) subjectEl.value = getReferEmailSubject();
     if (bodyEl)    bodyEl.value    = getReferEmailBody();
     if (typeof overlay.show === 'function') overlay.show();
@@ -113,7 +113,7 @@ export function openReferMe() {
 }
 
 export function closeReferMe() {
-  var overlay = document.getElementById('referMeOverlay');
+  const overlay = document.getElementById('referMeOverlay');
   if (!overlay) return;
   if (typeof overlay.close === 'function') overlay.close();
   else overlay.setAttribute('hidden', '');
@@ -122,20 +122,20 @@ export function closeReferMe() {
 // Compose the canonical "Subject: ...\n\nBody" string used by both the
 // clipboard path and as the source-of-truth render of the user's edits.
 function buildReferComposed() {
-  var subjectEl = document.getElementById('refer-subject');
-  var bodyEl    = document.getElementById('refer-body');
-  var subject = (subjectEl && subjectEl.value) || getReferEmailSubject();
-  var body    = (bodyEl && bodyEl.value)       || getReferEmailBody();
+  const subjectEl = document.getElementById('refer-subject');
+  const bodyEl    = document.getElementById('refer-body');
+  const subject = (subjectEl && subjectEl.value) || getReferEmailSubject();
+  const body    = (bodyEl && bodyEl.value)       || getReferEmailBody();
   return { subject: subject, body: body, combined: 'Subject: ' + subject + '\n\n' + body };
 }
 
 // Flash a transient label change on the copy button. Cheap, no toast
 // infrastructure needed.
 function flashCopyLabel(msg) {
-  var labelEl = document.getElementById('refer-copy-label');
+  const labelEl = document.getElementById('refer-copy-label');
   if (!labelEl) return;
   if (labelEl._restoreTimer) clearTimeout(labelEl._restoreTimer);
-  var prev = labelEl._originalText || labelEl.textContent;
+  const prev = labelEl._originalText || labelEl.textContent;
   labelEl._originalText = prev;
   labelEl.textContent = msg;
   labelEl._restoreTimer = setTimeout(function () {
@@ -144,7 +144,7 @@ function flashCopyLabel(msg) {
 }
 
 function handleReferCopy() {
-  var msg = buildReferComposed().combined;
+  const msg = buildReferComposed().combined;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(msg)
       .then(function () { flashCopyLabel('Copied \u2713'); })
@@ -159,13 +159,13 @@ function handleReferCopy() {
 // still works there.
 function fallbackCopy(text) {
   try {
-    var ta = document.createElement('textarea');
+    const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
     ta.style.opacity  = '0';
     document.body.appendChild(ta);
     ta.select();
-    var ok = document.execCommand('copy');
+    const ok = document.execCommand('copy');
     document.body.removeChild(ta);
     flashCopyLabel(ok ? 'Copied \u2713' : 'Copy failed');
   } catch (_) {
@@ -174,12 +174,12 @@ function fallbackCopy(text) {
 }
 
 function handleReferMailto() {
-  var c = buildReferComposed();
+  const c = buildReferComposed();
   // mailto:?subject=...&body=... — recipient is intentionally left empty
   // so the visitor types the recruiter's address into their own email
   // client. Body is URL-encoded so newlines survive into Gmail / Outlook
   // / Apple Mail.
-  var href = 'mailto:?subject=' + encodeURIComponent(c.subject)
+  const href = 'mailto:?subject=' + encodeURIComponent(c.subject)
            + '&body='          + encodeURIComponent(c.body);
   // Most browsers cap mailto: URLs ~2 KB. Our default body is ~600 chars,
   // so we're comfortably under. If the visitor edits heavily and overflows,
@@ -191,14 +191,14 @@ export function initRefer() {
   // Wire the action buttons once their custom elements have upgraded.
   // We guard with `_wired` so re-opening the dialog doesn't stack listeners.
   customElements.whenDefined('md-filled-button').then(function () {
-    var btn = document.getElementById('refer-copy-btn');
+    const btn = document.getElementById('refer-copy-btn');
     if (btn && !btn._wired) {
       btn._wired = true;
       btn.addEventListener('click', handleReferCopy);
     }
   });
   customElements.whenDefined('md-outlined-button').then(function () {
-    var btn = document.getElementById('refer-mailto-btn');
+    const btn = document.getElementById('refer-mailto-btn');
     if (btn && !btn._wired) {
       btn._wired = true;
       btn.addEventListener('click', handleReferMailto);

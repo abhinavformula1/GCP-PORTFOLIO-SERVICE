@@ -15,13 +15,13 @@
 
 import { t } from '../core/i18n.js';
 
-var WELCOME_TOAST_TTL_MS = 10000;
-var _welcomeToastTimer = null;
+const WELCOME_TOAST_TTL_MS = 10000;
+let _welcomeToastTimer = null;
 
 export function showWelcomeOverlay(opts) {
-  var overlay = document.getElementById('welcomeOverlay');
+  const overlay = document.getElementById('welcomeOverlay');
   if (!overlay) return;
-  var onShown = (opts && opts.onShown) || null;
+  const onShown = (opts && opts.onShown) || null;
   function show() {
     if (typeof overlay.show === 'function') overlay.show();
     else overlay.removeAttribute('hidden');
@@ -35,7 +35,7 @@ export function showWelcomeOverlay(opts) {
 }
 
 export function hideWelcomeOverlay() {
-  var overlay = document.getElementById('welcomeOverlay');
+  const overlay = document.getElementById('welcomeOverlay');
   if (!overlay) return;
   if (typeof overlay.close === 'function') overlay.close();
   else overlay.setAttribute('hidden', '');
@@ -48,14 +48,14 @@ export function hideWelcomeOverlay() {
 
 function getInitials(fullName) {
   if (!fullName) return '?';
-  var parts = String(fullName).trim().split(/\s+/);
-  var first = parts[0] ? parts[0][0] : '';
-  var last  = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  const parts = String(fullName).trim().split(/\s+/);
+  const first = parts[0] ? parts[0][0] : '';
+  const last  = parts.length > 1 ? parts[parts.length - 1][0] : '';
   return (first + last).toUpperCase() || '?';
 }
 
 export function closeWelcomeToast() {
-  var toast = document.getElementById('welcomeToast');
+  const toast = document.getElementById('welcomeToast');
   if (!toast) return;
   toast.classList.remove('show');
   if (_welcomeToastTimer) { clearTimeout(_welcomeToastTimer); _welcomeToastTimer = null; }
@@ -74,20 +74,20 @@ export function showWelcomeToast(profile, opts) {
     } catch (_) {}
   }
 
-  var toast    = document.getElementById('welcomeToast');
-  var photoEl  = document.getElementById('welcomeToastPhoto');
-  var titleEl  = document.getElementById('welcomeToastTitle');
-  var nameEl   = document.getElementById('welcomeToastName');
-  var closeEl  = document.getElementById('welcomeToastClose');
+  const toast    = document.getElementById('welcomeToast');
+  const photoEl  = document.getElementById('welcomeToastPhoto');
+  const titleEl  = document.getElementById('welcomeToastTitle');
+  const nameEl   = document.getElementById('welcomeToastName');
+  const closeEl  = document.getElementById('welcomeToastClose');
   if (!toast || !photoEl || !titleEl || !nameEl) return;
 
-  var first = profile.name.split(' ')[0];
+  const first = profile.name.split(' ')[0];
   titleEl.textContent = profile.isReturning ? t().toastWelcomeBack : t().toastWelcomeNew;
   nameEl.textContent  = first;
 
   photoEl.innerHTML = '';
   if (profile.picture) {
-    var img = document.createElement('img');
+    const img = document.createElement('img');
     img.src = profile.picture;
     img.alt = first;
     img.referrerPolicy = 'no-referrer';

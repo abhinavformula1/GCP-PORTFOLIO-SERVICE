@@ -32,7 +32,7 @@ import { currentLang } from '../core/i18n.js';
 // Each locale (en / fr) holds its own `title`, `subtitle`, and `body`. The
 // body is raw HTML -- keep it self-contained; the prose styles in
 // style.css's `.sd-detail` block handle h3 / p / ul / pre / code.
-export var TOPICS = [
+export const TOPICS = [
   // ── Topic 1: GCP <-> Salesforce Integration ────────────────────────────────
   {
     id: 'gcp-sf-integration',
@@ -258,18 +258,18 @@ export var TOPICS = [
 ];
 
 // ── Module state ─────────────────────────────────────────────────────────────
-var _activeView  = 'resume';   // 'resume' | 'sysdesign'
-var _activeTopic = null;
-var _resumeAside = null;
-var _resumeMain  = null;
-var _sdAside     = null;
-var _sdDetail    = null;
-var _btn         = null;
+let _activeView  = 'resume';   // 'resume' | 'sysdesign'
+let _activeTopic = null;
+let _resumeAside = null;
+let _resumeMain  = null;
+let _sdAside     = null;
+let _sdDetail    = null;
+let _btn         = null;
 
-var HASH_PREFIX = '#/system-design';
+const HASH_PREFIX = '#/system-design';
 
 function topicById(id) {
-  for (var i = 0; i < TOPICS.length; i++) {
+  for (let i = 0; i < TOPICS.length; i++) {
     if (TOPICS[i].id === id) return TOPICS[i];
   }
   return null;
@@ -298,7 +298,7 @@ function escapeHtml(s) {
 
 // ── DOM construction (lazy, idempotent) ──────────────────────────────────────
 function ensureDom() {
-  var body = document.querySelector('.body');
+  const body = document.querySelector('.body');
   if (!body) return false;
 
   if (!_resumeAside) {
@@ -327,7 +327,7 @@ function ensureDom() {
 // ── Rendering ────────────────────────────────────────────────────────────────
 function renderTopicList() {
   if (!_sdAside) return;
-  var html = '';
+  let html = '';
   html += '<div class="sd-topics-header">';
   html += '<div class="sd-eyebrow" data-i18n="systemDesignEyebrow">System Design</div>';
   html += '<button type="button" class="sd-back" onclick="window.closeSystemDesign && window.closeSystemDesign()">';
@@ -336,10 +336,10 @@ function renderTopicList() {
   html += '</button>';
   html += '</div>';
   html += '<ul class="sd-topic-list" role="list">';
-  for (var i = 0; i < TOPICS.length; i++) {
-    var t   = TOPICS[i];
-    var loc = localeOf(t);
-    var active = t.id === _activeTopic ? ' sd-active' : '';
+  for (let i = 0; i < TOPICS.length; i++) {
+    const t   = TOPICS[i];
+    const loc = localeOf(t);
+    const active = t.id === _activeTopic ? ' sd-active' : '';
     html += '<li class="sd-topic-item' + active + '" data-topic-id="' + t.id + '">';
     html += '<button type="button" class="sd-topic-btn" data-topic-id="' + t.id + '">';
     html += '<span class="material-symbols-outlined sd-topic-icon" aria-hidden="true">' + (t.icon || 'article') + '</span>';
@@ -357,7 +357,7 @@ function renderTopicList() {
   _sdAside.innerHTML = html;
   _sdAside.querySelectorAll('.sd-topic-btn').forEach(function (b) {
     b.addEventListener('click', function () {
-      var id = b.getAttribute('data-topic-id');
+      const id = b.getAttribute('data-topic-id');
       location.hash = HASH_PREFIX + '/' + id;
     });
   });
@@ -365,13 +365,13 @@ function renderTopicList() {
 
 function renderTopicDetail() {
   if (!_sdDetail) return;
-  var topic = topicById(_activeTopic);
+  const topic = topicById(_activeTopic);
   if (!topic) {
     _sdDetail.innerHTML = '<div class="sd-detail-empty">Pick a topic on the left.</div>';
     return;
   }
-  var loc = localeOf(topic);
-  var html = '<article class="sd-article">';
+  const loc = localeOf(topic);
+  let html = '<article class="sd-article">';
   html += '<header class="sd-article-head">';
   html += '<h2 class="sd-article-title">' + escapeHtml(loc.title) + '</h2>';
   if (loc.subtitle) {
@@ -380,7 +380,7 @@ function renderTopicDetail() {
   html += '<div class="sd-article-meta">';
   if (topic.tags && topic.tags.length) {
     html += '<div class="sd-tags">';
-    for (var i = 0; i < topic.tags.length; i++) {
+    for (let i = 0; i < topic.tags.length; i++) {
       html += '<span class="sd-tag">' + escapeHtml(topic.tags[i]) + '</span>';
     }
     html += '</div>';
@@ -410,7 +410,7 @@ function highlightActiveTopic() {
 function setView(view) {
   if (!ensureDom()) return;
   _activeView = view;
-  var sysOn = view === 'sysdesign';
+  const sysOn = view === 'sysdesign';
   if (_resumeAside) _resumeAside.toggleAttribute('hidden', sysOn);
   if (_resumeMain)  _resumeMain.toggleAttribute('hidden', sysOn);
   _sdAside.toggleAttribute('hidden', !sysOn);
@@ -420,8 +420,8 @@ function setView(view) {
 
 function updateButton() {
   if (!_btn) return;
-  var label = _btn.querySelector('[data-i18n="systemDesign"], [data-i18n="backToResume"]');
-  var icon  = _btn.querySelector('.material-symbols-outlined');
+  const label = _btn.querySelector('[data-i18n="systemDesign"], [data-i18n="backToResume"]');
+  const icon  = _btn.querySelector('.material-symbols-outlined');
   if (_activeView === 'sysdesign') {
     if (label) {
       label.setAttribute('data-i18n', 'backToResume');
@@ -441,19 +441,19 @@ function updateButton() {
 
 // ── Hash routing ─────────────────────────────────────────────────────────────
 function readHash() {
-  var h = location.hash || '';
+  const h = location.hash || '';
   if (h.indexOf(HASH_PREFIX) !== 0) return null;
-  var rest = h.slice(HASH_PREFIX.length).replace(/^\//, '');
+  const rest = h.slice(HASH_PREFIX.length).replace(/^\//, '');
   return { id: rest || null };
 }
 
 function handleRoute() {
-  var route = readHash();
+  const route = readHash();
   if (!route) {
     if (_activeView === 'sysdesign') setView('resume');
     return;
   }
-  var id = route.id;
+  let id = route.id;
   if (!id || !topicById(id)) id = TOPICS[0] ? TOPICS[0].id : null;
   _activeTopic = id;
   setView('sysdesign');
@@ -472,7 +472,7 @@ export function openSystemDesign(id) {
     closeSystemDesign();
     return;
   }
-  var initial = _activeTopic || (TOPICS[0] && TOPICS[0].id);
+  const initial = _activeTopic || (TOPICS[0] && TOPICS[0].id);
   if (!initial) return;
   location.hash = HASH_PREFIX + '/' + initial;
 }
@@ -488,7 +488,7 @@ export function initSystemDesign() {
   _btn = document.querySelector('.systemdesign-btn');
   ensureDom();
   window.addEventListener('hashchange', handleRoute);
-  var observer = new MutationObserver(function () {
+  const observer = new MutationObserver(function () {
     renderTopicList();
     highlightActiveTopic();
     if (_activeView === 'sysdesign') renderTopicDetail();

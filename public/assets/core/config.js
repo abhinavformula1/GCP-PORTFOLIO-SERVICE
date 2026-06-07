@@ -10,4 +10,4 @@
  * in guest-only mode (useful for local development without a configured
  * GCP project).
  */
-export var GOOGLE_CLIENT_ID = '647206478056-rd95imm61c309o4tc5ekddgkmk50fdvp.apps.googleusercontent.com';
+export const GOOGLE_CLIENT_ID = '647206478056-rd95imm61c309o4tc5ekddgkmk50fdvp.apps.googleusercontent.com';

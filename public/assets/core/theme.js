@@ -15,10 +15,10 @@
  * exposed — it lives in localStorage, which is the source of truth.
  */
 
-var THEME_KEY = 'portfolio_theme';
+const THEME_KEY = 'portfolio_theme';
 
 function applyTheme(theme) {
-  var root = document.documentElement;
+  const root = document.documentElement;
   if (theme === 'light' || theme === 'dark') {
     root.setAttribute('data-theme', theme);
   } else {
@@ -27,7 +27,7 @@ function applyTheme(theme) {
 }
 
 function currentTheme() {
-  var stored = localStorage.getItem(THEME_KEY);
+  const stored = localStorage.getItem(THEME_KEY);
   if (stored === 'light' || stored === 'dark') return stored;
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
@@ -38,7 +38,7 @@ export function initTheme() {
   applyTheme(currentTheme());
 
   customElements.whenDefined('md-outlined-icon-button').then(function () {
-    var btn = document.getElementById('themeToggleBtn');
+    const btn = document.getElementById('themeToggleBtn');
     if (!btn) return;
     // Both `aria-label` (screen readers) and `title` (sighted hover
     // tooltip) need to reflect the *next* action — i.e. when the page
@@ -47,15 +47,15 @@ export function initTheme() {
     // helper rewrites both attributes in lock-step so the tooltip a
     // visitor sees on hover always matches the action they'll get.
     function syncLabel(isLight) {
-      var msg = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+      const msg = isLight ? 'Switch to dark mode' : 'Switch to light mode';
       btn.setAttribute('aria-label', msg);
       btn.setAttribute('title',      msg);
     }
-    var isLight = currentTheme() === 'light';
+    const isLight = currentTheme() === 'light';
     btn.selected = isLight;
     syncLabel(isLight);
     btn.addEventListener('change', function () {
-      var nextTheme = btn.selected ? 'light' : 'dark';
+      const nextTheme = btn.selected ? 'light' : 'dark';
       applyTheme(nextTheme);
       localStorage.setItem(THEME_KEY, nextTheme);
       syncLabel(btn.selected);

@@ -36,7 +36,7 @@ import { GOOGLE_CLIENT_ID } from '../core/config.js';
    GUIDED ASSISTANT — state machine
 ═══════════════════════════════════════════════════════════ */
 
-var SLOTS = [
+const SLOTS = [
   'Mon 28 Apr · 10:00 AM IST',
   'Mon 28 Apr · 3:00 PM IST',
   'Tue 29 Apr · 11:00 AM IST',
@@ -44,9 +44,9 @@ var SLOTS = [
   'Thu 1 May · 4:00 PM IST',
 ];
 
-var TOTAL_STEPS = 7;
+const TOTAL_STEPS = 7;
 
-var state = {
+const state = {
   step: 0,
   answers: { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' },
   googleProfile: null,
@@ -54,7 +54,7 @@ var state = {
   minimised: false,
 };
 
-var STEPS = [
+const STEPS = [
   {
     key: 'name',
     bot: function () { return t().botGreeting; },
@@ -105,10 +105,10 @@ var STEPS = [
 ];
 
 /* ── Chat Launcher (FAB + teaser bubble) ─────────────────────────────────── */
-var teaserShown = false;
+let teaserShown = false;
 
 function setFabIcon(name) {
-  var icon = document.getElementById('chatFabIcon');
+  const icon = document.getElementById('chatFabIcon');
   if (icon) icon.textContent = name;
 }
 
@@ -128,7 +128,7 @@ export function toggleChatTeaser() {
     resumeAssistant();
     return;
   }
-  var teaser = document.getElementById('chatTeaser');
+  const teaser = document.getElementById('chatTeaser');
   if (teaser.hasAttribute('hidden')) {
     showTeaser();
   } else {
@@ -144,9 +144,9 @@ export function openAssistant() {
   state.googleProfile  = null;
   state.showGoogleStep = false;
   // Reset avatar and header
-  var avatar = document.querySelector('.ga-avatar');
+  const avatar = document.querySelector('.ga-avatar');
   if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
-  var headerName = document.querySelector('.ga-header-name');
+  const headerName = document.querySelector('.ga-header-name');
   if (headerName) headerName.textContent = "Abhinav's Assistant";
   document.getElementById('gaMessages').innerHTML = '';
   document.getElementById('assistantOverlay').removeAttribute('hidden');
@@ -178,7 +178,7 @@ export function forceCloseAssistant() {
   state.minimised = false;
   document.getElementById('assistantOverlay').setAttribute('hidden', '');
   // Remove confirm dialog if present
-  var existing = document.getElementById('gaCloseConfirm');
+  const existing = document.getElementById('gaCloseConfirm');
   if (existing) existing.remove();
 }
 
@@ -186,7 +186,7 @@ function showCloseConfirm() {
   // Don't stack multiple dialogs
   if (document.getElementById('gaCloseConfirm')) return;
 
-  var dialog = document.createElement('div');
+  const dialog = document.createElement('div');
   dialog.id = 'gaCloseConfirm';
   dialog.className = 'ga-close-confirm';
   dialog.innerHTML =
@@ -210,7 +210,7 @@ function showCloseConfirm() {
 export function minimiseAssistant() {
   state.minimised = true;
   document.getElementById('assistantOverlay').setAttribute('hidden', '');
-  var launcher = document.getElementById('chatLauncher');
+  const launcher = document.getElementById('chatLauncher');
   launcher.removeAttribute('hidden');
   setFabIcon('chat');
 }
@@ -225,7 +225,7 @@ export function restartAssistant() {
   }
   setPendingChatHistory(null);
   resetChatState();
-  var ov = document.getElementById('assistantOverlay');
+  const ov = document.getElementById('assistantOverlay');
   if (ov && !ov.hasAttribute('hidden')) {
     // Re-render: openAssistant() will run the greeting + step 0 again
     forceCloseAssistant();
@@ -234,7 +234,7 @@ export function restartAssistant() {
 }
 
 function setStartOverBtnVisible(visible) {
-  var btn = document.getElementById('gaStartOverBtn');
+  const btn = document.getElementById('gaStartOverBtn');
   if (!btn) return;
   if (visible) btn.removeAttribute('hidden');
   else         btn.setAttribute('hidden', '');
@@ -257,11 +257,11 @@ export function resetChatState() {
   state.googleProfile  = null;
   state.showGoogleStep = false;
   state.minimised      = false;
-  var msgs = document.getElementById('gaMessages');
+  const msgs = document.getElementById('gaMessages');
   if (msgs) msgs.innerHTML = '';
-  var avatar = document.querySelector('.ga-avatar');
+  const avatar = document.querySelector('.ga-avatar');
   if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
-  var headerName = document.querySelector('.ga-header-name');
+  const headerName = document.querySelector('.ga-header-name');
   if (headerName) headerName.textContent = "Abhinav's Assistant";
 }
 
@@ -278,23 +278,23 @@ export function applyGoogleProfileToChat(profile) {
   state.showGoogleStep = false;
 
   // Always update the avatar and header name
-  var avatar = document.querySelector('.ga-avatar');
+  const avatar = document.querySelector('.ga-avatar');
   if (avatar && profile.picture) {
     avatar.innerHTML = '<img src="' + profile.picture + '" alt="' + profile.name + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
     avatar.style.background = 'none';
     avatar.style.padding = '0';
   }
-  var headerName = document.querySelector('.ga-header-name');
+  const headerName = document.querySelector('.ga-header-name');
   if (headerName) headerName.textContent = profile.name.split(' ')[0] + "'s session";
 
   // Only restart the chat if we're still at the very beginning (pre-step or name/email)
   if (state.step <= 1) {
-    var first = profile.name.split(' ')[0];
+    const first = profile.name.split(' ')[0];
 
     // Resume from saved history if the user has an active chat in Firestore
     if (pendingChatHistory && pendingChatHistory.step > 1) {
       document.getElementById('gaMessages').innerHTML = '';
-      var resumeMsg = (profile.isReturning ? t().botWelcomeBack(first) : t().botWelcomeNew(first))
+      const resumeMsg = (profile.isReturning ? t().botWelcomeBack(first) : t().botWelcomeNew(first))
                       + ' ' + (t().botResume || '(picking up where we left off)');
       addBotMessage(resumeMsg, function () {
         renderRestoredMessages(pendingChatHistory.messages || []);
@@ -309,7 +309,7 @@ export function applyGoogleProfileToChat(profile) {
     } else {
       state.step = 2;
       document.getElementById('gaMessages').innerHTML = '';
-      var greeting = profile.isReturning
+      const greeting = profile.isReturning
         ? t().botWelcomeBack(first)
         : t().botWelcomeNew(first);
       addBotMessage(greeting);
@@ -322,13 +322,13 @@ export function applyGoogleProfileToChat(profile) {
 
 // Append saved messages without animation — used when restoring history.
 function renderRestoredMessages(messages) {
-  var msgs = document.getElementById('gaMessages');
+  const msgs = document.getElementById('gaMessages');
   if (!msgs || !messages || !messages.length) return;
   messages.forEach(function (m) {
     if (!m || !m.text) return;
-    var wrap = document.createElement('div');
+    const wrap = document.createElement('div');
     wrap.className = 'ga-msg ' + (m.role === 'user' ? 'ga-msg-user' : 'ga-msg-bot');
-    var bubbleCls = m.role === 'user' ? 'ga-bubble-user' : 'ga-bubble-bot';
+    const bubbleCls = m.role === 'user' ? 'ga-bubble-user' : 'ga-bubble-bot';
     wrap.innerHTML = '<div class="ga-bubble ' + bubbleCls + '">' + escHtml(m.text) + '</div>';
     msgs.appendChild(wrap);
   });
@@ -346,28 +346,28 @@ function mergeAnswers(target, source) {
 /* ── Render pipeline ─────────────────────────────────────────────────────── */
 
 function updateProgress() {
-  var pct = Math.round((state.step / TOTAL_STEPS) * 100);
+  const pct = Math.round((state.step / TOTAL_STEPS) * 100);
   document.getElementById('gaProgressBar').style.width = pct + '%';
 }
 
 function renderGoogleStep() {
-  var area = document.getElementById('gaInputArea');
+  const area = document.getElementById('gaInputArea');
   area.innerHTML = '';
 
   addBotMessage("Hi! To save time, you can sign in with Google — I'll auto-fill your name and email. Or continue as a guest and I'll ask you a couple of questions.");
 
-  var wrap = document.createElement('div');
+  const wrap = document.createElement('div');
   wrap.className = 'ga-google-step';
 
-  var googleBtnDiv = document.createElement('div');
+  const googleBtnDiv = document.createElement('div');
   googleBtnDiv.id = 'googleSignInBtn';
   googleBtnDiv.className = 'ga-google-btn-wrap';
 
-  var sep = document.createElement('div');
+  const sep = document.createElement('div');
   sep.className = 'ga-google-sep';
   sep.textContent = 'or';
 
-  var guestBtn = document.createElement('button');
+  const guestBtn = document.createElement('button');
   guestBtn.className = 'ga-guest-btn';
   guestBtn.textContent = 'Continue as Guest';
   guestBtn.onclick = function () {
@@ -396,16 +396,16 @@ function renderStep() {
   if (state.showGoogleStep) { renderGoogleStep(); return; }
   updateProgress();
   if (state.step >= STEPS.length) { renderConfirm(); return; }
-  var stepDef = STEPS[state.step];
-  var botText = stepDef.bot(state.answers);
+  const stepDef = STEPS[state.step];
+  const botText = stepDef.bot(state.answers);
   addBotMessage(botText, function () {
     renderInputArea(stepDef);
   });
 }
 
 function addBotMessage(text, cb) {
-  var msgs = document.getElementById('gaMessages');
-  var wrap = document.createElement('div');
+  const msgs = document.getElementById('gaMessages');
+  const wrap = document.createElement('div');
   wrap.className = 'ga-msg ga-msg-bot ga-msg-enter';
   wrap.innerHTML = '<div class="ga-bubble ga-bubble-bot">' + escHtml(text) + '</div>';
   msgs.appendChild(wrap);
@@ -415,8 +415,8 @@ function addBotMessage(text, cb) {
 }
 
 function addUserMessage(text) {
-  var msgs = document.getElementById('gaMessages');
-  var wrap = document.createElement('div');
+  const msgs = document.getElementById('gaMessages');
+  const wrap = document.createElement('div');
   wrap.className = 'ga-msg ga-msg-user ga-msg-enter';
   wrap.innerHTML = '<div class="ga-bubble ga-bubble-user">' + escHtml(text) + '</div>';
   msgs.appendChild(wrap);
@@ -447,22 +447,22 @@ function persistChatTurn(role, text) {
 }
 
 function renderInputArea(stepDef) {
-  var area = document.getElementById('gaInputArea');
+  const area = document.getElementById('gaInputArea');
   area.innerHTML = '';
 
   if (stepDef.inputType === 'text') {
-    var inp = document.createElement('input');
+    const inp = document.createElement('input');
     inp.type = 'text';
     inp.className = 'ga-text-input';
     inp.placeholder = stepDef.placeholder ? stepDef.placeholder() : '';
-    var err = document.createElement('div');
+    const err = document.createElement('div');
     err.className = 'ga-input-err';
-    var btn = document.createElement('button');
+    const btn = document.createElement('button');
     btn.className = 'ga-send-btn';
     btn.textContent = t().continueBtn;
     btn.onclick = function () {
-      var val = inp.value;
-      var e = stepDef.validate(val);
+      const val = inp.value;
+      const e = stepDef.validate(val);
       if (e) { err.textContent = e; return; }
       err.textContent = '';
       state.answers[stepDef.key] = val.trim();
@@ -478,10 +478,10 @@ function renderInputArea(stepDef) {
     setTimeout(function () { inp.focus(); }, 50);
 
   } else if (stepDef.inputType === 'choice') {
-    var grid = document.createElement('div');
+    const grid = document.createElement('div');
     grid.className = 'ga-choice-grid';
     stepDef.choices().forEach(function (choice) {
-      var btn = document.createElement('button');
+      const btn = document.createElement('button');
       btn.className = 'ga-choice-btn';
       btn.textContent = choice;
       btn.onclick = function () {
@@ -496,10 +496,10 @@ function renderInputArea(stepDef) {
     area.appendChild(grid);
 
   } else if (stepDef.inputType === 'slots') {
-    var slotGrid = document.createElement('div');
+    const slotGrid = document.createElement('div');
     slotGrid.className = 'ga-slot-grid';
     SLOTS.forEach(function (slot) {
-      var btn = document.createElement('button');
+      const btn = document.createElement('button');
       btn.className = 'ga-slot-btn';
       btn.textContent = slot;
       btn.onclick = function () {
@@ -517,14 +517,14 @@ function renderInputArea(stepDef) {
 
 function renderConfirm() {
   updateProgress();
-  var a = state.answers;
+  const a = state.answers;
   addBotMessage(
     t().botConfirm,
     function () {
-      var area = document.getElementById('gaInputArea');
+      const area = document.getElementById('gaInputArea');
       area.innerHTML = '';
 
-      var summary = document.createElement('div');
+      const summary = document.createElement('div');
       summary.className = 'ga-confirm-summary';
       summary.innerHTML =
         '<div class="ga-summary-row"><span>Name</span><strong>' + escHtml(a.name) + '</strong></div>' +
@@ -535,22 +535,22 @@ function renderConfirm() {
         '<div class="ga-summary-row"><span>Urgency</span><strong>' + escHtml(a.urgency) + '</strong></div>' +
         '<div class="ga-summary-row"><span>Slot</span><strong>' + escHtml(a.slot) + '</strong></div>';
 
-      var summaryBtn = document.createElement('button');
+      const summaryBtn = document.createElement('button');
       summaryBtn.className = 'ga-summary-btn';
       summaryBtn.textContent = 'Get AI Summary';
       summaryBtn.onclick = function () { requestSummary(summaryBtn); };
 
-      var summaryOut = document.createElement('div');
+      const summaryOut = document.createElement('div');
       summaryOut.className = 'ga-summary-out';
       summaryOut.id = 'gaSummaryOut';
 
-      var confirmBtn = document.createElement('button');
+      const confirmBtn = document.createElement('button');
       confirmBtn.className = 'ga-send-btn';
       confirmBtn.style.marginTop = '4px';
       confirmBtn.textContent = t().confirmBtn;
       confirmBtn.onclick = function () { submitAssistant(confirmBtn); };
 
-      var errDiv = document.createElement('div');
+      const errDiv = document.createElement('div');
       errDiv.className = 'ga-input-err';
       errDiv.id = 'gaSubmitErr';
 
@@ -568,9 +568,9 @@ async function submitAssistant(btn) {
   btn.textContent = t().confirmBtnBusy;
   document.getElementById('gaSubmitErr').textContent = '';
 
-  var a = state.answers;
+  const a = state.answers;
   try {
-    var res = await fetch('/api/hire', {
+    const res = await fetch('/api/hire', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -583,7 +583,7 @@ async function submitAssistant(btn) {
         slot: a.slot,
       }),
     });
-    var data = await res.json();
+    const data = await res.json();
     if (res.ok && data.success) {
       // Move active chat → completed-inquiries history (signed-in users only)
       if (googleCredential) {
@@ -610,19 +610,19 @@ async function submitAssistant(btn) {
 
 function renderDone(alreadySubmitted) {
   document.getElementById('gaProgressBar').style.width = '100%';
-  var area = document.getElementById('gaInputArea');
+  const area = document.getElementById('gaInputArea');
   area.innerHTML = '';
 
-  var firstName = state.answers.name.split(' ')[0];
-  var message = alreadySubmitted
+  const firstName = state.answers.name.split(' ')[0];
+  const message = alreadySubmitted
     ? t().botDuplicate(firstName)
     : t().botDone(firstName, state.answers.email);
 
   addBotMessage(message, function () {
-    var done = document.createElement('div');
+    const done = document.createElement('div');
     done.className = 'ga-done';
 
-    var checkEl = document.createElement('div');
+    const checkEl = document.createElement('div');
     checkEl.className = 'ga-done-check';
     checkEl.innerHTML = '&#10003;';
     done.appendChild(checkEl);
@@ -630,16 +630,16 @@ function renderDone(alreadySubmitted) {
     // Skip the slot/summary widgets for duplicate submissions — there's
     // no new booking to confirm or summarise.
     if (!alreadySubmitted) {
-      var slotEl = document.createElement('div');
+      const slotEl = document.createElement('div');
       slotEl.className = 'ga-done-slot';
       slotEl.textContent = state.answers.slot;
 
-      var summaryBtn = document.createElement('button');
+      const summaryBtn = document.createElement('button');
       summaryBtn.className = 'ga-summary-btn';
       summaryBtn.textContent = 'Get AI Summary';
       summaryBtn.onclick = function () { requestSummary(summaryBtn); };
 
-      var summaryOut = document.createElement('div');
+      const summaryOut = document.createElement('div');
       summaryOut.className = 'ga-summary-out';
       summaryOut.id = 'gaSummaryOut';
 
@@ -648,7 +648,7 @@ function renderDone(alreadySubmitted) {
       done.appendChild(summaryOut);
     }
 
-    var closeBtn = document.createElement('button');
+    const closeBtn = document.createElement('button');
     closeBtn.className = 'ga-done-close';
     closeBtn.textContent = t().closeBtn;
     closeBtn.onclick = closeAssistant;
@@ -661,12 +661,12 @@ function renderDone(alreadySubmitted) {
 async function requestSummary(btn) {
   btn.disabled = true;
   btn.textContent = 'Generating\u2026';
-  var out = document.getElementById('gaSummaryOut');
+  const out = document.getElementById('gaSummaryOut');
   out.textContent = '';
   out.className = 'ga-summary-out';
 
   try {
-    var res = await fetch('/api/summarise', {
+    const res = await fetch('/api/summarise', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -678,7 +678,7 @@ async function requestSummary(btn) {
         slot:         state.answers.slot,
       }),
     });
-    var data = await res.json();
+    const data = await res.json();
     if (res.ok && data.summary) {
       out.textContent = data.summary;
       out.className = 'ga-summary-out ga-summary-ready';
@@ -707,7 +707,7 @@ async function requestSummary(btn) {
 }
 
 function scrollMessages() {
-  var msgs = document.getElementById('gaMessages');
+  const msgs = document.getElementById('gaMessages');
   msgs.scrollTop = msgs.scrollHeight;
 }
 
@@ -722,23 +722,23 @@ function escHtml(str) {
 /* ── Resizable panel (mouse + touch via Pointer Events) ──────────────────── */
 
 function initChatResize() {
-  var handle  = document.getElementById('gaResizeHandle');
-  var overlay = document.getElementById('assistantOverlay');
+  const handle  = document.getElementById('gaResizeHandle');
+  const overlay = document.getElementById('assistantOverlay');
   if (!handle || !overlay) return;
 
-  var MIN_W = 300;
-  var MAX_W = 680;
-  var STORAGE_KEY = 'portfolio_chat_width';
+  const MIN_W = 300;
+  const MAX_W = 680;
+  const STORAGE_KEY = 'portfolio_chat_width';
 
   // Restore saved width on init
   try {
-    var saved = parseInt(localStorage.getItem(STORAGE_KEY) || '', 10);
+    const saved = parseInt(localStorage.getItem(STORAGE_KEY) || '', 10);
     if (saved && saved >= MIN_W && saved <= MAX_W) {
       overlay.style.width = saved + 'px';
     }
   } catch (_) {}
 
-  var dragging = false, startX = 0, startW = 0;
+  let dragging = false, startX = 0, startW = 0;
 
   function onDown(e) {
     dragging = true;
@@ -752,8 +752,8 @@ function initChatResize() {
 
   function onMove(e) {
     if (!dragging) return;
-    var clientX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX);
-    var newW = Math.min(MAX_W, Math.max(MIN_W, startW + (startX - clientX)));
+    const clientX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX);
+    const newW = Math.min(MAX_W, Math.max(MIN_W, startW + (startX - clientX)));
     overlay.style.width = newW + 'px';
   }
 
@@ -785,7 +785,7 @@ function initChatResize() {
 export function initChat() {
   // Reveal the FAB launcher 5s after page load + nudge teaser bubble 600ms later
   setTimeout(function () {
-    var launcher = document.getElementById('chatLauncher');
+    const launcher = document.getElementById('chatLauncher');
     if (!launcher) return;
     launcher.removeAttribute('hidden');
     setTimeout(function () {
@@ -793,7 +793,7 @@ export function initChat() {
     }, 600);
   }, 5000);
 
-  var teaserClose = document.getElementById('chatTeaserClose');
+  const teaserClose = document.getElementById('chatTeaserClose');
   if (teaserClose) {
     teaserClose.addEventListener('click', function (e) {
       e.stopPropagation();

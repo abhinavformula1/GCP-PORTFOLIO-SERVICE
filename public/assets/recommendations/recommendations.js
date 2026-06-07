@@ -45,7 +45,7 @@ import { PAGE_LANG, currentLang } from '../core/i18n.js';
 // English. Used for the kebab/confirm/button labels — duplicated here
 // rather than imported because i18n.js doesn't export this helper.
 function tStr(key, fallback) {
-  var d = PAGE_LANG[currentLang] || PAGE_LANG.en;
+  const d = PAGE_LANG[currentLang] || PAGE_LANG.en;
   return d[key] || (PAGE_LANG.en && PAGE_LANG.en[key]) || fallback || '';
 }
 
@@ -60,14 +60,14 @@ function whenMdDialogReady(cb) {
 }
 
 function setErr(fieldId, msg) {
-  var field = document.getElementById(fieldId);
+  const field = document.getElementById(fieldId);
   if (!field) return;
   field.error = true;
   field.errorText = msg;
 }
 
 function clearErr(fieldId) {
-  var field = document.getElementById(fieldId);
+  const field = document.getElementById(fieldId);
   if (!field) return;
   field.error = false;
   field.errorText = '';
@@ -81,7 +81,7 @@ function clearErr(fieldId) {
 // not-owned and skip the action menu entirely.
 function isOwnerOf(item) {
   if (!item || !item.id) return false;
-  var sub = (siteProfile && siteProfile.sub) || null;
+  const sub = (siteProfile && siteProfile.sub) || null;
   return !!sub && sub === item.id;
 }
 
@@ -100,34 +100,34 @@ function isOwnerOf(item) {
 // the card you're about to delete stays visible while you confirm.
 
 function buildOwnerMenu(uid) {
-  var wrap = document.createElement('div');
+  const wrap = document.createElement('div');
   wrap.className = 'reco-actions';
 
-  var trigger = document.createElement('button');
+  const trigger = document.createElement('button');
   trigger.type = 'button';
   trigger.className = 'reco-actions-trigger';
   trigger.setAttribute('aria-haspopup', 'menu');
   trigger.setAttribute('aria-expanded', 'false');
   trigger.setAttribute('aria-label', tStr('recoMenuLabel', 'Recommendation actions'));
-  var triggerIcon = document.createElement('span');
+  const triggerIcon = document.createElement('span');
   triggerIcon.className = 'material-symbols-outlined';
   triggerIcon.setAttribute('aria-hidden', 'true');
   triggerIcon.textContent = 'more_vert';
   trigger.appendChild(triggerIcon);
 
-  var menu = document.createElement('div');
+  const menu = document.createElement('div');
   menu.className = 'reco-actions-menu';
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
 
-  var editBtn = document.createElement('button');
+  const editBtn = document.createElement('button');
   editBtn.type = 'button';
   editBtn.className = 'reco-action-item';
   editBtn.setAttribute('role', 'menuitem');
   editBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">edit</span>'
                     + '<span>' + tStr('recoEdit', 'Edit') + '</span>';
 
-  var deleteBtn = document.createElement('button');
+  const deleteBtn = document.createElement('button');
   deleteBtn.type = 'button';
   deleteBtn.className = 'reco-action-item reco-action-item-destructive';
   deleteBtn.setAttribute('role', 'menuitem');
@@ -139,7 +139,7 @@ function buildOwnerMenu(uid) {
 
   trigger.addEventListener('click', function (e) {
     e.stopPropagation();
-    var willOpen = menu.hidden;
+    const willOpen = menu.hidden;
     closeAllOwnerMenus();
     if (willOpen) {
       menu.hidden = false;
@@ -159,7 +159,7 @@ function buildOwnerMenu(uid) {
   deleteBtn.addEventListener('click', function (e) {
     e.stopPropagation();
     closeAllOwnerMenus();
-    var card = wrap.closest('.reco-card');
+    const card = wrap.closest('.reco-card');
     if (card) showDeleteConfirm(card, uid);
   });
 
@@ -180,7 +180,7 @@ function closeAllOwnerMenus() {
 // Document-level click + Escape listeners — registered once at init,
 // not per-menu. Closes any open menu when the user clicks outside or
 // presses Escape. Kept module-private; idempotent guard via a flag.
-var _ownerMenuListenersBound = false;
+let _ownerMenuListenersBound = false;
 function bindOwnerMenuListeners() {
   if (_ownerMenuListenersBound) return;
   _ownerMenuListenersBound = true;
@@ -204,22 +204,22 @@ function showDeleteConfirm(card, uid) {
   // Stash the original body so Cancel can restore it. We snapshot the
   // outerHTML rather than the children individually so reply blocks
   // come back exactly as they were, including any <time> elements.
-  var bodyNodes = Array.prototype.filter.call(card.children, function (c) {
+  const bodyNodes = Array.prototype.filter.call(card.children, function (c) {
     return !c.classList || !c.classList.contains('reco-card-header');
   });
-  var bodyBackup = bodyNodes.map(function (n) { return n.outerHTML; }).join('');
+  const bodyBackup = bodyNodes.map(function (n) { return n.outerHTML; }).join('');
   bodyNodes.forEach(function (n) { card.removeChild(n); });
 
-  var confirm = document.createElement('div');
+  const confirm = document.createElement('div');
   confirm.className = 'reco-confirm';
   confirm.setAttribute('role', 'alert');
 
-  var title = document.createElement('div');
+  const title = document.createElement('div');
   title.className = 'reco-confirm-title';
   title.textContent = tStr('recoDeleteConfirmTitle', 'Delete this recommendation?');
   confirm.appendChild(title);
 
-  var hint = document.createElement('div');
+  const hint = document.createElement('div');
   hint.className = 'reco-confirm-hint';
   hint.textContent = tStr(
     'recoDeleteConfirmHint',
@@ -227,15 +227,15 @@ function showDeleteConfirm(card, uid) {
   );
   confirm.appendChild(hint);
 
-  var actions = document.createElement('div');
+  const actions = document.createElement('div');
   actions.className = 'reco-confirm-actions';
 
-  var cancelBtn = document.createElement('button');
+  const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.className = 'reco-confirm-cancel';
   cancelBtn.textContent = tStr('recoDeleteCancelBtn', 'Cancel');
 
-  var deleteBtn = document.createElement('button');
+  const deleteBtn = document.createElement('button');
   deleteBtn.type = 'button';
   deleteBtn.className = 'reco-confirm-delete';
   deleteBtn.textContent = tStr('recoDeleteConfirmBtn', 'Delete');
@@ -274,8 +274,8 @@ function showDeleteConfirm(card, uid) {
             // was their only card on the section.
             setMyRecommendation(null);
             updateRecommendationCta();
-            var grid  = document.getElementById('recosGrid');
-            var empty = document.getElementById('recosEmpty');
+            const grid  = document.getElementById('recosGrid');
+            const empty = document.getElementById('recosEmpty');
             if (grid && empty && grid.children.length === 0) {
               empty.hidden = false;
             }
@@ -286,7 +286,7 @@ function showDeleteConfirm(card, uid) {
           deleteBtn.textContent = tStr('recoDeleteConfirmBtn', 'Delete');
           // Surface a non-blocking error inline. We don't lift this to a
           // toast because the recruiter is already focused on this card.
-          var err = confirm.querySelector('.reco-confirm-error');
+          let err = confirm.querySelector('.reco-confirm-error');
           if (!err) {
             err = document.createElement('div');
             err.className = 'reco-confirm-error';
@@ -301,16 +301,16 @@ function showDeleteConfirm(card, uid) {
   });
 }
 
-async function handleDelete(uid) {
+async function handleDelete(_uid) {
   if (!googleCredential) {
     // Edge case: token expired between rendering the menu and
     // confirming. Bail to sign-in.
-    var welcome = document.getElementById('welcomeOverlay');
+    const welcome = document.getElementById('welcomeOverlay');
     if (welcome && typeof welcome.show === 'function') welcome.show();
     return false;
   }
   try {
-    var res = await fetch('/api/recommendation', {
+    const res = await fetch('/api/recommendation', {
       method:  'DELETE',
       headers: {
         'Authorization': 'Bearer ' + googleCredential,
@@ -325,7 +325,7 @@ async function handleDelete(uid) {
       return false;
     }
     if (!res.ok) return false;
-    var data = await res.json().catch(function () { return null; });
+    const data = await res.json().catch(function () { return null; });
     return !!(data && data.success);
   } catch (_) {
     return false;
@@ -333,15 +333,15 @@ async function handleDelete(uid) {
 }
 
 function renderRecommendation(item) {
-  var card = document.createElement('article');
+  const card = document.createElement('article');
   card.className = 'reco-card';
   card.setAttribute('data-uid', item.id);
 
-  var header = document.createElement('header');
+  const header = document.createElement('header');
   header.className = 'reco-card-header';
 
   if (item.avatarUrl) {
-    var img = document.createElement('img');
+    const img = document.createElement('img');
     img.className = 'reco-avatar';
     img.src   = item.avatarUrl;
     img.alt   = '';
@@ -349,18 +349,18 @@ function renderRecommendation(item) {
     img.referrerPolicy = 'no-referrer';
     header.appendChild(img);
   } else {
-    var initials = document.createElement('div');
+    const initials = document.createElement('div');
     initials.className = 'reco-avatar reco-avatar-initials';
     initials.textContent = (item.name || '?').slice(0, 1).toUpperCase();
     header.appendChild(initials);
   }
 
-  var who = document.createElement('div');
+  const who = document.createElement('div');
   who.className = 'reco-who';
-  var nameEl = document.createElement('div');
+  const nameEl = document.createElement('div');
   nameEl.className = 'reco-name';
   nameEl.textContent = item.name || 'Anonymous';
-  var compEl = document.createElement('div');
+  const compEl = document.createElement('div');
   compEl.className = 'reco-company';
   compEl.textContent = item.company || '';
   who.appendChild(nameEl);
@@ -372,10 +372,10 @@ function renderRecommendation(item) {
   // so it doesn't look stale. The 60s tolerance avoids flagging the
   // trivial submittedAt/updatedAt skew that exists on the very first
   // write (Firestore server-timestamps land a few ms apart).
-  var when = document.createElement('time');
+  const when = document.createElement('time');
   when.className = 'reco-when';
-  var displayMs    = item.submittedAt;
-  var displayLabel = '';
+  let displayMs    = item.submittedAt;
+  let displayLabel = '';
   if (item.updatedAt && item.submittedAt &&
       (item.updatedAt - item.submittedAt) > 60 * 1000) {
     displayMs    = item.updatedAt;
@@ -396,29 +396,29 @@ function renderRecommendation(item) {
 
   card.appendChild(header);
 
-  var text = document.createElement('p');
+  const text = document.createElement('p');
   text.className = 'reco-text';
   text.textContent = item.text || '';
   card.appendChild(text);
 
   // Reply (only if Abhinav has replied — flowed in via SF → GCP callback)
   if (item.reply) {
-    var reply = document.createElement('div');
+    const reply = document.createElement('div');
     reply.className = 'reco-reply';
 
-    var replyHead = document.createElement('div');
+    const replyHead = document.createElement('div');
     replyHead.className = 'reco-reply-head';
-    var icon = document.createElement('span');
+    const icon = document.createElement('span');
     icon.className = 'material-symbols-outlined reco-reply-icon';
     icon.setAttribute('aria-hidden', 'true');
     icon.textContent = 'reply';
     replyHead.appendChild(icon);
-    var replyAuthor = document.createElement('span');
+    const replyAuthor = document.createElement('span');
     replyAuthor.className = 'reco-reply-author';
     replyAuthor.textContent = 'Abhinav';
     replyHead.appendChild(replyAuthor);
     if (item.repliedAt) {
-      var replyWhen = document.createElement('time');
+      const replyWhen = document.createElement('time');
       replyWhen.className = 'reco-reply-when';
       replyWhen.textContent = formatRecoTimestamp(item.repliedAt);
       replyWhen.dateTime = new Date(item.repliedAt).toISOString();
@@ -426,7 +426,7 @@ function renderRecommendation(item) {
     }
     reply.appendChild(replyHead);
 
-    var replyText = document.createElement('p');
+    const replyText = document.createElement('p');
     replyText.className = 'reco-reply-text';
     replyText.textContent = item.reply;
     reply.appendChild(replyText);
@@ -440,12 +440,12 @@ function renderRecommendation(item) {
 // Friendly relative-time. "just now" / "5m" / "3h" / "2d" / "Jan 12".
 function formatRecoTimestamp(ms) {
   if (!ms) return '';
-  var diff = Date.now() - ms;
+  const diff = Date.now() - ms;
   if (diff < 60 * 1000)             return 'just now';
   if (diff < 60 * 60 * 1000)        return Math.floor(diff / 60000) + 'm';
   if (diff < 24 * 60 * 60 * 1000)   return Math.floor(diff / 3600000) + 'h';
   if (diff < 7  * 24 * 60 * 60 * 1000) return Math.floor(diff / 86400000) + 'd';
-  var d = new Date(ms);
+  const d = new Date(ms);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
@@ -465,10 +465,10 @@ function formatRecoTimestamp(ms) {
  */
 export function refreshRecommendations(opts) {
   opts = opts || {};
-  var grid  = document.getElementById('recosGrid');
-  var empty = document.getElementById('recosEmpty');
+  const grid  = document.getElementById('recosGrid');
+  const empty = document.getElementById('recosEmpty');
   if (!grid) return;
-  var url = '/api/recommendations';
+  let url = '/api/recommendations';
   if (opts.bustCache) url += '?_=' + Date.now();
   fetch(url, { headers: { 'Accept': 'application/json' } })
     .then(function (r) { return r.ok ? r.json() : null; })
@@ -480,7 +480,7 @@ export function refreshRecommendations(opts) {
       // inside the success handler — keeps the CTA in sync with whatever
       // the server believes is currently active, including replies that
       // landed while we were on another tab.
-      var mySub = (siteProfile && siteProfile.sub) || null;
+      const mySub = (siteProfile && siteProfile.sub) || null;
       setMyRecommendation(mySub
         ? (data.recommendations.find(function (it) { return it.id === mySub; }) || null)
         : null);
@@ -514,7 +514,7 @@ export function refreshRecommendations(opts) {
  * "Leave a Recommendation" with the rate_review icon.
  */
 export function updateRecommendationCta() {
-  var btn = document.getElementById('recosCtaBtn');
+  const btn = document.getElementById('recosCtaBtn');
   if (!btn) return;
   btn.hidden = !!myRecommendation;
 }
@@ -527,7 +527,7 @@ export function openLeaveRecommendation() {
     // Not signed in — redirect them through the existing welcome flow.
     // It already handles Google Sign-In + remembers them, so by the time
     // they come back to click the CTA we'll have a credential cached.
-    var welcome = document.getElementById('welcomeOverlay');
+    const welcome = document.getElementById('welcomeOverlay');
     if (welcome && typeof welcome.show === 'function') {
       welcome.show();
       return;
@@ -538,10 +538,10 @@ export function openLeaveRecommendation() {
 
   // Hydrate the identity preview from cached profile so the user sees
   // exactly what their card will look like before they hit submit.
-  var profile = siteProfile || {};
-  var avatar = document.getElementById('lr-avatar');
-  var name   = document.getElementById('lr-name');
-  var comp   = document.getElementById('lr-company');
+  const profile = siteProfile || {};
+  const avatar = document.getElementById('lr-avatar');
+  const name   = document.getElementById('lr-name');
+  const comp   = document.getElementById('lr-company');
   if (avatar && profile.picture) avatar.src = profile.picture;
   if (avatar) avatar.alt = profile.name || '';
   if (name)   name.textContent = profile.name || '';
@@ -553,11 +553,11 @@ export function openLeaveRecommendation() {
   // client is the modal chrome + textarea contents. The submit handler
   // doesn't need to know whether it's an edit — it sends the same
   // payload either way and the server figures out isNew.
-  var titleEl = document.getElementById('lr-title-text');
-  var lblEl   = document.getElementById('lr-submit-label');
-  var textEl  = document.getElementById('lr-text');
-  var d       = PAGE_LANG[currentLang] || PAGE_LANG.en;
-  var isEdit  = !!myRecommendation;
+  const titleEl = document.getElementById('lr-title-text');
+  const lblEl   = document.getElementById('lr-submit-label');
+  const textEl  = document.getElementById('lr-text');
+  const d       = PAGE_LANG[currentLang] || PAGE_LANG.en;
+  const isEdit  = !!myRecommendation;
 
   if (titleEl) titleEl.textContent = isEdit
     ? (d.recoModalTitleEdit || 'Edit your Recommendation')
@@ -574,7 +574,7 @@ export function openLeaveRecommendation() {
     if (textEl) textEl.value = isEdit ? (myRecommendation.text || '') : '';
   });
 
-  var overlay = document.getElementById('leaveRecoOverlay');
+  const overlay = document.getElementById('leaveRecoOverlay');
   if (!overlay) return;
   whenMdDialogReady(function () {
     if (typeof overlay.show === 'function') overlay.show();
@@ -583,7 +583,7 @@ export function openLeaveRecommendation() {
 }
 
 export function closeLeaveRecommendation() {
-  var overlay = document.getElementById('leaveRecoOverlay');
+  const overlay = document.getElementById('leaveRecoOverlay');
   if (!overlay) return;
   if (typeof overlay.close === 'function') overlay.close();
   else overlay.setAttribute('hidden', '');
@@ -591,30 +591,30 @@ export function closeLeaveRecommendation() {
 }
 
 function resetLeaveRecoForm() {
-  var form = document.getElementById('leaveRecoForm');
+  const form = document.getElementById('leaveRecoForm');
   if (form) form.reset();
   // form.reset() doesn't reliably clear md-outlined-text-field once we've
   // programmatically assigned .value (edit mode pre-fills via the property,
   // not the attribute, so the "default" is still empty in form-internals
   // terms — but some Material versions hold on to the last property value).
   // Clear it explicitly so the next "new" open starts clean.
-  var textEl = document.getElementById('lr-text');
+  const textEl = document.getElementById('lr-text');
   if (textEl) textEl.value = '';
   clearErr('lr-text');
-  var globalErr = document.getElementById('lr-global-error');
+  const globalErr = document.getElementById('lr-global-error');
   if (globalErr) globalErr.hidden = true;
-  var btn = document.getElementById('lr-submit-btn');
+  const btn = document.getElementById('lr-submit-btn');
   if (btn) btn.disabled = false;
   // Reset the chrome back to "new" defaults — openLeaveRecommendation()
   // will re-flip to edit mode if needed on the next open.
-  var lbl = document.getElementById('lr-submit-label');
+  const lbl = document.getElementById('lr-submit-label');
   if (lbl) lbl.textContent = 'Post Recommendation';
-  var titleEl = document.getElementById('lr-title-text');
+  const titleEl = document.getElementById('lr-title-text');
   if (titleEl) titleEl.textContent = 'Leave a Recommendation';
 }
 
 function validateLeaveReco() {
-  var text = document.getElementById('lr-text').value.trim();
+  const text = document.getElementById('lr-text').value.trim();
   clearErr('lr-text');
   if (!text) { setErr('lr-text', 'Please share a recommendation.'); return false; }
   if (text.length > 2000) {
@@ -635,23 +635,23 @@ async function handleSubmit(e) {
   }
   if (!validateLeaveReco()) return;
 
-  var btn       = document.getElementById('lr-submit-btn');
-  var btnLabel  = document.getElementById('lr-submit-label');
-  var globalErr = document.getElementById('lr-global-error');
+  const btn       = document.getElementById('lr-submit-btn');
+  const btnLabel  = document.getElementById('lr-submit-label');
+  const globalErr = document.getElementById('lr-global-error');
 
   // Mode is fixed at submit time — myRecommendation reflects what was
   // shown to the user when they opened the modal. We capture it locally
   // so the loading / error labels stay coherent even if a background
   // refresh changes myRecommendation while the request is in flight.
-  var isEdit      = !!myRecommendation;
-  var idleLabel   = isEdit ? 'Update Recommendation' : 'Post Recommendation';
-  var loadingLbl  = isEdit ? 'Updating\u2026'         : 'Posting\u2026';
+  const isEdit      = !!myRecommendation;
+  const idleLabel   = isEdit ? 'Update Recommendation' : 'Post Recommendation';
+  const loadingLbl  = isEdit ? 'Updating\u2026'         : 'Posting\u2026';
 
   btn.disabled = true;
   if (btnLabel) btnLabel.textContent = loadingLbl;
   globalErr.hidden = true;
 
-  var payload = { text: document.getElementById('lr-text').value.trim() };
+  const payload = { text: document.getElementById('lr-text').value.trim() };
 
   function fail(msg) {
     globalErr.textContent = msg;
@@ -661,7 +661,7 @@ async function handleSubmit(e) {
   }
 
   try {
-    var res = await fetch('/api/recommendation', {
+    const res = await fetch('/api/recommendation', {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',
@@ -669,7 +669,7 @@ async function handleSubmit(e) {
       },
       body: JSON.stringify(payload),
     });
-    var data = await res.json();
+    const data = await res.json();
 
     if (res.status === 401) {
       // Token expired or invalid — clear and reprompt.
@@ -689,7 +689,7 @@ async function handleSubmit(e) {
       // the confirmation. No success banner, no timeout, no flicker.
       closeLeaveRecommendation();
       refreshRecommendations({ bustCache: true });
-      var section = document.getElementById('recosSection');
+      const section = document.getElementById('recosSection');
       if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
@@ -714,9 +714,9 @@ export function initRecommendations() {
     if (document.visibilityState === 'visible') refreshRecommendations();
   });
 
-  var lrOverlay = document.getElementById('leaveRecoOverlay');
+  const lrOverlay = document.getElementById('leaveRecoOverlay');
   if (lrOverlay) lrOverlay.addEventListener('close', resetLeaveRecoForm);
 
-  var lrForm = document.getElementById('leaveRecoForm');
+  const lrForm = document.getElementById('leaveRecoForm');
   if (lrForm) lrForm.addEventListener('submit', handleSubmit);
 }
