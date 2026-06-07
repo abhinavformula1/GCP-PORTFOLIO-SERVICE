@@ -2485,7 +2485,16 @@ a:hover { text-decoration: underline; }
   padding: 14px 16px;
   gap: 8px;
 }
-.ga-header > .ga-avatar { display: none; }
+.ga-header > .ga-avatar {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  background: #0B2A5B url('/assets/chat/atlas-avatar.png') center/cover no-repeat;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  color: transparent;
+  font-size: 0;
+  flex-shrink: 0;
+}
 .ga-header-info { min-width: 0; }
 .ga-header-name {
   color: #ffffff;
@@ -2525,7 +2534,7 @@ a:hover { text-decoration: underline; }
 
 /* Progress — purple thread instead of blue */
 .ga-progress-track { background: #eef0f3; }
-.ga-progress-bar   { background: #6c4dff; }
+.ga-progress-bar   { background: #0070D2; }
 
 /* Messages canvas — soft off-white */
 .ga-messages {
@@ -2544,42 +2553,43 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 1px 1px rgba(15, 23, 42, 0.06);
 }
 .ga-bubble-bot {
-  background: #FFE9E7;
+  background: #d1e4ff;
   color: #1f2733;
   border-bottom-left-radius: 4px;
 }
 .ga-bubble-user {
-  background: #6c4dff;
+  background: #0070D2;
   color: #ffffff;
   border-bottom-right-radius: 4px;
 }
 
-/* Small avatar dot below each bot bubble — Swiggy-style coral circle */
+/* Atlas avatar tucked into the top-left of each bot bubble — Aura-style */
 .ga-msg-bot {
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 4px;
+  gap: 0;
 }
-.ga-msg-bot::after {
-  content: 'A';
-  width: 20px;
-  height: 20px;
+.ga-msg-bot::before {
+  content: '';
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FB6E1A, #FF8E3C);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 2px;
-  box-shadow: 0 1px 2px rgba(251, 110, 26, 0.3);
+  background: #0B2A5B url('/assets/chat/atlas-avatar.png') center/cover no-repeat;
+  flex-shrink: 0;
+  margin-right: -10px;   /* overlap into the bubble corner */
+  margin-top: -14px;     /* sit at the corner — most of the avatar above the bubble */
+  margin-left: -6px;     /* nudge slightly past the bubble's left edge */
+  position: relative;
+  z-index: 2;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
 }
-/* Hide the avatar on consecutive bot messages — only show it after the LAST
-   one so we don't get a column of dots between every step prompt. CSS-only
-   trick: every bot bubble shows the dot, but the next-following bot bubble's
-   own avatar sits flush, so visually they merge. We hide intermediate ones. */
-.ga-msg-bot:has(+ .ga-msg-bot)::after { display: none; }
+/* Make room for the avatar overlap inside the bubble */
+.ga-msg-bot .ga-bubble-bot { padding-left: 28px; }
+/* Hide the avatar on subsequent bot messages in a sequence — only the
+   first bot bubble in a group shows Atlas, like Slack/Aura. */
+.ga-msg-bot + .ga-msg-bot::before { visibility: hidden; }
+.ga-msg-bot + .ga-msg-bot .ga-bubble-bot { padding-left: 13px; }
 
 /* Input area — light footer */
 .ga-input-area {
@@ -2598,21 +2608,53 @@ a:hover { text-decoration: underline; }
 }
 .ga-text-input::placeholder { color: #9ca3af; }
 .ga-text-input:focus {
-  border-color: #6c4dff;
+  border-color: #0070D2;
   background: #ffffff;
   outline: none;
 }
 .ga-send-btn {
-  background: #6c4dff;
+  background: #0070D2;
   color: #ffffff;
   height: 40px;
   border-radius: 22px;
   font-size: 13px;
   font-weight: 600;
 }
-.ga-send-btn:hover:not(:disabled) { background: #5a3dd8; }
+.ga-send-btn:hover:not(:disabled) { background: #005A9E; }
 .ga-send-btn:disabled { background: #d1d5db; color: #9ca3af; }
 .ga-input-err { color: #d92d20; padding-left: 4px; }
+
+/* Aura-style input row: text field + circular send-icon button on the right */
+.ga-input-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.ga-input-row .ga-text-input { flex: 1; padding-right: 44px; }
+.ga-input-row .ga-send-icon-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #0070D2;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease;
+}
+.ga-input-row .ga-send-icon-btn:hover:not(:disabled) { opacity: 0.65; }
+.ga-input-row .ga-send-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.ga-input-row .ga-send-icon-btn .ga-send-svg {
+  transform: rotate(-35deg);   /* tilt the paper-plane up-and-to-the-right */
+  transform-origin: 50% 50%;
+}
 
 /* Quick-reply chips — full-width pink/coral, stacked */
 .ga-choice-grid {
@@ -2650,18 +2692,18 @@ a:hover { text-decoration: underline; }
 .ga-summary-row span    { color: #6b7280; }
 .ga-summary-row strong  { color: #1f2733; }
 
-/* Final submit button — purple to match user bubbles */
+/* Final submit button — Salesforce blue, matches Get In Touch + send icon */
 .ga-summary-btn {
-  background: #6c4dff;
-  border: 1px solid #6c4dff;
+  background: #0070D2;
+  border: 1px solid #0070D2;
   color: #ffffff;
   border-radius: 8px;
   padding: 10px 16px;
   font-weight: 600;
 }
 .ga-summary-btn:hover:not(:disabled) {
-  background: #5a3dd8;
-  border-color: #5a3dd8;
+  background: #005A9E;
+  border-color: #005A9E;
   color: #ffffff;
 }
 .ga-summary-ready {
@@ -2682,7 +2724,7 @@ a:hover { text-decoration: underline; }
   color: #6b7280;
   background: #ffffff;
 }
-.ga-done-close:hover { border-color: #6c4dff; color: #6c4dff; }
+.ga-done-close:hover { border-color: #0070D2; color: #0070D2; }
 
 /* Resize handle — light theme; sit flush inside the rounded modal so
    overflow:hidden doesn't clip half of it */
@@ -2690,9 +2732,9 @@ a:hover { text-decoration: underline; }
 .ga-resize-handle::before { background: #d1d5db; }
 .ga-resize-handle:hover::before,
 .ga-resize-handle:active::before,
-.ga-resize-handle.dragging::before { background: #6c4dff; height: 64px; }
-.ga-resize-handle:hover     { background: rgba(108, 77, 255, 0.06); }
-.ga-resize-handle.dragging  { background: rgba(108, 77, 255, 0.10); }
+.ga-resize-handle.dragging::before { background: #0070D2; height: 64px; }
+.ga-resize-handle:hover     { background: rgba(0, 112, 210, 0.06); }
+.ga-resize-handle.dragging  { background: rgba(0, 112, 210, 0.10); }
 
 /* Mid-conversation close confirmation — light card */
 .ga-close-confirm {
@@ -2707,7 +2749,7 @@ a:hover { text-decoration: underline; }
   background: #ffffff;
   color: #6b7280;
 }
-.ga-confirm-stay:hover { border-color: #6c4dff; color: #6c4dff; }
+.ga-confirm-stay:hover { border-color: #0070D2; color: #0070D2; }
 .ga-confirm-end {
   background: #fee2e2;
   border: 1px solid #fca5a5;

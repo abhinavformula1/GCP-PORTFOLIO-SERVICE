@@ -23,7 +23,7 @@ export const LANG = {
   en: {
     teaserText: 'Hi! Looking to hire a Salesforce engineer?',
     teaserCta: "Let's talk",
-    botGreeting: "Hi there! I'm Abhinav's assistant. To schedule a quick chat, I'll need a few details. What's your name?",
+    botGreeting: "Hi there! I'm Atlas, Abhinav's virtual assistant. To schedule a quick chat, I'll need a few details. What's your name?",
     botEmail: function (name) { return 'Nice to meet you, ' + name + "! What's your work email?"; },
     botCompany: 'Which company are you from?',
     botRole: 'What kind of role are you looking to fill?',
@@ -62,7 +62,7 @@ export const LANG = {
   fr: {
     teaserText: 'Bonjour! Vous recrutez un ingénieur Salesforce?',
     teaserCta: 'Discutons',
-    botGreeting: "Bonjour! Je suis l'assistant d'Abhinav. Pour planifier un échange, j'ai besoin de quelques informations. Quel est votre nom?",
+    botGreeting: "Bonjour! Je suis Atlas, l'assistant virtuel d'Abhinav. Pour planifier un échange, j'ai besoin de quelques informations. Quel est votre nom?",
     botEmail: function (name) { return 'Ravi de vous rencontrer, ' + name + '! Quelle est votre adresse email professionnelle?'; },
     botCompany: 'De quelle entreprise venez-vous?',
     botRole: 'Quel type de poste souhaitez-vous pourvoir?',
