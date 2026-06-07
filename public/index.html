@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,9 +10,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap" />
+    href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap" />
   <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
 
   <link rel="stylesheet" href="/assets/style.css" />
 
@@ -38,6 +39,7 @@
        --md-sys-color-* tokens already defined in style.css. -->
   <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
 </head>
+
 <body>
 
   <!-- ── Welcome-Back Toast (transient, auto-dismisses) ── -->
@@ -45,7 +47,7 @@
     <div class="welcome-toast-photo" id="welcomeToastPhoto"></div>
     <div class="welcome-toast-text">
       <div class="welcome-toast-title" id="welcomeToastTitle">Welcome back!</div>
-      <div class="welcome-toast-name"  id="welcomeToastName"></div>
+      <div class="welcome-toast-name" id="welcomeToastName"></div>
     </div>
     <button class="welcome-toast-close" id="welcomeToastClose" aria-label="Dismiss">&times;</button>
   </div>
@@ -69,7 +71,8 @@
       <md-outlined-button id="welcomeGuestBtn" class="welcome-guest-btn">
         <span data-i18n="welcomeGuestBtn">Maybe later</span>
       </md-outlined-button>
-      <p class="welcome-note" data-i18n="welcomeNote">Your details are only used to personalise the scheduling assistant.</p>
+      <p class="welcome-note" data-i18n="welcomeNote">Your details are only used to personalise the scheduling
+        assistant.</p>
     </div>
   </md-dialog>
 
@@ -77,13 +80,7 @@
   <div class="topbar">
     <div class="topbar-inner">
       <!-- M3 outlined select — floating "Language" label, dropdown menu -->
-      <md-outlined-select
-        id="langSelect"
-        class="lang-select"
-        label="Language"
-        value="en"
-        aria-label="Language"
-      >
+      <md-outlined-select id="langSelect" class="lang-select" label="Language" value="en" aria-label="Language">
         <md-select-option value="en" selected>
           <div slot="headline">English</div>
         </md-select-option>
@@ -94,13 +91,8 @@
 
       <!-- M3 outlined icon button — circular outline + filled-on-toggle state.
            Mirrors the Google reference (Material Components -> outlined icon button). -->
-      <md-outlined-icon-button
-        id="themeToggleBtn"
-        class="theme-toggle"
-        toggle
-        aria-label="Switch to light mode"
-        title="Switch theme"
-      >
+      <md-outlined-icon-button id="themeToggleBtn" class="theme-toggle" toggle aria-label="Switch to light mode"
+        title="Switch theme">
         <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
         <span class="material-symbols-outlined" slot="selected" aria-hidden="true">dark_mode</span>
       </md-outlined-icon-button>
@@ -140,20 +132,19 @@
              preserving the at-a-glance verification a recruiter does in
              the first 2 seconds. -->
         <div class="header-credentials" aria-label="Profile credentials">
-          <a class="cred-chip cred-chip-link"
-             href="https://linkedin.com/in/abhinavformula1"
-             target="_blank"
-             rel="noopener"
-             aria-label="LinkedIn profile (opens in a new tab)">
+          <a class="cred-chip cred-chip-link" href="https://linkedin.com/in/abhinavformula1" target="_blank"
+            rel="noopener" aria-label="LinkedIn profile (opens in a new tab)">
             <!-- LinkedIn brand mark — kept as SVG (no Material Symbol equivalent) -->
-            <svg class="cred-chip-icon" width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+            <svg class="cred-chip-icon" width="14" height="14" fill="currentColor" viewBox="0 0 24 24"
+              aria-hidden="true">
+              <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+              <rect x="2" y="9" width="4" height="12" />
+              <circle cx="4" cy="4" r="2" />
+            </svg>
             <span>LinkedIn</span>
           </a>
-          <a class="cred-chip cred-chip-link"
-             href="https://trailblazer.me/id/abhinavformula1"
-             target="_blank"
-             rel="noopener"
-             aria-label="Trailblazer profile (opens in a new tab)">
+          <a class="cred-chip cred-chip-link" href="https://trailblazer.me/id/abhinavformula1" target="_blank"
+            rel="noopener" aria-label="Trailblazer profile (opens in a new tab)">
             <span class="material-symbols-outlined cred-chip-icon" aria-hidden="true">verified</span>
             <span>Trailblazer</span>
           </a>
@@ -164,20 +155,18 @@
                in three glanceable chips. Material Symbols doesn't ship
                an octocat, so we use the official GitHub mark as inline
                SVG. -->
-          <a class="cred-chip cred-chip-link"
-             href="https://github.com/abhinavformula1"
-             target="_blank"
-             rel="noopener"
-             aria-label="GitHub profile (opens in a new tab)">
-            <svg class="cred-chip-icon" width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-1.94c-3.2.7-3.87-1.55-3.87-1.55-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.27-5.23-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39s1.96.13 2.88.39c2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.07.78 2.16v3.2c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+          <a class="cred-chip cred-chip-link" href="https://github.com/abhinavformula1" target="_blank" rel="noopener"
+            aria-label="GitHub profile (opens in a new tab)">
+            <svg class="cred-chip-icon" width="14" height="14" fill="currentColor" viewBox="0 0 24 24"
+              aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-1.94c-3.2.7-3.87-1.55-3.87-1.55-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.27-5.23-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39s1.96.13 2.88.39c2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.07.78 2.16v3.2c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z" />
+            </svg>
             <span>GitHub</span>
           </a>
-          <button type="button"
-                  class="cred-chip cred-chip-action"
-                  id="contactInfoBtn"
-                  onclick="window.openContactInfo && window.openContactInfo()"
-                  aria-haspopup="dialog"
-                  aria-controls="contactInfoOverlay">
+          <button type="button" class="cred-chip cred-chip-action" id="contactInfoBtn"
+            onclick="window.openContactInfo && window.openContactInfo()" aria-haspopup="dialog"
+            aria-controls="contactInfoOverlay">
             <span class="material-symbols-outlined cred-chip-icon" aria-hidden="true">contact_page</span>
             <span data-i18n="contactInfo">Contact info</span>
           </button>
@@ -205,9 +194,8 @@
                this view. URL hash #/system-design/<id> is the source of
                truth for which topic is rendered, so deep links are
                shareable and back/forward both work. -->
-          <md-outlined-button class="systemdesign-btn"
-                              aria-pressed="false"
-                              onclick="window.openSystemDesign && window.openSystemDesign()">
+          <md-outlined-button class="systemdesign-btn" aria-pressed="false"
+            onclick="window.openSystemDesign && window.openSystemDesign()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">schema</span>
             <span data-i18n="systemDesign">System Design</span>
           </md-outlined-button>
@@ -218,7 +206,7 @@
                (see generateResumePdf in main.js) — no static asset to keep
                in sync, and language toggle (EN/FR) carries through. -->
           <button type="button" class="download-resume-btn"
-                  onclick="window.generateResumePdf && window.generateResumePdf()">
+            onclick="window.generateResumePdf && window.generateResumePdf()">
             <span class="material-symbols-outlined" aria-hidden="true">download</span>
             <span data-i18n="downloadResume">Download Resume</span>
           </button>
@@ -240,11 +228,14 @@
         <div class="section">
           <div class="section-title" data-i18n="aboutMe">About Me</div>
           <p class="about-text" data-i18n-html="about1">
-            Senior Salesforce Application Engineer with <strong style="color:var(--text)">12+ years of experience</strong> across Salesforce development, architecture, and DevOps, building scalable enterprise applications using Apex, Lightning Web Components, and API-driven integrations.
+            Senior Salesforce Application Engineer with <strong style="color:var(--text)">12+ years of
+              experience</strong> across Salesforce development, architecture, and DevOps, building scalable enterprise
+            applications using Apex, Lightning Web Components, and API-driven integrations.
           </p>
-          <br/>
+          <br />
           <p class="about-text" data-i18n="about2">
-            Experienced across Sales Cloud, Service Cloud, Experience Cloud, and Salesforce Communications Cloud, with deep expertise in CPQ, Contract Lifecycle Management, and Order Management.
+            Experienced across Sales Cloud, Service Cloud, Experience Cloud, and Salesforce Communications Cloud, with
+            deep expertise in CPQ, Contract Lifecycle Management, and Order Management.
           </p>
         </div>
 
@@ -339,9 +330,11 @@
           <div class="cert-group">
             <div class="cert-group-title">Architecture</div>
             <div class="cert-item"><span class="cert-dot"></span>Salesforce Certified Application Architect</div>
-            <div class="cert-item"><span class="cert-dot"></span>Salesforce Certified Platform Integration Architect</div>
+            <div class="cert-item"><span class="cert-dot"></span>Salesforce Certified Platform Integration Architect
+            </div>
             <div class="cert-item"><span class="cert-dot"></span>Salesforce Certified Platform Data Architect</div>
-            <div class="cert-item"><span class="cert-dot"></span>Salesforce Certified Platform Sharing &amp; Visibility Architect</div>
+            <div class="cert-item"><span class="cert-dot"></span>Salesforce Certified Platform Sharing &amp; Visibility
+              Architect</div>
           </div>
 
           <div class="cert-group">
@@ -395,7 +388,8 @@
                 <div class="job-title">Senior Salesforce / Apttus Developer</div>
                 <div class="job-period">Apr 2017 – June 2022</div>
               </div>
-              <div class="job-company">Tata Consultancy Services (TCS) <span class="location">· India, Malaysia</span></div>
+              <div class="job-company">Tata Consultancy Services (TCS) <span class="location">· India, Malaysia</span>
+              </div>
               <ul class="job-bullets" data-i18n-list="job2"></ul>
             </div>
 
@@ -459,39 +453,22 @@
       <p class="hm-subtitle">Interested in working together? Fill in your details.</p>
 
       <div class="hm-field">
-        <md-outlined-text-field
-          id="hm-name"
-          label="Full Name"
-          type="text"
-          required
+        <md-outlined-text-field id="hm-name" label="Full Name" type="text" required
           autocomplete="name"></md-outlined-text-field>
       </div>
 
       <div class="hm-field">
-        <md-outlined-text-field
-          id="hm-email"
-          label="Work Email"
-          type="email"
-          required
+        <md-outlined-text-field id="hm-email" label="Work Email" type="email" required
           autocomplete="email"></md-outlined-text-field>
       </div>
 
       <div class="hm-field">
-        <md-outlined-text-field
-          id="hm-company"
-          label="Company"
-          type="text"
-          required
+        <md-outlined-text-field id="hm-company" label="Company" type="text" required
           autocomplete="organization"></md-outlined-text-field>
       </div>
 
       <div class="hm-field">
-        <md-outlined-text-field
-          id="hm-description"
-          label="Message"
-          type="textarea"
-          rows="3"
-          maxlength="255"
+        <md-outlined-text-field id="hm-description" label="Message" type="textarea" rows="3" maxlength="255"
           supporting-text="Tell me about the role, team, or what you'd like to discuss."></md-outlined-text-field>
       </div>
 
@@ -521,7 +498,8 @@
            doesn't clobber the personalised copy. The Done button below is
            fixed text, so it does carry data-i18n. -->
       <h3 class="hm-success-headline" id="hm-success-headline">Message sent</h3>
-      <p class="hm-success-body" id="hm-success-body">Thanks for reaching out. I usually reply within 24 hours via email.</p>
+      <p class="hm-success-body" id="hm-success-body">Thanks for reaching out. I usually reply within 24 hours via
+        email.</p>
       <md-filled-button class="hm-success-done" id="hm-success-done" type="button" onclick="closeHireMe()">
         <span data-i18n="hireSuccessDone">Done</span>
       </md-filled-button>
@@ -541,21 +519,15 @@
     </div>
 
     <div slot="content" class="refer-content">
-      <p class="hm-subtitle" data-i18n="referMeIntro">Thanks for thinking of referring me — copy the email below, edit, and send. The resume link is included in the body so you don't have to attach anything.</p>
+      <p class="hm-subtitle" data-i18n="referMeIntro">Thanks for thinking of referring me — copy the email below, edit,
+        and send. The resume link is included in the body so you don't have to attach anything.</p>
 
       <div class="hm-field">
-        <md-outlined-text-field
-          id="refer-subject"
-          label="Subject"
-          type="text"></md-outlined-text-field>
+        <md-outlined-text-field id="refer-subject" label="Subject" type="text"></md-outlined-text-field>
       </div>
 
       <div class="hm-field">
-        <md-outlined-text-field
-          id="refer-body"
-          label="Email body"
-          type="textarea"
-          rows="13"
+        <md-outlined-text-field id="refer-body" label="Email body" type="textarea" rows="13"
           supporting-text="Tip: replace the {{...}} placeholders before sending."></md-outlined-text-field>
       </div>
 
@@ -566,7 +538,8 @@
         </md-filled-button>
       </div>
 
-      <p class="hm-privacy" data-i18n="referMePrivacy">Nothing leaves your device until you hit Send in your own email. No tracking, no backend processing.</p>
+      <p class="hm-privacy" data-i18n="referMePrivacy">Nothing leaves your device until you hit Send in your own email.
+        No tracking, no backend processing.</p>
     </div>
   </md-dialog>
 
@@ -581,24 +554,23 @@
   <md-dialog id="resumePreviewOverlay" aria-labelledby="resume-preview-title-text">
     <div slot="headline" class="hm-headline">
       <span id="resume-preview-title-text" data-i18n="resumePreviewTitle">Resume Preview</span>
-      <button type="button" class="hm-close" aria-label="Close" onclick="window.closeResumePreview && window.closeResumePreview()">&times;</button>
+      <button type="button" class="hm-close" aria-label="Close"
+        onclick="window.closeResumePreview && window.closeResumePreview()">&times;</button>
     </div>
 
     <div slot="content" class="resume-preview-content">
-      <p class="hm-subtitle" data-i18n="resumePreviewIntro">This PDF is generated live from the page above. Review it below, then download.</p>
+      <p class="hm-subtitle" data-i18n="resumePreviewIntro">This PDF is generated live from the page above. Review it
+        below, then download.</p>
 
-      <iframe
-        id="resumePreviewFrame"
-        class="resume-preview-frame"
-        title="Resume PDF preview"
-        loading="lazy"></iframe>
+      <iframe id="resumePreviewFrame" class="resume-preview-frame" title="Resume PDF preview" loading="lazy"></iframe>
     </div>
 
     <div slot="actions" class="resume-preview-actions">
       <md-text-button type="button" onclick="window.closeResumePreview && window.closeResumePreview()">
         <span data-i18n="resumePreviewClose">Close</span>
       </md-text-button>
-      <md-filled-button class="resume-preview-download" type="button" onclick="window.downloadResumePdf && window.downloadResumePdf()">
+      <md-filled-button class="resume-preview-download" type="button"
+        onclick="window.downloadResumePdf && window.downloadResumePdf()">
         <span class="material-symbols-outlined" slot="icon" aria-hidden="true">download</span>
         <span data-i18n="resumePreviewDownload">Download PDF</span>
       </md-filled-button>
@@ -622,11 +594,13 @@
   <md-dialog id="contactInfoOverlay" aria-labelledby="contact-info-title-text">
     <div slot="headline" class="hm-headline">
       <span id="contact-info-title-text" data-i18n="contactInfoTitle">Contact Info</span>
-      <button type="button" class="hm-close" aria-label="Close" onclick="window.closeContactInfo && window.closeContactInfo()">&times;</button>
+      <button type="button" class="hm-close" aria-label="Close"
+        onclick="window.closeContactInfo && window.closeContactInfo()">&times;</button>
     </div>
 
     <div slot="content" class="ci-content">
-      <p class="hm-subtitle" data-i18n="contactInfoIntro">Reach me through any of these channels — copy is one click away.</p>
+      <p class="hm-subtitle" data-i18n="contactInfoIntro">Reach me through any of these channels — copy is one click
+        away.</p>
 
       <ul class="ci-list">
         <!-- Email -->
@@ -637,11 +611,8 @@
             <a class="ci-value ci-value-link" href="mailto:abhinavformula1@gmail.com">abhinavformula1@gmail.com</a>
           </div>
           <div class="ci-actions">
-            <button type="button"
-                    class="ci-action-btn"
-                    data-copy-target="abhinavformula1@gmail.com"
-                    aria-label="Copy email address"
-                    title="Copy">
+            <button type="button" class="ci-action-btn" data-copy-target="abhinavformula1@gmail.com"
+              aria-label="Copy email address" title="Copy">
               <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
             </button>
           </div>
@@ -656,22 +627,17 @@
           <span class="material-symbols-outlined ci-icon" aria-hidden="true">call</span>
           <div class="ci-body">
             <div class="ci-label" data-i18n="contactInfoPhone">Phone</div>
-            <a class="ci-value ci-value-link"
-               id="contactPhone"
-               aria-disabled="true"
-               aria-describedby="contactPhoneBadge">
+            <a class="ci-value ci-value-link" id="contactPhone" aria-disabled="true"
+              aria-describedby="contactPhoneBadge">
               <span id="contactPhoneText">+91-xxxxxxxxxx</span>
             </a>
             <span class="contact-reveal-badge" id="contactPhoneBadge" hidden></span>
-            <span class="ci-hint" id="contactPhoneHint" data-i18n="contactInfoPhoneHint">Visible after sign-in with a verified work email.</span>
+            <span class="ci-hint" id="contactPhoneHint" data-i18n="contactInfoPhoneHint">Visible after sign-in with a
+              verified work email.</span>
           </div>
           <div class="ci-actions">
-            <button type="button"
-                    class="ci-action-btn"
-                    id="contactPhoneCopyBtn"
-                    aria-label="Copy phone number"
-                    title="Copy"
-                    hidden>
+            <button type="button" class="ci-action-btn" id="contactPhoneCopyBtn" aria-label="Copy phone number"
+              title="Copy" hidden>
               <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
             </button>
           </div>
@@ -679,21 +645,20 @@
 
         <!-- LinkedIn -->
         <li class="ci-row">
-          <svg class="ci-icon ci-icon-svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+          <svg class="ci-icon ci-icon-svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24"
+            aria-hidden="true">
+            <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+            <rect x="2" y="9" width="4" height="12" />
+            <circle cx="4" cy="4" r="2" />
+          </svg>
           <div class="ci-body">
             <div class="ci-label" data-i18n="contactInfoLinkedIn">LinkedIn</div>
-            <a class="ci-value ci-value-link"
-               href="https://linkedin.com/in/abhinavformula1"
-               target="_blank"
-               rel="noopener">linkedin.com/in/abhinavformula1</a>
+            <a class="ci-value ci-value-link" href="https://linkedin.com/in/abhinavformula1" target="_blank"
+              rel="noopener">linkedin.com/in/abhinavformula1</a>
           </div>
           <div class="ci-actions">
-            <a class="ci-action-btn"
-               href="https://linkedin.com/in/abhinavformula1"
-               target="_blank"
-               rel="noopener"
-               aria-label="Open LinkedIn profile in a new tab"
-               title="Open">
+            <a class="ci-action-btn" href="https://linkedin.com/in/abhinavformula1" target="_blank" rel="noopener"
+              aria-label="Open LinkedIn profile in a new tab" title="Open">
               <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
             </a>
           </div>
@@ -704,18 +669,12 @@
           <span class="material-symbols-outlined ci-icon" aria-hidden="true">verified</span>
           <div class="ci-body">
             <div class="ci-label" data-i18n="contactInfoTrailblazer">Trailblazer</div>
-            <a class="ci-value ci-value-link"
-               href="https://trailblazer.me/id/abhinavformula1"
-               target="_blank"
-               rel="noopener">trailblazer.me/id/abhinavformula1</a>
+            <a class="ci-value ci-value-link" href="https://trailblazer.me/id/abhinavformula1" target="_blank"
+              rel="noopener">trailblazer.me/id/abhinavformula1</a>
           </div>
           <div class="ci-actions">
-            <a class="ci-action-btn"
-               href="https://trailblazer.me/id/abhinavformula1"
-               target="_blank"
-               rel="noopener"
-               aria-label="Open Trailblazer profile in a new tab"
-               title="Open">
+            <a class="ci-action-btn" href="https://trailblazer.me/id/abhinavformula1" target="_blank" rel="noopener"
+              aria-label="Open Trailblazer profile in a new tab" title="Open">
               <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
             </a>
           </div>
@@ -726,21 +685,19 @@
              rows (LinkedIn / Trailblazer) so the modal reads as
              [identity → channels → credentials → location]. -->
         <li class="ci-row">
-          <svg class="ci-icon ci-icon-svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-1.94c-3.2.7-3.87-1.55-3.87-1.55-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.27-5.23-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39s1.96.13 2.88.39c2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.07.78 2.16v3.2c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+          <svg class="ci-icon ci-icon-svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24"
+            aria-hidden="true">
+            <path
+              d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-1.94c-3.2.7-3.87-1.55-3.87-1.55-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.27-5.23-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39s1.96.13 2.88.39c2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.07.78 2.16v3.2c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z" />
+          </svg>
           <div class="ci-body">
             <div class="ci-label" data-i18n="contactInfoGithub">GitHub</div>
-            <a class="ci-value ci-value-link"
-               href="https://github.com/abhinavformula1"
-               target="_blank"
-               rel="noopener">github.com/abhinavformula1</a>
+            <a class="ci-value ci-value-link" href="https://github.com/abhinavformula1" target="_blank"
+              rel="noopener">github.com/abhinavformula1</a>
           </div>
           <div class="ci-actions">
-            <a class="ci-action-btn"
-               href="https://github.com/abhinavformula1"
-               target="_blank"
-               rel="noopener"
-               aria-label="Open GitHub profile in a new tab"
-               title="Open">
+            <a class="ci-action-btn" href="https://github.com/abhinavformula1" target="_blank" rel="noopener"
+              aria-label="Open GitHub profile in a new tab" title="Open">
               <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
             </a>
           </div>
@@ -769,12 +726,8 @@
             </div>
           </div>
           <div class="ci-actions">
-            <a class="ci-action-btn"
-               href="https://www.google.com/maps/place/Bengaluru,+Karnataka,+India"
-               target="_blank"
-               rel="noopener"
-               aria-label="Open Bengaluru in Google Maps"
-               title="Open in Maps">
+            <a class="ci-action-btn" href="https://www.google.com/maps/place/Bengaluru,+Karnataka,+India"
+              target="_blank" rel="noopener" aria-label="Open Bengaluru in Google Maps" title="Open in Maps">
               <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
             </a>
           </div>
@@ -808,7 +761,8 @@
         <p class="recos-subtitle" id="recosSubtitle" data-i18n="recoSubtitle">
           What people I've worked with — and recruiters I've spoken with — have to say.
         </p>
-        <md-outlined-button class="recos-cta" id="recosCtaBtn" onclick="window.openLeaveRecommendation && window.openLeaveRecommendation()">
+        <md-outlined-button class="recos-cta" id="recosCtaBtn"
+          onclick="window.openLeaveRecommendation && window.openLeaveRecommendation()">
           <span class="material-symbols-outlined" slot="icon" aria-hidden="true">rate_review</span>
           <span data-i18n="recoCta">Leave a Recommendation</span>
         </md-outlined-button>
@@ -848,20 +802,16 @@
         </div>
       </div>
 
-      <p class="hm-subtitle">Share what stood out about working with — or talking to — Abhinav. Your name, company, and photo come from your Google profile.</p>
+      <p class="hm-subtitle">Share what stood out about working with — or talking to — Abhinav. Your name, company, and
+        photo come from your Google profile.</p>
 
       <div class="hm-field">
-        <md-outlined-text-field
-          id="lr-text"
-          label="Your Recommendation"
-          type="textarea"
-          rows="5"
-          maxlength="2000"
-          required
-          supporting-text="Up to 2000 characters."></md-outlined-text-field>
+        <md-outlined-text-field id="lr-text" label="Your Recommendation" type="textarea" rows="5" maxlength="2000"
+          required supporting-text="Up to 2000 characters."></md-outlined-text-field>
       </div>
 
-      <p class="hm-privacy">Your name, company and photo (from Google) are shown publicly with this recommendation. Email is not.</p>
+      <p class="hm-privacy">Your name, company and photo (from Google) are shown publicly with this recommendation.
+        Email is not.</p>
 
       <md-filled-button class="hm-submit" id="lr-submit-btn" type="submit">
         <span id="lr-submit-label">Post Recommendation</span>
@@ -887,7 +837,8 @@
              + "Google Cloud" wordmark). SVG asset stored in /assets/img/.
              The wordmark text is inside the SVG so we don't need a separate
              <span class="sponsor-name"> label here. -->
-        <a href="https://cloud.google.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-gcp" aria-label="Google Cloud">
+        <a href="https://cloud.google.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-gcp"
+          aria-label="Google Cloud">
           <img class="sponsor-logo" src="/assets/img/google-cloud.svg" alt="Google Cloud" width="155" height="24" />
         </a>
 
@@ -897,14 +848,16 @@
              "salesforce" cursive wordmark inside). The wordmark is integral
              to the brand mark, so we don't add a separate text label
              alongside it. -->
-        <a href="https://www.salesforce.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-sf" aria-label="Salesforce">
+        <a href="https://www.salesforce.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-sf"
+          aria-label="Salesforce">
           <img class="sponsor-logo" src="/assets/img/salesforce.svg" alt="Salesforce" width="50" height="36" />
         </a>
 
       </div>
     </div>
     <p class="sponsors-disclaimer" data-i18n="footerTrademarkNote">
-      Trademarks are property of their respective owners. This is a personal portfolio; no endorsement or sponsorship is implied.
+      Trademarks are property of their respective owners. This is a personal portfolio; no endorsement or sponsorship is
+      implied.
     </p>
   </footer>
 
@@ -924,7 +877,8 @@
   </div>
 
   <!-- ── Guided Assistant Overlay ── -->
-  <div id="assistantOverlay" class="ga-overlay" hidden role="dialog" aria-modal="true" aria-label="Schedule a conversation">
+  <div id="assistantOverlay" class="ga-overlay" hidden role="dialog" aria-modal="true"
+    aria-label="Schedule a conversation">
     <div class="ga-modal">
       <div class="ga-resize-handle" id="gaResizeHandle" title="Drag to resize"></div>
 
@@ -938,9 +892,12 @@
           </div>
         </div>
         <div class="ga-header-actions">
-          <button class="ga-header-btn" id="gaStartOverBtn" onclick="restartAssistant()" aria-label="Start over" title="Start over" hidden>&#x21bb;</button>
-          <button class="ga-header-btn" onclick="minimiseAssistant()" aria-label="Minimise" title="Minimise">&#8722;</button>
-          <button class="ga-header-btn ga-close" onclick="closeAssistant()" aria-label="Close" title="Close">&times;</button>
+          <button class="ga-header-btn" id="gaStartOverBtn" onclick="restartAssistant()" aria-label="Start over"
+            title="Start over" hidden>&#x21bb;</button>
+          <button class="ga-header-btn" onclick="minimiseAssistant()" aria-label="Minimise"
+            title="Minimise">&#8722;</button>
+          <button class="ga-header-btn ga-close" onclick="closeAssistant()" aria-label="Close"
+            title="Close">&times;</button>
         </div>
       </div>
 
@@ -965,4 +922,5 @@
   <script type="module" src="/assets/main.js"></script>
 
 </body>
+
 </html>
