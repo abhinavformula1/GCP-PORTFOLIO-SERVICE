@@ -104,36 +104,30 @@ const STEPS = [
   },
 ];
 
-/* ── Chat Launcher (FAB + teaser bubble) ─────────────────────────────────── */
-let teaserShown = false;
-
+/* ── Chat Launcher (FAB) ─────────────────────────────────────────────────── */
 function setFabIcon(name) {
   const icon = document.getElementById('chatFabIcon');
   if (icon) icon.textContent = name;
 }
 
-function showTeaser() {
-  teaserShown = true;
-  document.getElementById('chatTeaser').removeAttribute('hidden');
-  setFabIcon('close');
-}
-
+// Defensive: the teaser HTML still exists in index.html (kept around in case
+// we ever want to revive the "Let's talk" auto-nudge), so we keep a one-way
+// hide helper that other flows (openAssistant, resumeAssistant) call.
 function hideTeaser() {
-  document.getElementById('chatTeaser').setAttribute('hidden', '');
+  const t = document.getElementById('chatTeaser');
+  if (t) t.setAttribute('hidden', '');
   setFabIcon('chat');
 }
 
 export function toggleChatTeaser() {
+  // Resume an in-flight conversation if one is minimised; otherwise open
+  // the chat panel directly. The "Let's talk" teaser detour was removed —
+  // clicking the FAB should always land on the actual chat window.
   if (state.minimised) {
     resumeAssistant();
     return;
   }
-  const teaser = document.getElementById('chatTeaser');
-  if (teaser.hasAttribute('hidden')) {
-    showTeaser();
-  } else {
-    hideTeaser();
-  }
+  openAssistant();
 }
 
 /* ── Open / close / minimise / restart ───────────────────────────────────── */
@@ -147,7 +141,7 @@ export function openAssistant() {
   const avatar = document.querySelector('.ga-avatar');
   if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
   const headerName = document.querySelector('.ga-header-name');
-  if (headerName) headerName.textContent = "Abhinav's Assistant";
+  if (headerName) headerName.textContent = 'Atlas';
   document.getElementById('gaMessages').innerHTML = '';
   document.getElementById('assistantOverlay').removeAttribute('hidden');
   hideTeaser();
@@ -262,7 +256,7 @@ export function resetChatState() {
   const avatar = document.querySelector('.ga-avatar');
   if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
   const headerName = document.querySelector('.ga-header-name');
-  if (headerName) headerName.textContent = "Abhinav's Assistant";
+  if (headerName) headerName.textContent = 'Atlas';
 }
 
 /**
@@ -451,15 +445,25 @@ function renderInputArea(stepDef) {
   area.innerHTML = '';
 
   if (stepDef.inputType === 'text') {
+    const row = document.createElement('div');
+    row.className = 'ga-input-row';
+
     const inp = document.createElement('input');
     inp.type = 'text';
     inp.className = 'ga-text-input';
     inp.placeholder = stepDef.placeholder ? stepDef.placeholder() : '';
+
     const err = document.createElement('div');
     err.className = 'ga-input-err';
+
     const btn = document.createElement('button');
-    btn.className = 'ga-send-btn';
-    btn.textContent = t().continueBtn;
+    btn.className = 'ga-send-btn ga-send-icon-btn';
+    btn.setAttribute('aria-label', t().continueBtn);
+    btn.title = t().continueBtn;
+    // Inline SVG paper-plane (kite), pointing upper-right.
+    btn.innerHTML = '<svg class="ga-send-svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">' +
+      '<path d="M3.4 20.4l17.45-7.48a1 1 0 0 0 0-1.84L3.4 3.6a.993.993 0 0 0-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z"/>' +
+      '</svg>';
     btn.onclick = function () {
       const val = inp.value;
       const e = stepDef.validate(val);
@@ -472,9 +476,11 @@ function renderInputArea(stepDef) {
       setTimeout(renderStep, 400);
     };
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') btn.onclick(); });
-    area.appendChild(inp);
+
+    row.appendChild(inp);
+    row.appendChild(btn);
+    area.appendChild(row);
     area.appendChild(err);
-    area.appendChild(btn);
     setTimeout(function () { inp.focus(); }, 50);
 
   } else if (stepDef.inputType === 'choice') {
@@ -783,14 +789,13 @@ function initChatResize() {
 /* ── Boot ────────────────────────────────────────────────────────────────── */
 
 export function initChat() {
-  // Reveal the FAB launcher 5s after page load + nudge teaser bubble 600ms later
+  // Reveal the FAB launcher 5s after page load. The teaser auto-nudge
+  // ("Hi! Looking to hire…") was removed so the FAB clicks straight into
+  // the chat — no intermediate "Let's talk" pop.
   setTimeout(function () {
     const launcher = document.getElementById('chatLauncher');
     if (!launcher) return;
     launcher.removeAttribute('hidden');
-    setTimeout(function () {
-      if (!teaserShown) showTeaser();
-    }, 600);
   }, 5000);
 
   const teaserClose = document.getElementById('chatTeaserClose');

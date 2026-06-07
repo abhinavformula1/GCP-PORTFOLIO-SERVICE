@@ -15,3 +15,7 @@ certificate.pem
 
 # Local-only Cursor rules — personal helpers, not project conventions
 .cursor/rules/swe-playbook.mdc
+.cursor/rules/response-style.mdc
+
+# Local Python venv used for one-off image processing (not part of app)
+.tools/
