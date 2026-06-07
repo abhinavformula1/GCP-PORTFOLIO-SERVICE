@@ -37,7 +37,7 @@ function whenMdDialogReady(cb) {
 }
 
 export function openContactInfo() {
-  var overlay = document.getElementById('contactInfoOverlay');
+  const overlay = document.getElementById('contactInfoOverlay');
   if (!overlay) return;
   whenMdDialogReady(function () {
     if (typeof overlay.show === 'function') overlay.show();
@@ -46,7 +46,7 @@ export function openContactInfo() {
 }
 
 export function closeContactInfo() {
-  var overlay = document.getElementById('contactInfoOverlay');
+  const overlay = document.getElementById('contactInfoOverlay');
   if (!overlay) return;
   if (typeof overlay.close === 'function') overlay.close();
   else overlay.setAttribute('hidden', '');
@@ -65,10 +65,10 @@ export function closeContactInfo() {
 //                                placeholder is never copyable because
 //                                the button stays hidden in that state).
 function getCopyValue(btn) {
-  var explicit = btn.getAttribute('data-copy-target');
+  const explicit = btn.getAttribute('data-copy-target');
   if (explicit) return explicit;
   if (btn.id === 'contactPhoneCopyBtn') {
-    var phoneText = document.getElementById('contactPhoneText');
+    const phoneText = document.getElementById('contactPhoneText');
     return phoneText ? phoneText.textContent.trim() : '';
   }
   return '';
@@ -84,7 +84,7 @@ function copyToClipboard(text) {
   // than display:none which kills selection.
   return new Promise(function (resolve, reject) {
     try {
-      var ta = document.createElement('textarea');
+      const ta = document.createElement('textarea');
       ta.value = text;
       ta.setAttribute('readonly', '');
       ta.style.position = 'fixed';
@@ -92,7 +92,7 @@ function copyToClipboard(text) {
       ta.style.opacity = '0';
       document.body.appendChild(ta);
       ta.select();
-      var ok = document.execCommand('copy');
+      const ok = document.execCommand('copy');
       document.body.removeChild(ta);
       ok ? resolve() : reject(new Error('execCommand failed'));
     } catch (e) { reject(e); }
@@ -101,14 +101,14 @@ function copyToClipboard(text) {
 
 // Transient toast inside the dialog. Single-instance — re-clicking
 // resets the timer rather than stacking toasts.
-var _toastTimer = null;
+let _toastTimer = null;
 function showCopiedToast() {
-  var toast = document.getElementById('contactInfoToast');
+  const toast = document.getElementById('contactInfoToast');
   if (!toast) return;
   toast.hidden = false;
   // Force a reflow before adding the visible class so the CSS transition
   // actually plays on rapid successive clicks.
-  // eslint-disable-next-line no-unused-expressions
+   
   toast.offsetHeight;
   toast.classList.add('is-visible');
   if (_toastTimer) clearTimeout(_toastTimer);
@@ -121,11 +121,11 @@ function showCopiedToast() {
 }
 
 export function initContactInfo() {
-  var overlay = document.getElementById('contactInfoOverlay');
+  const overlay = document.getElementById('contactInfoOverlay');
   if (!overlay) return;
 
   overlay.addEventListener('click', function (e) {
-    var btn = e.target.closest && e.target.closest('.ci-action-btn[aria-label^="Copy"], .ci-action-btn[data-copy-target]');
+    const btn = e.target.closest && e.target.closest('.ci-action-btn[aria-label^="Copy"], .ci-action-btn[data-copy-target]');
     if (!btn) return;
     // The "open in new tab" buttons are <a> elements — they share the
     // .ci-action-btn class but should follow the link, not copy. The
@@ -133,7 +133,7 @@ export function initContactInfo() {
     // explicit data-copy-target, so this is already correct; the early
     // return below is a belt-and-braces guard for future markup.
     if (btn.tagName === 'A') return;
-    var value = getCopyValue(btn);
+    const value = getCopyValue(btn);
     if (!value) return;
     e.preventDefault();
     copyToClipboard(value).then(showCopiedToast).catch(function () {

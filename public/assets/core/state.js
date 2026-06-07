@@ -24,16 +24,16 @@
 // ── Persistence keys ─────────────────────────────────────────────────────────
 // Centralised so sign-out cleanup (auth.js, once extracted) and tests can
 // reference the same names without typos drifting apart.
-export var STORAGE_PROFILE    = 'portfolio_profile';
-export var STORAGE_CREDENTIAL = 'portfolio_credential';
-export var STORAGE_TOAST_FLAG = 'welcome_toast_shown';
+export const STORAGE_PROFILE    = 'portfolio_profile';
+export const STORAGE_CREDENTIAL = 'portfolio_credential';
+export const STORAGE_TOAST_FLAG = 'welcome_toast_shown';
 
 // ── siteProfile ──────────────────────────────────────────────────────────────
 // The persisted snapshot of the signed-in (or guest) visitor. Shape:
 //   { sub, name, email, picture, contact, isReturning?, visitCount?, ... }
 // `null` when nothing has been persisted yet (very first visit).
 // `{ type: 'guest' }` for anonymous browsing (see saveSiteProfile callers).
-export var siteProfile = (function readInitialProfile() {
+export let siteProfile = (function readInitialProfile() {
   try { return JSON.parse(sessionStorage.getItem(STORAGE_PROFILE) || 'null'); }
   catch (_) { return null; }
 }());
@@ -50,7 +50,7 @@ export function setSiteProfile(p) {
 // The raw Google ID token (1-hour validity). Stamped on every authedFetch
 // as `Authorization: Bearer …`. Persisted in sessionStorage so a tab
 // refresh doesn't bounce the user back to the sign-in overlay.
-export var googleCredential = sessionStorage.getItem(STORAGE_CREDENTIAL) || null;
+export let googleCredential = sessionStorage.getItem(STORAGE_CREDENTIAL) || null;
 
 export function setGoogleCredential(token) {
   googleCredential = token || null;
@@ -64,7 +64,7 @@ export function setGoogleCredential(token) {
 // Set by handleGoogleSignIn after fetching /api/chat/active, consumed by
 // the chat module when the panel next opens so the conversation resumes
 // from where the visitor left off.
-export var pendingChatHistory = null;
+export let pendingChatHistory = null;
 export function setPendingChatHistory(h) { pendingChatHistory = h; }
 
 // ── myRecommendation (in-memory only) ────────────────────────────────────────
@@ -75,5 +75,5 @@ export function setPendingChatHistory(h) { pendingChatHistory = h; }
 //   2. updateRecommendationCta() hides the section-level "Leave a
 //      Recommendation" CTA when this is set, so the kebab is the sole
 //      management entry point and the CTA isn't redundant.
-export var myRecommendation = null;
+export let myRecommendation = null;
 export function setMyRecommendation(r) { myRecommendation = r; }

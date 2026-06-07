@@ -24,7 +24,7 @@ async function run() {
         console.log(a.Name);
       });
 
-    result.records.forEach(r => {
+    accResult.records.forEach(r => {
       console.log(r.Name, r.LastModifiedDate);
     });
 

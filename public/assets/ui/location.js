@@ -21,21 +21,21 @@
  */
 
 export function initLocationPopover() {
-  var timeEl       = document.getElementById('locPopoverTime');
-  var dayEl        = document.getElementById('locPopoverDay');
-  var deltaEl      = document.getElementById('locPopoverDelta');
-  var statusEl     = document.getElementById('locPopoverStatus');
-  var statusTextEl = document.getElementById('locPopoverStatusText');
+  const timeEl       = document.getElementById('locPopoverTime');
+  const dayEl        = document.getElementById('locPopoverDay');
+  const deltaEl      = document.getElementById('locPopoverDelta');
+  const statusEl     = document.getElementById('locPopoverStatus');
+  const statusTextEl = document.getElementById('locPopoverStatusText');
   if (!timeEl || !deltaEl || !statusEl || !statusTextEl) return;
 
-  var IST_TZ = 'Asia/Kolkata';
+  const IST_TZ = 'Asia/Kolkata';
   // 9 AM – 8 PM IST = comfortable working window.
-  var WORKING_START_HOUR = 9;
-  var WORKING_END_HOUR   = 20;
+  const WORKING_START_HOUR = 9;
+  const WORKING_END_HOUR   = 20;
 
   // Resolve the viewer's timezone via Intl. Falls back gracefully on
   // ancient browsers; on undetectable TZs we just hide the delta line.
-  var viewerTz = '';
+  let viewerTz = '';
   try { viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_) {}
 
   /** Format the IST hour:minute as "h:mm AM/PM" (12h, locale-stable). */
@@ -81,8 +81,8 @@ export function initLocationPopover() {
   function computeDeltaHours(now) {
     if (!viewerTz) return null;
     try {
-      var istMin    = localOffsetMinutes(IST_TZ,   now);
-      var viewerMin = localOffsetMinutes(viewerTz, now);
+      const istMin    = localOffsetMinutes(IST_TZ,   now);
+      const viewerMin = localOffsetMinutes(viewerTz, now);
       return (istMin - viewerMin) / 60;
     } catch (_) {
       return null;
@@ -93,15 +93,15 @@ export function initLocationPopover() {
    *  from the actual UTC instant to recover the offset. Lifted out of
    *  computeDeltaHours so the working-window logic below can reuse it. */
   function localOffsetMinutes(tz, now) {
-    var dtf = new Intl.DateTimeFormat('en-US', {
+    const dtf = new Intl.DateTimeFormat('en-US', {
       timeZone: tz, hourCycle: 'h23',
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', second: '2-digit',
     });
-    var parts = dtf.formatToParts(now).reduce(function (acc, p) {
+    const parts = dtf.formatToParts(now).reduce(function (acc, p) {
       if (p.type !== 'literal') acc[p.type] = p.value; return acc;
     }, {});
-    var asUTC = Date.UTC(
+    const asUTC = Date.UTC(
       +parts.year, +parts.month - 1, +parts.day,
       +parts.hour, +parts.minute, +parts.second
     );
@@ -111,16 +111,16 @@ export function initLocationPopover() {
   function formatDelta(hours) {
     if (hours == null) return '';
     if (Math.abs(hours) < 0.01) return 'Same timezone as you';
-    var rounded = Math.round(hours * 2) / 2;
-    var abs = Math.abs(rounded);
-    var label = (abs % 1 === 0 ? abs.toFixed(0) : abs.toFixed(1)) + ' h';
+    const rounded = Math.round(hours * 2) / 2;
+    const abs = Math.abs(rounded);
+    const label = (abs % 1 === 0 ? abs.toFixed(0) : abs.toFixed(1)) + ' h';
     return rounded > 0
       ? label + ' ahead of you'
       : label + ' behind you';
   }
 
   function updateStatus(hour) {
-    var status, label;
+    let status, label;
     if (hour < 0) {                                 status = 'asleep';  label = '—'; }
     else if (hour >= WORKING_START_HOUR && hour < WORKING_END_HOUR) { status = 'working'; label = 'Working hours'; }
     else if (hour >= WORKING_END_HOUR  && hour < 23) { status = 'late';    label = 'Late evening'; }
@@ -130,7 +130,7 @@ export function initLocationPopover() {
   }
 
   function tick() {
-    var now = new Date();
+    const now = new Date();
     timeEl.textContent  = formatIstTime(now);
     if (dayEl) dayEl.textContent = formatIstDay(now);
     deltaEl.textContent = formatDelta(computeDeltaHours(now));

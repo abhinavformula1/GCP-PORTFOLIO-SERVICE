@@ -28,7 +28,7 @@ function dict() {
 // the success copy falls back to the un-personalised variant.
 function firstNameOf(fullName) {
   if (!fullName) return '';
-  var trimmed = String(fullName).trim();
+  const trimmed = String(fullName).trim();
   if (!trimmed) return '';
   return trimmed.split(/\s+/)[0];
 }
@@ -42,7 +42,7 @@ function whenMdDialogReady(cb) {
 }
 
 export function openHireMe() {
-  var overlay = document.getElementById('hireMeOverlay');
+  const overlay = document.getElementById('hireMeOverlay');
   if (!overlay) return;
   whenMdDialogReady(function () {
     if (typeof overlay.show === 'function') overlay.show();
@@ -51,7 +51,7 @@ export function openHireMe() {
 }
 
 export function closeHireMe() {
-  var overlay = document.getElementById('hireMeOverlay');
+  const overlay = document.getElementById('hireMeOverlay');
   if (typeof overlay.close === 'function') overlay.close();
   else overlay.setAttribute('hidden', '');
   resetHireForm();
@@ -64,12 +64,12 @@ function resetHireForm() {
   document.getElementById('hm-success').hidden = true;
   document.getElementById('hireMeForm').hidden = false;
   document.getElementById('hm-submit-btn').disabled = false;
-  var lbl = document.getElementById('hm-submit-label');
+  const lbl = document.getElementById('hm-submit-label');
   if (lbl) lbl.textContent = 'Send Message';
   // Restore the dialog title — it gets swapped to "Message sent" /
   // "Already received" while the success state is showing, so reopening
   // the form (after a close) needs to flip it back to "Get In Touch".
-  var titleEl = document.getElementById('hm-title-text');
+  const titleEl = document.getElementById('hm-title-text');
   if (titleEl) titleEl.textContent = dict().getInTouch || 'Get In Touch';
 }
 
@@ -84,18 +84,18 @@ function resetHireForm() {
  * already, hang tight" variant so we don't claim success for a no-op.
  */
 function renderHireSuccess(opts) {
-  var d = dict();
-  var alreadySubmitted = !!(opts && opts.alreadySubmitted);
-  var firstName = firstNameOf(opts && opts.fullName);
+  const d = dict();
+  const alreadySubmitted = !!(opts && opts.alreadySubmitted);
+  const firstName = firstNameOf(opts && opts.fullName);
 
   // Pick the right headline + body keys for the state
-  var titleText = alreadySubmitted
+  const titleText = alreadySubmitted
     ? (d.hireTitleAlready || 'Already received')
     : (d.hireTitleSent    || 'Message sent');
-  var headlineText = alreadySubmitted
+  const headlineText = alreadySubmitted
     ? (d.hireAlreadyHeadline || 'Already received')
     : (d.hireSuccessHeadline || 'Message sent');
-  var bodyTpl;
+  let bodyTpl;
   if (alreadySubmitted) {
     bodyTpl = firstName
       ? (d.hireAlreadyBodyNamed || d.hireAlreadyBody)
@@ -106,11 +106,11 @@ function renderHireSuccess(opts) {
       : d.hireSuccessBody;
   }
   // Token-replace once so we don't have to ship a templating dep.
-  var bodyText = (bodyTpl || '').replace('{name}', firstName);
+  const bodyText = (bodyTpl || '').replace('{name}', firstName);
 
-  var titleEl    = document.getElementById('hm-title-text');
-  var headlineEl = document.getElementById('hm-success-headline');
-  var bodyEl     = document.getElementById('hm-success-body');
+  const titleEl    = document.getElementById('hm-title-text');
+  const headlineEl = document.getElementById('hm-success-headline');
+  const bodyEl     = document.getElementById('hm-success-body');
   if (titleEl)    titleEl.textContent    = titleText;
   if (headlineEl) headlineEl.textContent = headlineText;
   if (bodyEl)     bodyEl.textContent     = bodyText;
@@ -121,30 +121,30 @@ function renderHireSuccess(opts) {
   // Move keyboard focus to the primary action so Enter / Space dismisses
   // the dialog. Defer to the next tick so md-filled-button has had a
   // chance to upgrade.
-  var doneBtn = document.getElementById('hm-success-done');
+  const doneBtn = document.getElementById('hm-success-done');
   if (doneBtn) setTimeout(function () { try { doneBtn.focus(); } catch (_) {} }, 0);
 }
 
 function setErr(fieldId, msg) {
-  var field = document.getElementById(fieldId);
+  const field = document.getElementById(fieldId);
   if (!field) return;
   field.error = true;
   field.errorText = msg;
 }
 
 function clearErr(fieldId) {
-  var field = document.getElementById(fieldId);
+  const field = document.getElementById(fieldId);
   if (!field) return;
   field.error = false;
   field.errorText = '';
 }
 
 function validate() {
-  var name        = document.getElementById('hm-name').value.trim();
-  var email       = document.getElementById('hm-email').value.trim();
-  var company     = document.getElementById('hm-company').value.trim();
-  var description = document.getElementById('hm-description').value.trim();
-  var ok = true;
+  const name        = document.getElementById('hm-name').value.trim();
+  const email       = document.getElementById('hm-email').value.trim();
+  const company     = document.getElementById('hm-company').value.trim();
+  const description = document.getElementById('hm-description').value.trim();
+  let ok = true;
   ['hm-name', 'hm-email', 'hm-company', 'hm-description'].forEach(clearErr);
 
   if (!name)    { setErr('hm-name', 'Full name is required.'); ok = false; }
@@ -162,28 +162,28 @@ function validate() {
 }
 
 export function initHireMe() {
-  var overlay = document.getElementById('hireMeOverlay');
+  const overlay = document.getElementById('hireMeOverlay');
   if (overlay) {
     // <md-dialog> handles outside-click (scrim) and Escape key natively.
     // Listen for its `close` event to clean up form state.
     overlay.addEventListener('close', resetHireForm);
   }
 
-  var form = document.getElementById('hireMeForm');
+  const form = document.getElementById('hireMeForm');
   if (!form) return;
 
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
     if (!validate()) return;
 
-    var btn       = document.getElementById('hm-submit-btn');
-    var btnLabel  = document.getElementById('hm-submit-label');
-    var globalErr = document.getElementById('hm-global-error');
+    const btn       = document.getElementById('hm-submit-btn');
+    const btnLabel  = document.getElementById('hm-submit-label');
+    const globalErr = document.getElementById('hm-global-error');
     btn.disabled = true;
     if (btnLabel) btnLabel.textContent = 'Sending\u2026';
     globalErr.hidden = true;
 
-    var payload = {
+    const payload = {
       name:        document.getElementById('hm-name').value.trim(),
       email:       document.getElementById('hm-email').value.trim(),
       company:     document.getElementById('hm-company').value.trim(),
@@ -191,12 +191,12 @@ export function initHireMe() {
     };
 
     try {
-      var res  = await fetch('/api/hire', {
+      const res  = await fetch('/api/hire', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),
       });
-      var data = await res.json();
+      const data = await res.json();
       if (res.ok && data.success) {
         renderHireSuccess({
           alreadySubmitted: data.alreadySubmitted,

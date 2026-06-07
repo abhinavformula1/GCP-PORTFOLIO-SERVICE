@@ -27,7 +27,7 @@ const firestore                      = require('../services/firestore');
 const salesforce                     = require('../services/salesforce');
 const googleAuth                     = require('../services/googleAuth');
 const contactPolicy                  = require('../services/contactPolicy');
-const { ValidationError, AppError }  = require('../errors');
+const { ValidationError }            = require('../errors');
 
 const router = express.Router();
 

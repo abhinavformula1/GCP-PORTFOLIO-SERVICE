@@ -62,13 +62,13 @@
  * handlers in index.html resolve.
  */
 
-var JSPDF_CDN = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
-var _jspdfLoadPromise = null;
+const JSPDF_CDN = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+let _jspdfLoadPromise = null;
 
 function loadJsPDF() {
   if (_jspdfLoadPromise) return _jspdfLoadPromise;
   _jspdfLoadPromise = new Promise(function (resolve, reject) {
-    var s = document.createElement('script');
+    const s = document.createElement('script');
     s.src = JSPDF_CDN;
     s.async = true;
     s.onload  = function () {
@@ -99,7 +99,7 @@ function getResumeData() {
   // (Trailblazer), and location. Missing any of them means the
   // recruiter has to type them in manually before forwarding — a
   // friction point worth eliminating in a runtime resume.
-  var data = {
+  const data = {
     name:     'Abhinav Kumar',
     title:    txt(document.querySelector('[data-i18n="headerTitle"]')),
     contact:  {
@@ -118,25 +118,25 @@ function getResumeData() {
   };
 
   arr('.skill-group').forEach(function (g) {
-    var label = txt(g.querySelector('.skill-group-label'));
-    var tags  = arr('.tag', g).map(txt).filter(Boolean);
+    const label = txt(g.querySelector('.skill-group-label'));
+    const tags  = arr('.tag', g).map(txt).filter(Boolean);
     if (label && tags.length) data.skills.push({ label: label, tags: tags });
   });
 
   arr('.job').forEach(function (j) {
-    var bullets = arr('.job-bullets li', j).map(txt).filter(Boolean);
+    const bullets = arr('.job-bullets li', j).map(txt).filter(Boolean);
     // The on-page `.job-company` element bundles the company name with a
     // ` · India` style location span. The reference resume layout splits
     // those onto two lines (`Senior …, <Company>` then `<Period>, <Location>`),
     // so we extract the location separately and strip it from the company
     // string. The middle-dot separator is the visual cue we look for.
-    var companyEl   = j.querySelector('.job-company');
-    var locationEl  = companyEl && companyEl.querySelector('.location');
-    var locationStr = locationEl ? txt(locationEl).replace(/^[·•\s]+/, '').trim() : '';
-    var companyOnly = companyEl ? txt(companyEl) : '';
+    const companyEl   = j.querySelector('.job-company');
+    const locationEl  = companyEl && companyEl.querySelector('.location');
+    const locationStr = locationEl ? txt(locationEl).replace(/^[·•\s]+/, '').trim() : '';
+    let companyOnly = companyEl ? txt(companyEl) : '';
     if (locationStr && companyOnly) {
       // Trim "Salesforce · India" → "Salesforce".
-      var idx = companyOnly.indexOf(locationStr);
+      const idx = companyOnly.indexOf(locationStr);
       if (idx > 0) companyOnly = companyOnly.slice(0, idx).replace(/[·•\s]+$/, '').trim();
     }
     data.experience.push({
@@ -149,7 +149,7 @@ function getResumeData() {
   });
 
   arr('.project').forEach(function (p) {
-    var bullets = arr('.job-bullets li', p).map(txt).filter(Boolean);
+    const bullets = arr('.job-bullets li', p).map(txt).filter(Boolean);
     data.projects.push({
       title:   txt(p.querySelector('.project-title')),
       tag:     txt(p.querySelector('.project-tag')),
@@ -157,15 +157,15 @@ function getResumeData() {
     });
   });
 
-  var eduSection = arr('.section').find(function (s) {
-    var t = txt(s.querySelector('.section-title')).toLowerCase();
+  const eduSection = arr('.section').find(function (s) {
+    const t = txt(s.querySelector('.section-title')).toLowerCase();
     return t === 'education' || t === 'formation' || t.indexOf('educat') === 0;
   });
   if (eduSection) {
-    var rawYear = txt(eduSection.querySelector('.edu-year'));
+    const rawYear = txt(eduSection.querySelector('.edu-year'));
     // Reference resume shows just the year (e.g. "2012"), not "Graduated 2012".
     // Strip everything before the first 4-digit year for ATS-friendly format.
-    var yearMatch = rawYear.match(/(\d{4})/);
+    const yearMatch = rawYear.match(/(\d{4})/);
     data.education = {
       name:   txt(eduSection.querySelector('.edu-name')),
       degree: arr('.edu-degree', eduSection).map(txt).filter(Boolean),
@@ -174,7 +174,7 @@ function getResumeData() {
   }
 
   arr('.cert-group').forEach(function (g) {
-    var items = arr('.cert-item', g).map(txt).filter(Boolean);
+    const items = arr('.cert-item', g).map(txt).filter(Boolean);
     if (items.length) {
       data.certifications.push({
         title: txt(g.querySelector('.cert-group-title')),
@@ -201,29 +201,27 @@ function getResumeData() {
  * `lineHeight = size + 3` is the unit we advance after each line.
  */
 function renderResumePdf(jsPDF, data) {
-  var doc = new jsPDF({ unit: 'pt', format: 'a4' });
-  var W = doc.internal.pageSize.getWidth();   // 595 pt
-  var H = doc.internal.pageSize.getHeight();  // 842 pt
-  var MARGIN = 36;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();   // 595 pt
+  const H = doc.internal.pageSize.getHeight();  // 842 pt
+  const MARGIN = 36;
 
   // Column geometry — the ~40/60 split with an 18pt gutter mirrors the
   // visual proportions of the reference resume.
-  var LEFT_W  = 200;
-  var GUTTER  = 18;
-  var LEFT_X  = MARGIN;
-  var RIGHT_X = MARGIN + LEFT_W + GUTTER;       // 254
-  var RIGHT_W = W - RIGHT_X - MARGIN;            // 305
-  var FULL_W  = W - 2 * MARGIN;                  // 523
-  var BOTTOM  = H - MARGIN;                      // baseline below which we page-break
-  var BLUE    = [60, 90, 200];                   // hyperlink colour
-  var TEXT    = [20, 20, 20];                    // body text colour
-  var GREY    = [110, 110, 110];                 // muted captions
-
+  const LEFT_W  = 200;
+  const GUTTER  = 18;
+  const LEFT_X  = MARGIN;
+  const RIGHT_X = MARGIN + LEFT_W + GUTTER;       // 254
+  const RIGHT_W = W - RIGHT_X - MARGIN;            // 305
+  const FULL_W  = W - 2 * MARGIN;                  // 523
+  const BOTTOM  = H - MARGIN;                      // baseline below which we page-break
+  const BLUE    = [60, 90, 200];                   // hyperlink colour
+  const TEXT    = [20, 20, 20];                    // body text colour
   function setBody(opts) {
     opts = opts || {};
     doc.setFont('helvetica', opts.bold ? 'bold' : (opts.italic ? 'italic' : 'normal'));
     doc.setFontSize(opts.size || 10);
-    var c = opts.color || TEXT;
+    const c = opts.color || TEXT;
     doc.setTextColor(c[0], c[1], c[2]);
   }
 
@@ -240,23 +238,23 @@ function renderResumePdf(jsPDF, data) {
     doc.text(data.title, LEFT_X, MARGIN + 30);
   }
 
-  var c = data.contact || {};
-  var rY = MARGIN + 14;  // align first contact line with the name baseline
+  const c = data.contact || {};
+  let rY = MARGIN + 14;  // align first contact line with the name baseline
   function rText(text, baselineY, opts) {
     setBody(opts);
-    var w = doc.getTextWidth(text);
+    const w = doc.getTextWidth(text);
     doc.text(text, W - MARGIN - w, baselineY);
   }
   function rLink(text, baselineY, url, opts) {
     setBody(opts);
-    var w = doc.getTextWidth(text);
+    const w = doc.getTextWidth(text);
     doc.textWithLink(text, W - MARGIN - w, baselineY, { url: url });
   }
 
   if (c.email && c.phone) {
-    var line = c.email + ' | ' + c.phone;
+    const line = c.email + ' | ' + c.phone;
     setBody({ size: 10 });
-    var w = doc.getTextWidth(line);
+    const w = doc.getTextWidth(line);
     // Whole line is hot — clicking anywhere fires the mailto:. We
     // don't try to split the link target by character because jsPDF
     // doesn't support partial-line link rectangles.
@@ -276,10 +274,10 @@ function renderResumePdf(jsPDF, data) {
   // either side, plus a small gap). Both columns begin from this y on
   // page 1; on subsequent pages, columns start from MARGIN + 12 because
   // the header is page-1 only.
-  var leftHeaderBottom  = data.title ? MARGIN + 30 + 4 : MARGIN + 14 + 4;
-  var rightHeaderBottom = rY;
-  var BODY_TOP = Math.max(leftHeaderBottom, rightHeaderBottom) + 14;
-  var SUBSEQUENT_PAGE_TOP = MARGIN + 12;
+  const leftHeaderBottom  = data.title ? MARGIN + 30 + 4 : MARGIN + 14 + 4;
+  const rightHeaderBottom = rY;
+  const BODY_TOP = Math.max(leftHeaderBottom, rightHeaderBottom) + 14;
+  const SUBSEQUENT_PAGE_TOP = MARGIN + 12;
 
   // ── Column flow primitive ──────────────────────────────────────────
   // Each column owns its current page + y cursor. Drawing methods all
@@ -295,7 +293,7 @@ function renderResumePdf(jsPDF, data) {
         if (this.y + needed > BOTTOM) this.advancePage();
       },
       advancePage: function () {
-        var totalPages = doc.internal.getNumberOfPages();
+        const totalPages = doc.internal.getNumberOfPages();
         if (this.page < totalPages) this.page += 1;
         else { doc.addPage(); this.page = totalPages + 1; }
         doc.setPage(this.page);
@@ -304,11 +302,11 @@ function renderResumePdf(jsPDF, data) {
       activate: function () { doc.setPage(this.page); },
       paragraph: function (text, opts) {
         opts = opts || {};
-        var size = opts.size || 10;
-        var lh   = opts.lineHeight || (size + 3);
+        const size = opts.size || 10;
+        const lh   = opts.lineHeight || (size + 3);
         setBody(opts);
-        var lines = doc.splitTextToSize(text, this.w);
-        for (var i = 0; i < lines.length; i++) {
+        const lines = doc.splitTextToSize(text, this.w);
+        for (let i = 0; i < lines.length; i++) {
           this.ensure(lh);
           this.activate();
           doc.text(lines[i], this.x, this.y);
@@ -318,12 +316,12 @@ function renderResumePdf(jsPDF, data) {
       },
       bullet: function (text, opts) {
         opts = opts || {};
-        var size = opts.size || 10;
-        var lh   = size + 3;
-        var indent = 12;
+        const size = opts.size || 10;
+        const lh   = size + 3;
+        const indent = 12;
         setBody(opts);
-        var lines = doc.splitTextToSize(text, this.w - indent);
-        for (var i = 0; i < lines.length; i++) {
+        const lines = doc.splitTextToSize(text, this.w - indent);
+        for (let i = 0; i < lines.length; i++) {
           this.ensure(lh);
           this.activate();
           if (i === 0) doc.text('•', this.x, this.y);
@@ -335,7 +333,7 @@ function renderResumePdf(jsPDF, data) {
       sectionHeader: function (label) {
         // Add air above (skipped if we're already at the top of a column
         // on its current page — i.e. this is the first section here).
-        var atTop = (this.y <= BODY_TOP + 1) || (this.y <= SUBSEQUENT_PAGE_TOP + 1);
+        const atTop = (this.y <= BODY_TOP + 1) || (this.y <= SUBSEQUENT_PAGE_TOP + 1);
         this.ensure(20);
         if (!atTop) this.y += 6;
         this.activate();
@@ -350,16 +348,16 @@ function renderResumePdf(jsPDF, data) {
       // how the reference resume lays out skill rows.
       labeledLine: function (label, body, opts) {
         opts = opts || {};
-        var size = opts.size || 10;
-        var lh   = size + 3;
-        var labelStr = label + ': ';
+        const size = opts.size || 10;
+        const lh   = size + 3;
+        const labelStr = label + ': ';
         setBody({ bold: true, size: size });
-        var labelW = doc.getTextWidth(labelStr);
+        const labelW = doc.getTextWidth(labelStr);
         setBody({ size: size });
-        var firstSplit = doc.splitTextToSize(body, this.w - labelW);
-        var firstLine  = firstSplit[0] || '';
-        var rest       = body.slice(firstLine.length).trimStart();
-        var restLines  = rest ? doc.splitTextToSize(rest, this.w) : [];
+        const firstSplit = doc.splitTextToSize(body, this.w - labelW);
+        const firstLine  = firstSplit[0] || '';
+        const rest       = body.slice(firstLine.length).trimStart();
+        const restLines  = rest ? doc.splitTextToSize(rest, this.w) : [];
 
         this.ensure(lh);
         this.activate();
@@ -368,7 +366,7 @@ function renderResumePdf(jsPDF, data) {
         setBody({ size: size });
         if (firstLine) doc.text(firstLine, this.x + labelW, this.y);
         this.y += lh;
-        for (var i = 0; i < restLines.length; i++) {
+        for (let i = 0; i < restLines.length; i++) {
           this.ensure(lh);
           this.activate();
           doc.text(restLines[i], this.x, this.y);
@@ -380,8 +378,8 @@ function renderResumePdf(jsPDF, data) {
     };
   }
 
-  var leftCol  = makeColumn(LEFT_X,  LEFT_W);
-  var rightCol = makeColumn(RIGHT_X, RIGHT_W);
+  const leftCol  = makeColumn(LEFT_X,  LEFT_W);
+  const rightCol = makeColumn(RIGHT_X, RIGHT_W);
 
   // ── LEFT COLUMN ────────────────────────────────────────────────────
   if (data.summary && data.summary.length) {
@@ -402,8 +400,8 @@ function renderResumePdf(jsPDF, data) {
 
   if (data.education) {
     leftCol.sectionHeader('Education');
-    var degree0 = (data.education.degree && data.education.degree[0]) || '';
-    var firstLine = degree0 + (data.education.year ? ', ' + data.education.year : '');
+    const degree0 = (data.education.degree && data.education.degree[0]) || '';
+    const firstLine = degree0 + (data.education.year ? ', ' + data.education.year : '');
     if (firstLine.trim()) leftCol.paragraph(firstLine, { bold: true });
     if (data.education.name) leftCol.paragraph(data.education.name);
     // Any further `.edu-degree` entries (e.g. "Indore, Madhya Pradesh")
@@ -431,7 +429,7 @@ function renderResumePdf(jsPDF, data) {
         // each subgroup title (no bullet glyph), so we do the same — it
         // packs more density into the sidebar without looking like a
         // checklist.
-        var clean = item.replace(/^[\u2022\u00B7•]\s*/, '');
+        const clean = item.replace(/^[\u2022\u00B7•]\s*/, '');
         leftCol.paragraph(clean, { size: 9.5, lineHeight: 12 });
       });
       if (idx < data.certifications.length - 1) leftCol.gap(3);
@@ -448,9 +446,9 @@ function renderResumePdf(jsPDF, data) {
       rightCol.activate();
       // Line 1: "<role>, <company>" (bold)
       setBody({ bold: true, size: 11 });
-      var titleLine = j.title + (j.company ? ', ' + j.company : '');
-      var titleLines = doc.splitTextToSize(titleLine, rightCol.w);
-      for (var ti = 0; ti < titleLines.length; ti++) {
+      const titleLine = j.title + (j.company ? ', ' + j.company : '');
+      const titleLines = doc.splitTextToSize(titleLine, rightCol.w);
+      for (let ti = 0; ti < titleLines.length; ti++) {
         rightCol.ensure(13);
         rightCol.activate();
         doc.text(titleLines[ti], rightCol.x, rightCol.y);
@@ -458,7 +456,7 @@ function renderResumePdf(jsPDF, data) {
       }
       // Line 2: "<period>, <location>" (bold, slightly smaller)
       if (j.period || j.location) {
-        var dateLine = j.period + (j.location ? ', ' + j.location : '');
+        const dateLine = j.period + (j.location ? ', ' + j.location : '');
         rightCol.ensure(12);
         rightCol.activate();
         setBody({ bold: true, size: 10 });
@@ -475,13 +473,13 @@ function renderResumePdf(jsPDF, data) {
   // Place below whichever column ended deeper. If neither column
   // reached the last page, project section may need its own pages.
   if (data.projects && data.projects.length) {
-    var lastPage = Math.max(leftCol.page, rightCol.page);
-    var leftY    = (leftCol.page  === lastPage) ? leftCol.y  : MARGIN;
-    var rightY   = (rightCol.page === lastPage) ? rightCol.y : MARGIN;
-    var projY    = Math.max(leftY, rightY) + 14;
+    const lastPage = Math.max(leftCol.page, rightCol.page);
+    const leftY    = (leftCol.page  === lastPage) ? leftCol.y  : MARGIN;
+    const rightY   = (rightCol.page === lastPage) ? rightCol.y : MARGIN;
+    let projY    = Math.max(leftY, rightY) + 14;
 
     doc.setPage(lastPage);
-    var projPage = lastPage;
+    let projPage = lastPage;
 
     // If we're nearly at page bottom, push to a new page.
     if (projY + 50 > BOTTOM) {
@@ -515,10 +513,10 @@ function renderResumePdf(jsPDF, data) {
       // titles already contain an em-dash (e.g. "PLDT — Order
       // Management") — using "—" again would produce an awkward
       // double-dash line.
-      var projTitle = 'Project ' + (idx + 1) + ': ' + p.title;
-      var titleLine = p.tag ? projTitle + ', ' + p.tag : projTitle;
+      const projTitle = 'Project ' + (idx + 1) + ': ' + p.title;
+      const titleLine = p.tag ? projTitle + ', ' + p.tag : projTitle;
       setBody({ bold: true, size: 11 });
-      var titleLines = doc.splitTextToSize(titleLine, FULL_W);
+      const titleLines = doc.splitTextToSize(titleLine, FULL_W);
       titleLines.forEach(function (tl) {
         ensureFull(13);
         doc.text(tl, LEFT_X, projY);
@@ -526,7 +524,7 @@ function renderResumePdf(jsPDF, data) {
       });
       setBody();
       (p.bullets || []).forEach(function (b) {
-        var lines = doc.splitTextToSize(b, FULL_W - 14);
+        const lines = doc.splitTextToSize(b, FULL_W - 14);
         lines.forEach(function (ln, i) {
           ensureFull(12);
           if (i === 0) doc.text('•', LEFT_X, projY);
@@ -545,12 +543,12 @@ function renderResumePdf(jsPDF, data) {
 // We hold the rendered jsPDF document and a derived blob URL between
 // "preview is open" and "user clicks Download". Both get cleared on
 // close so we don't leak object URLs across multiple opens.
-var _currentDoc      = null;
-var _currentBlobUrl  = null;
+let _currentDoc      = null;
+let _currentBlobUrl  = null;
 // Filename mirrors the canonical, ATS-passing reference resume so a
 // recruiter who searches their inbox/downloads for either spelling
 // finds the same document.
-var _currentFilename = 'Abhinav_Kumar_Senior_Salesforce_Application_Engineer.pdf';
+const _currentFilename = 'Abhinav_Kumar_Senior_Salesforce_Application_Engineer.pdf';
 
 function whenMdDialogReady(cb) {
   if (customElements.get('md-dialog')) { cb(); return; }
@@ -563,7 +561,7 @@ function clearPreviewState() {
   }
   _currentDoc     = null;
   _currentBlobUrl = null;
-  var iframe = document.getElementById('resumePreviewFrame');
+  const iframe = document.getElementById('resumePreviewFrame');
   if (iframe) iframe.removeAttribute('src');
 }
 
@@ -578,9 +576,9 @@ function clearPreviewState() {
  * silent so we don't spam the console for non-developers.
  */
 export function generateResumePdf() {
-  var btn = document.querySelector('.download-resume-btn');
-  var lbl = btn && btn.querySelector('[data-i18n="downloadResume"]');
-  var origLabel = lbl ? lbl.textContent : '';
+  const btn = document.querySelector('.download-resume-btn');
+  const lbl = btn && btn.querySelector('[data-i18n="downloadResume"]');
+  const origLabel = lbl ? lbl.textContent : '';
   if (btn) btn.setAttribute('aria-busy', 'true');
   if (btn) btn.disabled = true;
   if (lbl) lbl.textContent = 'Generating\u2026';
@@ -606,8 +604,8 @@ export function generateResumePdf() {
 }
 
 function openResumePreview(blobUrl) {
-  var overlay = document.getElementById('resumePreviewOverlay');
-  var iframe  = document.getElementById('resumePreviewFrame');
+  const overlay = document.getElementById('resumePreviewOverlay');
+  const iframe  = document.getElementById('resumePreviewFrame');
   if (!overlay || !iframe) {
     // Modal markup missing — fall back to direct save so the click still
     // delivers the file. Defensive only; index.html ships the markup.
@@ -642,7 +640,7 @@ export function downloadResumePdf() {
 }
 
 export function closeResumePreview() {
-  var overlay = document.getElementById('resumePreviewOverlay');
+  const overlay = document.getElementById('resumePreviewOverlay');
   if (overlay) {
     if (typeof overlay.close === 'function') overlay.close();
     else overlay.setAttribute('hidden', '');

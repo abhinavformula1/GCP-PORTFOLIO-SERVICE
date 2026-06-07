@@ -27,7 +27,7 @@ import { googleCredential } from './state.js';
 export function authedFetch(url, opts) {
   opts = opts || {};
   if (!googleCredential) return Promise.resolve(null);
-  var headers = Object.assign({}, opts.headers || {}, {
+  const headers = Object.assign({}, opts.headers || {}, {
     'Authorization': 'Bearer ' + googleCredential,
     'Content-Type':  'application/json',
   });
@@ -53,11 +53,11 @@ export function authedFetch(url, opts) {
  * @param {{canSeePhone: boolean, phone: string|null, matchedDomain: string|null}|null|undefined} contact
  */
 export function applyContactPolicy(contact) {
-  var phoneRow   = document.getElementById('contactPhone');
-  var phoneText  = document.getElementById('contactPhoneText');
-  var phoneBadge = document.getElementById('contactPhoneBadge');
-  var phoneHint  = document.getElementById('contactPhoneHint');
-  var phoneCopy  = document.getElementById('contactPhoneCopyBtn');
+  const phoneRow   = document.getElementById('contactPhone');
+  const phoneText  = document.getElementById('contactPhoneText');
+  const phoneBadge = document.getElementById('contactPhoneBadge');
+  const phoneHint  = document.getElementById('contactPhoneHint');
+  const phoneCopy  = document.getElementById('contactPhoneCopyBtn');
   if (!phoneRow || !phoneText) return;
 
   if (contact && contact.canSeePhone && contact.phone) {
@@ -94,8 +94,8 @@ export function applyContactPolicy(contact) {
  * @param {Function} opts.onSignIn — called by GIS with `{ credential }`
  */
 export function initGoogleSignIn(opts) {
-  var clientId = opts && opts.clientId;
-  var onSignIn = opts && opts.onSignIn;
+  const clientId = opts && opts.clientId;
+  const onSignIn = opts && opts.onSignIn;
   if (!clientId || !window.google) return;
   google.accounts.id.initialize({
     client_id: clientId,
@@ -126,7 +126,7 @@ export function initGoogleSignIn(opts) {
     itp_support: true,
   });
   // Render button in welcome overlay if shown
-  var welcomeBtn = document.getElementById('welcomeGoogleBtn');
+  const welcomeBtn = document.getElementById('welcomeGoogleBtn');
   if (welcomeBtn && welcomeBtn.childElementCount === 0) {
     google.accounts.id.renderButton(welcomeBtn, {
       theme: 'filled_black', size: 'large', text: 'continue_with',

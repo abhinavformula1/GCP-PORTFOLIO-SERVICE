@@ -19,7 +19,7 @@
  */
 
 // ── LANG (chat assistant runtime strings) ────────────────────────────────────
-export var LANG = {
+export const LANG = {
   en: {
     teaserText: 'Hi! Looking to hire a Salesforce engineer?',
     teaserCta: "Let's talk",
@@ -101,7 +101,7 @@ export var LANG = {
 };
 
 // ── PAGE_LANG (DOM-driven page translations, keyed by data-i18n*) ────────────
-export var PAGE_LANG = {
+export const PAGE_LANG = {
   en: {
     headerTitle: 'Senior Salesforce Application Engineer',
     getInTouch: 'Get In Touch',
@@ -303,21 +303,21 @@ export var PAGE_LANG = {
  * and search-engine signalling.
  */
 export function applyPageLang(lang) {
-  var d = PAGE_LANG[lang] || PAGE_LANG.en;
+  const d = PAGE_LANG[lang] || PAGE_LANG.en;
   document.querySelectorAll('[data-i18n]').forEach(function (el) {
-    var key = el.getAttribute('data-i18n');
+    const key = el.getAttribute('data-i18n');
     if (d[key] !== undefined) el.textContent = d[key];
   });
   document.querySelectorAll('[data-i18n-html]').forEach(function (el) {
-    var key = el.getAttribute('data-i18n-html');
+    const key = el.getAttribute('data-i18n-html');
     if (d[key] !== undefined) el.innerHTML = d[key];
   });
   document.querySelectorAll('[data-i18n-list]').forEach(function (ul) {
-    var key = ul.getAttribute('data-i18n-list');
+    const key = ul.getAttribute('data-i18n-list');
     if (!d[key]) return;
     ul.innerHTML = '';
     d[key].forEach(function (item) {
-      var li = document.createElement('li');
+      const li = document.createElement('li');
       li.textContent = item;
       ul.appendChild(li);
     });
@@ -329,7 +329,7 @@ export function applyPageLang(lang) {
 // Default to English; main.js's setLang orchestrator updates this whenever
 // the user picks from the language select. Importers (chat, recommendations,
 // refer, hireme) read the live binding and pick up changes for free.
-export var currentLang = 'en';
+export let currentLang = 'en';
 
 export function setCurrentLang(lang) { currentLang = lang; }
 

@@ -24,13 +24,13 @@ import { initTheme }         from './core/theme.js';
 import { initLocationPopover } from './ui/location.js';
 import {
   siteProfile,         setSiteProfile,
-  googleCredential,    setGoogleCredential,
-  pendingChatHistory,  setPendingChatHistory,
-  myRecommendation,    setMyRecommendation,
+                       setGoogleCredential,
+                       setPendingChatHistory,
+                       setMyRecommendation,
 } from './core/state.js';
 import {
-  LANG, PAGE_LANG, applyPageLang, t,
-  currentLang, setCurrentLang,
+  applyPageLang, t,
+  setCurrentLang,
 } from './core/i18n.js';
 import {
   authedFetch, applyContactPolicy, initGoogleSignIn,
@@ -105,7 +105,7 @@ import {
 
     // Wipe any in-flight chat state so the next user starts clean
     resetChatState();
-    var chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
+    const chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
     if (chatOpen) {
       forceCloseAssistant();
     }
@@ -141,9 +141,9 @@ import {
   window.closeWelcomeToast  = closeWelcomeToast;
 
   function handleGoogleSignIn(response) {
-    var profile;
+    let profile;
     try {
-      var payload = JSON.parse(atob(response.credential.split('.')[1]));
+      const payload = JSON.parse(atob(response.credential.split('.')[1]));
       // sub = Google's stable user identifier. Stored alongside the visible
       // profile fields so the client can identify "its own" recommendation
       // in the public list (the Firestore doc id IS this sub claim) without
@@ -161,11 +161,11 @@ import {
 
     // If a different user is signing in (or this was previously a guest
     // session), wipe any in-memory chat state so the new user starts clean.
-    var prevEmail = (siteProfile && siteProfile.email) || '';
+    const prevEmail = (siteProfile && siteProfile.email) || '';
     if (prevEmail && prevEmail !== profile.email) {
       resetChatState();
       setPendingChatHistory(null);
-      var ov = document.getElementById('assistantOverlay');
+      const ov = document.getElementById('assistantOverlay');
       if (ov && !ov.hasAttribute('hidden')) forceCloseAssistant();
     }
 
@@ -212,7 +212,7 @@ import {
         if (chatRes && chatRes.success && chatRes.chat) {
           setPendingChatHistory(chatRes.chat);
         }
-        var chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
+        const chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
         if (chatOpen) applyGoogleProfileToChat(profile);
 
         // Now that we know the visitor's sub, re-fetch the recommendation
@@ -230,14 +230,14 @@ import {
   // belongs at the boot layer, where we can see both modules at once.
   function setLang(lang) {
     setCurrentLang(lang);
-    var langSelect = document.getElementById('langSelect');
+    const langSelect = document.getElementById('langSelect');
     if (langSelect && langSelect.value !== lang) langSelect.value = lang;
     applyPageLang(lang);
-    var teaserText = document.querySelector('.chat-teaser-text');
-    var teaserCta  = document.querySelector('.chat-teaser-cta');
+    const teaserText = document.querySelector('.chat-teaser-text');
+    const teaserCta  = document.querySelector('.chat-teaser-cta');
     if (teaserText) teaserText.textContent = t().teaserText;
     if (teaserCta)  teaserCta.textContent  = t().teaserCta;
-    var overlay = document.getElementById('assistantOverlay');
+    const overlay = document.getElementById('assistantOverlay');
     if (!overlay.hasAttribute('hidden')) {
       openAssistant();
     }
@@ -260,16 +260,16 @@ import {
    */
   function injectShadowStyle(host, css) {
     if (!host || !host.shadowRoot) return;
-    var sr = host.shadowRoot;
+    const sr = host.shadowRoot;
     try {
       if (typeof CSSStyleSheet === 'function' && Array.isArray(sr.adoptedStyleSheets)) {
-        var sheet = new CSSStyleSheet();
+        const sheet = new CSSStyleSheet();
         sheet.replaceSync(css);
         sr.adoptedStyleSheets = sr.adoptedStyleSheets.concat([sheet]);
         return;
       }
     } catch (_) { /* fall through to <style> fallback */ }
-    var style = document.createElement('style');
+    const style = document.createElement('style');
     style.textContent = css;
     sr.appendChild(style);
   }
@@ -283,7 +283,7 @@ import {
   // host, but @material/web@1.5.1 hard-codes a `min-height: 56px` on the
   // internal field that the token doesn't override.
   customElements.whenDefined('md-outlined-select').then(function () {
-    var langSelect = document.getElementById('langSelect');
+    const langSelect = document.getElementById('langSelect');
     if (!langSelect) return;
     langSelect.addEventListener('change', function () {
       setLang(langSelect.value);
@@ -303,7 +303,7 @@ import {
   // injection trick as the language select to add real padding + a wider
   // icon-label gap, so our primary CTA reads as substantial instead of
   // cramped.
-  var BRAND_BUTTON_CSS = [
+  const BRAND_BUTTON_CSS = [
     '.button {',
     '  padding-inline: 28px !important;',
     '  gap: 12px !important;',
@@ -361,7 +361,7 @@ import {
 
   // Close (X) button on welcome overlay — same effect as "Continue as Guest"
   // (dismiss the modal, browse anonymously, signin remains available in the topbar).
-  var welcomeCloseBtn = document.getElementById('welcomeCloseBtn');
+  const welcomeCloseBtn = document.getElementById('welcomeCloseBtn');
   if (welcomeCloseBtn) {
     welcomeCloseBtn.addEventListener('click', function () {
       saveSiteProfile({ type: 'guest' });
@@ -373,7 +373,7 @@ import {
   // scrim click, Maybe later, X) and we still don't have a profile, default
   // to a guest session so the topbar Sign-in button reveals itself.
   customElements.whenDefined('md-dialog').then(function () {
-    var welcomeOverlay = document.getElementById('welcomeOverlay');
+    const welcomeOverlay = document.getElementById('welcomeOverlay');
     if (!welcomeOverlay) return;
     welcomeOverlay.addEventListener('close', function () {
       if (!siteProfile) {
@@ -384,14 +384,14 @@ import {
 
   // Top-bar "Sign in" button — re-opens the welcome overlay so guests can
   // upgrade to a signed-in session at any time.
-  var topbarSignInBtn = document.getElementById('topbarSignInBtn');
+  const topbarSignInBtn = document.getElementById('topbarSignInBtn');
   if (topbarSignInBtn) {
     topbarSignInBtn.addEventListener('click', showWelcomeOverlayWithGsi);
   }
 
   // Init Google Sign-In once the GIS library has loaded
   if (GOOGLE_CLIENT_ID) {
-    var _gsiPoll = setInterval(function () {
+    const _gsiPoll = setInterval(function () {
       if (window.google && window.google.accounts) {
         clearInterval(_gsiPoll);
         bootGoogleSignIn();
@@ -434,7 +434,7 @@ import {
   // revoked. closeResumePreview is idempotent, so calling it again
   // after the X button already fired it is harmless.
   customElements.whenDefined('md-dialog').then(function () {
-    var preview = document.getElementById('resumePreviewOverlay');
+    const preview = document.getElementById('resumePreviewOverlay');
     if (preview) preview.addEventListener('close', closeResumePreview);
   });
 
