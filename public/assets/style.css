@@ -1,5 +1,15 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The HTML `hidden` attribute should *always* hide an element. By default the
+   user-agent stylesheet defines `[hidden] { display: none }`, but that has
+   the same specificity (0,1,0) as a single class selector — and author CSS
+   wins ties over UA CSS. So the moment we wrote something like
+   `.hm-success { display: flex }`, the `hidden` attribute silently stopped
+   working on that element. Forcing the rule globally avoids that whole
+   class of bug — toggling `el.hidden = true/false` from JS now Just Works
+   regardless of any `display:` rule the element happens to also match. */
+[hidden] { display: none !important; }
+
 /* ──────────────────────────────────────────────────────────────────
    Material Design 3 — design tokens
    ──────────────────────────────────────────────────────────────────
@@ -1017,7 +1027,7 @@ a:hover { text-decoration: underline; }
    headline → supporting body → primary action. Replaces the form
    in-place inside the same <md-dialog>. Subtle scale-in animation
    sells the state change so the success doesn't feel abrupt. */
-.hm-success {
+.hm-success:not([hidden]) {
   display: flex;
   flex-direction: column;
   align-items: center;
