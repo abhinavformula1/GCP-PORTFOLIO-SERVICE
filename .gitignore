@@ -7,3 +7,11 @@ accounts.csv
 *.pem
 private_key.pem
 certificate.pem
+
+# Personal interview-prep material — never commit
+*Playbook*.txt
+*playbook*.txt
+*SWE*Playbook*.txt
+
+# Local-only Cursor rules — personal helpers, not project conventions
+.cursor/rules/swe-playbook.mdc
