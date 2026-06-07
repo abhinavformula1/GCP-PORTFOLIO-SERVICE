@@ -529,11 +529,11 @@
   </md-dialog>
 
   <!-- ── Refer Me Dialog (M3 <md-dialog>) ──
-       Pure client-side: hand the visitor an editable email template and a
-       one-click resume download. Copy → clipboard. Open in client → mailto:
-       launches their default email app with subject + body pre-filled. The
-       actual send happens from the visitor's own account, which is why we
-       don't need a verified sender domain or a backend mailer here. -->
+       Pure client-side: hand the visitor an editable email template, then
+       Copy → clipboard so they can paste into whatever client they prefer
+       (Gmail tab, Outlook desktop, phone Mail app). The actual send happens
+       from the visitor's own account, which is why we don't need a verified
+       sender domain or a backend mailer here. -->
   <md-dialog id="referMeOverlay" aria-labelledby="refer-title-text">
     <div slot="headline" class="hm-headline">
       <span id="refer-title-text">Refer Me</span>
@@ -564,10 +564,6 @@
           <span class="material-symbols-outlined" slot="icon" aria-hidden="true">content_copy</span>
           <span id="refer-copy-label" data-i18n="referMeCopy">Copy email</span>
         </md-filled-button>
-        <md-outlined-button class="refer-mailto-btn" id="refer-mailto-btn" type="button">
-          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">open_in_new</span>
-          <span data-i18n="referMeOpen">Open in email client</span>
-        </md-outlined-button>
       </div>
 
       <p class="hm-privacy" data-i18n="referMePrivacy">Nothing leaves your device until you hit Send in your own email. No tracking, no backend processing.</p>

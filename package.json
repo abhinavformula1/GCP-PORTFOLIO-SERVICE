@@ -8,7 +8,8 @@
     "dev": "node --watch server.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "Abhinav Kumar",
@@ -27,6 +28,11 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.4.1",
-    "globals": "^17.6.0"
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7"
+  },
+  "lint-staged": {
+    "*.js": "eslint --fix"
   }
 }

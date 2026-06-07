@@ -700,7 +700,7 @@ a:hover { text-decoration: underline; }
   gap: 14px;
 }
 
-/* Action row — Copy (filled) + Open in client (outlined). */
+/* Action row — Copy (filled). */
 .refer-actions {
   display: flex;
   flex-wrap: wrap;
@@ -712,18 +712,11 @@ a:hover { text-decoration: underline; }
   --md-filled-button-container-color: #0070D2;
   --md-filled-button-label-text-color: #ffffff;
 }
-.refer-mailto-btn {
-  --md-outlined-button-container-height: 44px;
-  --md-outlined-button-outline-color: #0070D2;
-  --md-outlined-button-label-text-color: #0070D2;
-}
 
-/* Mobile: collapse the modal min-width and stack the action buttons. */
+/* Mobile: collapse the modal min-width and stretch the copy button. */
 @media (max-width: 540px) {
   #referMeOverlay { min-width: 0; max-width: calc(100vw - 32px); }
-  .refer-actions { flex-direction: column; }
-  .refer-copy-btn,
-  .refer-mailto-btn { width: 100%; }
+  .refer-copy-btn { width: 100%; }
 }
 
 /* ── Contact Info modal ──

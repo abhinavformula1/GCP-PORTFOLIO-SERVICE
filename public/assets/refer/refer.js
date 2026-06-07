@@ -1,11 +1,12 @@
 /**
  * "Refer Me" modal — pure client-side referral email builder.
  *
- * Renders an editable email template, supports copy-to-clipboard and a
- * `mailto:` launch for the visitor's default email client. No POST to
- * the backend, no rate limit, no Salesforce write — the visitor sends
- * from their own account, so we don't carry the abuse risk or
- * sender-verification overhead a server-side mailer would.
+ * Renders an editable email template and supports copy-to-clipboard. The
+ * visitor pastes into whatever client they prefer (Gmail tab, Outlook
+ * desktop, phone Mail app) and sends from their own account. No POST to
+ * the backend, no rate limit, no Salesforce write — so we don't carry
+ * the abuse risk or sender-verification overhead a server-side mailer
+ * would.
  *
  * Why no backend tracking? The Recommendations feature already carries
  * the SF-integration narrative (custom object + Apex REST + trigger +
@@ -15,7 +16,7 @@
  * Module shape:
  *   - `openReferMe()` / `closeReferMe()` — public API, re-exported on
  *     `window` from main.js for HTML inline handlers.
- *   - `initRefer()` — wires the copy + mailto buttons on boot.
+ *   - `initRefer()` — wires the copy button on boot.
  */
 
 import { siteProfile } from '../core/state.js';
@@ -173,35 +174,14 @@ function fallbackCopy(text) {
   }
 }
 
-function handleReferMailto() {
-  const c = buildReferComposed();
-  // mailto:?subject=...&body=... — recipient is intentionally left empty
-  // so the visitor types the recruiter's address into their own email
-  // client. Body is URL-encoded so newlines survive into Gmail / Outlook
-  // / Apple Mail.
-  const href = 'mailto:?subject=' + encodeURIComponent(c.subject)
-           + '&body='          + encodeURIComponent(c.body);
-  // Most browsers cap mailto: URLs ~2 KB. Our default body is ~600 chars,
-  // so we're comfortably under. If the visitor edits heavily and overflows,
-  // the Copy button is the always-works fallback.
-  window.location.href = href;
-}
-
 export function initRefer() {
-  // Wire the action buttons once their custom elements have upgraded.
+  // Wire the copy button once its custom element has upgraded.
   // We guard with `_wired` so re-opening the dialog doesn't stack listeners.
   customElements.whenDefined('md-filled-button').then(function () {
     const btn = document.getElementById('refer-copy-btn');
     if (btn && !btn._wired) {
       btn._wired = true;
       btn.addEventListener('click', handleReferCopy);
-    }
-  });
-  customElements.whenDefined('md-outlined-button').then(function () {
-    const btn = document.getElementById('refer-mailto-btn');
-    if (btn && !btn._wired) {
-      btn._wired = true;
-      btn.addEventListener('click', handleReferMailto);
     }
   });
 }

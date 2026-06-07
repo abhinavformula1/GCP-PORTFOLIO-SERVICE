@@ -318,12 +318,12 @@ import {
   // The "Refer Me" CTA is an <md-outlined-button>, which uses a separate
   // custom element. Same horizontal-padding fix applies — without it the
   // icon and label crash into each other. Wait until the outlined variant
-  // is registered before injecting. We also extend this to .refer-mailto-btn
-  // (the "Open in email client" button inside the Refer Me dialog) and
-  // .recos-cta (the "Leave a Recommendation" button) so all three outlined
-  // CTAs share the same internal padding as the filled brand buttons.
+  // is registered before injecting. We also extend this to .recos-cta
+  // (the "Leave a Recommendation" button) and .systemdesign-btn so all
+  // outlined CTAs share the same internal padding as the filled brand
+  // buttons.
   customElements.whenDefined('md-outlined-button').then(function () {
-    document.querySelectorAll('.refer-btn, .refer-mailto-btn, .recos-cta, .systemdesign-btn').forEach(function (btn) {
+    document.querySelectorAll('.refer-btn, .recos-cta, .systemdesign-btn').forEach(function (btn) {
       injectShadowStyle(btn, BRAND_BUTTON_CSS);
     });
   });
