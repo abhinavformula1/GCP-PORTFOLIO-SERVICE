@@ -18,7 +18,7 @@
 
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const firestore       = require('../services/firestore');
+const firestore = require('../services/firestore');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
