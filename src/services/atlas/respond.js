@@ -63,88 +63,65 @@ function sanitiseReply(text) {
 }
 
 /**
- * Generate Atlas's reply.
+ * Tag-and-throw helper for the validation errors thrown from below.
+ * Centralised so we get consistent shape (code/statusCode/isOperational)
+ * and avoid open-coding the same error envelope twice.
+ */
+function inputError(message) {
+  const err = new Error(message);
+  err.code = 'INVALID_INPUT';
+  err.statusCode = 400;
+  err.isOperational = true;
+  return err;
+}
+
+/**
+ * Validate + normalise a request: trims the user message, enforces
+ * length, builds a clean history. Throws on bad input. Both ask() and
+ * askStream() are thin wrappers around this + a Gemini call, so this
+ * keeps the validation logic in one place.
+ */
+function prepareCall(args) {
+  const message = (args && typeof args.message === 'string') ? args.message.trim() : '';
+  if (!message) {
+    throw inputError('Message is empty.');
+  }
+  if (message.length > MAX_USER_MSG_CHARS) {
+    throw inputError(`Message must be ${MAX_USER_MSG_CHARS} characters or fewer.`);
+  }
+  const history = truncateHistory(
+    ((args && args.history) || []).map(normaliseTurn).filter(Boolean)
+  );
+  return { systemPrompt: SYSTEM_PROMPT, history, userMessage: message };
+}
+
+/**
+ * Generate Atlas's reply (single-shot).
  *
  * @param {object} args
  * @param {string} args.message    User's current message (required, ≤1000 chars after trim).
  * @param {Array<{role:'user'|'model', text:string}>} [args.history=[]]
- *                                 Prior turns. Older first; final 'user' turn is OPTIONAL
- *                                 (callers who already pushed the new message into history
- *                                 should pass it as `message` instead — we don't
- *                                 double-append).
  * @returns {Promise<{answer:string}>}
  */
 async function ask(args) {
-  const message = (args && typeof args.message === 'string') ? args.message.trim() : '';
-  if (!message) {
-    const err = new Error('Message is empty.');
-    err.code = 'INVALID_INPUT';
-    err.statusCode = 400;
-    err.isOperational = true;
-    throw err;
-  }
-  if (message.length > MAX_USER_MSG_CHARS) {
-    const err = new Error(`Message must be ${MAX_USER_MSG_CHARS} characters or fewer.`);
-    err.code = 'INVALID_INPUT';
-    err.statusCode = 400;
-    err.isOperational = true;
-    throw err;
-  }
-
-  const cleanHistory = truncateHistory(
-    (args.history || []).map(normaliseTurn).filter(Boolean)
-  );
-
-  const text = await generateChatResponse({
-    systemPrompt: SYSTEM_PROMPT,
-    history:      cleanHistory,
-    userMessage:  message,
-  });
-
+  const call = prepareCall(args);
+  const text = await generateChatResponse(call);
   return { answer: sanitiseReply(text) };
 }
 
 /**
- * Streaming variant of ask(). Validates input the same way, then yields
- * (chunkText, done) tuples. The caller is expected to forward chunks
- * over Server-Sent Events to the client, then collect the final answer
- * for sanitisation and persistence.
- *
- * Yields:
+ * Streaming variant of ask(). Yields:
  *   { kind: 'chunk', text: string }   for each delta
- *   { kind: 'done',  text: string }   ONCE at the end with the final
+ *   { kind: 'done',  text: string }   once at the end with the final
  *                                     sanitised reply (so callers don't
  *                                     have to concat themselves).
  *
  * @returns {AsyncGenerator<{kind:'chunk'|'done', text:string}>}
  */
 async function* askStream(args) {
-  const message = (args && typeof args.message === 'string') ? args.message.trim() : '';
-  if (!message) {
-    const err = new Error('Message is empty.');
-    err.code = 'INVALID_INPUT';
-    err.statusCode = 400;
-    err.isOperational = true;
-    throw err;
-  }
-  if (message.length > MAX_USER_MSG_CHARS) {
-    const err = new Error(`Message must be ${MAX_USER_MSG_CHARS} characters or fewer.`);
-    err.code = 'INVALID_INPUT';
-    err.statusCode = 400;
-    err.isOperational = true;
-    throw err;
-  }
-
-  const cleanHistory = truncateHistory(
-    (args.history || []).map(normaliseTurn).filter(Boolean)
-  );
-
+  const call = prepareCall(args);
   let acc = '';
-  for await (const delta of generateChatResponseStream({
-    systemPrompt: SYSTEM_PROMPT,
-    history:      cleanHistory,
-    userMessage:  message,
-  })) {
+  for await (const delta of generateChatResponseStream(call)) {
     acc += delta;
     yield { kind: 'chunk', text: delta };
   }

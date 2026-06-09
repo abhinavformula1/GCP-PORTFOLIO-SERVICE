@@ -85,23 +85,39 @@ async function persistTurns(uid, userText, botText) {
   }
 }
 
+/**
+ * Shared "validate body + extract message/uid + mint transactionId" prelude.
+ * Returns null on validation failure (after delegating to next() with a
+ * ValidationError), or `{ transactionId, message, uid }` on success.
+ *
+ * Both POST handlers begin with this same dance, so centralising avoids
+ * the duplication that SonarQube flags on the route module.
+ */
+function prepareAtlasRequest(req, _res, next) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    next(new ValidationError(
+      errors.array()[0].msg,
+      errors.array().map((e) => ({ field: e.path, message: e.msg }))
+    ));
+    return null;
+  }
+  return {
+    transactionId: crypto.randomUUID(),
+    message:       req.body.message,
+    uid:           req.user.uid,
+  };
+}
+
 // ── POST /api/atlas/ask ──────────────────────────────────────────────────────
 router.post('/atlas/ask',
   requireAuth,
   atlasLimiter,
   validateAsk,
   async (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return next(new ValidationError(
-        errors.array()[0].msg,
-        errors.array().map((e) => ({ field: e.path, message: e.msg }))
-      ));
-    }
-
-    const transactionId = crypto.randomUUID();
-    const { message } = req.body;
-    const uid = req.user.uid;
+    const ctx = prepareAtlasRequest(req, res, next);
+    if (!ctx) return undefined;
+    const { transactionId, message, uid } = ctx;
 
     try {
       const history = await loadServerHistory(uid);
@@ -118,11 +134,7 @@ router.post('/atlas/ask',
         answerLen:     answer.length,
       });
 
-      return res.status(200).json({
-        success: true,
-        answer,
-        transactionId,
-      });
+      return res.status(200).json({ success: true, answer, transactionId });
     } catch (err) {
       return next(err);
     }
@@ -135,30 +147,19 @@ router.post('/atlas/ask',
 //   - We hand-write the format ("data: {json}\n\n") rather than using a
 //     library — Express has no first-class SSE support and the protocol
 //     is simple enough.
-//   - We disable Nagle / response buffering so each chunk flushes
-//     immediately. On Cloud Run the default is fine, but `X-Accel-Buffering: no`
-//     is the established hint for any nginx/Cloud-Front-style proxy in
-//     between to also disable buffering.
-//   - On error mid-stream we emit a final `error` event so the client can
-//     render a sensible bubble — we don't get to use HTTP status codes
-//     after the response is already streaming.
+//   - `X-Accel-Buffering: no` tells any nginx/Cloud-Front-style proxy
+//     not to buffer the response; chunks need to flush immediately.
+//   - On error mid-stream we emit a final `error` event since HTTP status
+//     codes are already locked in once we begin streaming.
 //
 router.post('/atlas/stream',
   requireAuth,
   atlasLimiter,
   validateAsk,
   async (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return next(new ValidationError(
-        errors.array()[0].msg,
-        errors.array().map((e) => ({ field: e.path, message: e.msg }))
-      ));
-    }
-
-    const transactionId = crypto.randomUUID();
-    const { message } = req.body;
-    const uid = req.user.uid;
+    const ctx = prepareAtlasRequest(req, res, next);
+    if (!ctx) return undefined;
+    const { transactionId, message, uid } = ctx;
 
     // Open the SSE stream.
     res.status(200).set({
@@ -169,9 +170,7 @@ router.post('/atlas/stream',
     });
     res.flushHeaders && res.flushHeaders();
 
-    function send(obj) {
-      res.write('data: ' + JSON.stringify(obj) + '\n\n');
-    }
+    const send = (obj) => res.write('data: ' + JSON.stringify(obj) + '\n\n');
 
     let finalAnswer = '';
     let aborted = false;
@@ -179,7 +178,6 @@ router.post('/atlas/stream',
 
     try {
       const history = await loadServerHistory(uid);
-
       for await (const evt of askStream({ message, history })) {
         if (aborted) break;
         if (evt.kind === 'chunk') {
@@ -190,9 +188,7 @@ router.post('/atlas/stream',
         }
       }
 
-      if (!aborted && finalAnswer) {
-        persistTurns(uid, message, finalAnswer);
-      }
+      if (!aborted && finalAnswer) persistTurns(uid, message, finalAnswer);
 
       console.log('[atlas/stream]', {
         transactionId, uid,
@@ -201,15 +197,16 @@ router.post('/atlas/stream',
         aborted,
       });
     } catch (err) {
-      // We're already streaming, can't change status. Emit a JSON error
-      // event the client knows how to handle, then close.
-      const code  = err.code        || 'INTERNAL_ERROR';
-      const safeMessage = err.isOperational ? err.message : 'Atlas could not generate a response. Please try again.';
+      const code = err.code || 'INTERNAL_ERROR';
+      const safeMessage = err.isOperational
+        ? err.message
+        : 'Atlas could not generate a response. Please try again.';
       send({ error: safeMessage, code, transactionId });
       console.error('[atlas/stream] error:', { transactionId, message: err.message });
     } finally {
       if (!res.writableEnded) res.end();
     }
+    return undefined;
   }
 );
 
