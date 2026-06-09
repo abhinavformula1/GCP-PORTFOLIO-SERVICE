@@ -13,6 +13,7 @@ const summariseRoute      = require('./src/routes/summarise');
 const salesforceRoute     = require('./src/routes/salesforce');
 const sessionRoute        = require('./src/routes/session');
 const chatRoute           = require('./src/routes/chat');
+const atlasRoute          = require('./src/routes/atlas');
 const { errorHandler } = require('./src/middleware/errorHandler');
 
 const app  = express();
@@ -41,6 +42,7 @@ app.use('/api', summariseRoute);
 app.use('/api', salesforceRoute);
 app.use('/api', sessionRoute);
 app.use('/api', chatRoute);
+app.use('/api', atlasRoute);
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (_req, res) => {

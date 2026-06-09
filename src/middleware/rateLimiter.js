@@ -63,4 +63,23 @@ const recommendationLimiter = rateLimit({
   skip: () => config.server.env === 'test',
 });
 
-module.exports = { hireLimiter, questionLimiter, recommendationLimiter };
+// "Ask Atlas" — the AI assistant Q&A endpoint. Each call costs real money
+// (Gemini API tokens) and is much more expensive than the form-based routes,
+// so we cap aggressively. 15/hour/IP gives a real recruiter a meaningful
+// dialogue (typically 3-6 turns) while preventing a runaway loop or scraper
+// from racking up a bill. Auth is required at the route layer too — IP is
+// just the secondary gate.
+const atlasLimiter = rateLimit({
+  windowMs:       60 * 60 * 1000,  // 1 hour
+  max:            15,
+  standardHeaders: 'draft-7',
+  legacyHeaders:  false,
+  message: {
+    success: false,
+    code:    'RATE_LIMIT_ERROR',
+    error:   "You've reached the hourly limit for Atlas. Please try again in an hour, or use Get In Touch to reach Abhinav directly.",
+  },
+  skip: () => config.server.env === 'test',
+});
+
+module.exports = { hireLimiter, questionLimiter, recommendationLimiter, atlasLimiter };

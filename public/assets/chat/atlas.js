@@ -1,0 +1,602 @@
+/**
+ * Atlas — free-form Q&A mode for the chat assistant.
+ *
+ * Sibling to chat.js (the 7-step guided hire flow). Where chat.js owns
+ * the form state machine, this module owns:
+ *   - Multi-turn conversation history (in-memory mirror of Firestore)
+ *   - POST /api/atlas/stream  (preferred) and POST /api/atlas/ask (fallback)
+ *   - GET /api/atlas/conversations/active  (resume on re-open)
+ *   - DELETE /api/atlas/conversations/active  ("Start over")
+ *   - Suggested-question chip variants (rotated per session)
+ *   - Typing indicator + progressive bubble updates while streaming
+ *   - A tiny safe-Markdown renderer (no external dep)
+ *
+ * Public surface:
+ *   - renderFreeFormMode()   — paint the free-form panel into the existing
+ *                              assistant overlay (#gaMessages + #gaInputArea)
+ *   - resetAtlasState()      — clear in-memory history + UI
+ *
+ * The chat overlay's chrome (header, progress bar, resize handle) is
+ * reused as-is — we just hide the progress bar in this mode because
+ * there is no fixed step count.
+ */
+
+import { googleCredential } from '../core/state.js';
+
+/* ── Suggested-question variants ──────────────────────────────────────── */
+//
+// Three chip sets aimed at different visitor intents. Variant is sticky
+// per browser session via sessionStorage so a user doesn't see a
+// different set on every chat re-open mid-conversation. Variant id is
+// also stamped on each `sendAtlasMessage` call so we (the server log
+// scanner) can see which variant a message originated from when scanning
+// the [atlas] correlation logs.
+//
+// To add a fourth variant, just append to QUESTION_VARIANTS — the
+// rotation logic picks uniformly from the array length.
+
+const QUESTION_VARIANTS = [
+  {
+    id: 'hiring',
+    label: 'Hiring lens',
+    chips: [
+      'Is Abhinav available for a Senior / Staff Salesforce role?',
+      'Tell me about his most recent project at Salesforce.',
+      'Which industries has he delivered to?',
+      'How many years of CPQ experience does he have?',
+      'How can I get in touch?',
+    ],
+  },
+  {
+    id: 'technical',
+    label: 'Technical lens',
+    chips: [
+      'How does this portfolio integrate Salesforce with GCP?',
+      'What design patterns does Abhinav use for Apex callouts?',
+      "What's his experience with OmniStudio?",
+      'Has he worked on event-driven architectures?',
+      'Which GCP services does he use day-to-day?',
+    ],
+  },
+  {
+    id: 'general',
+    label: 'General lens',
+    chips: [
+      'Give me a 30-second pitch on Abhinav.',
+      "What's his strongest area?",
+      'What certifications does he hold?',
+      'What kind of role is he looking for next?',
+      'How can I reach him?',
+    ],
+  },
+];
+
+const VARIANT_STORAGE_KEY = 'atlas_chip_variant_v1';
+
+/** Pick a sticky variant per browser session. */
+function chooseVariant() {
+  let stored;
+  try { stored = sessionStorage.getItem(VARIANT_STORAGE_KEY); } catch (_) {}
+  if (stored !== null && stored !== undefined) {
+    const idx = parseInt(stored, 10);
+    if (idx >= 0 && idx < QUESTION_VARIANTS.length) return QUESTION_VARIANTS[idx];
+  }
+  const idx = Math.floor(Math.random() * QUESTION_VARIANTS.length);
+  try { sessionStorage.setItem(VARIANT_STORAGE_KEY, String(idx)); } catch (_) {}
+  return QUESTION_VARIANTS[idx];
+}
+
+/* ── State ────────────────────────────────────────────────────────────── */
+
+const atlasState = {
+  history:   /** @type {Array<{role:'user'|'model', text:string}>} */ ([]),
+  inFlight:  false,
+  variant:   null, // { id, label, chips }  resolved on first render
+};
+
+export function resetAtlasState() {
+  atlasState.history = [];
+  atlasState.inFlight = false;
+  // Variant is intentionally NOT reset — it's session-sticky on purpose.
+}
+
+/* ── Render ───────────────────────────────────────────────────────────── */
+
+export async function renderFreeFormMode() {
+  const overlay = document.getElementById('assistantOverlay');
+  if (overlay) overlay.setAttribute('data-mode', 'freeform');
+
+  // Hide the step-progress bar — there are no fixed steps in free-form.
+  const track = document.querySelector('.ga-progress-track');
+  if (track) track.style.display = 'none';
+
+  // Show the "Start over" header button (atlas mode reuses the same
+  // button — chat.js shows it for signed-in users in guided mode too).
+  const startBtn = document.getElementById('gaStartOverBtn');
+  if (startBtn) {
+    startBtn.removeAttribute('hidden');
+    startBtn.title = 'Start over';
+    startBtn.onclick = startOver;
+  }
+
+  const msgs = document.getElementById('gaMessages');
+  const area = document.getElementById('gaInputArea');
+  if (!msgs || !area) return;
+
+  msgs.innerHTML = '';
+  area.innerHTML = '';
+
+  // Render the input bar early so it's there even while we wait for the
+  // server to load any saved conversation.
+  renderFreeFormInput(area);
+
+  // Try to restore a saved conversation. If found, replay it; otherwise
+  // show the greeting + suggested chips.
+  const restored = await fetchSavedConversation();
+  if (restored && restored.length) {
+    appendBotBubble(
+      "Welcome back — picking up where we left off."
+    );
+    replayHistory(restored);
+    atlasState.history = restored.slice();
+  } else {
+    appendBotBubble(
+      "Hi — I'm **Atlas**, Abhinav's virtual assistant. Ask me anything about his experience, projects, or how to get in touch.\n\n_(I won't make things up — if I don't know, I'll say so.)_"
+    );
+    renderSuggestedChips(msgs);
+  }
+}
+
+function replayHistory(turns) {
+  for (const t of turns) {
+    if (!t || !t.text) continue;
+    if (t.role === 'user')        appendUserBubble(t.text);
+    else if (t.role === 'model')  appendBotBubble(t.text);
+  }
+}
+
+function renderSuggestedChips(msgs) {
+  const variant = atlasState.variant || (atlasState.variant = chooseVariant());
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ga-atlas-chips';
+  wrap.setAttribute('aria-label', 'Suggested questions');
+  wrap.setAttribute('data-variant', variant.id);
+
+  variant.chips.forEach(function (q) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'ga-atlas-chip';
+    chip.textContent = q;
+    chip.onclick = function () { sendAtlasMessage(q); };
+    wrap.appendChild(chip);
+  });
+
+  msgs.appendChild(wrap);
+  scrollToBottom();
+}
+
+function renderFreeFormInput(area) {
+  const row = document.createElement('div');
+  row.className = 'ga-input-row ga-atlas-input-row';
+
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'ga-text-input ga-atlas-input';
+  inp.placeholder = 'Ask Atlas anything…';
+  inp.maxLength = 1000;
+  inp.id = 'gaAtlasInput';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ga-send-btn ga-send-icon-btn';
+  btn.id = 'gaAtlasSendBtn';
+  btn.setAttribute('aria-label', 'Send');
+  btn.title = 'Send';
+  btn.innerHTML = '<svg class="ga-send-svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">' +
+    '<path d="M3.4 20.4l17.45-7.48a1 1 0 0 0 0-1.84L3.4 3.6a.993.993 0 0 0-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z"/>' +
+    '</svg>';
+
+  function submit() {
+    const v = (inp.value || '').trim();
+    if (!v) return;
+    inp.value = '';
+    sendAtlasMessage(v);
+  }
+
+  btn.onclick = submit;
+  inp.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  row.appendChild(inp);
+  row.appendChild(btn);
+  area.appendChild(row);
+
+  setTimeout(function () { inp.focus(); }, 50);
+}
+
+/* ── Send / receive ───────────────────────────────────────────────────── */
+
+async function sendAtlasMessage(text) {
+  if (atlasState.inFlight) return;
+
+  // Remove suggested chips on first turn so they don't keep eating space
+  const chips = document.querySelector('.ga-atlas-chips');
+  if (chips) chips.remove();
+
+  appendUserBubble(text);
+
+  setSendDisabled(true);
+  atlasState.inFlight = true;
+
+  // Try the streaming endpoint first; fall back to the JSON one if SSE
+  // isn't reachable for any reason (proxy, browser, transient error).
+  try {
+    const ok = await streamAsk(text, atlasState.history);
+    if (!ok) {
+      await fallbackJsonAsk(text, atlasState.history);
+    }
+  } finally {
+    atlasState.inFlight = false;
+    setSendDisabled(false);
+    const inp = document.getElementById('gaAtlasInput');
+    if (inp) inp.focus();
+  }
+}
+
+/**
+ * Stream the reply from /api/atlas/stream. Returns true on success
+ * (streamed and got a `done` event), false on a soft failure that
+ * should fall back to JSON. Throws are caught here too — they also
+ * count as a soft failure.
+ */
+async function streamAsk(message, history) {
+  if (!googleCredential) {
+    appendErrorBubble(friendlyHttpError(401));
+    return true;  // No fallback — same outcome with JSON.
+  }
+
+  let resp;
+  try {
+    resp = await fetch('/api/atlas/stream', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + googleCredential,
+        'Content-Type':  'application/json',
+        'Accept':        'text/event-stream',
+      },
+      body: JSON.stringify({ message, history }),
+    });
+  } catch (_e) {
+    // Network failure — try JSON next.
+    return false;
+  }
+
+  if (!resp.ok || !resp.body) {
+    // Surface the structured error from the JSON envelope, then bail
+    // out (don't fall back — the JSON path will hit the same error).
+    let body = null;
+    try { body = await resp.json(); } catch (_) {}
+    const errText = (body && (body.error || body.message)) || friendlyHttpError(resp.status);
+    appendErrorBubble(errText);
+    return true;
+  }
+
+  // Open a streaming bubble that we'll fill chunk-by-chunk.
+  const typing = appendTypingIndicator();
+  const bubbleWrap = appendBotBubble('');
+  const bubble = bubbleWrap.querySelector('.ga-bubble.ga-md');
+  let acc = '';
+  let typingRemoved = false;
+  let final = '';
+
+  try {
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const rawEvent = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const dataLine = rawEvent.split('\n').find((l) => l.startsWith('data:'));
+        if (!dataLine) continue;
+        const jsonStr = dataLine.slice(5).trim();
+        if (!jsonStr) continue;
+
+        let parsed;
+        try { parsed = JSON.parse(jsonStr); } catch (_) { continue; }
+
+        if (parsed.error) {
+          if (!typingRemoved && typing) { typing.remove(); typingRemoved = true; }
+          // Replace the empty bubble with an error bubble for clarity.
+          bubbleWrap.remove();
+          appendErrorBubble(parsed.error);
+          return true;
+        }
+
+        if (typeof parsed.chunk === 'string') {
+          // Lazy-remove the typing indicator on the first real chunk so
+          // there's no visual flicker between dots and text.
+          if (!typingRemoved && typing) { typing.remove(); typingRemoved = true; }
+          acc += parsed.chunk;
+          if (bubble) bubble.innerHTML = renderMarkdown(acc);
+          scrollToBottom();
+        }
+
+        if (typeof parsed.done === 'string') {
+          final = parsed.done;
+          if (bubble) bubble.innerHTML = renderMarkdown(final);
+        }
+      }
+    }
+  } catch (_e) {
+    if (!typingRemoved && typing) typing.remove();
+    bubbleWrap.remove();
+    return false;  // Try JSON fallback.
+  } finally {
+    if (typing && typing.parentNode) typing.remove();
+  }
+
+  // Update local history with the AUTHORITATIVE final text (the server
+  // sanitises after streaming completes — we mirror that, not the raw
+  // accumulated chunks).
+  const answer = final || acc;
+  if (answer) {
+    atlasState.history.push({ role: 'user',  text: message });
+    atlasState.history.push({ role: 'model', text: answer });
+  }
+  return true;
+}
+
+/**
+ * JSON-only fallback for browsers / networks that can't do SSE.
+ */
+async function fallbackJsonAsk(message, history) {
+  const typing = appendTypingIndicator();
+  try {
+    const res = await postAskJson(message, history);
+    if (!res.ok) {
+      const errText = (res.body && (res.body.error || res.body.message))
+        || friendlyHttpError(res.status);
+      appendErrorBubble(errText);
+      return;
+    }
+    const answer = (res.body && res.body.answer)
+      || "I couldn't generate a response. Please try again.";
+    appendBotBubble(answer);
+    atlasState.history.push({ role: 'user',  text: message });
+    atlasState.history.push({ role: 'model', text: answer });
+  } catch (_e) {
+    appendErrorBubble("Network error — please try again.");
+  } finally {
+    if (typing && typing.parentNode) typing.remove();
+  }
+}
+
+async function postAskJson(message, history) {
+  if (!googleCredential) {
+    return { ok: false, status: 401, body: { error: friendlyHttpError(401) } };
+  }
+  let resp;
+  try {
+    resp = await fetch('/api/atlas/ask', {
+      method:  'POST',
+      headers: {
+        'Authorization': 'Bearer ' + googleCredential,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ message, history }),
+    });
+  } catch (e) {
+    throw new Error('Network error reaching Atlas.', { cause: e });
+  }
+  let body = null;
+  try { body = await resp.json(); } catch (_) {}
+  return { ok: resp.ok, status: resp.status, body };
+}
+
+function friendlyHttpError(status) {
+  if (status === 401) return "You'll need to sign in with Google to chat with Atlas.";
+  if (status === 429) return "You've reached the hourly limit for Atlas — please try again later or use the Get In Touch form.";
+  if (status === 503) return "Atlas isn't available right now. Please try again in a few minutes.";
+  if (status === 422) return "Atlas couldn't generate a safe response to that. Try rephrasing.";
+  return "Something went wrong on our end. Please try again.";
+}
+
+/* ── Persistence ──────────────────────────────────────────────────────── */
+
+async function fetchSavedConversation() {
+  if (!googleCredential) return null;
+  try {
+    const resp = await fetch('/api/atlas/conversations/active', {
+      method:  'GET',
+      headers: { 'Authorization': 'Bearer ' + googleCredential },
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (data && data.success && data.conversation && Array.isArray(data.conversation.turns)) {
+      return data.conversation.turns;
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function startOver() {
+  if (atlasState.inFlight) return;
+
+  // Wipe server-side history first (best effort) so a refresh doesn't
+  // resurrect the old conversation.
+  if (googleCredential) {
+    try {
+      await fetch('/api/atlas/conversations/active', {
+        method:  'DELETE',
+        headers: { 'Authorization': 'Bearer ' + googleCredential },
+      });
+    } catch (_) { /* fall through — local reset still happens */ }
+  }
+
+  // Reset local state and re-render the greeting + chips.
+  atlasState.history = [];
+  const msgs = document.getElementById('gaMessages');
+  const area = document.getElementById('gaInputArea');
+  if (msgs) msgs.innerHTML = '';
+  if (area) {
+    area.innerHTML = '';
+    renderFreeFormInput(area);
+  }
+  appendBotBubble(
+    "Fresh start. Ask me anything about Abhinav."
+  );
+  if (msgs) renderSuggestedChips(msgs);
+}
+
+/* ── Bubbles ──────────────────────────────────────────────────────────── */
+
+function appendBotBubble(markdown) {
+  const msgs = document.getElementById('gaMessages');
+  if (!msgs) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'ga-msg ga-msg-bot ga-msg-enter';
+  const bubble = document.createElement('div');
+  bubble.className = 'ga-bubble ga-bubble-bot ga-md';
+  bubble.innerHTML = renderMarkdown(markdown || '');
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  scrollToBottom();
+  setTimeout(function () { wrap.classList.remove('ga-msg-enter'); }, 300);
+  return wrap;
+}
+
+function appendUserBubble(text) {
+  const msgs = document.getElementById('gaMessages');
+  if (!msgs) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'ga-msg ga-msg-user ga-msg-enter';
+  const bubble = document.createElement('div');
+  bubble.className = 'ga-bubble ga-bubble-user';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  scrollToBottom();
+  setTimeout(function () { wrap.classList.remove('ga-msg-enter'); }, 300);
+}
+
+function appendErrorBubble(text) {
+  const msgs = document.getElementById('gaMessages');
+  if (!msgs) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'ga-msg ga-msg-bot';
+  const bubble = document.createElement('div');
+  bubble.className = 'ga-bubble ga-bubble-bot ga-bubble-error';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  scrollToBottom();
+}
+
+function appendTypingIndicator() {
+  const msgs = document.getElementById('gaMessages');
+  if (!msgs) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'ga-msg ga-msg-bot';
+  const bubble = document.createElement('div');
+  bubble.className = 'ga-bubble ga-bubble-bot ga-typing';
+  bubble.innerHTML = '<span class="ga-typing-dot"></span><span class="ga-typing-dot"></span><span class="ga-typing-dot"></span>';
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  scrollToBottom();
+  return wrap;
+}
+
+function setSendDisabled(disabled) {
+  const btn = document.getElementById('gaAtlasSendBtn');
+  if (btn) btn.disabled = !!disabled;
+  const inp = document.getElementById('gaAtlasInput');
+  if (inp) inp.disabled = !!disabled;
+}
+
+function scrollToBottom() {
+  const msgs = document.getElementById('gaMessages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+/* ── Tiny safe Markdown renderer ──────────────────────────────────────── */
+
+const GAMD_FENCE_OPEN  = 'XGAMDFENCEOPEN';
+const GAMD_FENCE_CLOSE = 'XGAMDFENCECLOSE';
+
+function renderMarkdown(input) {
+  const src = String(input == null ? '' : input);
+
+  const fences = [];
+  let escaped = src.replace(/```([\s\S]*?)```/g, function (_m, code) {
+    const idx = fences.length;
+    fences.push(code);
+    return GAMD_FENCE_OPEN + idx + GAMD_FENCE_CLOSE;
+  });
+
+  escaped = escapeHtml(escaped);
+
+  const blocks = escaped.split(/\n{2,}/);
+  const rendered = blocks.map(renderBlock).join('\n');
+
+  const reinject = new RegExp(GAMD_FENCE_OPEN + '(\\d+)' + GAMD_FENCE_CLOSE, 'g');
+  return rendered.replace(reinject, function (_m, i) {
+    const code = escapeHtml(fences[Number(i)] || '').replace(/^\n/, '');
+    return '<pre class="ga-md-pre"><code>' + code + '</code></pre>';
+  });
+}
+
+function renderBlock(block) {
+  const lines = block.split('\n');
+  if (lines.every(function (l) { return /^\s*[-*]\s+/.test(l); })) {
+    const items = lines.map(function (l) {
+      return '<li>' + renderInline(l.replace(/^\s*[-*]\s+/, '')) + '</li>';
+    });
+    return '<ul class="ga-md-ul">' + items.join('') + '</ul>';
+  }
+  if (lines.every(function (l) { return /^\s*\d+\.\s+/.test(l); })) {
+    const items = lines.map(function (l) {
+      return '<li>' + renderInline(l.replace(/^\s*\d+\.\s+/, '')) + '</li>';
+    });
+    return '<ol class="ga-md-ol">' + items.join('') + '</ol>';
+  }
+  const inline = lines.map(renderInline).join('<br>');
+  return '<p class="ga-md-p">' + inline + '</p>';
+}
+
+function renderInline(text) {
+  let out = text;
+  out = out.replace(/`([^`]+)`/g, function (_m, c) {
+    return '<code class="ga-md-code">' + c + '</code>';
+  });
+  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  out = out.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>');
+  out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (_m, label, url) {
+    return '<a href="' + url + '" target="_blank" rel="noopener">' + label + '</a>';
+  });
+  out = out.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, function (_m, prefix, url) {
+    return prefix + '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
+  });
+  return out;
+}
+
+function escapeHtml(s) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}

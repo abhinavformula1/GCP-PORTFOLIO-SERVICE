@@ -52,6 +52,8 @@ export const LANG = {
     continueBtn: 'Continue',
     errors: {
       name: 'Please enter your name.',
+      nameLooksLikeGreeting: "Hi there! I meant your actual name — what should I call you?",
+      nameTooShort: 'Please enter your full name (at least 2 letters).',
       emailRequired: 'Email is required.',
       emailInvalid: 'Enter a valid email address.',
       company: 'Please enter your company.',
@@ -91,6 +93,8 @@ export const LANG = {
     continueBtn: 'Continuer',
     errors: {
       name: 'Veuillez entrer votre nom.',
+      nameLooksLikeGreeting: 'Bonjour! Je voulais dire votre vrai nom — comment dois-je vous appeler?',
+      nameTooShort: 'Veuillez entrer votre nom complet (au moins 2 lettres).',
       emailRequired: "L'email est requis.",
       emailInvalid: 'Entrez une adresse email valide.',
       company: "Veuillez entrer le nom de l'entreprise.",

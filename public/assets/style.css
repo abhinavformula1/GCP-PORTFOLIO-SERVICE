@@ -3168,3 +3168,203 @@ a:hover { text-decoration: underline; }
   .recos-subtitle   { font-size: 14px; }
   #leaveRecoOverlay { min-width: 0; }
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   Atlas — free-form Q&A mode + mode chooser
+   ──────────────────────────────────────────────────────────────────
+   The chat overlay (.ga-overlay > .ga-modal) is shared between the
+   guided 7-step hire flow and the free-form Atlas mode. We re-use
+   .ga-msg / .ga-bubble-bot / .ga-bubble-user / .ga-input-row but
+   add Atlas-specific surfaces here:
+     - .ga-mode-chooser  → two-card landing screen
+     - .ga-atlas-chips   → suggested-question chips
+     - .ga-typing        → animated three-dot typing indicator
+     - .ga-md-*          → safe-Markdown render output (paragraphs,
+                           lists, inline code, code fences, links)
+   The overlay's `data-mode="freeform"` attribute is set by atlas.js
+   and lets us tweak chrome (e.g. hide the step progress track) for
+   that mode without affecting the guided flow.
+   ────────────────────────────────────────────────────────────────── */
+
+/* Mode chooser — two stacked cards inside the input area */
+.ga-mode-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.ga-mode-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+  font-family: inherit;
+}
+.ga-mode-card:hover {
+  border-color: #0070D2;
+  box-shadow: 0 4px 14px rgba(0, 112, 210, 0.10);
+}
+.ga-mode-card:active { transform: translateY(1px); }
+.ga-mode-card:focus-visible {
+  outline: none;
+  border-color: #0070D2;
+  box-shadow: 0 0 0 3px rgba(0, 112, 210, 0.18);
+}
+
+.ga-mode-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: #e8f1fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0070D2;
+}
+.ga-mode-icon .material-symbols-outlined { font-size: 22px; }
+
+.ga-mode-text { flex: 1; min-width: 0; }
+.ga-mode-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2733;
+  margin-bottom: 2px;
+}
+.ga-mode-body {
+  font-size: 12px;
+  color: #5b6473;
+  line-height: 1.4;
+}
+
+.ga-mode-cta {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0070D2;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Suggested-question chips — appear below the greeting in free-form mode */
+.ga-atlas-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 4px 40px;   /* indent so they line up with bot bubble text */
+}
+.ga-atlas-chip {
+  background: #f4f7fb;
+  color: #0070D2;
+  border: 1px solid #d6e4f5;
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.ga-atlas-chip:hover {
+  background: #e8f1fb;
+  border-color: #0070D2;
+}
+
+/* Free-form input bar tightening — slightly more breathing room because
+   in this mode the user types longer messages than the 7-step flow. */
+.ga-overlay[data-mode="freeform"] .ga-input-area { padding-top: 10px; }
+
+/* Typing indicator — three pulsing dots */
+.ga-bubble.ga-typing {
+  padding: 10px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+}
+.ga-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  animation: gaTypingBounce 1.2s infinite ease-in-out;
+}
+.ga-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.ga-typing-dot:nth-child(3) { animation-delay: 0.30s; }
+@keyframes gaTypingBounce {
+  0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
+  30%           { transform: translateY(-3px); opacity: 1;   }
+}
+
+/* Error bubble — same shape as bot bubble but with an error tint.
+   Subtle so it doesn't feel like a system alert; the message text
+   is the primary signal. */
+.ga-bubble-error {
+  background: #fdecec !important;
+  color: #8c1e1e !important;
+  border: 1px solid #f4c2c2;
+}
+
+/* ── Markdown render output (.ga-md inside .ga-bubble-bot) ────────── */
+
+.ga-bubble.ga-md {
+  /* Reset inherited form-y line-height; let Markdown blocks own spacing */
+  line-height: 1.5;
+}
+.ga-bubble.ga-md > .ga-md-p { margin: 0 0 8px 0; }
+.ga-bubble.ga-md > .ga-md-p:last-child { margin-bottom: 0; }
+
+.ga-bubble.ga-md ul.ga-md-ul,
+.ga-bubble.ga-md ol.ga-md-ol {
+  margin: 4px 0 8px 18px;
+  padding: 0;
+}
+.ga-bubble.ga-md li { margin: 2px 0; }
+.ga-bubble.ga-md ul.ga-md-ul:last-child,
+.ga-bubble.ga-md ol.ga-md-ol:last-child { margin-bottom: 0; }
+
+.ga-bubble.ga-md code.ga-md-code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.92em;
+}
+.ga-bubble.ga-md pre.ga-md-pre {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 6px 0;
+  overflow-x: auto;
+  font-size: 0.88em;
+  line-height: 1.45;
+}
+.ga-bubble.ga-md pre.ga-md-pre code {
+  background: transparent;
+  padding: 0;
+  font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+.ga-bubble.ga-md a {
+  color: #0070D2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ga-bubble.ga-md a:hover { color: #005a9c; }
+.ga-bubble.ga-md strong { font-weight: 600; }
+
+/* Mobile: reduce chooser card padding + chip font slightly */
+@media (max-width: 480px) {
+  .ga-mode-card { padding: 10px 12px; gap: 10px; }
+  .ga-mode-icon { width: 34px; height: 34px; }
+  .ga-mode-title { font-size: 13px; }
+  .ga-mode-body  { font-size: 11px; }
+  .ga-atlas-chips { margin-left: 36px; }
+  .ga-atlas-chip  { font-size: 11px; padding: 5px 10px; }
+}
