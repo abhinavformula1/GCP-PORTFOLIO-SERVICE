@@ -2,10 +2,21 @@
 
 const config = require('../config');
 
+// Gemini API version: `/v1beta/`.
+//
+// We were on `/v1/` and it broke in production with:
+//   "Invalid JSON payload received. Unknown name \"systemInstruction\":
+//    Cannot find field."
+//
+// The `systemInstruction` field on the gemini-2.5-flash family is only
+// supported by the `/v1beta/` endpoint — the stable `/v1/` predates the
+// system-prompt feature. Google's official docs and quickstarts for
+// gemini-2.5-flash all use `/v1beta/`, so we mirror that here for both
+// the single-shot and streaming endpoints (consistent error surface).
 const GEMINI_FLASH_URL =
-  'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 const GEMINI_FLASH_STREAM_URL =
-  'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:streamGenerateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent';
 
 /* ── Shared helpers (used by both single-shot and streaming paths) ─────── */
 
@@ -91,9 +102,15 @@ async function callGemini(body, opts) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const err = new Error(`Gemini API error ${res.status}: ${text.slice(0, 500)}`);
+    // The full upstream body is preserved in `err.upstream` for server
+    // logs, but `err.message` stays generic so the route layer can show
+    // a clean user-facing string. `isOperational` remains false for
+    // upstream 5xx-style failures — see the route for how that's
+    // distinguished from user-input errors (which set isOperational=true).
+    const err = new Error(`Gemini API upstream error ${res.status}.`);
     err.statusCode = 502;
-    err.isOperational = true;
+    err.code = 'UPSTREAM_ERROR';
+    err.upstream = text.slice(0, 500);
     throw err;
   }
 
@@ -193,9 +210,10 @@ async function* generateChatResponseStream(args, opts) {
   if (!res.ok || !res.body) {
     clearTimeout(timer);
     const text = await res.text().catch(() => '');
-    const e = new Error(`Gemini stream error ${res.status}: ${text.slice(0, 500)}`);
+    const e = new Error(`Gemini stream upstream error ${res.status}.`);
     e.statusCode = 502;
-    e.isOperational = true;
+    e.code = 'UPSTREAM_ERROR';
+    e.upstream = text.slice(0, 500);
     throw e;
   }
 

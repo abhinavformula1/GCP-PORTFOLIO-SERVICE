@@ -30,12 +30,17 @@ function errorHandler(err, req, res, _next) {
     });
   }
 
-  // Programmer / unexpected errors — log everything, expose nothing
+  // Programmer / unexpected errors — log everything, expose nothing.
+  // `err.upstream` carries truncated upstream-service response bodies
+  // (e.g. raw Gemini error JSON) that we deliberately do NOT show to
+  // the user, but want available in server logs for debugging.
   console.error('[ERROR]', {
-    message: err.message,
-    stack:   err.stack,
-    url:     req.originalUrl,
-    method:  req.method,
+    message:  err.message,
+    code:     err.code,
+    stack:    err.stack,
+    upstream: err.upstream,
+    url:      req.originalUrl,
+    method:   req.method,
   });
 
   return res.status(500).json({
