@@ -7,20 +7,9 @@ const GEMINI_FLASH_URL =
 const GEMINI_FLASH_STREAM_URL =
   'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:streamGenerateContent';
 
-/**
- * Low-level Gemini call. Centralises:
- *   - URL + API-key handling
- *   - HTTP error → thrown Error with body
- *   - response shape unwrapping (candidates[0].content.parts[0].text)
- *
- * @param {object} body            Gemini request body (contents, systemInstruction, generationConfig)
- * @param {object} [opts]
- * @param {number} [opts.timeoutMs=15000]  Abort the request after this many ms.
- * @returns {Promise<string>}      The model's text reply (trimmed). May be ''.
- */
-async function callGemini(body, opts) {
-  const timeoutMs = (opts && opts.timeoutMs) || 15000;
+/* ── Shared helpers (used by both single-shot and streaming paths) ─────── */
 
+function requireApiKey() {
   if (!config.gemini.apiKey) {
     const err = new Error('Gemini is not configured (GEMINI_API_KEY missing).');
     err.code = 'GEMINI_DISABLED';
@@ -28,13 +17,55 @@ async function callGemini(body, opts) {
     err.isOperational = true;
     throw err;
   }
+}
 
+/** Build the Gemini request body shared by both endpoints. */
+function buildChatBody({ systemPrompt, history = [], userMessage, generationConfig }) {
+  if (typeof systemPrompt !== 'string' || !systemPrompt.trim()) {
+    throw new Error('systemPrompt is required.');
+  }
+  if (typeof userMessage !== 'string' || !userMessage.trim()) {
+    throw new Error('userMessage is required.');
+  }
+  const contents = history
+    .filter((m) => m && (m.role === 'user' || m.role === 'model') && typeof m.text === 'string')
+    .map((m) => ({ role: m.role, parts: [{ text: m.text }] }));
+  contents.push({ role: 'user', parts: [{ text: userMessage }] });
+
+  return {
+    systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
+    contents,
+    generationConfig: Object.assign(
+      { temperature: 0.6, topP: 0.9, maxOutputTokens: 600 },
+      generationConfig || {}
+    ),
+  };
+}
+
+/**
+ * Inspect a candidate's finishReason and throw a typed error for the
+ * blocking ones. Non-fatal reasons (MAX_TOKENS / RECITATION / null /
+ * STOP) fall through silently so callers can use any partial text.
+ */
+function checkFinishReason(candidate) {
+  if (!candidate || !candidate.finishReason || candidate.finishReason === 'STOP') return;
+  const reason = candidate.finishReason;
+  if (reason === 'SAFETY' || reason === 'BLOCKLIST' || reason === 'PROHIBITED_CONTENT') {
+    const err = new Error('Response was blocked by safety filters.');
+    err.code = 'SAFETY_BLOCKED';
+    err.statusCode = 422;
+    err.isOperational = true;
+    throw err;
+  }
+}
+
+/** POST to Gemini with a timeout. Returns the raw `Response`. */
+async function fetchGemini(url, body, timeoutMs) {
+  requireApiKey();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  let res;
   try {
-    res = await fetch(`${GEMINI_FLASH_URL}?key=${config.gemini.apiKey}`, {
+    return await fetch(`${url}?key=${config.gemini.apiKey}`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
@@ -43,6 +74,20 @@ async function callGemini(body, opts) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Low-level non-streaming Gemini call. URL + key + body + error handling
+ * + candidate unwrapping.
+ *
+ * @param {object} body
+ * @param {object} [opts]
+ * @param {number} [opts.timeoutMs=15000]
+ * @returns {Promise<string>}  Trimmed text. May be ''.
+ */
+async function callGemini(body, opts) {
+  const timeoutMs = (opts && opts.timeoutMs) || 15000;
+  const res = await fetchGemini(GEMINI_FLASH_URL, body, timeoutMs);
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -53,22 +98,8 @@ async function callGemini(body, opts) {
   }
 
   const data = await res.json();
-  // The block reasons live at candidates[0].finishReason — surface them as
-  // a clean, user-safe error so callers can show a helpful message instead
-  // of falling through to an empty response.
   const candidate = data.candidates && data.candidates[0];
-  if (candidate && candidate.finishReason && candidate.finishReason !== 'STOP') {
-    const reason = candidate.finishReason;
-    if (reason === 'SAFETY' || reason === 'BLOCKLIST' || reason === 'PROHIBITED_CONTENT') {
-      const err = new Error('Response was blocked by safety filters.');
-      err.code = 'SAFETY_BLOCKED';
-      err.statusCode = 422;
-      err.isOperational = true;
-      throw err;
-    }
-    // MAX_TOKENS / RECITATION etc. are non-fatal — fall through to the
-    // partial text below.
-  }
+  checkFinishReason(candidate);
   return (candidate?.content?.parts?.[0]?.text || '').trim();
 }
 
@@ -114,33 +145,7 @@ No filler phrases, no emojis, no bullet points. Plain text only.`;
  * @returns {Promise<string>}            Trimmed model reply.
  */
 async function generateChatResponse(args) {
-  const { systemPrompt, history = [], userMessage, generationConfig } = args;
-
-  if (typeof systemPrompt !== 'string' || !systemPrompt.trim()) {
-    throw new Error('systemPrompt is required.');
-  }
-  if (typeof userMessage !== 'string' || !userMessage.trim()) {
-    throw new Error('userMessage is required.');
-  }
-
-  const contents = history
-    .filter((m) => m && (m.role === 'user' || m.role === 'model') && typeof m.text === 'string')
-    .map((m) => ({ role: m.role, parts: [{ text: m.text }] }));
-
-  contents.push({ role: 'user', parts: [{ text: userMessage }] });
-
-  return callGemini({
-    systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
-    contents,
-    generationConfig: Object.assign(
-      {
-        temperature:     0.6,
-        topP:            0.9,
-        maxOutputTokens: 600,
-      },
-      generationConfig || {}
-    ),
-  });
+  return callGemini(buildChatBody(args || {}));
 }
 
 /**
@@ -161,37 +166,14 @@ async function generateChatResponse(args) {
  * @returns {AsyncGenerator<string>}
  */
 async function* generateChatResponseStream(args, opts) {
-  const { systemPrompt, history = [], userMessage, generationConfig } = args || {};
   const timeoutMs = (opts && opts.timeoutMs) || 30000;
+  const body = buildChatBody(args || {});
 
-  if (typeof systemPrompt !== 'string' || !systemPrompt.trim()) {
-    throw new Error('systemPrompt is required.');
-  }
-  if (typeof userMessage !== 'string' || !userMessage.trim()) {
-    throw new Error('userMessage is required.');
-  }
-  if (!config.gemini.apiKey) {
-    const err = new Error('Gemini is not configured (GEMINI_API_KEY missing).');
-    err.code = 'GEMINI_DISABLED';
-    err.statusCode = 503;
-    err.isOperational = true;
-    throw err;
-  }
-
-  const contents = history
-    .filter((m) => m && (m.role === 'user' || m.role === 'model') && typeof m.text === 'string')
-    .map((m) => ({ role: m.role, parts: [{ text: m.text }] }));
-  contents.push({ role: 'user', parts: [{ text: userMessage }] });
-
-  const body = {
-    systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
-    contents,
-    generationConfig: Object.assign(
-      { temperature: 0.6, topP: 0.9, maxOutputTokens: 600 },
-      generationConfig || {}
-    ),
-  };
-
+  // streamGenerateContent uses the same endpoint shape as generateContent
+  // but with `?alt=sse` for SSE-formatted output. We can't reuse fetchGemini
+  // here because it doesn't expose the alt= param, so the call is open-coded
+  // — but key validation, timer, and abort wiring all match.
+  requireApiKey();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -230,7 +212,6 @@ async function* generateChatResponseStream(args, opts) {
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
-      // Process complete events delimited by blank line (\n\n).
       let idx;
       while ((idx = buffer.indexOf('\n\n')) !== -1) {
         const rawEvent = buffer.slice(0, idx);
@@ -244,20 +225,8 @@ async function* generateChatResponseStream(args, opts) {
         let parsed;
         try { parsed = JSON.parse(jsonStr); } catch (_) { continue; }
 
-        // Block reasons → stop early with a typed error so the route
-        // can show a safe message.
         const candidate = parsed.candidates && parsed.candidates[0];
-        if (candidate && candidate.finishReason && candidate.finishReason !== 'STOP') {
-          const reason = candidate.finishReason;
-          if (reason === 'SAFETY' || reason === 'BLOCKLIST' || reason === 'PROHIBITED_CONTENT') {
-            const err = new Error('Response was blocked by safety filters.');
-            err.code = 'SAFETY_BLOCKED';
-            err.statusCode = 422;
-            err.isOperational = true;
-            throw err;
-          }
-          // MAX_TOKENS / RECITATION etc. — yield any partial text and stop.
-        }
+        checkFinishReason(candidate);
 
         const delta = candidate?.content?.parts?.[0]?.text;
         if (delta) yield delta;
