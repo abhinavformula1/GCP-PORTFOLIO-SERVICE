@@ -16,7 +16,7 @@
  *     `resumeAssistant`, `toggleChatTeaser`, `resetChatState`,
  *     `applyGoogleProfileToChat`, `initChat`.
  *   - private state: `state` (step + answers + minimised flag),
- *     `STEPS`, `SLOTS`, `TOTAL_STEPS`, `teaserShown`. None of these
+ *     `STEPS`, `TOTAL_STEPS`, `teaserShown`. None of these
  *     leak — main.js can't and doesn't reach in.
  *
  * main.js re-exports the inline-onclick'd functions onto `window` so
@@ -38,19 +38,16 @@ import { createInputRow } from './widgets.js';
    GUIDED ASSISTANT — state machine
 ═══════════════════════════════════════════════════════════ */
 
-const SLOTS = [
-  'Mon 28 Apr · 10:00 AM IST',
-  'Mon 28 Apr · 3:00 PM IST',
-  'Tue 29 Apr · 11:00 AM IST',
-  'Wed 30 Apr · 2:00 PM IST',
-  'Thu 1 May · 4:00 PM IST',
-];
-
-const TOTAL_STEPS = 7;
+// Step count drives the progress bar. We collect six structured answers
+// (name, email, company, role, contractType, urgency) and then go straight
+// to a confirm-and-send screen — no slot picker. Visitors said it felt
+// presumptuous to lock them into a fixed time before any conversation has
+// happened, so the new flow promises an email follow-up instead.
+const TOTAL_STEPS = 6;
 
 const state = {
   step: 0,
-  answers: { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' },
+  answers: { name: '', email: '', company: '', role: '', contractType: '', urgency: '' },
   googleProfile: null,
   showGoogleStep: false,
   minimised: false,
@@ -119,11 +116,6 @@ const STEPS = [
     inputType: 'choice',
     choices: function () { return t().choices.urgency; },
   },
-  {
-    key: 'slot',
-    bot: function () { return t().botSlot; },
-    inputType: 'slots',
-  },
 ];
 
 /* ── Chat Launcher (FAB) ─────────────────────────────────────────────────── */
@@ -156,7 +148,7 @@ export function toggleChatTeaser() {
 
 export function openAssistant() {
   state.step = 0;
-  state.answers  = { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' };
+  state.answers  = { name: '', email: '', company: '', role: '', contractType: '', urgency: '' };
   state.googleProfile  = null;
   state.showGoogleStep = false;
   state.mode = null;
@@ -284,7 +276,7 @@ export function resumeAssistant() {
  */
 export function resetChatState() {
   state.step = 0;
-  state.answers = { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' };
+  state.answers = { name: '', email: '', company: '', role: '', contractType: '', urgency: '' };
   state.googleProfile  = null;
   state.showGoogleStep = false;
   state.minimised      = false;
@@ -422,8 +414,8 @@ function renderModeChooser() {
 
   const scheduleCard = buildModeCard({
     icon:     'event_available',
-    title:    'Schedule a chat',
-    body:     'Share a few details and pick a slot. Goes straight to Abhinav.',
+    title:    'Get in touch',
+    body:     "Share a few details and I'll email you back to set up a chat.",
     cta:      'Start',
     onClick:  function () {
       state.mode = 'guided';
@@ -660,24 +652,6 @@ function renderInputArea(stepDef) {
       grid.appendChild(btn);
     });
     area.appendChild(grid);
-
-  } else if (stepDef.inputType === 'slots') {
-    const slotGrid = document.createElement('div');
-    slotGrid.className = 'ga-slot-grid';
-    SLOTS.forEach(function (slot) {
-      const btn = document.createElement('button');
-      btn.className = 'ga-slot-btn';
-      btn.textContent = slot;
-      btn.onclick = function () {
-        state.answers.slot = slot;
-        addUserMessage(slot);
-        area.innerHTML = '';
-        state.step++;
-        setTimeout(renderStep, 400);
-      };
-      slotGrid.appendChild(btn);
-    });
-    area.appendChild(slotGrid);
   }
 }
 
@@ -698,17 +672,7 @@ function renderConfirm() {
         '<div class="ga-summary-row"><span>Company</span><strong>' + escHtml(a.company) + '</strong></div>' +
         '<div class="ga-summary-row"><span>Role</span><strong>' + escHtml(a.role) + '</strong></div>' +
         '<div class="ga-summary-row"><span>Type</span><strong>' + escHtml(a.contractType) + '</strong></div>' +
-        '<div class="ga-summary-row"><span>Urgency</span><strong>' + escHtml(a.urgency) + '</strong></div>' +
-        '<div class="ga-summary-row"><span>Slot</span><strong>' + escHtml(a.slot) + '</strong></div>';
-
-      const summaryBtn = document.createElement('button');
-      summaryBtn.className = 'ga-summary-btn';
-      summaryBtn.textContent = 'Get AI Summary';
-      summaryBtn.onclick = function () { requestSummary(summaryBtn); };
-
-      const summaryOut = document.createElement('div');
-      summaryOut.className = 'ga-summary-out';
-      summaryOut.id = 'gaSummaryOut';
+        '<div class="ga-summary-row"><span>Urgency</span><strong>' + escHtml(a.urgency) + '</strong></div>';
 
       const confirmBtn = document.createElement('button');
       confirmBtn.className = 'ga-send-btn';
@@ -721,8 +685,6 @@ function renderConfirm() {
       errDiv.id = 'gaSubmitErr';
 
       area.appendChild(summary);
-      area.appendChild(summaryBtn);
-      area.appendChild(summaryOut);
       area.appendChild(confirmBtn);
       area.appendChild(errDiv);
     }
@@ -746,7 +708,6 @@ async function submitAssistant(btn) {
         role: a.role,
         contractType: a.contractType,
         urgency: a.urgency,
-        slot: a.slot,
       }),
     });
     const data = await res.json();
@@ -765,12 +726,12 @@ async function submitAssistant(btn) {
     } else {
       document.getElementById('gaSubmitErr').textContent = (data && data.error) || 'Something went wrong. Please try again.';
       btn.disabled = false;
-      btn.textContent = 'Confirm & Schedule';
+      btn.textContent = t().confirmBtn;
     }
   } catch (_) {
     document.getElementById('gaSubmitErr').textContent = 'Network error. Please try again.';
     btn.disabled = false;
-    btn.textContent = 'Confirm & Schedule';
+    btn.textContent = t().confirmBtn;
   }
 }
 
@@ -793,27 +754,6 @@ function renderDone(alreadySubmitted) {
     checkEl.innerHTML = '&#10003;';
     done.appendChild(checkEl);
 
-    // Skip the slot/summary widgets for duplicate submissions — there's
-    // no new booking to confirm or summarise.
-    if (!alreadySubmitted) {
-      const slotEl = document.createElement('div');
-      slotEl.className = 'ga-done-slot';
-      slotEl.textContent = state.answers.slot;
-
-      const summaryBtn = document.createElement('button');
-      summaryBtn.className = 'ga-summary-btn';
-      summaryBtn.textContent = 'Get AI Summary';
-      summaryBtn.onclick = function () { requestSummary(summaryBtn); };
-
-      const summaryOut = document.createElement('div');
-      summaryOut.className = 'ga-summary-out';
-      summaryOut.id = 'gaSummaryOut';
-
-      done.appendChild(slotEl);
-      done.appendChild(summaryBtn);
-      done.appendChild(summaryOut);
-    }
-
     const closeBtn = document.createElement('button');
     closeBtn.className = 'ga-done-close';
     closeBtn.textContent = t().closeBtn;
@@ -822,54 +762,6 @@ function renderDone(alreadySubmitted) {
 
     area.appendChild(done);
   });
-}
-
-async function requestSummary(btn) {
-  btn.disabled = true;
-  btn.textContent = 'Generating\u2026';
-  const out = document.getElementById('gaSummaryOut');
-  out.textContent = '';
-  out.className = 'ga-summary-out';
-
-  try {
-    const res = await fetch('/api/summarise', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name:         state.answers.name,
-        company:      state.answers.company,
-        role:         state.answers.role,
-        contractType: state.answers.contractType,
-        urgency:      state.answers.urgency,
-        slot:         state.answers.slot,
-      }),
-    });
-    const data = await res.json();
-    if (res.ok && data.summary) {
-      out.textContent = data.summary;
-      out.className = 'ga-summary-out ga-summary-ready';
-      btn.textContent = 'Copy Summary';
-      btn.disabled = false;
-      btn.onclick = function () {
-        navigator.clipboard.writeText(data.summary).then(function () {
-          btn.textContent = 'Copied!';
-          setTimeout(function () { btn.textContent = 'Copy Summary'; }, 2000);
-        });
-      };
-    } else {
-      out.textContent = data.error || 'Could not generate summary.';
-      out.className = 'ga-summary-out ga-summary-err';
-      btn.textContent = 'Retry';
-      btn.disabled = false;
-      btn.onclick = function () { requestSummary(btn); };
-    }
-  } catch (_) {
-    out.textContent = 'Network error. Please try again.';
-    out.className = 'ga-summary-out ga-summary-err';
-    btn.textContent = 'Retry';
-    btn.disabled = false;
-    btn.onclick = function () { requestSummary(btn); };
-  }
 }
 
 function scrollMessages() {
