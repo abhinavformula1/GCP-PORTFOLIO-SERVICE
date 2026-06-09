@@ -22,6 +22,7 @@
  */
 
 import { googleCredential } from '../core/state.js';
+import { createInputRow } from './widgets.js';
 
 /* ── Suggested-question variants ──────────────────────────────────────── */
 //
@@ -195,46 +196,23 @@ function renderSuggestedChips(msgs) {
 }
 
 function renderFreeFormInput(area) {
-  const row = document.createElement('div');
-  row.className = 'ga-input-row ga-atlas-input-row';
-
-  const inp = document.createElement('input');
-  inp.type = 'text';
-  inp.className = 'ga-text-input ga-atlas-input';
-  inp.placeholder = 'Ask Atlas anything…';
-  inp.maxLength = 1000;
-  inp.id = 'gaAtlasInput';
-
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'ga-send-btn ga-send-icon-btn';
-  btn.id = 'gaAtlasSendBtn';
-  btn.setAttribute('aria-label', 'Send');
-  btn.title = 'Send';
-  btn.innerHTML = '<svg class="ga-send-svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">' +
-    '<path d="M3.4 20.4l17.45-7.48a1 1 0 0 0 0-1.84L3.4 3.6a.993.993 0 0 0-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z"/>' +
-    '</svg>';
-
-  function submit() {
-    const v = (inp.value || '').trim();
-    if (!v) return;
-    inp.value = '';
-    sendAtlasMessage(v);
-  }
-
-  btn.onclick = submit;
-  inp.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submit();
-    }
+  const { row, input, button } = createInputRow({
+    rowClass:    'ga-input-row ga-atlas-input-row',
+    inputClass:  'ga-text-input ga-atlas-input',
+    placeholder: 'Ask Atlas anything…',
+    maxLength:   1000,
+    onSubmit:    function (raw) {
+      const v = (raw || '').trim();
+      if (!v) return;
+      input.value = '';
+      sendAtlasMessage(v);
+    },
   });
+  input.id  = 'gaAtlasInput';
+  button.id = 'gaAtlasSendBtn';
 
-  row.appendChild(inp);
-  row.appendChild(btn);
   area.appendChild(row);
-
-  setTimeout(function () { inp.focus(); }, 50);
+  setTimeout(function () { input.focus(); }, 50);
 }
 
 /* ── Send / receive ───────────────────────────────────────────────────── */
