@@ -32,6 +32,7 @@ import {
 import { authedFetch }     from '../core/auth.js';
 import { GOOGLE_CLIENT_ID } from '../core/config.js';
 import { renderFreeFormMode, resetAtlasState } from './atlas.js';
+import { createInputRow } from './widgets.js';
 
 /* ═══════════════════════════════════════════════════════════
    GUIDED ASSISTANT — state machine
@@ -618,43 +619,29 @@ function renderInputArea(stepDef) {
   area.innerHTML = '';
 
   if (stepDef.inputType === 'text') {
-    const row = document.createElement('div');
-    row.className = 'ga-input-row';
-
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.className = 'ga-text-input';
-    inp.placeholder = stepDef.placeholder ? stepDef.placeholder() : '';
-
     const err = document.createElement('div');
     err.className = 'ga-input-err';
 
-    const btn = document.createElement('button');
-    btn.className = 'ga-send-btn ga-send-icon-btn';
-    btn.setAttribute('aria-label', t().continueBtn);
-    btn.title = t().continueBtn;
-    // Inline SVG paper-plane (kite), pointing upper-right.
-    btn.innerHTML = '<svg class="ga-send-svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">' +
-      '<path d="M3.4 20.4l17.45-7.48a1 1 0 0 0 0-1.84L3.4 3.6a.993.993 0 0 0-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z"/>' +
-      '</svg>';
-    btn.onclick = function () {
-      const val = inp.value;
-      const e = stepDef.validate(val);
-      if (e) { err.textContent = e; return; }
-      err.textContent = '';
-      state.answers[stepDef.key] = val.trim();
-      addUserMessage(val.trim());
-      area.innerHTML = '';
-      state.step++;
-      setTimeout(renderStep, 400);
-    };
-    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') btn.onclick(); });
+    const { row, input } = createInputRow({
+      placeholder:     stepDef.placeholder ? stepDef.placeholder() : '',
+      buttonAriaLabel: t().continueBtn,
+      buttonTitle:     t().continueBtn,
+      onSubmit: function (val) {
+        const v = val == null ? '' : val;
+        const e = stepDef.validate(v);
+        if (e) { err.textContent = e; return; }
+        err.textContent = '';
+        state.answers[stepDef.key] = v.trim();
+        addUserMessage(v.trim());
+        area.innerHTML = '';
+        state.step++;
+        setTimeout(renderStep, 400);
+      },
+    });
 
-    row.appendChild(inp);
-    row.appendChild(btn);
     area.appendChild(row);
     area.appendChild(err);
-    setTimeout(function () { inp.focus(); }, 50);
+    setTimeout(function () { input.focus(); }, 50);
 
   } else if (stepDef.inputType === 'choice') {
     const grid = document.createElement('div');
