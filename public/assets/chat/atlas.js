@@ -74,19 +74,20 @@ const QUESTION_VARIANTS = [
 const VARIANT_STORAGE_KEY = 'atlas_chip_variant_v1';
 
 /**
- * Cryptographically-strong uniform integer in [0, max). We don't *need*
- * crypto-grade randomness for A/B bucketing, but using crypto.getRandomValues
- * here keeps SAST/Sonar happy (no Math.random hotspot) and is plenty fast
- * for once-per-session bucketing. Falls back to Math.random only if the
- * Web Crypto API is unavailable (legacy browsers).
+ * Cryptographically-strong uniform integer in [0, max).
+ * We don't need crypto-grade randomness for A/B bucketing — output is
+ * just a chip-set index, observable to the user, with zero security
+ * impact. We use the Web Crypto API anyway because it (a) keeps SAST
+ * tooling (Sonar's javascript:S2245) silent and (b) is supported in
+ * every browser made since 2015 (IE 11+, Safari 6.1+, Chrome 11+,
+ * Firefox 21+). On the off-chance crypto is unavailable, the caller
+ * catches and defaults to variant 0 — that's fine, the worst case is
+ * "this visitor always sees the first chip set", not a bug.
  */
 function pickIndex(max) {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const buf = new Uint32Array(1);
-    crypto.getRandomValues(buf);
-    return buf[0] % max;
-  }
-  return Math.floor(Math.random() * max); // very old browsers only
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] % max;
 }
 
 /** Pick a sticky variant per browser session. */
@@ -97,7 +98,8 @@ function chooseVariant() {
     const idx = parseInt(stored, 10);
     if (idx >= 0 && idx < QUESTION_VARIANTS.length) return QUESTION_VARIANTS[idx];
   }
-  const idx = pickIndex(QUESTION_VARIANTS.length);
+  let idx;
+  try { idx = pickIndex(QUESTION_VARIANTS.length); } catch (_) { idx = 0; }
   try { sessionStorage.setItem(VARIANT_STORAGE_KEY, String(idx)); } catch (_) {}
   return QUESTION_VARIANTS[idx];
 }
