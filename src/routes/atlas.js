@@ -197,12 +197,23 @@ router.post('/atlas/stream',
         aborted,
       });
     } catch (err) {
-      const code = err.code || 'INTERNAL_ERROR';
-      const safeMessage = err.isOperational
+      // User-input errors (400/422) carry isOperational=true and a clean
+      // user-facing message. Upstream / internal errors get a generic
+      // bubble — never surface raw Gemini JSON or stack traces to the
+      // visitor; log them server-side for debugging.
+      const code        = err.code || 'INTERNAL_ERROR';
+      const isUserError = err.isOperational && err.statusCode && err.statusCode < 500;
+      const safeMessage = isUserError
         ? err.message
-        : 'Atlas could not generate a response. Please try again.';
+        : 'Atlas is having trouble responding right now. Please try again in a moment.';
       send({ error: safeMessage, code, transactionId });
-      console.error('[atlas/stream] error:', { transactionId, message: err.message });
+      console.error('[atlas/stream] error:', {
+        transactionId,
+        code,
+        statusCode: err.statusCode,
+        message:    err.message,
+        upstream:   err.upstream,
+      });
     } finally {
       if (!res.writableEnded) res.end();
     }
