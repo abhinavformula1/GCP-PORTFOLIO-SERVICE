@@ -31,6 +31,7 @@ import {
 } from '../core/state.js';
 import { authedFetch }     from '../core/auth.js';
 import { GOOGLE_CLIENT_ID } from '../core/config.js';
+import { renderFreeFormMode, resetAtlasState } from './atlas.js';
 
 /* ═══════════════════════════════════════════════════════════
    GUIDED ASSISTANT — state machine
@@ -52,6 +53,10 @@ const state = {
   googleProfile: null,
   showGoogleStep: false,
   minimised: false,
+  // mode = null  → show the mode-chooser screen (Schedule vs Ask Atlas)
+  // mode = 'guided'   → existing 7-step hire flow
+  // mode = 'freeform' → free-form Q&A delegated to ./atlas.js
+  mode: null,
 };
 
 const STEPS = [
@@ -60,7 +65,23 @@ const STEPS = [
     bot: function () { return t().botGreeting; },
     inputType: 'text',
     placeholder: function () { return t().namePlaceholder; },
-    validate: function (v) { return v.trim().length > 0 ? null : t().errors.name; },
+    validate: function (v) {
+      const raw = (v || '').trim();
+      if (!raw) return t().errors.name;
+
+      // Catch the most common case: "hi" / "hello" / "hey" — these are
+      // not names. We only match when the entire input is the greeting
+      // (so "Hi, I'm John" or "Hello Ravi" still pass).
+      const GREETINGS = /^(hi|hii+|hey+|hello|hola|yo|sup|hiya|howdy|namaste|bonjour|salut)[!. ]*$/i;
+      if (GREETINGS.test(raw)) return t().errors.nameLooksLikeGreeting;
+
+      // Must contain at least one letter and be at least 2 characters
+      // total — rejects "x", "1", "...". Allows non-Latin scripts via
+      // \p{L} (Devanagari, CJK, etc.).
+      if (raw.length < 2 || !/\p{L}/u.test(raw)) return t().errors.nameTooShort;
+
+      return null;
+    },
   },
   {
     key: 'email',
@@ -137,26 +158,38 @@ export function openAssistant() {
   state.answers  = { name: '', email: '', company: '', role: '', contractType: '', urgency: '', slot: '' };
   state.googleProfile  = null;
   state.showGoogleStep = false;
+  state.mode = null;
+  resetAtlasState();
   // Reset avatar and header
   const avatar = document.querySelector('.ga-avatar');
   if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
   const headerName = document.querySelector('.ga-header-name');
   if (headerName) headerName.textContent = 'Atlas';
+  const overlay = document.getElementById('assistantOverlay');
+  overlay.removeAttribute('data-mode');
   document.getElementById('gaMessages').innerHTML = '';
-  document.getElementById('assistantOverlay').removeAttribute('hidden');
+  // Restore the step-progress track (atlas.js hides it for free-form mode).
+  const progressTrack = document.querySelector('.ga-progress-track');
+  if (progressTrack) progressTrack.style.display = '';
+  overlay.removeAttribute('hidden');
   hideTeaser();
 
   // Show the "Start over" button only for signed-in users (it operates
   // on Firestore-backed history, which guests don't have).
   setStartOverBtnVisible(!!(siteProfile && siteProfile.type !== 'guest'));
 
-  // If already signed in from welcome screen, skip sign-in step
-  if (siteProfile && siteProfile.type !== 'guest') {
+  // If a saved guided-flow conversation exists for this user, jump straight
+  // back into it (skip the mode chooser — they're clearly resuming the
+  // hire flow, not starting over).
+  if (pendingChatHistory && pendingChatHistory.step > 1 && siteProfile && siteProfile.type !== 'guest') {
+    state.mode = 'guided';
     applyGoogleProfileToChat(siteProfile);
-  } else {
-    state.showGoogleStep = !!(GOOGLE_CLIENT_ID && window.google && (!siteProfile));
-    renderStep();
+    return;
   }
+
+  // Otherwise: show the two-card mode chooser. Sign-in gating happens
+  // inside the chooser when the user picks the path that requires it.
+  renderModeChooser();
 }
 
 export function closeAssistant() {
@@ -232,6 +265,9 @@ function setStartOverBtnVisible(visible) {
   if (!btn) return;
   if (visible) btn.removeAttribute('hidden');
   else         btn.setAttribute('hidden', '');
+  // Reset to the guided-flow handler whenever we toggle visibility from
+  // chat.js. Atlas mode rebinds this to its own startOver in renderFreeFormMode().
+  btn.onclick = restartAssistant;
 }
 
 export function resumeAssistant() {
@@ -251,12 +287,18 @@ export function resetChatState() {
   state.googleProfile  = null;
   state.showGoogleStep = false;
   state.minimised      = false;
+  state.mode           = null;
+  resetAtlasState();
   const msgs = document.getElementById('gaMessages');
   if (msgs) msgs.innerHTML = '';
   const avatar = document.querySelector('.ga-avatar');
   if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
   const headerName = document.querySelector('.ga-header-name');
   if (headerName) headerName.textContent = 'Atlas';
+  const overlay = document.getElementById('assistantOverlay');
+  if (overlay) overlay.removeAttribute('data-mode');
+  const progressTrack = document.querySelector('.ga-progress-track');
+  if (progressTrack) progressTrack.style.display = '';
 }
 
 /**
@@ -280,6 +322,13 @@ export function applyGoogleProfileToChat(profile) {
   }
   const headerName = document.querySelector('.ga-header-name');
   if (headerName) headerName.textContent = profile.name.split(' ')[0] + "'s session";
+
+  // Free-form mode was requested before sign-in (user clicked Ask Atlas
+  // while signed-out). Now they're signed in — drop straight into Atlas.
+  if (state.mode === 'freeform') {
+    renderFreeFormMode();
+    return;
+  }
 
   // Only restart the chat if we're still at the very beginning (pre-step or name/email)
   if (state.step <= 1) {
@@ -342,6 +391,130 @@ function mergeAnswers(target, source) {
 function updateProgress() {
   const pct = Math.round((state.step / TOTAL_STEPS) * 100);
   document.getElementById('gaProgressBar').style.width = pct + '%';
+}
+
+/* ── Mode chooser ────────────────────────────────────────────────────────
+   Two-card landing screen that runs once per chat-open (unless the user
+   is resuming a saved guided-flow conversation). Picks between:
+     - "Schedule a chat with Abhinav" → existing 7-step hire flow
+     - "Ask Atlas anything"           → free-form Q&A (./atlas.js)
+   Atlas mode requires Google Sign-In; guests see an inline sign-in
+   prompt when they pick that card.
+   ───────────────────────────────────────────────────────────────────── */
+
+function renderModeChooser() {
+  // Reset progress bar — chooser is "step 0".
+  const bar = document.getElementById('gaProgressBar');
+  if (bar) bar.style.width = '0%';
+
+  const msgs = document.getElementById('gaMessages');
+  const area = document.getElementById('gaInputArea');
+  if (!msgs || !area) return;
+
+  msgs.innerHTML = '';
+  area.innerHTML = '';
+
+  addBotMessage("Hi — I'm Atlas, Abhinav's virtual assistant. What would you like to do?");
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ga-mode-chooser';
+
+  const scheduleCard = buildModeCard({
+    icon:     'event_available',
+    title:    'Schedule a chat',
+    body:     'Share a few details and pick a slot. Goes straight to Abhinav.',
+    cta:      'Start',
+    onClick:  function () {
+      state.mode = 'guided';
+      area.innerHTML = '';
+      msgs.innerHTML = '';
+      // Hand off to the existing guided flow.
+      if (siteProfile && siteProfile.type !== 'guest') {
+        applyGoogleProfileToChat(siteProfile);
+      } else {
+        state.showGoogleStep = !!(GOOGLE_CLIENT_ID && window.google && (!siteProfile));
+        renderStep();
+      }
+    },
+  });
+
+  const askCard = buildModeCard({
+    icon:     'forum',
+    title:    'Ask Atlas anything',
+    body:     'Free-form Q&A about his experience, projects, and skills.',
+    cta:      'Ask',
+    onClick:  function () {
+      // Pin the intended mode now so the sign-in callback in main.js
+      // (→ applyGoogleProfileToChat) can route to free-form instead of
+      // the guided hire flow.
+      state.mode = 'freeform';
+      if (!googleCredential || !siteProfile || siteProfile.type === 'guest') {
+        renderAtlasSignInPrompt();
+        return;
+      }
+      renderFreeFormMode();
+    },
+  });
+
+  wrap.appendChild(scheduleCard);
+  wrap.appendChild(askCard);
+  area.appendChild(wrap);
+}
+
+function buildModeCard(opts) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'ga-mode-card';
+  card.innerHTML =
+    '<div class="ga-mode-icon"><span class="material-symbols-outlined" aria-hidden="true">' +
+      escHtml(opts.icon) +
+    '</span></div>' +
+    '<div class="ga-mode-text">' +
+      '<div class="ga-mode-title">' + escHtml(opts.title) + '</div>' +
+      '<div class="ga-mode-body">'  + escHtml(opts.body)  + '</div>' +
+    '</div>' +
+    '<div class="ga-mode-cta">' + escHtml(opts.cta) + ' &rsaquo;</div>';
+  card.onclick = opts.onClick;
+  return card;
+}
+
+function renderAtlasSignInPrompt() {
+  const area = document.getElementById('gaInputArea');
+  if (!area) return;
+  area.innerHTML = '';
+
+  addBotMessage("Atlas needs a quick sign-in so I know who I'm talking to. It's a one-click Google sign-in — your details aren't shared.");
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ga-google-step';
+
+  const googleBtnDiv = document.createElement('div');
+  googleBtnDiv.id = 'googleSignInBtn';
+  googleBtnDiv.className = 'ga-google-btn-wrap';
+
+  const sep = document.createElement('div');
+  sep.className = 'ga-google-sep';
+  sep.textContent = 'or';
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'ga-guest-btn';
+  backBtn.textContent = 'Back';
+  backBtn.onclick = function () { renderModeChooser(); };
+
+  wrap.appendChild(googleBtnDiv);
+  wrap.appendChild(sep);
+  wrap.appendChild(backBtn);
+  area.appendChild(wrap);
+
+  if (window.google && window.google.accounts && GOOGLE_CLIENT_ID) {
+    google.accounts.id.renderButton(googleBtnDiv, {
+      theme: 'filled_black',
+      size: 'large',
+      text: 'continue_with',
+      shape: 'rectangular',
+      width: 260,
+    });
+  }
 }
 
 function renderGoogleStep() {

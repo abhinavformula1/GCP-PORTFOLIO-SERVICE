@@ -180,6 +180,84 @@ async function clearActiveChat(uid) {
   await activeDocRef(uid).delete();
 }
 
+// ── Atlas (free-form Q&A) conversation persistence ───────────────────────────
+//
+// Parallel to the guided-flow `/users/{uid}/sessions/active` doc above, but
+// for the LLM-backed Atlas chat. Storing only the latest active conversation
+// per user — same trade-offs (single read restores everything, capped turn
+// count keeps reads bounded). If a user wants longer-term history we'd
+// graduate this to a /atlas-conversations/{auto} subcollection like inquiries.
+
+const ATLAS_COLLECTION = 'atlas';
+const MAX_ATLAS_TURNS  = 40;
+
+function atlasActiveDocRef(uid) {
+  return getDb()
+    .collection(USERS_COLLECTION).doc(uid)
+    .collection(ATLAS_COLLECTION).doc(ACTIVE_DOC_ID);
+}
+
+/**
+ * Returns the user's active Atlas conversation, or null if none.
+ * Shape mirrors getActiveChat() — timestamps converted to epoch-ms.
+ *   { startedAt, updatedAt, turns: [{ role: 'user'|'model', text, ts }, ...] }
+ */
+async function getActiveAtlasConversation(uid) {
+  const snap = await atlasActiveDocRef(uid).get();
+  if (!snap.exists) return null;
+  const d = snap.data() || {};
+  return {
+    startedAt: d.startedAt && d.startedAt.toMillis ? d.startedAt.toMillis() : null,
+    updatedAt: d.updatedAt && d.updatedAt.toMillis ? d.updatedAt.toMillis() : null,
+    turns:     Array.isArray(d.turns) ? d.turns : [],
+  };
+}
+
+/**
+ * Append a single turn to the active conversation, capped at MAX_ATLAS_TURNS.
+ * Role uses Gemini's vocabulary ('user' / 'model') — matches what the LLM
+ * service expects so the client can pass `turns` straight back as `history`.
+ *
+ * Best-effort: callers fire-and-forget. Failures are surfaced as thrown
+ * errors but the route layer logs and moves on — chat UX never blocks
+ * on Firestore.
+ */
+async function appendAtlasTurn(uid, { role, text }) {
+  if (role !== 'user' && role !== 'model') {
+    throw new Error('appendAtlasTurn: role must be "user" or "model".');
+  }
+  const ref = atlasActiveDocRef(uid);
+  return getDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const now  = FieldValue.serverTimestamp();
+
+    let turns = [];
+    if (snap.exists) {
+      const d = snap.data() || {};
+      turns = Array.isArray(d.turns) ? d.turns.slice() : [];
+    }
+
+    turns.push({
+      role,
+      text: String(text || '').slice(0, 4000),
+      ts:   Date.now(),
+    });
+    if (turns.length > MAX_ATLAS_TURNS) {
+      turns = turns.slice(turns.length - MAX_ATLAS_TURNS);
+    }
+
+    const update = { turns, updatedAt: now };
+    if (!snap.exists) update.startedAt = now;
+
+    if (snap.exists) tx.update(ref, update);
+    else             tx.set(ref, update);
+  });
+}
+
+async function clearActiveAtlasConversation(uid) {
+  await atlasActiveDocRef(uid).delete();
+}
+
 /**
  * Moves the active chat into /users/{uid}/inquiries and clears it. Used after
  * a successful Recruiter_Inquiry__c create so we keep history but the next
@@ -382,6 +460,9 @@ module.exports = {
   upsertActiveChat,
   clearActiveChat,
   completeActiveChat,
+  getActiveAtlasConversation,
+  appendAtlasTurn,
+  clearActiveAtlasConversation,
   upsertRecommendation,
   listActiveRecommendations,
   writeRecommendationReply,
