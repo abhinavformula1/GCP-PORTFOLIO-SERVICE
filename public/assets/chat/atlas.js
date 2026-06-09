@@ -73,6 +73,23 @@ const QUESTION_VARIANTS = [
 
 const VARIANT_STORAGE_KEY = 'atlas_chip_variant_v1';
 
+/**
+ * Cryptographically-strong uniform integer in [0, max).
+ * We don't need crypto-grade randomness for A/B bucketing — output is
+ * just a chip-set index, observable to the user, with zero security
+ * impact. We use the Web Crypto API anyway because it (a) keeps SAST
+ * tooling (Sonar's javascript:S2245) silent and (b) is supported in
+ * every browser made since 2015 (IE 11+, Safari 6.1+, Chrome 11+,
+ * Firefox 21+). On the off-chance crypto is unavailable, the caller
+ * catches and defaults to variant 0 — that's fine, the worst case is
+ * "this visitor always sees the first chip set", not a bug.
+ */
+function pickIndex(max) {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] % max;
+}
+
 /** Pick a sticky variant per browser session. */
 function chooseVariant() {
   let stored;
@@ -81,7 +98,8 @@ function chooseVariant() {
     const idx = parseInt(stored, 10);
     if (idx >= 0 && idx < QUESTION_VARIANTS.length) return QUESTION_VARIANTS[idx];
   }
-  const idx = Math.floor(Math.random() * QUESTION_VARIANTS.length);
+  let idx;
+  try { idx = pickIndex(QUESTION_VARIANTS.length); } catch (_) { idx = 0; }
   try { sessionStorage.setItem(VARIANT_STORAGE_KEY, String(idx)); } catch (_) {}
   return QUESTION_VARIANTS[idx];
 }
@@ -461,61 +479,73 @@ async function startOver() {
 }
 
 /* ── Bubbles ──────────────────────────────────────────────────────────── */
+//
+// All four append* helpers funnel through `appendBubble`. Each variant only
+// differs by the wrap classes, the bubble classes, and how the inner HTML
+// is rendered (markdown / textContent / static dots). Centralising kills the
+// near-identical boilerplate that SAST tools flag as duplication, and makes
+// future bubble types a 1-liner.
 
-function appendBotBubble(markdown) {
+function appendBubble(opts) {
   const msgs = document.getElementById('gaMessages');
   if (!msgs) return null;
-  const wrap = document.createElement('div');
-  wrap.className = 'ga-msg ga-msg-bot ga-msg-enter';
+
+  const wrap   = document.createElement('div');
+  wrap.className = opts.wrapClass;
+
   const bubble = document.createElement('div');
-  bubble.className = 'ga-bubble ga-bubble-bot ga-md';
-  bubble.innerHTML = renderMarkdown(markdown || '');
+  bubble.className = opts.bubbleClass;
+
+  if (opts.markdown != null) {
+    bubble.innerHTML = renderMarkdown(opts.markdown || '');
+  } else if (opts.text != null) {
+    bubble.textContent = opts.text;
+  } else if (opts.html != null) {
+    bubble.innerHTML = opts.html;
+  }
+
   wrap.appendChild(bubble);
   msgs.appendChild(wrap);
   scrollToBottom();
-  setTimeout(function () { wrap.classList.remove('ga-msg-enter'); }, 300);
+
+  if (opts.animate) {
+    setTimeout(function () { wrap.classList.remove('ga-msg-enter'); }, 300);
+  }
   return wrap;
+}
+
+function appendBotBubble(markdown) {
+  return appendBubble({
+    wrapClass:   'ga-msg ga-msg-bot ga-msg-enter',
+    bubbleClass: 'ga-bubble ga-bubble-bot ga-md',
+    markdown:    markdown,
+    animate:     true,
+  });
 }
 
 function appendUserBubble(text) {
-  const msgs = document.getElementById('gaMessages');
-  if (!msgs) return;
-  const wrap = document.createElement('div');
-  wrap.className = 'ga-msg ga-msg-user ga-msg-enter';
-  const bubble = document.createElement('div');
-  bubble.className = 'ga-bubble ga-bubble-user';
-  bubble.textContent = text;
-  wrap.appendChild(bubble);
-  msgs.appendChild(wrap);
-  scrollToBottom();
-  setTimeout(function () { wrap.classList.remove('ga-msg-enter'); }, 300);
+  return appendBubble({
+    wrapClass:   'ga-msg ga-msg-user ga-msg-enter',
+    bubbleClass: 'ga-bubble ga-bubble-user',
+    text:        text,
+    animate:     true,
+  });
 }
 
 function appendErrorBubble(text) {
-  const msgs = document.getElementById('gaMessages');
-  if (!msgs) return;
-  const wrap = document.createElement('div');
-  wrap.className = 'ga-msg ga-msg-bot';
-  const bubble = document.createElement('div');
-  bubble.className = 'ga-bubble ga-bubble-bot ga-bubble-error';
-  bubble.textContent = text;
-  wrap.appendChild(bubble);
-  msgs.appendChild(wrap);
-  scrollToBottom();
+  return appendBubble({
+    wrapClass:   'ga-msg ga-msg-bot',
+    bubbleClass: 'ga-bubble ga-bubble-bot ga-bubble-error',
+    text:        text,
+  });
 }
 
 function appendTypingIndicator() {
-  const msgs = document.getElementById('gaMessages');
-  if (!msgs) return null;
-  const wrap = document.createElement('div');
-  wrap.className = 'ga-msg ga-msg-bot';
-  const bubble = document.createElement('div');
-  bubble.className = 'ga-bubble ga-bubble-bot ga-typing';
-  bubble.innerHTML = '<span class="ga-typing-dot"></span><span class="ga-typing-dot"></span><span class="ga-typing-dot"></span>';
-  wrap.appendChild(bubble);
-  msgs.appendChild(wrap);
-  scrollToBottom();
-  return wrap;
+  return appendBubble({
+    wrapClass:   'ga-msg ga-msg-bot',
+    bubbleClass: 'ga-bubble ga-bubble-bot ga-typing',
+    html:        '<span class="ga-typing-dot"></span><span class="ga-typing-dot"></span><span class="ga-typing-dot"></span>',
+  });
 }
 
 function setSendDisabled(disabled) {
@@ -575,18 +605,22 @@ function renderBlock(block) {
   return '<p class="ga-md-p">' + inline + '</p>';
 }
 
+// All inline regexes are explicitly length-bounded. The model is capped at
+// MAX_REPLY_CHARS (4000) so any individual span can't realistically exceed
+// these limits, and bounded quantifiers eliminate the super-linear backtracking
+// surface that SAST tools (rightly) flag on `+` over negated character classes.
 function renderInline(text) {
   let out = text;
-  out = out.replace(/`([^`]+)`/g, function (_m, c) {
+  out = out.replace(/`([^`]{1,500})`/g, function (_m, c) {
     return '<code class="ga-md-code">' + c + '</code>';
   });
-  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  out = out.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
-  out = out.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>');
-  out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (_m, label, url) {
+  out = out.replace(/\*\*([^*]{1,500})\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/(^|[^*])\*([^*\n]{1,500})\*(?!\*)/g, '$1<em>$2</em>');
+  out = out.replace(/(^|[^_])_([^_\n]{1,500})_(?!_)/g, '$1<em>$2</em>');
+  out = out.replace(/\[([^\]]{1,200})\]\((https?:\/\/[^\s)]{1,500})\)/g, function (_m, label, url) {
     return '<a href="' + url + '" target="_blank" rel="noopener">' + label + '</a>';
   });
-  out = out.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, function (_m, prefix, url) {
+  out = out.replace(/(^|[\s(])(https?:\/\/[^\s<)]{1,500})/g, function (_m, prefix, url) {
     return prefix + '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
   });
   return out;
