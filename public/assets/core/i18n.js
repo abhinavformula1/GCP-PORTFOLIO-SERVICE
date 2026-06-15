@@ -106,6 +106,7 @@ export const LANG = {
 export const PAGE_LANG = {
   en: {
     headerTitle: 'Senior Salesforce Application Engineer',
+    home: 'Home',
     getInTouch: 'Get In Touch',
     hireTitleSent: 'Message sent',
     hireTitleAlready: 'Already received',
@@ -199,6 +200,7 @@ export const PAGE_LANG = {
   },
   fr: {
     headerTitle: 'Ingénieur Senior en Applications Salesforce',
+    home: 'Accueil',
     getInTouch: 'Me Contacter',
     hireTitleSent: 'Message envoyé',
     hireTitleAlready: 'Déjà reçu',

@@ -106,7 +106,7 @@
       <!-- Signed-in user avatar (right side) -->
       <div class="topbar-user" id="topbarUser" hidden>
         <button class="topbar-avatar-btn" id="topbarAvatarBtn" onclick="toggleUserMenu()" aria-label="User menu">
-          <img class="topbar-user-photo" id="topbarUserPhoto" src="" alt="" />
+          <img class="topbar-user-photo" id="topbarUserPhoto" src="" alt="Signed-in user profile photo" />
         </button>
         <div class="topbar-dropdown" id="topbarDropdown" hidden>
           <div class="topbar-dropdown-name" id="topbarUserName"></div>
@@ -172,10 +172,16 @@
           </button>
         </div>
         <div class="hero-actions">
-          <md-filled-button class="hire-me-btn" onclick="window.openHireMe && window.openHireMe()">
+          <md-outlined-button class="home-btn" aria-label="Home" aria-pressed="true"
+            onclick="window.closeSystemDesign && window.closeSystemDesign()">
+            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">home</span>
+            <span data-i18n="home">Home</span>
+          </md-outlined-button>
+          <md-outlined-button class="hire-me-btn hire-me-btn-neutral" aria-label="Get in touch"
+            onclick="window.openHireMe && window.openHireMe()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">waving_hand</span>
             <span data-i18n="getInTouch">Get In Touch</span>
-          </md-filled-button>
+          </md-outlined-button>
           <!-- "Refer Me" — secondary CTA. Pure client-side: the modal hands
                the visitor a ready-to-send email body and a one-click resume
                download. Sending happens from the visitor's own email account
@@ -183,7 +189,8 @@
                verified sender domain. The Recommendations feature already
                carries the SF integration narrative; this stays deliberately
                backend-free. -->
-          <md-outlined-button class="refer-btn" onclick="window.openReferMe && window.openReferMe()">
+          <md-outlined-button class="refer-btn" aria-label="Refer me"
+            onclick="window.openReferMe && window.openReferMe()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">forward_to_inbox</span>
             <span data-i18n="referMe">Refer Me</span>
           </md-outlined-button>
@@ -194,7 +201,7 @@
                this view. URL hash #/system-design/<id> is the source of
                truth for which topic is rendered, so deep links are
                shareable and back/forward both work. -->
-          <md-outlined-button class="systemdesign-btn" aria-pressed="false"
+          <md-outlined-button class="systemdesign-btn" aria-label="System Design" aria-pressed="false"
             onclick="window.openSystemDesign && window.openSystemDesign()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">schema</span>
             <span data-i18n="systemDesign">System Design</span>
@@ -797,7 +804,7 @@
            sees exactly what'll appear publicly (name, company, photo) so
            nothing about their submission is a surprise. -->
       <div class="lr-identity" id="lr-identity">
-        <img class="lr-avatar" id="lr-avatar" alt="" />
+        <img class="lr-avatar" id="lr-avatar" alt="Recommendation author profile photo" />
         <div class="lr-identity-text">
           <span class="lr-name" id="lr-name"></span>
           <span class="lr-company" id="lr-company"></span>
