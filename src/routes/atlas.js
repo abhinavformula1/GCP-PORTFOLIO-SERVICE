@@ -43,6 +43,26 @@ const { ValidationError } = require('../errors');
 
 const router = express.Router();
 const MODEL_KEYS = Object.keys(GEMINI_MODELS);
+const ATLAS_PERSONA_VERSION = '2026-06-15';
+const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const CACHEABLE_QUESTIONS = new Set([
+  'is abhinav available for a senior staff salesforce role',
+  'tell me about his most recent project at salesforce',
+  'which industries has he delivered to',
+  'how many years of cpq experience does he have',
+  'how can i get in touch',
+  'how can i reach him',
+  'how does this portfolio integrate salesforce with gcp',
+  'what design patterns does abhinav use for apex callouts',
+  'whats his experience with omnistudio',
+  'has he worked on event driven architectures',
+  'which gcp services does he use day to day',
+  'give me a 30 second pitch on abhinav',
+  'whats his strongest area',
+  'what certifications does he hold',
+  'what kind of role is he looking for next',
+  'does he know lwc',
+]);
 
 const validateAsk = [
   body('message')
@@ -87,9 +107,67 @@ async function persistTurns(uid, userText, botText, usage) {
   try {
     await firestore.appendAtlasTurn(uid, { role: 'user',  text: userText });
     await firestore.appendAtlasTurn(uid, { role: 'model', text: botText, usage });
-    await firestore.appendAtlasUsageEvent(uid, usage);
+    if (!usage || !usage.cached) await firestore.appendAtlasUsageEvent(uid, usage);
   } catch (err) {
     console.warn('[atlas] persistTurns failed:', err.message);
+  }
+}
+
+function normaliseCacheQuestion(message) {
+  return String(message || '')
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function cacheKeyFor({ message, model, history }) {
+  if (Array.isArray(history) && history.length > 0) return null;
+  const normalizedQuestion = normaliseCacheQuestion(message);
+  if (!CACHEABLE_QUESTIONS.has(normalizedQuestion)) return null;
+  const raw = [ATLAS_PERSONA_VERSION, model, normalizedQuestion].join('|');
+  return {
+    key: crypto.createHash('sha256').update(raw).digest('hex'),
+    normalizedQuestion,
+  };
+}
+
+function cachedUsage(model) {
+  const modelInfo = GEMINI_MODELS[model] || GEMINI_MODELS[DEFAULT_GEMINI_MODEL_KEY];
+  return {
+    model:        modelInfo.id,
+    modelLabel:   modelInfo.label,
+    inputTokens:  0,
+    outputTokens: 0,
+    totalTokens:  0,
+    estimatedUsd: 0,
+    estimatedInr: 0,
+    cached:       true,
+  };
+}
+
+async function readCachedAnswer(cacheRef) {
+  if (!cacheRef) return null;
+  try {
+    return await firestore.getAtlasCacheEntry(cacheRef.key);
+  } catch (err) {
+    console.warn('[atlas] cache read failed:', err.message);
+    return null;
+  }
+}
+
+async function saveCachedAnswer(cacheRef, { model, answer }) {
+  if (!cacheRef || !answer) return;
+  try {
+    await firestore.saveAtlasCacheEntry(cacheRef.key, {
+      normalizedQuestion: cacheRef.normalizedQuestion,
+      model,
+      personaVersion: ATLAS_PERSONA_VERSION,
+      answer,
+      expiresAtMs: Date.now() + CACHE_TTL_MS,
+    });
+  } catch (err) {
+    console.warn('[atlas] cache write failed:', err.message);
   }
 }
 
@@ -130,11 +208,27 @@ router.post('/atlas/ask',
 
     try {
       const history = await loadServerHistory(uid);
+      const cacheRef = cacheKeyFor({ message, model, history });
+      const cached = await readCachedAnswer(cacheRef);
+      if (cached && cached.answer) {
+        const usage = cachedUsage(model);
+        persistTurns(uid, message, cached.answer, usage);
+        console.log('[atlas/cache]', { transactionId, uid, model: usage.model });
+        return res.status(200).json({
+          success: true,
+          answer: cached.answer,
+          usage,
+          cached: true,
+          transactionId,
+        });
+      }
+
       const { answer, usage } = await ask({ message, history, model });
 
       // Fire-and-forget persistence — we already have the answer; the
       // user shouldn't wait on Firestore to see it.
       persistTurns(uid, message, answer, usage);
+      saveCachedAnswer(cacheRef, { model, answer });
 
       console.log('[atlas]', {
         transactionId, uid,
@@ -145,7 +239,7 @@ router.post('/atlas/ask',
         usage,
       });
 
-      return res.status(200).json({ success: true, answer, usage, transactionId });
+      return res.status(200).json({ success: true, answer, usage, cached: false, transactionId });
     } catch (err) {
       return next(err);
     }
@@ -190,6 +284,17 @@ router.post('/atlas/stream',
 
     try {
       const history = await loadServerHistory(uid);
+      const cacheRef = cacheKeyFor({ message, model, history });
+      const cached = await readCachedAnswer(cacheRef);
+      if (cached && cached.answer) {
+        finalAnswer = cached.answer;
+        usage = cachedUsage(model);
+        send({ done: finalAnswer, usage, cached: true, transactionId });
+        persistTurns(uid, message, finalAnswer, usage);
+        console.log('[atlas/stream/cache]', { transactionId, uid, model: usage.model });
+        return undefined;
+      }
+
       for await (const evt of askStream({ message, history, model })) {
         if (aborted) break;
         if (evt.kind === 'chunk') {
@@ -202,6 +307,7 @@ router.post('/atlas/stream',
       }
 
       if (!aborted && finalAnswer) persistTurns(uid, message, finalAnswer, usage);
+      if (!aborted && finalAnswer) saveCachedAnswer(cacheRef, { model, answer: finalAnswer });
 
       console.log('[atlas/stream]', {
         transactionId, uid,

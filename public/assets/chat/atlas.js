@@ -363,6 +363,7 @@ async function streamAsk(message, history) {
   let typingRemoved = false;
   let final = '';
   let usage = null;
+  let cached = false;
 
   try {
     const reader = resp.body.getReader();
@@ -406,6 +407,7 @@ async function streamAsk(message, history) {
         if (typeof parsed.done === 'string') {
           final = parsed.done;
           usage = parsed.usage || null;
+          cached = !!parsed.cached;
           if (bubble) bubble.innerHTML = renderMarkdown(final);
         }
       }
@@ -426,6 +428,7 @@ async function streamAsk(message, history) {
   if (answer) {
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
+    if (usage && cached) usage.cached = true;
     appendUsageMeta(bubbleWrap, usage);
     setTimeout(refreshUsageSummary, 800);
   }
@@ -452,7 +455,9 @@ async function fallbackJsonAsk(message, history) {
     const answer = (res.body && res.body.answer)
       || "I couldn't generate a response. Please try again.";
     const bubbleWrap = appendBotBubble(answer);
-    appendUsageMeta(bubbleWrap, res.body && res.body.usage);
+    const usage = res.body && res.body.usage;
+    if (usage && res.body && res.body.cached) usage.cached = true;
+    appendUsageMeta(bubbleWrap, usage);
     setTimeout(refreshUsageSummary, 800);
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
@@ -689,6 +694,14 @@ function appendTypingIndicator() {
 
 function appendUsageMeta(wrap, usage) {
   if (!wrap || !usage) return;
+  if (usage.cached) {
+    const meta = document.createElement('div');
+    meta.className = 'ga-atlas-usage ga-atlas-usage-cache';
+    meta.textContent = 'Retrieved from cache · 0 Gemini tokens used · Est. cost ₹0.00';
+    wrap.appendChild(meta);
+    scrollToBottom();
+    return;
+  }
   const totalTokens = Number(usage.totalTokens || 0);
   const estimatedInr = Number(usage.estimatedInr || 0);
   if (!totalTokens && !estimatedInr) return;
