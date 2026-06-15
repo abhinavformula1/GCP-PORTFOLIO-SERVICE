@@ -33,10 +33,106 @@ import { currentLang } from '../core/i18n.js';
 // body is raw HTML -- keep it self-contained; the prose styles in
 // style.css's `.sd-detail` block handle h3 / p / ul / pre / code.
 export const TOPICS = [
+  // ── Flagship: Salesforce -> MuleSoft Authentication ────────────────────────
+  {
+    id: 'salesforce-mulesoft-authentication',
+    category: 'integration',
+    icon: 'key',
+    status: 'Published',
+    tags: ['Salesforce', 'MuleSoft', 'OAuth 2.0', 'Security'],
+    readMinutes: 10,
+    en: {
+      title: 'Salesforce to MuleSoft Authentication',
+      subtitle: 'OAuth 2.0 Client Credentials, Named Credentials, TLS, and bearer-token risk',
+      body: [
+        '<section class="sd-hero-block">',
+        '<div class="sd-kicker">Selected design</div>',
+        '<h3 id="executive-summary" data-toc-label="Summary">OAuth 2.0 Client Credentials via Salesforce External + Named Credentials</h3>',
+        '<p>This design lets Salesforce prove application identity to MuleSoft without hard-coding secrets in Apex. OAuth handles application authentication, TLS protects the channel, and Salesforce manages token acquisition and reuse through platform configuration.</p>',
+        '<div class="sd-decision-grid">',
+        '<div><span>Caller</span><strong>Salesforce Apex</strong></div>',
+        '<div><span>Gateway</span><strong>MuleSoft API</strong></div>',
+        '<div><span>Grant</span><strong>Client Credentials</strong></div>',
+        '<div><span>Risk focus</span><strong>Bearer token replay</strong></div>',
+        '</div>',
+        '</section>',
+        '<h3 id="problem" data-toc-label="Problem">Problem</h3>',
+        '<p>Salesforce is the system of record and MuleSoft fronts downstream business APIs. There is no browser, login page, or user session when Salesforce calls MuleSoft. The core question is: how does Salesforce prove its identity without scattering long-lived secrets across application code?</p>',
+        '<h3 id="goals" data-toc-label="Goals">Design goals</h3>',
+        '<div class="sd-card-grid">',
+        '<div class="sd-info-card"><strong>Authenticate the caller</strong><span>Prove that Salesforce is the trusted application invoking MuleSoft.</span></div>',
+        '<div class="sd-info-card"><strong>Protect credentials</strong><span>Keep client credentials out of Apex and source control.</span></div>',
+        '<div class="sd-info-card"><strong>Use standards</strong><span>Prefer OAuth 2.0 and TLS over custom authentication code.</span></div>',
+        '<div class="sd-info-card"><strong>Reduce operations risk</strong><span>Let the platform manage token lifecycle and reuse.</span></div>',
+        '</div>',
+        '<h3 id="trust-boundaries" data-toc-label="Trust boundaries">Trust boundaries</h3>',
+        '<div class="sd-flow" aria-label="Trust boundary flow">',
+        '<span>Apex</span><span>Salesforce Platform</span><span>Network</span><span>MuleSoft</span><span>Downstream APIs</span>',
+        '</div>',
+        '<p>The protected assets are the client id, client secret, access token, and business data. The attacker model includes network observation, replay attempts, log access, repository access, and over-privileged org access. It does not assume TLS cryptography or Salesforce encrypted credential storage can be broken.</p>',
+        '<h3 id="alternatives" data-toc-label="Alternatives">Alternatives considered</h3>',
+        '<div class="sd-comparison">',
+        '<div class="sd-comparison-row"><strong>Basic Authentication</strong><span>Rejected</span><p>Simple, but long-lived credentials are transmitted on every request and rotation is weak.</p></div>',
+        '<div class="sd-comparison-row"><strong>API Key</strong><span>Rejected</span><p>Operationally easy, but not identity-aware and difficult to audit.</p></div>',
+        '<div class="sd-comparison-row sd-selected"><strong>OAuth 2.0 Client Credentials</strong><span>Selected</span><p>Industry standard, short-lived tokens, native Salesforce support, and platform-managed lifecycle.</p></div>',
+        '<div class="sd-comparison-row"><strong>Mutual TLS</strong><span>Future maturity</span><p>Strong sender identity, but certificate lifecycle adds operational overhead.</p></div>',
+        '<div class="sd-comparison-row"><strong>JWT Bearer Flow</strong><span>Not selected</span><p>Strong cryptographic identity, but private key operations were unnecessary for this use case.</p></div>',
+        '</div>',
+        '<h3 id="selected-architecture" data-toc-label="Architecture">Selected architecture</h3>',
+        '<div class="sd-sequence">',
+        '<div><b>1</b><span>Apex makes a callout through the Named Credential.</span></div>',
+        '<div><b>2</b><span>Salesforce requests or reuses an OAuth access token.</span></div>',
+        '<div><b>3</b><span>The Named Credential injects the token into the MuleSoft API request.</span></div>',
+        '<div><b>4</b><span>MuleSoft validates the token and routes the business request.</span></div>',
+        '</div>',
+        '<p>Most business requests require only one outbound call because the platform reuses previously obtained tokens until expiry.</p>',
+        '<h3 id="implementation" data-toc-label="Implementation">Salesforce implementation</h3>',
+        '<div class="sd-card-grid">',
+        '<div class="sd-info-card"><strong>External Credential</strong><span>Defines OAuth protocol, token endpoint, client credentials, and principal configuration.</span></div>',
+        '<div class="sd-info-card"><strong>Named Credential</strong><span>Defines the endpoint, performs token injection, and enables token reuse.</span></div>',
+        '</div>',
+        '<h3 id="security-properties" data-toc-label="Security properties">Security properties achieved</h3>',
+        '<table class="sd-matrix"><tbody>',
+        '<tr><th>Authentication</th><td>OAuth 2.0 Client Credentials</td></tr>',
+        '<tr><th>Confidentiality</th><td>TLS protects credentials, token, and business data in transit.</td></tr>',
+        '<tr><th>Integrity</th><td>TLS protects transport integrity; JWT signatures provide token integrity if JWT access tokens are used.</td></tr>',
+        '<tr><th>Credential protection</th><td>Salesforce encrypted credential storage, no hard-coded Apex secrets.</td></tr>',
+        '<tr><th>Token lifecycle</th><td>Platform-managed acquisition, caching, and renewal.</td></tr>',
+        '<tr><th>Replay resistance</th><td>Partial. Bearer tokens remain replayable until expiry if stolen.</td></tr>',
+        '<tr><th>Sender constraint</th><td>Not implemented. mTLS or DPoP would be the next maturity step.</td></tr>',
+        '</tbody></table>',
+        '<h3 id="failure-modes" data-toc-label="Failure modes">Failure modes</h3>',
+        '<div class="sd-risk-grid">',
+        '<div class="sd-risk low"><strong>Token expires</strong><span>Automatic token renewal. Low operational risk.</span></div>',
+        '<div class="sd-risk medium"><strong>Token stolen</strong><span>Replay possible until expiration. Mitigate with TLS and short token lifetime.</span></div>',
+        '<div class="sd-risk high"><strong>Client secret leaked</strong><span>Attacker can request tokens. Requires immediate secret rotation.</span></div>',
+        '<div class="sd-risk medium"><strong>TLS failure</strong><span>Credential and data compromise. Rely on certificate validation and strong TLS.</span></div>',
+        '</div>',
+        '<h3 id="bearer-token-risk" data-toc-label="Bearer tokens">Bearer-token risk</h3>',
+        '<p>Bearer tokens behave like cash: possession is enough to use them. A signature can prevent forgery, but it does not prevent reuse. The strongest mitigation is sender-constrained tokens such as mTLS or DPoP, which bind the token to a specific client.</p>',
+        '<h3 id="conclusions" data-toc-label="Conclusions">Architectural conclusions</h3>',
+        '<ul>',
+        '<li>OAuth solves application authentication.</li>',
+        '<li>TLS protects communication and business data in transit.</li>',
+        '<li>Platform-managed authentication reduces custom-code risk.</li>',
+        '<li>Bearer-token replay remains the main residual risk.</li>',
+        '<li>Sender-constrained tokens are the next security maturity step.</li>',
+        '</ul>',
+      ].join(''),
+    },
+    fr: {
+      title: 'Authentification Salesforce vers MuleSoft',
+      subtitle: 'OAuth 2.0 Client Credentials, Named Credentials, TLS et risque bearer-token',
+      body: '<p>Version detaillee en anglais pour conserver la precision des termes de securite.</p>',
+    },
+  },
+
   // ── Topic 1: GCP <-> Salesforce Integration ────────────────────────────────
   {
     id: 'gcp-sf-integration',
+    category: 'integration',
     icon: 'cloud_sync',
+    status: 'Published',
     tags: ['GCP', 'Salesforce', 'Integration'],
     readMinutes: 6,
     en: {
@@ -86,7 +182,9 @@ export const TOPICS = [
   // ── Topic 2: Event-Driven Architecture ─────────────────────────────────────
   {
     id: 'event-driven-architecture',
+    category: 'architecture',
     icon: 'bolt',
+    status: 'Published',
     tags: ['Salesforce', 'Platform Events', 'CDC', 'EDA'],
     readMinutes: 7,
     en: {
@@ -136,7 +234,9 @@ export const TOPICS = [
   // ── Topic 3: Designing for Millions of Records ─────────────────────────────
   {
     id: 'millions-of-records',
+    category: 'scale',
     icon: 'database',
+    status: 'Published',
     tags: ['Salesforce', 'Apex', 'Bulk', 'LDV'],
     readMinutes: 8,
     en: {
@@ -202,7 +302,9 @@ export const TOPICS = [
   // ── Topic 4: Sharing & Visibility (stub) ───────────────────────────────────
   {
     id: 'sharing-and-visibility',
+    category: 'security',
     icon: 'shield_person',
+    status: 'Coming soon',
     tags: ['Salesforce', 'Sharing', 'Security'],
     readMinutes: 4,
     stub: true,
@@ -221,7 +323,9 @@ export const TOPICS = [
   // ── Topic 5: CPQ Bundle Modelling (stub) ───────────────────────────────────
   {
     id: 'cpq-bundle-modeling',
+    category: 'delivery',
     icon: 'inventory_2',
+    status: 'Coming soon',
     tags: ['CPQ', 'Pricing', 'Product Modeling'],
     readMinutes: 5,
     stub: true,
@@ -240,7 +344,9 @@ export const TOPICS = [
   // ── Topic 6: Salesforce DevOps with Copado (stub) ──────────────────────────
   {
     id: 'salesforce-devops',
+    category: 'delivery',
     icon: 'rocket_launch',
+    status: 'Coming soon',
     tags: ['DevOps', 'Copado', 'CI/CD'],
     readMinutes: 4,
     stub: true,
@@ -265,8 +371,16 @@ let _resumeMain  = null;
 let _sdAside     = null;
 let _sdDetail    = null;
 let _btn         = null;
+let _topicFilter = '';
 
 const HASH_PREFIX = '#/system-design';
+const CATEGORY_LABELS = {
+  integration: 'Integration',
+  architecture: 'Architecture',
+  scale: 'Scale',
+  security: 'Security',
+  delivery: 'Delivery',
+};
 
 function topicById(id) {
   for (let i = 0; i < TOPICS.length; i++) {
@@ -294,6 +408,22 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function normaliseText(s) {
+  return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function uiText(key) {
+  const fr = currentLang === 'fr';
+  const dict = {
+    title:       fr ? 'Carnet d architecture' : 'Architecture Notes',
+    intro:       fr ? 'Choisissez un sujet pour voir les compromis, les choix et les details d implementation.' : 'Choose a topic to review trade-offs, design choices, and implementation details.',
+    search:      fr ? 'Filtrer les sujets' : 'Filter topics',
+    noResults:   fr ? 'Aucun sujet ne correspond.' : 'No matching topics.',
+    articleLabel: fr ? 'Note de conception' : 'Design note',
+  };
+  return dict[key] || '';
 }
 
 // ── DOM construction (lazy, idempotent) ──────────────────────────────────────
@@ -327,38 +457,121 @@ function ensureDom() {
 // ── Rendering ────────────────────────────────────────────────────────────────
 function renderTopicList() {
   if (!_sdAside) return;
+  const query = normaliseText(_topicFilter);
   let html = '';
   html += '<div class="sd-topics-header">';
   html += '<div class="sd-eyebrow" data-i18n="systemDesignEyebrow">System Design</div>';
-  html += '<button type="button" class="sd-back" onclick="window.closeSystemDesign && window.closeSystemDesign()">';
-  html += '<span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>';
-  html += '<span data-i18n="backToResume">Back to Resume</span>';
-  html += '</button>';
+  html += '<h2 class="sd-topics-title">' + escapeHtml(uiText('title')) + '</h2>';
+  html += '<p class="sd-topics-intro">' + escapeHtml(uiText('intro')) + '</p>';
+  html += '<label class="sd-topic-search">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">search</span>';
+  html += '<input type="search" value="' + escapeHtml(_topicFilter) + '" placeholder="' + escapeHtml(uiText('search')) + '" aria-label="' + escapeHtml(uiText('search')) + '">';
+  html += '</label>';
   html += '</div>';
-  html += '<ul class="sd-topic-list" role="list">';
-  for (let i = 0; i < TOPICS.length; i++) {
-    const t   = TOPICS[i];
-    const loc = localeOf(t);
-    const active = t.id === _activeTopic ? ' sd-active' : '';
-    html += '<li class="sd-topic-item' + active + '" data-topic-id="' + t.id + '">';
-    html += '<button type="button" class="sd-topic-btn" data-topic-id="' + t.id + '">';
-    html += '<span class="material-symbols-outlined sd-topic-icon" aria-hidden="true">' + (t.icon || 'article') + '</span>';
-    html += '<span class="sd-topic-text">';
-    html += '<span class="sd-topic-title" data-i18n="' + topicKey(t.id, 'title') + '">' + escapeHtml(loc.title) + '</span>';
-    html += '<span class="sd-topic-sub" data-i18n="' + topicKey(t.id, 'subtitle') + '">' + escapeHtml(loc.subtitle) + '</span>';
-    html += '</span>';
-    if (t.stub) {
-      html += '<span class="sd-topic-stub" data-i18n="systemDesignStub">Soon</span>';
+  html += '<button type="button" class="sd-overview-link' + (!_activeTopic ? ' sd-active' : '') + '" data-topic-id="">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">dashboard</span>';
+  html += '<span>Overview</span>';
+  html += '</button>';
+  html += '<div class="sd-topic-list" role="list">';
+  let visibleCount = 0;
+  Object.keys(CATEGORY_LABELS).forEach(function (category) {
+    let group = '';
+    let groupCount = 0;
+    for (let i = 0; i < TOPICS.length; i++) {
+      const t = TOPICS[i];
+      if ((t.category || 'architecture') !== category) continue;
+      const loc = localeOf(t);
+      const haystack = normaliseText(loc.title + ' ' + loc.subtitle + ' ' + (t.tags || []).join(' '));
+      if (query && haystack.indexOf(query) === -1) continue;
+      groupCount += 1;
+      visibleCount += 1;
+      const active = t.id === _activeTopic ? ' sd-active' : '';
+      const disabled = t.stub ? ' sd-disabled' : '';
+      group += '<li class="sd-topic-item' + active + disabled + '" data-topic-id="' + t.id + '">';
+      group += '<button type="button" class="sd-topic-btn" data-topic-id="' + t.id + '"' + (t.id === _activeTopic ? ' aria-current="page"' : '') + '>';
+      group += '<span class="material-symbols-outlined sd-topic-icon" aria-hidden="true">' + (t.icon || 'article') + '</span>';
+      group += '<span class="sd-topic-text">';
+      group += '<span class="sd-topic-title" data-i18n="' + topicKey(t.id, 'title') + '">' + escapeHtml(loc.title) + '</span>';
+      group += '<span class="sd-topic-sub" data-i18n="' + topicKey(t.id, 'subtitle') + '">' + escapeHtml(loc.subtitle) + '</span>';
+      group += '</span>';
+      group += '</button>';
+      group += '</li>';
     }
-    html += '</button>';
-    html += '</li>';
+    if (groupCount) {
+      html += '<section class="sd-topic-group">';
+      html += '<div class="sd-topic-group-title">' + escapeHtml(CATEGORY_LABELS[category]) + '</div>';
+      html += '<ul role="list">' + group + '</ul>';
+      html += '</section>';
+    }
+  });
+  if (!visibleCount) {
+    html += '<div class="sd-topic-empty">' + escapeHtml(uiText('noResults')) + '</div>';
   }
-  html += '</ul>';
+  html += '</div>';
   _sdAside.innerHTML = html;
+  const search = _sdAside.querySelector('.sd-topic-search input');
+  if (search) {
+    search.addEventListener('input', function () {
+      _topicFilter = search.value || '';
+      renderTopicList();
+      highlightActiveTopic();
+      const nextSearch = _sdAside.querySelector('.sd-topic-search input');
+      if (nextSearch) {
+        nextSearch.focus();
+        nextSearch.setSelectionRange(nextSearch.value.length, nextSearch.value.length);
+      }
+    });
+  }
   _sdAside.querySelectorAll('.sd-topic-btn').forEach(function (b) {
     b.addEventListener('click', function () {
       const id = b.getAttribute('data-topic-id');
       location.hash = HASH_PREFIX + '/' + id;
+    });
+  });
+  const overview = _sdAside.querySelector('.sd-overview-link');
+  if (overview) {
+    overview.addEventListener('click', function () {
+      location.hash = HASH_PREFIX;
+    });
+  }
+}
+
+function renderLanding() {
+  if (!_sdDetail) return;
+  const published = TOPICS.filter(function (t) { return !t.stub; });
+  const soon = TOPICS.filter(function (t) { return t.stub; });
+  let html = '';
+  html += '<section class="sd-landing">';
+  html += '<div class="sd-landing-hero">';
+  html += '<div class="sd-article-eyebrow">System Design</div>';
+  html += '<h2>Architecture Notes</h2>';
+  html += '<p>Deep-dive notes on Salesforce, GCP, MuleSoft, scale, security, and integration trade-offs. Built for recruiters, architects, and security reviewers who want more than resume bullets.</p>';
+  html += '</div>';
+  html += '<h3>Published notes</h3>';
+  html += '<div class="sd-landing-grid">';
+  published.forEach(function (t) {
+    const loc = localeOf(t);
+    html += '<button type="button" class="sd-landing-card" data-topic-id="' + t.id + '">';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">' + (t.icon || 'article') + '</span>';
+    html += '<strong>' + escapeHtml(loc.title) + '</strong>';
+    html += '<small>' + escapeHtml(loc.subtitle) + '</small>';
+    html += '</button>';
+  });
+  html += '</div>';
+  if (soon.length) {
+    html += '<h3>Coming next</h3>';
+    html += '<div class="sd-coming-grid">';
+    soon.forEach(function (t) {
+      const loc = localeOf(t);
+      html += '<div class="sd-coming-card"><strong>' + escapeHtml(loc.title) + '</strong><span>Draft</span></div>';
+    });
+    html += '</div>';
+  }
+  html += '</section>';
+  _sdDetail.innerHTML = html;
+  _sdDetail.querySelectorAll('.sd-landing-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      location.hash = HASH_PREFIX + '/' + card.getAttribute('data-topic-id');
     });
   });
 }
@@ -373,6 +586,7 @@ function renderTopicDetail() {
   const loc = localeOf(topic);
   let html = '<article class="sd-article">';
   html += '<header class="sd-article-head">';
+  html += '<div class="sd-article-eyebrow">' + escapeHtml(uiText('articleLabel')) + '</div>';
   html += '<h2 class="sd-article-title">' + escapeHtml(loc.title) + '</h2>';
   if (loc.subtitle) {
     html += '<p class="sd-article-sub">' + escapeHtml(loc.subtitle) + '</p>';
@@ -411,6 +625,8 @@ function setView(view) {
   if (!ensureDom()) return;
   _activeView = view;
   const sysOn = view === 'sysdesign';
+  const body = document.querySelector('.body');
+  if (body) body.classList.toggle('sd-mode', sysOn);
   if (_resumeAside) _resumeAside.toggleAttribute('hidden', sysOn);
   if (_resumeMain)  _resumeMain.toggleAttribute('hidden', sysOn);
   _sdAside.toggleAttribute('hidden', !sysOn);
@@ -419,24 +635,21 @@ function setView(view) {
 }
 
 function updateButton() {
-  if (!_btn) return;
-  const label = _btn.querySelector('[data-i18n="systemDesign"], [data-i18n="backToResume"]');
-  const icon  = _btn.querySelector('.material-symbols-outlined');
-  if (_activeView === 'sysdesign') {
-    if (label) {
-      label.setAttribute('data-i18n', 'backToResume');
-      label.textContent = currentLang === 'fr' ? 'Retour au CV' : 'Back to Resume';
-    }
-    if (icon) icon.textContent = 'arrow_back';
-    _btn.setAttribute('aria-pressed', 'true');
-  } else {
-    if (label) {
-      label.setAttribute('data-i18n', 'systemDesign');
-      label.textContent = currentLang === 'fr' ? 'Conception systeme' : 'System Design';
-    }
-    if (icon) icon.textContent = 'schema';
-    _btn.setAttribute('aria-pressed', 'false');
+  const homeBtn = document.querySelector('.home-btn');
+  const sysOn = _activeView === 'sysdesign';
+
+  if (homeBtn) {
+    homeBtn.setAttribute('aria-pressed', sysOn ? 'false' : 'true');
   }
+  if (!_btn) return;
+
+  const label = _btn.querySelector('[data-i18n="systemDesign"]');
+  const icon  = _btn.querySelector('.material-symbols-outlined');
+  if (label) {
+    label.textContent = currentLang === 'fr' ? 'Conception systeme' : 'System Design';
+  }
+  if (icon) icon.textContent = 'schema';
+  _btn.setAttribute('aria-pressed', sysOn ? 'true' : 'false');
 }
 
 // ── Hash routing ─────────────────────────────────────────────────────────────
@@ -454,9 +667,17 @@ function handleRoute() {
     return;
   }
   let id = route.id;
-  if (!id || !topicById(id)) id = TOPICS[0] ? TOPICS[0].id : null;
+  if (!id) {
+    _activeTopic = null;
+    setView('sysdesign');
+    renderTopicList();
+    renderLanding();
+    return;
+  }
+  if (!topicById(id)) id = TOPICS[0] ? TOPICS[0].id : null;
   _activeTopic = id;
   setView('sysdesign');
+  renderTopicList();
   highlightActiveTopic();
   renderTopicDetail();
 }
@@ -469,12 +690,9 @@ export function openSystemDesign(id) {
     return;
   }
   if (_activeView === 'sysdesign') {
-    closeSystemDesign();
     return;
   }
-  const initial = _activeTopic || (TOPICS[0] && TOPICS[0].id);
-  if (!initial) return;
-  location.hash = HASH_PREFIX + '/' + initial;
+  location.hash = HASH_PREFIX;
 }
 
 export function closeSystemDesign() {

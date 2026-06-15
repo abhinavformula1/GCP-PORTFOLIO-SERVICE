@@ -172,10 +172,15 @@
           </button>
         </div>
         <div class="hero-actions">
-          <md-filled-button class="hire-me-btn" onclick="window.openHireMe && window.openHireMe()">
+          <md-outlined-button class="home-btn" aria-pressed="true"
+            onclick="window.closeSystemDesign && window.closeSystemDesign()">
+            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">home</span>
+            <span data-i18n="home">Home</span>
+          </md-outlined-button>
+          <md-outlined-button class="hire-me-btn hire-me-btn-neutral" onclick="window.openHireMe && window.openHireMe()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">waving_hand</span>
             <span data-i18n="getInTouch">Get In Touch</span>
-          </md-filled-button>
+          </md-outlined-button>
           <!-- "Refer Me" — secondary CTA. Pure client-side: the modal hands
                the visitor a ready-to-send email body and a one-click resume
                download. Sending happens from the visitor's own email account

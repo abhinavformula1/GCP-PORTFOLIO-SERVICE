@@ -319,11 +319,11 @@ import {
   // custom element. Same horizontal-padding fix applies — without it the
   // icon and label crash into each other. Wait until the outlined variant
   // is registered before injecting. We also extend this to .recos-cta
-  // (the "Leave a Recommendation" button) and .systemdesign-btn so all
+  // (the "Leave a Recommendation" button), .home-btn, and .systemdesign-btn so all
   // outlined CTAs share the same internal padding as the filled brand
   // buttons.
   customElements.whenDefined('md-outlined-button').then(function () {
-    document.querySelectorAll('.refer-btn, .recos-cta, .systemdesign-btn').forEach(function (btn) {
+    document.querySelectorAll('.hire-me-btn-neutral, .home-btn, .refer-btn, .recos-cta, .systemdesign-btn').forEach(function (btn) {
       injectShadowStyle(btn, BRAND_BUTTON_CSS);
     });
   });
