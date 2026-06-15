@@ -21,7 +21,7 @@
  * there is no fixed step count.
  */
 
-import { googleCredential } from '../core/state.js';
+import { googleCredential, setGoogleCredential } from '../core/state.js';
 import { createInputRow } from './widgets.js';
 
 /* ── Suggested-question variants ──────────────────────────────────────── */
@@ -74,6 +74,7 @@ const QUESTION_VARIANTS = [
 
 const VARIANT_STORAGE_KEY = 'atlas_chip_variant_v1';
 const ATLAS_STREAM_TIMEOUT_MS = 20000;
+const GOOGLE_TOKEN_EXPIRY_SKEW_SECONDS = 60;
 
 /**
  * Cryptographically-strong uniform integer in [0, max).
@@ -252,8 +253,8 @@ async function sendAtlasMessage(text) {
  * count as a soft failure.
  */
 async function streamAsk(message, history) {
-  if (!googleCredential) {
-    appendErrorBubble(friendlyHttpError(401));
+  if (!hasFreshGoogleCredential()) {
+    handleInvalidGoogleCredential();
     return true;  // No fallback — same outcome with JSON.
   }
 
@@ -282,6 +283,11 @@ async function streamAsk(message, history) {
     // out (don't fall back — the JSON path will hit the same error).
     let body = null;
     try { body = await resp.json(); } catch (_) {}
+    if (resp.status === 401) {
+      handleInvalidGoogleCredential();
+      clearTimeout(timeout);
+      return true;
+    }
     const errText = (body && (body.error || body.message)) || friendlyHttpError(resp.status);
     appendErrorBubble(errText);
     clearTimeout(timeout);
@@ -369,6 +375,10 @@ async function fallbackJsonAsk(message, history) {
   try {
     const res = await postAskJson(message, history);
     if (!res.ok) {
+      if (res.status === 401) {
+        handleInvalidGoogleCredential();
+        return;
+      }
       const errText = (res.body && (res.body.error || res.body.message))
         || friendlyHttpError(res.status);
       appendErrorBubble(errText);
@@ -387,7 +397,7 @@ async function fallbackJsonAsk(message, history) {
 }
 
 async function postAskJson(message, history) {
-  if (!googleCredential) {
+  if (!hasFreshGoogleCredential()) {
     return { ok: false, status: 401, body: { error: friendlyHttpError(401) } };
   }
   let resp;
@@ -414,6 +424,31 @@ function friendlyHttpError(status) {
   if (status === 503) return "Atlas isn't available right now. Please try again in a few minutes.";
   if (status === 422) return "Atlas couldn't generate a safe response to that. Try rephrasing.";
   return "Something went wrong on our end. Please try again.";
+}
+
+function hasFreshGoogleCredential() {
+  if (!googleCredential) return false;
+  try {
+    const payload = decodeJwtPayload(googleCredential);
+    const exp = Number(payload && payload.exp);
+    return Number.isFinite(exp) && exp > (Date.now() / 1000) + GOOGLE_TOKEN_EXPIRY_SKEW_SECONDS;
+  } catch (_) {
+    return false;
+  }
+}
+
+function decodeJwtPayload(token) {
+  const part = String(token || '').split('.')[1];
+  if (!part) throw new Error('Missing JWT payload.');
+  const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+  return JSON.parse(atob(padded));
+}
+
+function handleInvalidGoogleCredential() {
+  setGoogleCredential(null);
+  appendErrorBubble("Your Google sign-in expired. Please sign in again to chat with Atlas.");
+  if (typeof window.showWelcomeOverlay === 'function') window.showWelcomeOverlay();
 }
 
 /* ── Persistence ──────────────────────────────────────────────────────── */
