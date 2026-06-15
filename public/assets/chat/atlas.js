@@ -21,7 +21,7 @@
  * there is no fixed step count.
  */
 
-import { googleCredential } from '../core/state.js';
+import { googleCredential, setGoogleCredential } from '../core/state.js';
 import { createInputRow } from './widgets.js';
 
 /* ── Suggested-question variants ──────────────────────────────────────── */
@@ -73,7 +73,19 @@ const QUESTION_VARIANTS = [
 ];
 
 const VARIANT_STORAGE_KEY = 'atlas_chip_variant_v1';
+const MODEL_STORAGE_KEY = 'atlas_model_choice_v1';
 const ATLAS_STREAM_TIMEOUT_MS = 20000;
+const GOOGLE_TOKEN_EXPIRY_SKEW_SECONDS = 60;
+const MODEL_OPTIONS = {
+  'flash-lite': {
+    label: 'Fast & economical',
+    detail: 'Default',
+  },
+  flash: {
+    label: 'More detailed',
+    detail: 'Higher cost',
+  },
+};
 
 /**
  * Cryptographically-strong uniform integer in [0, max).
@@ -106,12 +118,19 @@ function chooseVariant() {
   return QUESTION_VARIANTS[idx];
 }
 
+function readStoredModel() {
+  let stored;
+  try { stored = sessionStorage.getItem(MODEL_STORAGE_KEY); } catch (_) {}
+  return MODEL_OPTIONS[stored] ? stored : 'flash-lite';
+}
+
 /* ── State ────────────────────────────────────────────────────────────── */
 
 const atlasState = {
   history:   /** @type {Array<{role:'user'|'model', text:string}>} */ ([]),
   inFlight:  false,
   variant:   null, // { id, label, chips }  resolved on first render
+  model:     readStoredModel(),
 };
 
 export function resetAtlasState() {
@@ -197,6 +216,7 @@ function renderSuggestedChips(msgs) {
 }
 
 function renderFreeFormInput(area) {
+  renderModelSelector(area);
   const { row, input, button } = createInputRow({
     rowClass:    'ga-input-row ga-atlas-input-row',
     inputClass:  'ga-text-input ga-atlas-input',
@@ -214,6 +234,37 @@ function renderFreeFormInput(area) {
 
   area.appendChild(row);
   setTimeout(function () { input.focus(); }, 50);
+}
+
+function renderModelSelector(area) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ga-atlas-model-picker';
+  wrap.setAttribute('aria-label', 'Atlas response mode');
+
+  Object.keys(MODEL_OPTIONS).forEach(function (key) {
+    const opt = MODEL_OPTIONS[key];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ga-atlas-model-btn';
+    btn.setAttribute('data-model', key);
+    btn.setAttribute('aria-pressed', String(atlasState.model === key));
+    btn.innerHTML = '<span>' + escapeHtml(opt.label) + '</span><small>' + escapeHtml(opt.detail) + '</small>';
+    btn.onclick = function () {
+      if (atlasState.inFlight) return;
+      atlasState.model = key;
+      try { sessionStorage.setItem(MODEL_STORAGE_KEY, key); } catch (_) {}
+      updateModelPicker(wrap);
+    };
+    wrap.appendChild(btn);
+  });
+
+  area.appendChild(wrap);
+}
+
+function updateModelPicker(wrap) {
+  wrap.querySelectorAll('.ga-atlas-model-btn').forEach(function (btn) {
+    btn.setAttribute('aria-pressed', String(btn.getAttribute('data-model') === atlasState.model));
+  });
 }
 
 /* ── Send / receive ───────────────────────────────────────────────────── */
@@ -252,8 +303,8 @@ async function sendAtlasMessage(text) {
  * count as a soft failure.
  */
 async function streamAsk(message, history) {
-  if (!googleCredential) {
-    appendErrorBubble(friendlyHttpError(401));
+  if (!hasFreshGoogleCredential()) {
+    handleInvalidGoogleCredential();
     return true;  // No fallback — same outcome with JSON.
   }
 
@@ -268,7 +319,7 @@ async function streamAsk(message, history) {
         'Content-Type':  'application/json',
         'Accept':        'text/event-stream',
       },
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify({ message, history, model: atlasState.model }),
       signal: controller.signal,
     });
   } catch (_e) {
@@ -282,6 +333,11 @@ async function streamAsk(message, history) {
     // out (don't fall back — the JSON path will hit the same error).
     let body = null;
     try { body = await resp.json(); } catch (_) {}
+    if (resp.status === 401) {
+      handleInvalidGoogleCredential();
+      clearTimeout(timeout);
+      return true;
+    }
     const errText = (body && (body.error || body.message)) || friendlyHttpError(resp.status);
     appendErrorBubble(errText);
     clearTimeout(timeout);
@@ -295,6 +351,7 @@ async function streamAsk(message, history) {
   let acc = '';
   let typingRemoved = false;
   let final = '';
+  let usage = null;
 
   try {
     const reader = resp.body.getReader();
@@ -306,10 +363,10 @@ async function streamAsk(message, history) {
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
-      let idx;
-      while ((idx = buffer.indexOf('\n\n')) !== -1) {
-        const rawEvent = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
+      let boundary;
+      while ((boundary = /\r?\n\r?\n/.exec(buffer)) !== null) {
+        const rawEvent = buffer.slice(0, boundary.index);
+        buffer = buffer.slice(boundary.index + boundary[0].length);
         const dataLine = rawEvent.split('\n').find((l) => l.startsWith('data:'));
         if (!dataLine) continue;
         const jsonStr = dataLine.slice(5).trim();
@@ -337,6 +394,7 @@ async function streamAsk(message, history) {
 
         if (typeof parsed.done === 'string') {
           final = parsed.done;
+          usage = parsed.usage || null;
           if (bubble) bubble.innerHTML = renderMarkdown(final);
         }
       }
@@ -357,6 +415,7 @@ async function streamAsk(message, history) {
   if (answer) {
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
+    appendUsageMeta(bubbleWrap, usage);
   }
   return true;
 }
@@ -369,6 +428,10 @@ async function fallbackJsonAsk(message, history) {
   try {
     const res = await postAskJson(message, history);
     if (!res.ok) {
+      if (res.status === 401) {
+        handleInvalidGoogleCredential();
+        return;
+      }
       const errText = (res.body && (res.body.error || res.body.message))
         || friendlyHttpError(res.status);
       appendErrorBubble(errText);
@@ -376,7 +439,8 @@ async function fallbackJsonAsk(message, history) {
     }
     const answer = (res.body && res.body.answer)
       || "I couldn't generate a response. Please try again.";
-    appendBotBubble(answer);
+    const bubbleWrap = appendBotBubble(answer);
+    appendUsageMeta(bubbleWrap, res.body && res.body.usage);
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
   } catch (_e) {
@@ -387,7 +451,7 @@ async function fallbackJsonAsk(message, history) {
 }
 
 async function postAskJson(message, history) {
-  if (!googleCredential) {
+  if (!hasFreshGoogleCredential()) {
     return { ok: false, status: 401, body: { error: friendlyHttpError(401) } };
   }
   let resp;
@@ -398,7 +462,7 @@ async function postAskJson(message, history) {
         'Authorization': 'Bearer ' + googleCredential,
         'Content-Type':  'application/json',
       },
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify({ message, history, model: atlasState.model }),
     });
   } catch (e) {
     throw new Error('Network error reaching Atlas.', { cause: e });
@@ -414,6 +478,31 @@ function friendlyHttpError(status) {
   if (status === 503) return "Atlas isn't available right now. Please try again in a few minutes.";
   if (status === 422) return "Atlas couldn't generate a safe response to that. Try rephrasing.";
   return "Something went wrong on our end. Please try again.";
+}
+
+function hasFreshGoogleCredential() {
+  if (!googleCredential) return false;
+  try {
+    const payload = decodeJwtPayload(googleCredential);
+    const exp = Number(payload && payload.exp);
+    return Number.isFinite(exp) && exp > (Date.now() / 1000) + GOOGLE_TOKEN_EXPIRY_SKEW_SECONDS;
+  } catch (_) {
+    return false;
+  }
+}
+
+function decodeJwtPayload(token) {
+  const part = String(token || '').split('.')[1];
+  if (!part) throw new Error('Missing JWT payload.');
+  const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+  return JSON.parse(atob(padded));
+}
+
+function handleInvalidGoogleCredential() {
+  setGoogleCredential(null);
+  appendErrorBubble("Your Google sign-in expired. Please sign in again to chat with Atlas.");
+  if (typeof window.showWelcomeOverlay === 'function') window.showWelcomeOverlay();
 }
 
 /* ── Persistence ──────────────────────────────────────────────────────── */
@@ -531,6 +620,34 @@ function appendTypingIndicator() {
     bubbleClass: 'ga-bubble ga-bubble-bot ga-typing',
     html:        '<span class="ga-typing-dot"></span><span class="ga-typing-dot"></span><span class="ga-typing-dot"></span>',
   });
+}
+
+function appendUsageMeta(wrap, usage) {
+  if (!wrap || !usage) return;
+  const totalTokens = Number(usage.totalTokens || 0);
+  const estimatedInr = Number(usage.estimatedInr || 0);
+  if (!totalTokens && !estimatedInr) return;
+
+  const meta = document.createElement('div');
+  meta.className = 'ga-atlas-usage';
+  const modelLabel = usage.modelLabel || usage.model || 'Gemini';
+  meta.textContent = 'Usage: ' + formatNumber(totalTokens)
+    + ' tokens (' + formatNumber(usage.inputTokens) + ' in / '
+    + formatNumber(usage.outputTokens) + ' out) · Est. cost: ' + formatInr(estimatedInr)
+    + ' · ' + modelLabel;
+  wrap.appendChild(meta);
+  scrollToBottom();
+}
+
+function formatNumber(n) {
+  try { return Number(n || 0).toLocaleString('en-IN'); }
+  catch (_) { return String(n || 0); }
+}
+
+function formatInr(value) {
+  const amount = Number(value || 0);
+  if (amount > 0 && amount < 0.01) return '< ₹0.01';
+  return '₹' + amount.toFixed(2);
 }
 
 function setSendDisabled(disabled) {

@@ -14,7 +14,12 @@
  * and HTTP shaping. This module is pure orchestration.
  */
 
-const { generateChatResponse, generateChatResponseStream } = require('../gemini');
+const {
+  generateChatResponse,
+  generateChatResponseStream,
+  GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL_KEY,
+} = require('../gemini');
 const { SYSTEM_PROMPT }                                     = require('./persona');
 
 const MAX_USER_MSG_CHARS  = 1000;
@@ -75,6 +80,11 @@ function inputError(message) {
   return err;
 }
 
+function normaliseModel(model) {
+  if (!model) return DEFAULT_GEMINI_MODEL_KEY;
+  return GEMINI_MODELS[model] ? model : DEFAULT_GEMINI_MODEL_KEY;
+}
+
 /**
  * Validate + normalise a request: trims the user message, enforces
  * length, builds a clean history. Throws on bad input. Both ask() and
@@ -92,7 +102,12 @@ function prepareCall(args) {
   const history = truncateHistory(
     ((args && args.history) || []).map(normaliseTurn).filter(Boolean)
   );
-  return { systemPrompt: SYSTEM_PROMPT, history, userMessage: message };
+  return {
+    systemPrompt: SYSTEM_PROMPT,
+    history,
+    userMessage: message,
+    model: normaliseModel(args && args.model),
+  };
 }
 
 /**
@@ -105,8 +120,8 @@ function prepareCall(args) {
  */
 async function ask(args) {
   const call = prepareCall(args);
-  const text = await generateChatResponse(call);
-  return { answer: sanitiseReply(text) };
+  const result = await generateChatResponse(call);
+  return { answer: sanitiseReply(result.text), usage: result.usage };
 }
 
 /**
@@ -121,16 +136,23 @@ async function ask(args) {
 async function* askStream(args) {
   const call = prepareCall(args);
   let acc = '';
-  for await (const delta of generateChatResponseStream(call)) {
-    acc += delta;
-    yield { kind: 'chunk', text: delta };
+  let usage = null;
+  for await (const evt of generateChatResponseStream(call)) {
+    if (evt.kind === 'chunk') {
+      acc += evt.text;
+      yield { kind: 'chunk', text: evt.text };
+    } else if (evt.kind === 'usage') {
+      usage = evt.usage;
+    }
   }
-  yield { kind: 'done', text: sanitiseReply(acc) };
+  yield { kind: 'done', text: sanitiseReply(acc), usage };
 }
 
 module.exports = {
   ask,
   askStream,
+  GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL_KEY,
   // Exported for tests / external observers.
   MAX_USER_MSG_CHARS,
   MAX_HISTORY_TURNS,

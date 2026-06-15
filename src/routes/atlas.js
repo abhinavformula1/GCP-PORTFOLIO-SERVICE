@@ -35,12 +35,14 @@ const { body, validationResult } = require('express-validator');
 const { requireAuth }            = require('../middleware/auth');
 const { atlasLimiter }           = require('../middleware/rateLimiter');
 const {
-  ask, askStream, MAX_USER_MSG_CHARS, MAX_HISTORY_TURNS,
+  ask, askStream, MAX_USER_MSG_CHARS, MAX_HISTORY_TURNS, GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL_KEY,
 } = require('../services/atlas/respond');
 const firestore           = require('../services/firestore');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
+const MODEL_KEYS = Object.keys(GEMINI_MODELS);
 
 const validateAsk = [
   body('message')
@@ -56,6 +58,11 @@ const validateAsk = [
     .optional()
     .isArray({ max: MAX_HISTORY_TURNS * 2 })
     .withMessage(`History must be an array of at most ${MAX_HISTORY_TURNS * 2} turns.`),
+
+  body('model')
+    .optional()
+    .isIn(MODEL_KEYS)
+    .withMessage(`Model must be one of: ${MODEL_KEYS.join(', ')}.`),
 ];
 
 /**
@@ -105,6 +112,7 @@ function prepareAtlasRequest(req, _res, next) {
   return {
     transactionId: crypto.randomUUID(),
     message:       req.body.message,
+    model:         req.body.model || DEFAULT_GEMINI_MODEL_KEY,
     uid:           req.user.uid,
   };
 }
@@ -117,11 +125,11 @@ router.post('/atlas/ask',
   async (req, res, next) => {
     const ctx = prepareAtlasRequest(req, res, next);
     if (!ctx) return undefined;
-    const { transactionId, message, uid } = ctx;
+    const { transactionId, message, model, uid } = ctx;
 
     try {
       const history = await loadServerHistory(uid);
-      const { answer } = await ask({ message, history });
+      const { answer, usage } = await ask({ message, history, model });
 
       // Fire-and-forget persistence — we already have the answer; the
       // user shouldn't wait on Firestore to see it.
@@ -132,9 +140,11 @@ router.post('/atlas/ask',
         msgLen:        message.length,
         historyTurns:  history.length,
         answerLen:     answer.length,
+        model:         usage && usage.model,
+        usage,
       });
 
-      return res.status(200).json({ success: true, answer, transactionId });
+      return res.status(200).json({ success: true, answer, usage, transactionId });
     } catch (err) {
       return next(err);
     }
@@ -159,7 +169,7 @@ router.post('/atlas/stream',
   async (req, res, next) => {
     const ctx = prepareAtlasRequest(req, res, next);
     if (!ctx) return undefined;
-    const { transactionId, message, uid } = ctx;
+    const { transactionId, message, model, uid } = ctx;
 
     // Open the SSE stream.
     res.status(200).set({
@@ -173,18 +183,20 @@ router.post('/atlas/stream',
     const send = (obj) => res.write('data: ' + JSON.stringify(obj) + '\n\n');
 
     let finalAnswer = '';
+    let usage = null;
     let aborted = false;
     req.on('close', () => { aborted = true; });
 
     try {
       const history = await loadServerHistory(uid);
-      for await (const evt of askStream({ message, history })) {
+      for await (const evt of askStream({ message, history, model })) {
         if (aborted) break;
         if (evt.kind === 'chunk') {
           send({ chunk: evt.text });
         } else if (evt.kind === 'done') {
           finalAnswer = evt.text;
-          send({ done: finalAnswer, transactionId });
+          usage = evt.usage;
+          send({ done: finalAnswer, usage, transactionId });
         }
       }
 
@@ -194,6 +206,8 @@ router.post('/atlas/stream',
         transactionId, uid,
         msgLen:    message.length,
         answerLen: finalAnswer.length,
+        model:     usage && usage.model,
+        usage,
         aborted,
       });
     } catch (err) {
