@@ -13,10 +13,23 @@ const config = require('../config');
 // system-prompt feature. Google's official docs and quickstarts for
 // gemini-2.5-flash all use `/v1beta/`, so we mirror that here for both
 // the single-shot and streaming endpoints (consistent error surface).
-const GEMINI_FLASH_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const GEMINI_FLASH_STREAM_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_MODELS = Object.freeze({
+  'flash-lite': {
+    id: 'gemini-2.5-flash-lite',
+    label: 'Gemini 2.5 Flash-Lite',
+    inputUsdPerMillion: 0.10,
+    outputUsdPerMillion: 0.40,
+  },
+  flash: {
+    id: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash',
+    inputUsdPerMillion: 0.30,
+    outputUsdPerMillion: 2.50,
+  },
+});
+const DEFAULT_GEMINI_MODEL_KEY = 'flash-lite';
+const USD_TO_INR = 83;
 
 /* ── Shared helpers (used by both single-shot and streaming paths) ─────── */
 
@@ -87,6 +100,32 @@ async function fetchGemini(url, body, timeoutMs) {
   }
 }
 
+function getModel(modelKey) {
+  return GEMINI_MODELS[modelKey] || GEMINI_MODELS[DEFAULT_GEMINI_MODEL_KEY];
+}
+
+function modelUrl(model, action) {
+  return `${GEMINI_API_BASE}/${model.id}:${action}`;
+}
+
+function estimateUsageCost(model, usageMetadata) {
+  const inputTokens = Number(usageMetadata?.promptTokenCount || 0);
+  const outputTokens = Number(usageMetadata?.candidatesTokenCount || 0);
+  const totalTokens = Number(usageMetadata?.totalTokenCount || inputTokens + outputTokens);
+  const inputUsd = (inputTokens / 1000000) * model.inputUsdPerMillion;
+  const outputUsd = (outputTokens / 1000000) * model.outputUsdPerMillion;
+  const totalUsd = inputUsd + outputUsd;
+  return {
+    model: model.id,
+    modelLabel: model.label,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedUsd: Number(totalUsd.toFixed(8)),
+    estimatedInr: Number((totalUsd * USD_TO_INR).toFixed(4)),
+  };
+}
+
 /**
  * Low-level non-streaming Gemini call. URL + key + body + error handling
  * + candidate unwrapping.
@@ -98,7 +137,8 @@ async function fetchGemini(url, body, timeoutMs) {
  */
 async function callGemini(body, opts) {
   const timeoutMs = (opts && opts.timeoutMs) || 15000;
-  const res = await fetchGemini(GEMINI_FLASH_URL, body, timeoutMs);
+  const model = getModel(opts && opts.model);
+  const res = await fetchGemini(modelUrl(model, 'generateContent'), body, timeoutMs);
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -117,7 +157,10 @@ async function callGemini(body, opts) {
   const data = await res.json();
   const candidate = data.candidates && data.candidates[0];
   checkFinishReason(candidate);
-  return (candidate?.content?.parts?.[0]?.text || '').trim();
+  return {
+    text: (candidate?.content?.parts?.[0]?.text || '').trim(),
+    usage: estimateUsageCost(model, data.usageMetadata),
+  };
 }
 
 /**
@@ -143,7 +186,7 @@ No filler phrases, no emojis, no bullet points. Plain text only.`;
   return callGemini({
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
-  });
+  }).then((r) => r.text);
 }
 
 /**
@@ -162,7 +205,7 @@ No filler phrases, no emojis, no bullet points. Plain text only.`;
  * @returns {Promise<string>}            Trimmed model reply.
  */
 async function generateChatResponse(args) {
-  return callGemini(buildChatBody(args || {}));
+  return callGemini(buildChatBody(args || {}), { model: args && args.model });
 }
 
 /**
@@ -185,6 +228,7 @@ async function generateChatResponse(args) {
 async function* generateChatResponseStream(args, opts) {
   const timeoutMs = (opts && opts.timeoutMs) || 30000;
   const body = buildChatBody(args || {});
+  const model = getModel(args && args.model);
 
   // streamGenerateContent uses the same endpoint shape as generateContent
   // but with `?alt=sse` for SSE-formatted output. We can't reuse fetchGemini
@@ -196,7 +240,7 @@ async function* generateChatResponseStream(args, opts) {
 
   let res;
   try {
-    res = await fetch(`${GEMINI_FLASH_STREAM_URL}?alt=sse&key=${config.gemini.apiKey}`, {
+    res = await fetch(`${modelUrl(model, 'streamGenerateContent')}?alt=sse&key=${config.gemini.apiKey}`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
@@ -247,7 +291,10 @@ async function* generateChatResponseStream(args, opts) {
         checkFinishReason(candidate);
 
         const delta = candidate?.content?.parts?.[0]?.text;
-        if (delta) yield delta;
+        if (delta) yield { kind: 'chunk', text: delta };
+        if (parsed.usageMetadata) {
+          yield { kind: 'usage', usage: estimateUsageCost(model, parsed.usageMetadata) };
+        }
       }
     }
   } finally {
@@ -256,4 +303,10 @@ async function* generateChatResponseStream(args, opts) {
   }
 }
 
-module.exports = { summariseConversation, generateChatResponse, generateChatResponseStream };
+module.exports = {
+  summariseConversation,
+  generateChatResponse,
+  generateChatResponseStream,
+  GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL_KEY,
+};

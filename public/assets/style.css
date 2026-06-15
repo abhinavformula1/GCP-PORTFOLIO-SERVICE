@@ -3280,6 +3280,46 @@ a:hover { text-decoration: underline; }
    in this mode the user types longer messages than the 7-step flow. */
 .ga-overlay[data-mode="freeform"] .ga-input-area { padding-top: 10px; }
 
+.ga-atlas-model-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ga-atlas-model-btn {
+  background: #f8fbff;
+  border: 1px solid #d6e4f5;
+  border-radius: 10px;
+  color: #24445f;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 7px 9px;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.ga-atlas-model-btn span {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ga-atlas-model-btn small {
+  color: #6f7f8f;
+  display: block;
+  font-size: 10px;
+  margin-top: 1px;
+}
+.ga-atlas-model-btn[aria-pressed="true"] {
+  background: #eef7ff;
+  border-color: #0070D2;
+  box-shadow: 0 0 0 1px rgba(0, 112, 210, 0.12);
+}
+.ga-atlas-usage {
+  color: #6f7f8f;
+  font-size: 10px;
+  line-height: 1.35;
+  margin: 4px 0 0 40px;
+}
+
 /* Typing indicator — three pulsing dots */
 .ga-bubble.ga-typing {
   padding: 10px 14px;
@@ -3367,4 +3407,6 @@ a:hover { text-decoration: underline; }
   .ga-mode-body  { font-size: 11px; }
   .ga-atlas-chips { margin-left: 36px; }
   .ga-atlas-chip  { font-size: 11px; padding: 5px 10px; }
+  .ga-atlas-model-picker { grid-template-columns: 1fr; }
+  .ga-atlas-usage { margin-left: 36px; }
 }
