@@ -190,6 +190,7 @@ async function clearActiveChat(uid) {
 
 const ATLAS_COLLECTION = 'atlas';
 const ATLAS_USAGE_COLLECTION = 'atlasUsage';
+const ATLAS_CACHE_COLLECTION = 'atlasCache';
 const MAX_ATLAS_TURNS  = 40;
 const ATLAS_MONTHLY_BUDGET_INR = 100;
 
@@ -333,6 +334,36 @@ async function getAtlasMonthlyUsageSummary(now = new Date()) {
     ? Math.min(100, (summary.estimatedInr / ATLAS_MONTHLY_BUDGET_INR) * 100)
     : 0;
   return summary;
+}
+
+async function getAtlasCacheEntry(cacheKey) {
+  const snap = await getDb().collection(ATLAS_CACHE_COLLECTION).doc(cacheKey).get();
+  if (!snap.exists) return null;
+
+  const data = snap.data() || {};
+  if (Number(data.expiresAtMs || 0) <= Date.now()) return null;
+
+  await snap.ref.update({
+    hitCount: FieldValue.increment(1),
+    lastHitAt: FieldValue.serverTimestamp(),
+  });
+
+  return {
+    answer: String(data.answer || ''),
+    model:  String(data.model || ''),
+  };
+}
+
+async function saveAtlasCacheEntry(cacheKey, entry) {
+  await getDb().collection(ATLAS_CACHE_COLLECTION).doc(cacheKey).set({
+    normalizedQuestion: String(entry.normalizedQuestion || '').slice(0, 500),
+    model:              String(entry.model || ''),
+    personaVersion:     String(entry.personaVersion || ''),
+    answer:             String(entry.answer || '').slice(0, 4000),
+    createdAt:          FieldValue.serverTimestamp(),
+    expiresAtMs:        Number(entry.expiresAtMs || 0),
+    hitCount:           0,
+  });
 }
 
 /**
@@ -542,6 +573,8 @@ module.exports = {
   clearActiveAtlasConversation,
   getAtlasUsageSummary,
   appendAtlasUsageEvent,
+  getAtlasCacheEntry,
+  saveAtlasCacheEntry,
   upsertRecommendation,
   listActiveRecommendations,
   writeRecommendationReply,

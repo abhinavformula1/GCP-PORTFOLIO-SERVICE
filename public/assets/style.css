@@ -3360,6 +3360,9 @@ a:hover { text-decoration: underline; }
   line-height: 1.35;
   margin: 4px 0 0 40px;
 }
+.ga-atlas-usage-cache {
+  color: #2e6f4f;
+}
 
 /* Typing indicator — three pulsing dots */
 .ga-bubble.ga-typing {
