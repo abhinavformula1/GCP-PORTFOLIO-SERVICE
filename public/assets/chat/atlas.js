@@ -131,6 +131,7 @@ const atlasState = {
   inFlight:  false,
   variant:   null, // { id, label, chips }  resolved on first render
   model:     readStoredModel(),
+  usage:     null,
 };
 
 export function resetAtlasState() {
@@ -168,6 +169,7 @@ export async function renderFreeFormMode() {
   // Render the input bar early so it's there even while we wait for the
   // server to load any saved conversation.
   renderFreeFormInput(area);
+  refreshUsageSummary();
 
   // Try to restore a saved conversation. If found, replay it; otherwise
   // show the greeting + suggested chips.
@@ -216,6 +218,7 @@ function renderSuggestedChips(msgs) {
 }
 
 function renderFreeFormInput(area) {
+  renderBudgetStatus(area);
   renderModelSelector(area);
   const { row, input, button } = createInputRow({
     rowClass:    'ga-input-row ga-atlas-input-row',
@@ -234,6 +237,14 @@ function renderFreeFormInput(area) {
 
   area.appendChild(row);
   setTimeout(function () { input.focus(); }, 50);
+}
+
+function renderBudgetStatus(area) {
+  const wrap = document.createElement('div');
+  wrap.id = 'gaAtlasBudget';
+  wrap.className = 'ga-atlas-budget';
+  wrap.textContent = 'Monthly Atlas budget: checking usage…';
+  area.appendChild(wrap);
 }
 
 function renderModelSelector(area) {
@@ -416,6 +427,7 @@ async function streamAsk(message, history) {
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
     appendUsageMeta(bubbleWrap, usage);
+    setTimeout(refreshUsageSummary, 800);
   }
   return true;
 }
@@ -441,6 +453,7 @@ async function fallbackJsonAsk(message, history) {
       || "I couldn't generate a response. Please try again.";
     const bubbleWrap = appendBotBubble(answer);
     appendUsageMeta(bubbleWrap, res.body && res.body.usage);
+    setTimeout(refreshUsageSummary, 800);
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
   } catch (_e) {
@@ -523,8 +536,51 @@ async function fetchSavedConversation() {
   return null;
 }
 
+async function fetchUsageSummary() {
+  if (!hasFreshGoogleCredential()) return null;
+  try {
+    const resp = await fetch('/api/atlas/usage', {
+      method:  'GET',
+      headers: { 'Authorization': 'Bearer ' + googleCredential },
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data && data.success ? data.usage : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function refreshUsageSummary() {
+  const usage = await fetchUsageSummary();
+  if (!usage) return;
+  atlasState.usage = usage;
+  renderBudgetUsage(usage);
+}
+
+function renderBudgetUsage(usage) {
+  const el = document.getElementById('gaAtlasBudget');
+  if (!el) return;
+  const month = usage.month || {};
+  const budget = Number(usage.monthlyBudgetInr || 100);
+  const used = Number(month.estimatedInr || 0);
+  const pct = budget ? Math.min(100, (used / budget) * 100) : 0;
+  el.innerHTML = ''
+    + '<div class="ga-atlas-budget-row">'
+    + '<span>Monthly Atlas budget</span>'
+    + '<strong>' + formatInr(used) + ' used of ₹' + budget.toFixed(0) + '</strong>'
+    + '</div>'
+    + '<div class="ga-atlas-budget-bar" aria-hidden="true"><span style="width: '
+    + pct.toFixed(1) + '%"></span></div>'
+    + '<div class="ga-atlas-budget-note">Across all visitors this month · '
+    + formatNumber(month.totalTokens || 0) + ' tokens</div>';
+}
+
 async function startOver() {
   if (atlasState.inFlight) return;
+
+  const beforeClear = await fetchUsageSummary();
+  const activeUsage = beforeClear && beforeClear.activeConversation;
 
   // Wipe server-side history first (best effort) so a refresh doesn't
   // resurrect the old conversation.
@@ -549,7 +605,16 @@ async function startOver() {
   appendBotBubble(
     "Fresh start. Ask me anything about Abhinav."
   );
+  if (activeUsage && Number(activeUsage.totalTokens || 0)) {
+    appendBotBubble(
+      'Previous conversation usage: **' + formatNumber(activeUsage.totalTokens)
+      + ' tokens** (' + formatNumber(activeUsage.inputTokens) + ' in / '
+      + formatNumber(activeUsage.outputTokens) + ' out), estimated cost **'
+      + formatInr(Number(activeUsage.estimatedInr || 0)) + '**.'
+    );
+  }
   if (msgs) renderSuggestedChips(msgs);
+  setTimeout(refreshUsageSummary, 800);
 }
 
 /* ── Bubbles ──────────────────────────────────────────────────────────── */
@@ -646,7 +711,7 @@ function formatNumber(n) {
 
 function formatInr(value) {
   const amount = Number(value || 0);
-  if (amount > 0 && amount < 0.01) return '< ₹0.01';
+  if (amount > 0 && amount < 0.01) return 'under ₹0.01';
   return '₹' + amount.toFixed(2);
 }
 

@@ -83,10 +83,11 @@ async function loadServerHistory(uid) {
  * Append both turns to Firestore. Best-effort — never throws into the
  * caller. Logged and swallowed on failure.
  */
-async function persistTurns(uid, userText, botText) {
+async function persistTurns(uid, userText, botText, usage) {
   try {
     await firestore.appendAtlasTurn(uid, { role: 'user',  text: userText });
-    await firestore.appendAtlasTurn(uid, { role: 'model', text: botText });
+    await firestore.appendAtlasTurn(uid, { role: 'model', text: botText, usage });
+    await firestore.appendAtlasUsageEvent(uid, usage);
   } catch (err) {
     console.warn('[atlas] persistTurns failed:', err.message);
   }
@@ -133,7 +134,7 @@ router.post('/atlas/ask',
 
       // Fire-and-forget persistence — we already have the answer; the
       // user shouldn't wait on Firestore to see it.
-      persistTurns(uid, message, answer);
+      persistTurns(uid, message, answer, usage);
 
       console.log('[atlas]', {
         transactionId, uid,
@@ -200,7 +201,7 @@ router.post('/atlas/stream',
         }
       }
 
-      if (!aborted && finalAnswer) persistTurns(uid, message, finalAnswer);
+      if (!aborted && finalAnswer) persistTurns(uid, message, finalAnswer, usage);
 
       console.log('[atlas/stream]', {
         transactionId, uid,
@@ -245,6 +246,19 @@ router.get('/atlas/conversations/active',
         success:      true,
         conversation: conv,
       });
+    } catch (err) {
+      return next(err);
+    }
+  }
+);
+
+// ── GET /api/atlas/usage ─────────────────────────────────────────────────────
+router.get('/atlas/usage',
+  requireAuth,
+  async (req, res, next) => {
+    try {
+      const usage = await firestore.getAtlasUsageSummary(req.user.uid);
+      return res.status(200).json({ success: true, usage });
     } catch (err) {
       return next(err);
     }
