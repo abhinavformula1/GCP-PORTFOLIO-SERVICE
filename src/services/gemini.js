@@ -230,10 +230,10 @@ async function* generateChatResponseStream(args, opts) {
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
-      let idx;
-      while ((idx = buffer.indexOf('\n\n')) !== -1) {
-        const rawEvent = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
+      let boundary;
+      while ((boundary = /\r?\n\r?\n/.exec(buffer)) !== null) {
+        const rawEvent = buffer.slice(0, boundary.index);
+        buffer = buffer.slice(boundary.index + boundary[0].length);
 
         const dataLine = rawEvent.split('\n').find((l) => l.startsWith('data:'));
         if (!dataLine) continue;

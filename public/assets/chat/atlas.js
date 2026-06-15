@@ -73,6 +73,7 @@ const QUESTION_VARIANTS = [
 ];
 
 const VARIANT_STORAGE_KEY = 'atlas_chip_variant_v1';
+const ATLAS_STREAM_TIMEOUT_MS = 20000;
 
 /**
  * Cryptographically-strong uniform integer in [0, max).
@@ -257,6 +258,8 @@ async function streamAsk(message, history) {
   }
 
   let resp;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ATLAS_STREAM_TIMEOUT_MS);
   try {
     resp = await fetch('/api/atlas/stream', {
       method: 'POST',
@@ -266,9 +269,11 @@ async function streamAsk(message, history) {
         'Accept':        'text/event-stream',
       },
       body: JSON.stringify({ message, history }),
+      signal: controller.signal,
     });
   } catch (_e) {
     // Network failure — try JSON next.
+    clearTimeout(timeout);
     return false;
   }
 
@@ -279,6 +284,7 @@ async function streamAsk(message, history) {
     try { body = await resp.json(); } catch (_) {}
     const errText = (body && (body.error || body.message)) || friendlyHttpError(resp.status);
     appendErrorBubble(errText);
+    clearTimeout(timeout);
     return true;
   }
 
@@ -340,6 +346,7 @@ async function streamAsk(message, history) {
     bubbleWrap.remove();
     return false;  // Try JSON fallback.
   } finally {
+    clearTimeout(timeout);
     if (typing && typing.parentNode) typing.remove();
   }
 
