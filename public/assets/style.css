@@ -1723,6 +1723,28 @@ a:hover { text-decoration: underline; }
 }
 .sd-readtime .material-symbols-outlined { font-size: 16px; }
 
+.sd-export-btn {
+  align-items: center;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, #0070D2 32%, transparent);
+  border-radius: 999px;
+  color: #0070D2;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  margin-left: 0;
+  padding: 6px 10px;
+}
+.sd-export-btn:hover {
+  background: color-mix(in srgb, #0070D2 8%, transparent);
+}
+.sd-export-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
 /* Article body — long-form prose */
 .sd-article-body {
   font-size: 14px;
@@ -3856,4 +3878,51 @@ a:hover { text-decoration: underline; }
   .ga-atlas-chip  { font-size: 11px; padding: 5px 10px; }
   .ga-atlas-model-picker { grid-template-columns: 1fr; }
   .ga-atlas-usage { margin-left: 36px; }
+}
+
+@media print {
+  body.sd-printing * {
+    visibility: hidden !important;
+  }
+
+  body.sd-printing .sd-article,
+  body.sd-printing .sd-article * {
+    visibility: visible !important;
+  }
+
+  body.sd-printing .sd-article {
+    background: #fff !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #111 !important;
+    left: 0;
+    padding: 0 !important;
+    position: absolute;
+    top: 0;
+    width: 100%;
+  }
+
+  body.sd-printing .sd-export-btn {
+    display: none !important;
+  }
+
+  body.sd-printing .sd-article-body,
+  body.sd-printing .sd-article-sub {
+    color: #222 !important;
+  }
+
+  body.sd-printing .sd-tag,
+  body.sd-printing .sd-flow span,
+  body.sd-printing .sd-decision-grid div,
+  body.sd-printing .sd-info-card,
+  body.sd-printing .sd-risk,
+  body.sd-printing .sd-comparison-row,
+  body.sd-printing .sd-matrix th,
+  body.sd-printing .sd-matrix td {
+    border-color: #d9d9d9 !important;
+  }
+
+  @page {
+    margin: 16mm;
+  }
 }
