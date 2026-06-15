@@ -422,6 +422,7 @@ function uiText(key) {
     search:      fr ? 'Filtrer les sujets' : 'Filter topics',
     noResults:   fr ? 'Aucun sujet ne correspond.' : 'No matching topics.',
     articleLabel: fr ? 'Note de conception' : 'Design note',
+    exportPdf:   fr ? 'Exporter PDF' : 'Export PDF',
   };
   return dict[key] || '';
 }
@@ -602,14 +603,28 @@ function renderTopicDetail() {
   if (topic.readMinutes) {
     html += '<span class="sd-readtime"><span class="material-symbols-outlined" aria-hidden="true">schedule</span>' + topic.readMinutes + ' min</span>';
   }
+  html += '<button type="button" class="sd-export-btn" aria-label="' + escapeHtml(uiText('exportPdf')) + '">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>';
+  html += '<span>' + escapeHtml(uiText('exportPdf')) + '</span>';
+  html += '</button>';
   html += '</div>';
   html += '</header>';
   html += '<div class="sd-article-body">' + (loc.body || '') + '</div>';
   html += '</article>';
   _sdDetail.innerHTML = html;
+  const exportBtn = _sdDetail.querySelector('.sd-export-btn');
+  if (exportBtn) exportBtn.addEventListener('click', exportCurrentTopicPdf);
   if (typeof _sdDetail.scrollIntoView === 'function') {
     _sdDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+}
+
+function exportCurrentTopicPdf() {
+  document.body.classList.add('sd-printing');
+  window.print();
+  setTimeout(function () {
+    document.body.classList.remove('sd-printing');
+  }, 500);
 }
 
 function highlightActiveTopic() {

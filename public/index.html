@@ -173,11 +173,13 @@
         </div>
         <div class="hero-actions">
           <md-outlined-button class="home-btn" aria-label="Home" aria-pressed="true"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
             onclick="window.closeSystemDesign && window.closeSystemDesign()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">home</span>
             <span data-i18n="home">Home</span>
           </md-outlined-button>
           <md-outlined-button class="hire-me-btn hire-me-btn-neutral" aria-label="Get in touch"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
             onclick="window.openHireMe && window.openHireMe()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">waving_hand</span>
             <span data-i18n="getInTouch">Get In Touch</span>
@@ -190,6 +192,7 @@
                carries the SF integration narrative; this stays deliberately
                backend-free. -->
           <md-outlined-button class="refer-btn" aria-label="Refer me"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
             onclick="window.openReferMe && window.openReferMe()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">forward_to_inbox</span>
             <span data-i18n="referMe">Refer Me</span>
@@ -202,6 +205,7 @@
                truth for which topic is rendered, so deep links are
                shareable and back/forward both work. -->
           <md-outlined-button class="systemdesign-btn" aria-label="System Design" aria-pressed="false"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
             onclick="window.openSystemDesign && window.openSystemDesign()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">schema</span>
             <span data-i18n="systemDesign">System Design</span>
