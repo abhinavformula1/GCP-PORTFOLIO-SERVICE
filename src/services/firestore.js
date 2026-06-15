@@ -189,7 +189,9 @@ async function clearActiveChat(uid) {
 // graduate this to a /atlas-conversations/{auto} subcollection like inquiries.
 
 const ATLAS_COLLECTION = 'atlas';
+const ATLAS_USAGE_COLLECTION = 'atlasUsage';
 const MAX_ATLAS_TURNS  = 40;
+const ATLAS_MONTHLY_BUDGET_INR = 100;
 
 function atlasActiveDocRef(uid) {
   return getDb()
@@ -200,7 +202,7 @@ function atlasActiveDocRef(uid) {
 /**
  * Returns the user's active Atlas conversation, or null if none.
  * Shape mirrors getActiveChat() — timestamps converted to epoch-ms.
- *   { startedAt, updatedAt, turns: [{ role: 'user'|'model', text, ts }, ...] }
+ *   { startedAt, updatedAt, turns: [{ role: 'user'|'model', text, ts, usage? }, ...], usage }
  */
 async function getActiveAtlasConversation(uid) {
   const snap = await atlasActiveDocRef(uid).get();
@@ -210,7 +212,27 @@ async function getActiveAtlasConversation(uid) {
     startedAt: d.startedAt && d.startedAt.toMillis ? d.startedAt.toMillis() : null,
     updatedAt: d.updatedAt && d.updatedAt.toMillis ? d.updatedAt.toMillis() : null,
     turns:     Array.isArray(d.turns) ? d.turns : [],
+    usage:     summariseAtlasUsage(Array.isArray(d.turns) ? d.turns : []),
   };
+}
+
+function summariseAtlasUsage(turns) {
+  return (Array.isArray(turns) ? turns : []).reduce((acc, turn) => {
+    const usage = turn && turn.usage;
+    if (!usage) return acc;
+    acc.inputTokens += Number(usage.inputTokens || 0);
+    acc.outputTokens += Number(usage.outputTokens || 0);
+    acc.totalTokens += Number(usage.totalTokens || 0);
+    acc.estimatedInr += Number(usage.estimatedInr || 0);
+    acc.estimatedUsd += Number(usage.estimatedUsd || 0);
+    return acc;
+  }, {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    estimatedInr: 0,
+    estimatedUsd: 0,
+  });
 }
 
 /**
@@ -222,7 +244,7 @@ async function getActiveAtlasConversation(uid) {
  * errors but the route layer logs and moves on — chat UX never blocks
  * on Firestore.
  */
-async function appendAtlasTurn(uid, { role, text }) {
+async function appendAtlasTurn(uid, { role, text, usage }) {
   if (role !== 'user' && role !== 'model') {
     throw new Error('appendAtlasTurn: role must be "user" or "model".');
   }
@@ -237,11 +259,23 @@ async function appendAtlasTurn(uid, { role, text }) {
       turns = Array.isArray(d.turns) ? d.turns.slice() : [];
     }
 
-    turns.push({
+    const turn = {
       role,
       text: String(text || '').slice(0, 4000),
       ts:   Date.now(),
-    });
+    };
+    if (usage && typeof usage === 'object') {
+      turn.usage = {
+        model:        String(usage.model || ''),
+        modelLabel:   String(usage.modelLabel || ''),
+        inputTokens:  Number(usage.inputTokens || 0),
+        outputTokens: Number(usage.outputTokens || 0),
+        totalTokens:  Number(usage.totalTokens || 0),
+        estimatedUsd: Number(usage.estimatedUsd || 0),
+        estimatedInr: Number(usage.estimatedInr || 0),
+      };
+    }
+    turns.push(turn);
     if (turns.length > MAX_ATLAS_TURNS) {
       turns = turns.slice(turns.length - MAX_ATLAS_TURNS);
     }
@@ -256,6 +290,49 @@ async function appendAtlasTurn(uid, { role, text }) {
 
 async function clearActiveAtlasConversation(uid) {
   await atlasActiveDocRef(uid).delete();
+}
+
+async function getAtlasUsageSummary(uid) {
+  const conv = await getActiveAtlasConversation(uid);
+  const month = await getAtlasMonthlyUsageSummary();
+  return {
+    activeConversation: conv ? conv.usage : summariseAtlasUsage([]),
+    month,
+    monthlyBudgetInr:  ATLAS_MONTHLY_BUDGET_INR,
+  };
+}
+
+async function appendAtlasUsageEvent(uid, usage) {
+  if (!usage || typeof usage !== 'object') return;
+  await getDb().collection(ATLAS_USAGE_COLLECTION).add({
+    uid,
+    model:        String(usage.model || ''),
+    modelLabel:   String(usage.modelLabel || ''),
+    inputTokens:  Number(usage.inputTokens || 0),
+    outputTokens: Number(usage.outputTokens || 0),
+    totalTokens:  Number(usage.totalTokens || 0),
+    estimatedUsd: Number(usage.estimatedUsd || 0),
+    estimatedInr: Number(usage.estimatedInr || 0),
+    usedAt:       FieldValue.serverTimestamp(),
+    usedAtMs:     Date.now(),
+  });
+}
+
+async function getAtlasMonthlyUsageSummary(now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const snap = await getDb()
+    .collection(ATLAS_USAGE_COLLECTION)
+    .where('usedAtMs', '>=', start)
+    .get();
+
+  const summary = summariseAtlasUsage(
+    snap.docs.map((doc) => ({ usage: doc.data() || {} }))
+  );
+  summary.remainingBudgetInr = Math.max(0, ATLAS_MONTHLY_BUDGET_INR - summary.estimatedInr);
+  summary.budgetUsedPercent = ATLAS_MONTHLY_BUDGET_INR
+    ? Math.min(100, (summary.estimatedInr / ATLAS_MONTHLY_BUDGET_INR) * 100)
+    : 0;
+  return summary;
 }
 
 /**
@@ -463,6 +540,8 @@ module.exports = {
   getActiveAtlasConversation,
   appendAtlasTurn,
   clearActiveAtlasConversation,
+  getAtlasUsageSummary,
+  appendAtlasUsageEvent,
   upsertRecommendation,
   listActiveRecommendations,
   writeRecommendationReply,

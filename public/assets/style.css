@@ -3280,6 +3280,47 @@ a:hover { text-decoration: underline; }
    in this mode the user types longer messages than the 7-step flow. */
 .ga-overlay[data-mode="freeform"] .ga-input-area { padding-top: 10px; }
 
+.ga-atlas-budget {
+  background: #f8fbff;
+  border: 1px solid #d6e4f5;
+  border-radius: 10px;
+  color: #24445f;
+  font-size: 11px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+}
+.ga-atlas-budget-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ga-atlas-budget-row span { color: #5f7284; }
+.ga-atlas-budget-row strong {
+  color: #0070D2;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ga-atlas-budget-bar {
+  background: #dcebf8;
+  border-radius: 999px;
+  height: 5px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.ga-atlas-budget-bar span {
+  background: #0070D2;
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 2px;
+}
+.ga-atlas-budget-note {
+  color: #6f7f8f;
+  font-size: 10px;
+  margin-top: 5px;
+}
+
 .ga-atlas-model-picker {
   display: grid;
   grid-template-columns: 1fr 1fr;
