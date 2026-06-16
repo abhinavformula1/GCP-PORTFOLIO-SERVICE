@@ -10,11 +10,9 @@
  * the cross-cutting bits explicit.
  *
  * Persistence layers:
- *   - sessionStorage: `siteProfile`, `googleCredential`. Survive reloads
- *     within the tab; cleared on tab close or sign-out.
- *   - in-memory only: `pendingChatHistory`, `myRecommendation`. They're
- *     recomputed from the server on every page load — no point
- *     persisting and risking staleness.
+ *   - sessionStorage: `googleCredential`. Survives reloads within the tab.
+ *   - in-memory only: `siteProfile`, `pendingChatHistory`, `myRecommendation`.
+ *     Profile data is rehydrated from the server instead of browser storage.
  *
  * Exports use ES module live bindings: any importer sees updates
  * whenever the setter is called. Writes MUST go through setters because
@@ -30,21 +28,14 @@ export const STORAGE_TOAST_FLAG = 'welcome_toast_shown';
 export const STORAGE_SIGNOUT_EVENT = 'portfolio_signout_event';
 
 // ── siteProfile ──────────────────────────────────────────────────────────────
-// The persisted snapshot of the signed-in (or guest) visitor. Shape:
+// The in-memory snapshot of the signed-in (or guest) visitor. Shape:
 //   { sub, name, email, picture, contact, isReturning?, visitCount?, ... }
-// `null` when nothing has been persisted yet (very first visit).
+// `null` when nothing has been loaded yet (very first visit / reload).
 // `{ type: 'guest' }` for anonymous browsing (see saveSiteProfile callers).
-export let siteProfile = (function readInitialProfile() {
-  try { return JSON.parse(sessionStorage.getItem(STORAGE_PROFILE) || 'null'); }
-  catch (_) { return null; }
-}());
+export let siteProfile = null;
 
 export function setSiteProfile(p) {
   siteProfile = p;
-  try {
-    if (p) sessionStorage.setItem(STORAGE_PROFILE, JSON.stringify(p));
-    else   sessionStorage.removeItem(STORAGE_PROFILE);
-  } catch (_) {}
 }
 
 // ── googleCredential ─────────────────────────────────────────────────────────

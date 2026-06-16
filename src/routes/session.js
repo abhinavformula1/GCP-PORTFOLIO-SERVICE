@@ -85,6 +85,7 @@ router.post('/session/start', async (req, res, next) => {
     return res.status(200).json({
       success:     true,
       isReturning: visit.isReturning,
+      sub:         uid,
       name:        name || '',
       email,
       picture:     picture || null,

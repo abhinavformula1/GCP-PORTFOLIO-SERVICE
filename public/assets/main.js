@@ -153,7 +153,6 @@ import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-la
       if (googleCredential && siteProfile && siteProfile.type !== 'guest') {
         localStorage.setItem('portfolio_admin_handoff', JSON.stringify({
           credential: googleCredential,
-          profile:    siteProfile,
           expiresAt:  Date.now() + 60000,
         }));
       }
@@ -272,6 +271,41 @@ import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-la
       });
   }
 
+  function restoreSessionFromCredential(token) {
+    return fetch('/api/session/start', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ credential: token }),
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || !data.success) return false;
+        const profile = {
+          sub:         data.sub,
+          name:        data.name || '',
+          email:       data.email || '',
+          picture:     data.picture || null,
+          isReturning: !!data.isReturning,
+          visitCount:  data.visitCount || 1,
+          lastSeenAt:  data.lastSeenAt || null,
+          contact:     data.contact || null,
+        };
+        saveSiteProfile(profile);
+        applyContactPolicy(profile.contact);
+        if (profile.name) {
+          setTimeout(function () { showWelcomeToast(profile); }, 200);
+        }
+        refreshRecommendations();
+        return authedFetch('/api/chat/active').then(function (chatRes) {
+          if (chatRes && chatRes.success && chatRes.chat) {
+            setPendingChatHistory(chatRes.chat);
+          }
+          return true;
+        });
+      })
+      .catch(function () { return false; });
+  }
+
   // setLang is the language-flip orchestrator — it lives here (not in
   // i18n.js) because flipping the language has to also re-render the
   // chat assistant if the panel is open. That cross-module concern
@@ -376,19 +410,11 @@ import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-la
   // Location popover (timezone-aware): extracted to ./ui/location.js
   initLocationPopover();
 
-  // Restore topbar user if session exists
-  if (siteProfile) {
-    updateTopbarUser(siteProfile);
-    refreshAdminNav();
-    // Re-apply the cached server contact-reveal decision so a returning
-    // signed-in viewer's phone stays revealed across reloads (until token
-    // expiry / sign-out clears the profile).
-    applyContactPolicy(siteProfile.contact);
-    // Show the once-per-session welcome toast for signed-in (non-guest) users
-    if (siteProfile.type !== 'guest' && siteProfile.name) {
-      // Defer to next tick so DOM/CSS are settled before the slide-in
-      setTimeout(function () { showWelcomeToast(siteProfile); }, 200);
-    }
+  // Rehydrate signed-in state from the server using the stored credential.
+  if (googleCredential) {
+    restoreSessionFromCredential(googleCredential).then(function (restored) {
+      if (!restored && !siteProfile) showWelcomeOverlayWithGsi();
+    });
   } else {
     showWelcomeOverlayWithGsi();
   }

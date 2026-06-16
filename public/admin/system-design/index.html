@@ -57,10 +57,15 @@
         <div class="sd-admin-eyebrow">Internal publishing console</div>
         <h1>System Design Admin</h1>
         <p>Manage architecture notes with the same Google Cloud + Salesforce publishing stack that powers the portfolio.</p>
-        <div class="sd-admin-trust-row" aria-label="Admin platform">
-          <span><span class="material-symbols-outlined" aria-hidden="true">cloud</span> Google Cloud</span>
-          <span><span class="material-symbols-outlined" aria-hidden="true">database</span> Firestore CMS</span>
-          <span><span class="material-symbols-outlined" aria-hidden="true">verified_user</span> Google Sign-In</span>
+        <div id="adminModules" class="sd-admin-modules" hidden aria-label="Admin modules">
+          <button type="button" class="sd-admin-module sd-admin-module-active" data-module="system-design">
+            <span class="material-symbols-outlined" aria-hidden="true">article</span>
+            <span>System Design</span>
+          </button>
+          <button type="button" class="sd-admin-module" data-module="contact-policy">
+            <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
+            <span>Contact Policy</span>
+          </button>
         </div>
       </div>
       <div class="exp-badge sd-admin-badge">
@@ -68,19 +73,6 @@
         <div class="label">Firestore</div>
       </div>
     </header>
-
-    <section id="adminModules" class="sd-admin-modules" hidden aria-label="Admin modules">
-      <button type="button" class="sd-admin-module sd-admin-module-active" data-module="system-design">
-        <span class="material-symbols-outlined" aria-hidden="true">article</span>
-        <strong>System Design</strong>
-        <small>Publish architecture notes</small>
-      </button>
-      <button type="button" class="sd-admin-module" data-module="contact-policy">
-        <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
-        <strong>Contact Policy</strong>
-        <small>Configure phone reveal domains</small>
-      </button>
-    </section>
 
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
       <aside class="sd-admin-list-panel">
