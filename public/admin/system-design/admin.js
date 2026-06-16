@@ -3,6 +3,7 @@
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import { initTheme } from '../../assets/core/theme.js';
 import { hideWelcomeOverlay, showWelcomeOverlay } from '../../assets/ui/welcome.js';
+import { renderTechFooter, renderTopbar } from '../../assets/ui/shared-layout.js';
 import {
   closeAssistant,
   initChat,
@@ -17,6 +18,25 @@ const STORAGE_KEY = 'portfolio_admin_credential';
 let credential = sessionStorage.getItem(STORAGE_KEY) || '';
 let articles = [];
 let selectedId = '';
+
+renderTopbar('#sharedTopbar', {
+  className: 'topbar sd-admin-topbar',
+  controlsClassName: 'sd-admin-auth',
+  backHref: '/',
+  backText: 'Back to portfolio',
+  signInId: 'adminTopbarSignInBtn',
+  userId: 'adminTopbarUser',
+  avatarBtnId: 'adminAvatarBtn',
+  userPhotoId: 'adminUserPhoto',
+  dropdownId: 'adminTopbarDropdown',
+  userNameId: 'adminUserName',
+  signOutId: 'adminSignOut',
+  photoAlt: 'Signed-in admin profile photo',
+});
+renderTechFooter('#sharedFooter', {
+  className: 'sponsors-footer sd-admin-footer',
+  i18n: false,
+});
 
 const els = {
   topbarSignIn:    document.getElementById('adminTopbarSignInBtn'),
@@ -71,13 +91,25 @@ function decodeJwtPayload(token) {
 function updateAdminChrome(profile) {
   const signedIn = !!profile;
   els.topbarSignIn.hidden = signedIn;
-  els.googleBtn.hidden = signedIn;
   els.topbarUser.hidden = !signedIn;
   els.signOut.hidden = !signedIn;
-  if (!signedIn) return;
+  if (!signedIn) {
+    els.userName.textContent = '';
+    els.userPhoto.removeAttribute('src');
+    els.userPhoto.alt = 'Signed-in admin profile photo';
+    return;
+  }
   els.userName.textContent = profile.email || profile.name || 'Admin';
   els.userPhoto.src = profile.picture || '';
   els.userPhoto.alt = (profile.name || 'Admin') + ' profile photo';
+}
+
+function resetAdminSession() {
+  credential = '';
+  sessionStorage.removeItem(STORAGE_KEY);
+  els.workspace.hidden = true;
+  els.dropdown.hidden = true;
+  updateAdminChrome(null);
 }
 
 function slugify(value) {
@@ -262,6 +294,7 @@ function initGoogle() {
       hideWelcomeOverlay();
       updateAdminChrome(decodeJwtPayload(credential));
       loadArticles().catch(function (err) {
+        resetAdminSession();
         setStatus(err.message, 'error');
       });
     },
@@ -280,10 +313,12 @@ function initGoogle() {
   }
   if (credential) {
     updateAdminChrome(decodeJwtPayload(credential));
-    loadArticles().catch(function () {
-      sessionStorage.removeItem(STORAGE_KEY);
-      credential = '';
-      updateAdminChrome(null);
+    loadArticles().catch(function (err) {
+      resetAdminSession();
+      if (err?.message) {
+        setStatus(err.message, 'error');
+        return;
+      }
       setStatus('', 'info');
     });
   } else {
@@ -331,11 +366,7 @@ els.newBtn.addEventListener('click', function () {
   els.title.focus();
 });
 els.signOut.addEventListener('click', function () {
-  credential = '';
-  sessionStorage.removeItem(STORAGE_KEY);
-  els.workspace.hidden = true;
-  els.dropdown.hidden = true;
-  updateAdminChrome(null);
+  resetAdminSession();
   setStatus('', 'info');
 });
 
