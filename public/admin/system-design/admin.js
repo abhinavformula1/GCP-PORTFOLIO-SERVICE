@@ -64,6 +64,9 @@ const els = {
   policyWorkspace: document.getElementById('contactPolicyWorkspace'),
   policyMeta:      document.getElementById('contactPolicyMeta'),
   allowedDomains:  document.getElementById('contactAllowedDomains'),
+  personalDomains: document.getElementById('contactPersonalDomains'),
+  allowedEmails:   document.getElementById('contactAllowedEmails'),
+  blockedDomains:  document.getElementById('contactBlockedDomains'),
   testEmail:       document.getElementById('contactTestEmail'),
   policyTest:      document.getElementById('contactPolicyTestResult'),
   testPolicyBtn:   document.getElementById('testContactPolicyBtn'),
@@ -81,6 +84,7 @@ const els = {
   subtitle:        document.getElementById('articleSubtitle'),
   tags:            document.getElementById('articleTags'),
   body:            document.getElementById('articleBody'),
+  systemStatus:    document.getElementById('systemDesignStatus'),
   previewBtn:      document.getElementById('previewBtn'),
   publishBtn:      document.getElementById('publishBtn'),
   previewTitle:    document.getElementById('previewTitle'),
@@ -102,6 +106,13 @@ function setStatus(message, kind) {
   }
   status.textContent = message;
   status.dataset.kind = kind || 'info';
+}
+
+function setSectionStatus(el, message, kind) {
+  if (!el) return;
+  el.textContent = message || '';
+  if (message) el.dataset.kind = kind || 'info';
+  else delete el.dataset.kind;
 }
 
 function decodeJwtPayload(token) {
@@ -147,20 +158,36 @@ function saveSharedSession(token) {
   return profile;
 }
 
-function updateAdminChrome(isSignedIn) {
-  const signedIn = !!isSignedIn;
+function safeDisplayName(profile) {
+  const raw = String(profile?.name || profile?.email || 'Admin').trim();
+  return raw.replace(/[<>]/g, '').slice(0, 80) || 'Admin';
+}
+
+function initialsFor(profile) {
+  const display = safeDisplayName(profile);
+  const parts = display.split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] || 'A';
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  return (first + last).toUpperCase().slice(0, 2);
+}
+
+function updateAdminChrome(profile) {
+  const signedIn = !!profile;
   els.topbarSignIn.hidden = signedIn;
   els.topbarUser.hidden = !signedIn;
   els.signOut.hidden = !signedIn;
   if (!signedIn) {
     els.userName.textContent = '';
+    delete els.avatarBtn.dataset.initials;
     els.userPhoto.removeAttribute('src');
     els.userPhoto.alt = 'Signed-in admin profile photo';
     return;
   }
-  els.userName.textContent = 'Admin session';
+  const displayName = safeDisplayName(profile);
+  els.userName.textContent = displayName;
+  els.avatarBtn.dataset.initials = initialsFor(profile);
   els.userPhoto.removeAttribute('src');
-  els.userPhoto.alt = 'Admin session';
+  els.userPhoto.alt = displayName + ' profile';
 }
 
 function resetAdminSession() {
@@ -232,10 +259,10 @@ function handleAdminLoadError(err) {
   setStatus(err.message, 'error');
 }
 
-function parseDomainsInput() {
-  return els.allowedDomains.value
+function parseListInput(el) {
+  return el.value
     .split(/\n|,/)
-    .map(function (domain) { return domain.trim().toLowerCase(); })
+    .map(function (value) { return value.trim().toLowerCase(); })
     .filter(Boolean);
 }
 
@@ -248,15 +275,20 @@ function domainFromEmail(email) {
 
 function renderContactPolicy(policy) {
   contactPolicyState = policy || {};
-  const domains = Array.isArray(contactPolicyState.allowedDomains) ? contactPolicyState.allowedDomains : [];
-  els.allowedDomains.value = domains.join('\n');
+  const allowedDomains = Array.isArray(contactPolicyState.allowedDomains) ? contactPolicyState.allowedDomains : [];
+  const personalDomains = Array.isArray(contactPolicyState.personalDomains) ? contactPolicyState.personalDomains : [];
+  const allowedEmails = Array.isArray(contactPolicyState.allowedEmails) ? contactPolicyState.allowedEmails : [];
+  const blockedDomains = Array.isArray(contactPolicyState.blockedDomains) ? contactPolicyState.blockedDomains : [];
+  els.allowedDomains.value = allowedDomains.join('\n');
+  els.personalDomains.value = personalDomains.join('\n');
+  els.allowedEmails.value = allowedEmails.join('\n');
+  els.blockedDomains.value = blockedDomains.join('\n');
   const source = contactPolicyState.source === 'firestore' ? 'Firestore override' : 'Environment defaults';
   const updated = contactPolicyState.updatedAt
     ? new Date(contactPolicyState.updatedAt).toLocaleString()
     : 'Not edited yet';
-  els.policyMeta.textContent = source + ' · ' + domains.length + ' domains · Updated: ' + updated;
-  els.policyTest.textContent = '';
-  delete els.policyTest.dataset.kind;
+  els.policyMeta.textContent = source + ' · ' + personalDomains.length + ' personal domains blocked · ' + allowedEmails.length + ' email exceptions · Updated: ' + updated;
+  setSectionStatus(els.policyTest, '', 'info');
 }
 
 function setActiveModule(moduleName) {
@@ -274,34 +306,56 @@ async function loadContactPolicy() {
 }
 
 async function saveContactPolicy() {
-  const allowedDomains = parseDomainsInput();
-  setStatus('Saving contact policy...', 'info');
+  const allowedDomains = parseListInput(els.allowedDomains);
+  const personalDomains = parseListInput(els.personalDomains);
+  const allowedEmails = parseListInput(els.allowedEmails);
+  const blockedDomains = parseListInput(els.blockedDomains);
+  setSectionStatus(els.policyTest, 'Saving contact policy...', 'info');
   const data = await authedJson('/api/admin/contact-policy', {
     method: 'PUT',
-    body:   JSON.stringify({ allowedDomains }),
+    body:   JSON.stringify({ allowedDomains, personalDomains, allowedEmails, blockedDomains }),
   });
   renderContactPolicy(data.policy || {});
-  setStatus('Contact policy saved.', 'success');
+  setSectionStatus(els.policyTest, 'Contact policy saved.', 'success');
 }
 
 function testContactPolicy() {
+  const email = String(els.testEmail.value || '').trim().toLowerCase();
   const domain = domainFromEmail(els.testEmail.value);
-  const domains = parseDomainsInput();
-  const matched = domains.find(function (allowed) {
+  const allowedDomains = parseListInput(els.allowedDomains);
+  const personalDomains = parseListInput(els.personalDomains);
+  const allowedEmails = parseListInput(els.allowedEmails);
+  const blockedDomains = parseListInput(els.blockedDomains);
+  const blocked = blockedDomains.find(function (blockedDomain) {
+    return domain === blockedDomain || domain.endsWith('.' + blockedDomain);
+  });
+  const personal = personalDomains.find(function (personalDomain) {
+    return domain === personalDomain || domain.endsWith('.' + personalDomain);
+  });
+  const alwaysAllowed = allowedDomains.find(function (allowed) {
     return domain === allowed || domain.endsWith('.' + allowed);
   });
   if (!domain) {
-    els.policyTest.textContent = 'Enter a valid email to test.';
-    els.policyTest.dataset.kind = 'error';
+    setSectionStatus(els.policyTest, 'Enter a valid email to test.', 'error');
     return;
   }
-  if (matched) {
-    els.policyTest.textContent = 'Allowed. ' + els.testEmail.value + ' matches ' + matched + '.';
-    els.policyTest.dataset.kind = 'success';
+  if (allowedEmails.includes(email)) {
+    setSectionStatus(els.policyTest, 'Allowed. ' + email + ' is an approved email exception.', 'success');
     return;
   }
-  els.policyTest.textContent = 'Blocked. ' + els.testEmail.value + ' does not match the allowlist.';
-  els.policyTest.dataset.kind = 'error';
+  if (blocked) {
+    setSectionStatus(els.policyTest, 'Blocked. ' + domain + ' is in blocked company domains.', 'error');
+    return;
+  }
+  if (personal) {
+    setSectionStatus(els.policyTest, 'Blocked. ' + domain + ' is a personal email domain.', 'error');
+    return;
+  }
+  if (alwaysAllowed) {
+    setSectionStatus(els.policyTest, 'Allowed. ' + domain + ' is an always-allowed company domain.', 'success');
+    return;
+  }
+  setSectionStatus(els.policyTest, 'Allowed. ' + domain + ' looks like a company domain.', 'success');
 }
 
 function articleFromForm() {
@@ -412,10 +466,10 @@ async function loadArticles() {
 async function publishArticle() {
   const article = articleFromForm();
   if (!article.id || !article.en.title || !article.en.body) {
-    setStatus('Slug, title, and body are required.', 'error');
+    setSectionStatus(els.systemStatus, 'Slug, title, and body are required.', 'error');
     return;
   }
-  setStatus('Publishing...', 'info');
+  setSectionStatus(els.systemStatus, 'Publishing...', 'info');
   const data = await authedJson('/api/admin/system-design/articles/' + article.id, {
     method: 'PUT',
     body:   JSON.stringify(article),
@@ -424,13 +478,13 @@ async function publishArticle() {
   articles = articles.filter(function (item) { return item.id !== saved.id; }).concat(saved)
     .sort(function (a, b) { return Number(a.order || 999) - Number(b.order || 999); });
   fillForm(saved);
-  setStatus('Published version ' + data.version + '.', 'success');
+  setSectionStatus(els.systemStatus, 'Published version ' + data.version + '.', 'success');
 }
 
 async function seedArticles() {
-  setStatus('Importing seed articles...', 'info');
+  setSectionStatus(els.systemStatus, 'Importing seed articles...', 'info');
   const data = await authedJson('/api/admin/system-design/seed', { method: 'POST' });
-  setStatus('Imported ' + data.imported + ' seed articles.', 'success');
+  setSectionStatus(els.systemStatus, 'Imported ' + data.imported + ' seed articles.', 'success');
   await loadArticles();
 }
 
@@ -449,7 +503,7 @@ function initGoogle() {
       credential = resp.credential || '';
       hideWelcomeOverlay();
       saveSharedSession(credential);
-      updateAdminChrome(true);
+      updateAdminChrome(profileFromCredential(credential));
       loadArticles().catch(function (err) {
         handleAdminLoadError(err);
       });
@@ -469,7 +523,7 @@ function initGoogle() {
   }
   if (credential) {
     saveSharedSession(credential);
-    updateAdminChrome(true);
+    updateAdminChrome(profileFromCredential(credential));
     loadArticles().catch(function (err) {
       handleAdminLoadError(err);
     });
@@ -499,7 +553,7 @@ els.modules.addEventListener('click', function (event) {
   setActiveModule(btn.dataset.module || 'system-design');
 });
 els.savePolicyBtn.addEventListener('click', function () {
-  saveContactPolicy().catch(function (err) { setStatus(err.message, 'error'); });
+  saveContactPolicy().catch(function (err) { setSectionStatus(els.policyTest, err.message, 'error'); });
 });
 els.testPolicyBtn.addEventListener('click', testContactPolicy);
 
@@ -516,10 +570,10 @@ els.title.addEventListener('input', function () {
 });
 els.previewBtn.addEventListener('click', renderPreview);
 els.publishBtn.addEventListener('click', function () {
-  publishArticle().catch(function (err) { setStatus(err.message, 'error'); });
+  publishArticle().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
 });
 els.seedBtn.addEventListener('click', function () {
-  seedArticles().catch(function (err) { setStatus(err.message, 'error'); });
+  seedArticles().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
 });
 els.newBtn.addEventListener('click', function () {
   selectedId = '';

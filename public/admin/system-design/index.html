@@ -145,6 +145,8 @@
           <textarea id="articleBody" rows="18" placeholder="<h3>Problem</h3><p>Write the article body here.</p>"></textarea>
         </label>
 
+        <div id="systemDesignStatus" class="sd-admin-section-status"></div>
+
         <div class="sd-admin-actions">
           <button type="button" id="previewBtn">Preview</button>
           <button type="button" id="publishBtn" class="sd-admin-primary">Publish</button>
@@ -162,13 +164,22 @@
     <section id="contactPolicyWorkspace" class="sd-admin-policy" hidden>
       <div class="sd-admin-policy-copy">
         <div class="sd-admin-section-kicker">Contact policy</div>
-        <h2>Domain allowlist</h2>
-        <p>Visitors signed in with these verified email domains can see the private phone number on the portfolio contact card.</p>
+        <h2>Phone visibility rules</h2>
+        <p>Company email domains can see the private phone number. Personal domains stay blocked unless the exact email is approved.</p>
         <div id="contactPolicyMeta" class="sd-admin-policy-meta"></div>
       </div>
       <div class="sd-admin-policy-card">
-        <label>Allowed Domains
-          <textarea id="contactAllowedDomains" rows="8" placeholder="google.com&#10;salesforce.com"></textarea>
+        <label>Blocked Personal Domains
+          <textarea id="contactPersonalDomains" rows="5" placeholder="gmail.com&#10;yahoo.com&#10;outlook.com"></textarea>
+        </label>
+        <label>Allowed Email Exceptions
+          <textarea id="contactAllowedEmails" rows="4" placeholder="trusted.person@gmail.com"></textarea>
+        </label>
+        <label>Blocked Company Domains
+          <textarea id="contactBlockedDomains" rows="4" placeholder="spamdomain.com"></textarea>
+        </label>
+        <label>Always Allowed Company Domains
+          <textarea id="contactAllowedDomains" rows="3" placeholder="google.com&#10;salesforce.com"></textarea>
         </label>
         <label>Test Email
           <input id="contactTestEmail" type="email" placeholder="recruiter@google.com">

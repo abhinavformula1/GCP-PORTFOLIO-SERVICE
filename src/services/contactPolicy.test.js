@@ -21,6 +21,10 @@ const CONFIG_PATH = path.resolve(__dirname, '../config/index.js');
 function loadFreshPolicy(envOverrides) {
   delete require.cache[POLICY_PATH];
   delete require.cache[CONFIG_PATH];
+  delete process.env.CONTACT_ALLOWED_DOMAINS;
+  delete process.env.CONTACT_PERSONAL_DOMAINS;
+  delete process.env.CONTACT_ALLOWED_EMAILS;
+  delete process.env.CONTACT_BLOCKED_DOMAINS;
   Object.assign(process.env, envOverrides);
   return require('./contactPolicy');
 }
@@ -38,7 +42,7 @@ test('guest (no email) — phone stays masked', () => {
 
 test('@gmail.com — random user, phone hidden', () => {
   const policy = loadFreshPolicy({
-    CONTACT_ALLOWED_DOMAINS: 'google.com,salesforce.com',
+    CONTACT_PERSONAL_DOMAINS: 'gmail.com,yahoo.com',
     PRIVATE_PHONE: '+91 98765 43210',
   });
   const decision = policy.resolveContactView({ email: 'someone@gmail.com' });
@@ -46,51 +50,55 @@ test('@gmail.com — random user, phone hidden', () => {
   assert.equal(decision.phone, null);
 });
 
-test('@google.com — exact domain match, phone revealed', () => {
+test('@google.com — company domain, phone revealed', () => {
   const policy = loadFreshPolicy({
-    CONTACT_ALLOWED_DOMAINS: 'google.com,salesforce.com',
+    CONTACT_PERSONAL_DOMAINS: 'gmail.com,yahoo.com',
     PRIVATE_PHONE: '+91 98765 43210',
   });
   const decision = policy.resolveContactView({ email: 'recruiter@google.com' });
   assert.equal(decision.canSeePhone, true);
   assert.equal(decision.phone, '+91 98765 43210');
   assert.equal(decision.matchedDomain, 'google.com');
+  assert.equal(decision.reason, 'company-domain');
 });
 
-test('@corp.google.com — subdomain match, phone revealed', () => {
+test('@corp.google.com — subdomain company domain, phone revealed', () => {
   const policy = loadFreshPolicy({
-    CONTACT_ALLOWED_DOMAINS: 'google.com,salesforce.com',
+    CONTACT_PERSONAL_DOMAINS: 'gmail.com,yahoo.com',
     PRIVATE_PHONE: '+91 98765 43210',
   });
   const decision = policy.resolveContactView({ email: 'recruiter@corp.google.com' });
   assert.equal(decision.canSeePhone, true);
-  assert.equal(decision.matchedDomain, 'google.com');
+  assert.equal(decision.matchedDomain, 'corp.google.com');
 });
 
-test('@salesforce.com — second allow-listed domain, phone revealed', () => {
+test('allowed domain list still marks explicit strategic domains', () => {
   const policy = loadFreshPolicy({
     CONTACT_ALLOWED_DOMAINS: 'google.com,salesforce.com',
+    CONTACT_PERSONAL_DOMAINS: 'gmail.com,yahoo.com',
     PRIVATE_PHONE: '+91 98765 43210',
   });
   const decision = policy.resolveContactView({ email: 'lookalike@salesforce.com' });
   assert.equal(decision.canSeePhone, true);
   assert.equal(decision.matchedDomain, 'salesforce.com');
+  assert.equal(decision.reason, 'allowed-domain');
 });
 
-test('@notgoogle.com — no false-positive partial match', () => {
-  // The string "google.com" is a SUFFIX of "notgoogle.com" — must not match.
+test('blocked domain exception hides company-looking domains', () => {
   const policy = loadFreshPolicy({
-    CONTACT_ALLOWED_DOMAINS: 'google.com,salesforce.com',
+    CONTACT_BLOCKED_DOMAINS: 'notgoogle.com',
+    CONTACT_PERSONAL_DOMAINS: 'gmail.com,yahoo.com',
     PRIVATE_PHONE: '+91 98765 43210',
   });
   const decision = policy.resolveContactView({ email: 'attacker@notgoogle.com' });
   assert.equal(decision.canSeePhone, false);
-  assert.equal(decision.matchedDomain, null);
+  assert.equal(decision.matchedDomain, 'notgoogle.com');
+  assert.equal(decision.reason, 'blocked-domain');
 });
 
 test('mixed-case email — domain matching is case-insensitive', () => {
   const policy = loadFreshPolicy({
-    CONTACT_ALLOWED_DOMAINS: 'google.com,salesforce.com',
+    CONTACT_PERSONAL_DOMAINS: 'gmail.com,yahoo.com',
     PRIVATE_PHONE: '+91 98765 43210',
   });
   const decision = policy.resolveContactView({ email: 'Recruiter@GOOGLE.com' });
@@ -108,11 +116,13 @@ test('malformed email — treated as untrusted', () => {
   }
 });
 
-test('empty allow-list — all viewers blocked', () => {
+test('allowed email exception reveals phone for trusted personal email', () => {
   const policy = loadFreshPolicy({
-    CONTACT_ALLOWED_DOMAINS: '',
+    CONTACT_PERSONAL_DOMAINS: 'gmail.com,yahoo.com',
+    CONTACT_ALLOWED_EMAILS: 'trusted@gmail.com',
     PRIVATE_PHONE: '+91 98765 43210',
   });
-  const decision = policy.resolveContactView({ email: 'recruiter@google.com' });
-  assert.equal(decision.canSeePhone, false);
+  const decision = policy.resolveContactView({ email: 'trusted@gmail.com' });
+  assert.equal(decision.canSeePhone, true);
+  assert.equal(decision.reason, 'allowed-email');
 });
