@@ -78,6 +78,7 @@
 }
 
 .sd-admin-list-head,
+.sd-admin-list-actions,
 .sd-admin-actions {
   display: flex;
   align-items: center;
@@ -87,6 +88,10 @@
 
 .sd-admin-list-head h2 {
   margin: 0;
+}
+
+.sd-admin-list-actions {
+  gap: 8px;
 }
 
 .sd-admin-list {
