@@ -64,7 +64,7 @@ import {
 import {
   initSystemDesign, openSystemDesign, closeSystemDesign,
 } from './ui/systemdesign.js';
-import { renderTechFooter, renderTopbar } from './ui/shared-layout.js';
+import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-layout.js';
 
 (function () {
   'use strict';
@@ -443,6 +443,13 @@ import { renderTechFooter, renderTopbar } from './ui/shared-layout.js';
   window.minimiseAssistant = minimiseAssistant;
   window.restartAssistant  = restartAssistant;
   window.resumeAssistant   = resumeAssistant;
+  renderAtlasShell('#sharedAtlasShell', {
+    toggleChatTeaser,
+    openAssistant,
+    closeAssistant,
+    minimiseAssistant,
+    restartAssistant,
+  });
   initChat();
 
   // Hire Me modal → ./ui/hireme.js

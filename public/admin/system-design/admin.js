@@ -9,7 +9,7 @@ import {
 } from '../../assets/core/state.js';
 import { initTheme } from '../../assets/core/theme.js';
 import { hideWelcomeOverlay, showWelcomeOverlay } from '../../assets/ui/welcome.js';
-import { renderTechFooter, renderTopbar } from '../../assets/ui/shared-layout.js';
+import { renderAtlasShell, renderTechFooter, renderTopbar } from '../../assets/ui/shared-layout.js';
 import {
   closeAssistant,
   initChat,
@@ -441,5 +441,12 @@ globalThis.openAssistant = openAssistant;
 globalThis.closeAssistant = closeAssistant;
 globalThis.minimiseAssistant = minimiseAssistant;
 globalThis.restartAssistant = restartAssistant;
+renderAtlasShell('#sharedAtlasShell', {
+  toggleChatTeaser,
+  openAssistant,
+  closeAssistant,
+  minimiseAssistant,
+  restartAssistant,
+});
 initChat();
 initGoogle();

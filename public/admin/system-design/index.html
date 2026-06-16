@@ -157,54 +157,7 @@
     <div id="sharedFooter"></div>
   </main>
 
-  <!-- ── Chat Launcher (bottom-right floating button) ── -->
-  <div id="chatLauncher" class="chat-launcher" hidden>
-    <div id="chatTeaser" class="chat-teaser" hidden>
-      <button class="chat-teaser-close" id="chatTeaserClose">&times;</button>
-      <div class="chat-teaser-text">Hi! Looking to hire a Salesforce engineer?</div>
-      <button class="chat-teaser-cta" onclick="openAssistant()">Let's talk</button>
-    </div>
-    <div class="chat-fab-wrap">
-      <md-fab id="chatFab" variant="primary" aria-label="Open assistant" onclick="toggleChatTeaser()"
-        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}">
-        <span class="material-symbols-outlined" slot="icon" id="chatFabIcon" aria-hidden="true">chat</span>
-      </md-fab>
-      <span class="chat-fab-ping" aria-hidden="true"></span>
-    </div>
-  </div>
-
-  <!-- ── Guided Assistant Overlay ── -->
-  <div id="assistantOverlay" class="ga-overlay" hidden role="dialog" aria-modal="true"
-    aria-label="Schedule a conversation">
-    <div class="ga-modal">
-      <div class="ga-resize-handle" id="gaResizeHandle" title="Drag to resize"></div>
-
-      <div class="ga-header">
-        <div class="ga-avatar">AK</div>
-        <div class="ga-header-info">
-          <div class="ga-header-name">Atlas</div>
-          <div class="ga-header-status">
-            <span class="ga-status-dot"></span> virtual assistant
-          </div>
-        </div>
-        <div class="ga-header-actions">
-          <button class="ga-header-btn" id="gaStartOverBtn" onclick="restartAssistant()" aria-label="Start over"
-            title="Start over" hidden>&#x21bb;</button>
-          <button class="ga-header-btn" onclick="minimiseAssistant()" aria-label="Minimise"
-            title="Minimise">&#8722;</button>
-          <button class="ga-header-btn ga-close" onclick="closeAssistant()" aria-label="Close"
-            title="Close">&times;</button>
-        </div>
-      </div>
-
-      <div class="ga-progress-track">
-        <div class="ga-progress-bar" id="gaProgressBar"></div>
-      </div>
-
-      <div class="ga-messages" id="gaMessages"></div>
-      <div class="ga-input-area" id="gaInputArea"></div>
-    </div>
-  </div>
+  <div id="sharedAtlasShell"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script type="module" src="/admin/system-design/admin.js"></script>
