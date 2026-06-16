@@ -132,9 +132,6 @@ function readAdminHandoffCredential() {
     localStorage.removeItem(ADMIN_HANDOFF_KEY);
     const handoff = JSON.parse(raw);
     if (!handoff || Number(handoff.expiresAt || 0) < Date.now()) return '';
-    if (handoff.profile && typeof handoff.profile === 'object') {
-      setSiteProfile(handoff.profile);
-    }
     if (handoff.credential) {
       setGoogleCredential(handoff.credential);
       return handoff.credential;
@@ -150,8 +147,8 @@ function saveSharedSession(token) {
   return profile;
 }
 
-function updateAdminChrome(profile) {
-  const signedIn = !!profile;
+function updateAdminChrome(isSignedIn) {
+  const signedIn = !!isSignedIn;
   els.topbarSignIn.hidden = signedIn;
   els.topbarUser.hidden = !signedIn;
   els.signOut.hidden = !signedIn;
@@ -161,9 +158,9 @@ function updateAdminChrome(profile) {
     els.userPhoto.alt = 'Signed-in admin profile photo';
     return;
   }
-  els.userName.textContent = profile.name || profile.email || 'Admin';
-  els.userPhoto.src = profile.picture || '';
-  els.userPhoto.alt = (profile.name || 'Admin') + ' profile photo';
+  els.userName.textContent = 'Admin session';
+  els.userPhoto.removeAttribute('src');
+  els.userPhoto.alt = 'Admin session';
 }
 
 function resetAdminSession() {
@@ -451,8 +448,8 @@ function initGoogle() {
     callback: function (resp) {
       credential = resp.credential || '';
       hideWelcomeOverlay();
-      const profile = saveSharedSession(credential);
-      updateAdminChrome(profile);
+      saveSharedSession(credential);
+      updateAdminChrome(true);
       loadArticles().catch(function (err) {
         handleAdminLoadError(err);
       });
@@ -471,7 +468,8 @@ function initGoogle() {
     });
   }
   if (credential) {
-    updateAdminChrome(saveSharedSession(credential));
+    saveSharedSession(credential);
+    updateAdminChrome(true);
     loadArticles().catch(function (err) {
       handleAdminLoadError(err);
     });
