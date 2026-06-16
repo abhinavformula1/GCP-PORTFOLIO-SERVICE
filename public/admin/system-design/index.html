@@ -108,12 +108,17 @@
             <p>Select an article or start a fresh draft.</p>
           </div>
           <div class="sd-admin-list-actions">
-            <button type="button" id="newArticleBtn">
+            <button type="button" id="toggleArticleLibraryBtn" title="Collapse article library" aria-expanded="true" aria-label="Collapse article library">
+              <span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>
+              <span class="sd-admin-collapse-label">Collapse</span>
+            </button>
+            <button type="button" id="newArticleBtn" title="New article">
               <span class="material-symbols-outlined" aria-hidden="true">add</span>
               <span>New</span>
             </button>
           </div>
         </div>
+        <div class="sd-admin-rail-label" aria-hidden="true">Articles</div>
         <div id="articleList" class="sd-admin-list"></div>
         <details class="sd-admin-migration">
           <summary>Migration tools</summary>
@@ -131,30 +136,75 @@
               <p>Focus on the reader-facing title, promise, and article body first.</p>
             </div>
             <div class="sd-admin-editor-controls">
-              <label class="sd-admin-status-control">Visibility
+              <label class="sd-admin-status-control">
+                <span class="sd-admin-status-label">Status</span>
                 <select id="articleStatus">
-                  <option>Draft</option>
-                  <option selected>Published</option>
+                  <option selected>Draft</option>
+                  <option>Published</option>
                   <option>Coming soon</option>
                 </select>
               </label>
               <span id="articleSaveState" class="sd-admin-save-state">Not saved yet</span>
+              <div class="sd-admin-editor-actions">
+                <button type="button" id="publishBtn" class="sd-admin-primary">
+                  <span class="material-symbols-outlined" aria-hidden="true">publish</span>
+                  <span>Publish</span>
+                </button>
+              </div>
             </div>
           </div>
 
           <div class="sd-admin-primary-fields">
-            <label>Title
-              <input id="articleTitle" type="text" placeholder="Article title">
-            </label>
-            <label>Subtitle
-              <input id="articleSubtitle" type="text" placeholder="Short article subtitle">
-            </label>
-            <label>Tags
-              <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
-            </label>
-            <label>Article body
-              <textarea id="articleBody" rows="18" placeholder="<h3>Problem</h3><p>Write the article body here. HTML is supported.</p>"></textarea>
-            </label>
+            <section class="sd-article-details-card">
+              <div class="sd-article-details-head">
+                <div>
+                  <div class="sd-admin-section-kicker">Article details</div>
+                  <h3 id="articleDetailsTitle">Untitled article</h3>
+                  <p id="articleDetailsSubtitle">No subtitle yet.</p>
+                  <div id="articleDetailsTags" class="sd-article-details-tags"></div>
+                </div>
+                <div class="reco-actions sd-article-details-actions">
+                  <button type="button" id="articleDetailsActionsBtn" class="reco-actions-trigger" aria-label="Article details actions" aria-haspopup="menu" aria-expanded="false">
+                    <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+                  </button>
+                  <div id="articleDetailsActionsMenu" class="reco-actions-menu" role="menu" hidden>
+                    <button type="button" id="editArticleDetailsBtn" class="reco-action-item" role="menuitem">
+                      <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                      <span>Edit</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div id="articleDetailsForm" class="sd-article-details-form" hidden>
+                <label>Title
+                  <input id="articleTitle" type="text" placeholder="Article title">
+                </label>
+                <label>Subtitle
+                  <input id="articleSubtitle" type="text" placeholder="Short article subtitle">
+                </label>
+                <label>Tags
+                  <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
+                </label>
+                <div class="sd-section-edit-bar">
+                  <button type="button" id="doneArticleDetailsBtn">Done</button>
+                </div>
+              </div>
+            </section>
+            <section class="sd-section-builder" aria-labelledby="sectionBuilderTitle">
+              <div class="sd-section-builder-head">
+                <div>
+                  <div class="sd-admin-section-kicker">Article body</div>
+                  <h3 id="sectionBuilderTitle">Structured sections</h3>
+                  <p>Add standard sections so every article follows a clean system-design narrative.</p>
+                </div>
+                <button type="button" id="addArticleSectionBtn">
+                  <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                  <span>Add section</span>
+                </button>
+              </div>
+              <div id="articleSections" class="sd-section-list"></div>
+              <textarea id="articleBody" hidden></textarea>
+            </section>
           </div>
 
           <details class="sd-admin-advanced">
@@ -209,41 +259,128 @@
             <div id="previewBody" class="sd-article-body"></div>
           </article>
           <div id="systemDesignStatus" class="sd-admin-section-status"></div>
-          <div class="sd-admin-actions">
-            <button type="button" id="saveDraftBtn">
-              <span class="material-symbols-outlined" aria-hidden="true">save</span>
-              <span>Save draft</span>
-            </button>
-            <button type="button" id="previewBtn">Refresh preview</button>
-            <button type="button" id="publishBtn" class="sd-admin-primary">
-              <span class="material-symbols-outlined" aria-hidden="true">publish</span>
-              <span>Publish article</span>
-            </button>
-          </div>
         </aside>
       </section>
     </section>
 
     <section id="contactPolicyWorkspace" class="sd-admin-policy" hidden>
       <div class="sd-admin-policy-copy">
-        <div class="sd-admin-section-kicker">Contact policy</div>
-        <h2>Phone visibility rules</h2>
-        <p>Company email domains can see the private phone number. Personal domains stay blocked unless the exact email is approved.</p>
-        <div id="contactPolicyMeta" class="sd-admin-policy-meta"></div>
+        <div class="sd-admin-policy-copy-head">
+          <div>
+            <div class="sd-admin-section-kicker">Contact policy</div>
+            <h2>Phone visibility rules</h2>
+          </div>
+          <button type="button" id="toggleContactPolicyInfoBtn" class="sd-admin-panel-toggle" title="Collapse policy info" aria-label="Collapse policy info" aria-expanded="true">
+            <span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>
+          </button>
+        </div>
+        <div class="sd-admin-policy-copy-body">
+          <p>Company email domains can see the private phone number. Personal domains stay blocked unless the exact email is approved.</p>
+          <div id="contactPolicyMeta" class="sd-admin-policy-meta"></div>
+        </div>
+        <div class="sd-admin-rail-label" aria-hidden="true">Policy</div>
       </div>
       <div class="sd-admin-policy-card">
-        <label>Blocked Personal Domains
-          <textarea id="contactPersonalDomains" rows="5" placeholder="gmail.com&#10;yahoo.com&#10;outlook.com"></textarea>
-        </label>
-        <label>Allowed Email Exceptions
-          <textarea id="contactAllowedEmails" rows="4" placeholder="trusted.person@gmail.com"></textarea>
-        </label>
-        <label>Blocked Company Domains
-          <textarea id="contactBlockedDomains" rows="4" placeholder="spamdomain.com"></textarea>
-        </label>
-        <label>Always Allowed Company Domains
-          <textarea id="contactAllowedDomains" rows="3" placeholder="google.com&#10;salesforce.com"></textarea>
-        </label>
+        <section class="sd-policy-rule-card" data-policy-card="personalDomains">
+          <div class="sd-policy-rule-head">
+            <div>
+              <div class="sd-admin-section-kicker">Blocked</div>
+              <h3>Personal domains</h3>
+              <p>These public email domains never reveal the private phone number.</p>
+            </div>
+            <div class="reco-actions sd-policy-rule-actions">
+              <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Personal domains actions" aria-haspopup="menu" aria-expanded="false">
+                <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+              </button>
+              <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
+                <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                  <span>Edit</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="contactPersonalDomainsView" class="sd-policy-rule-values"></div>
+          <label class="sd-policy-rule-edit" hidden>Blocked Personal Domains
+            <textarea id="contactPersonalDomains" rows="5" placeholder="gmail.com&#10;yahoo.com&#10;outlook.com"></textarea>
+            <button type="button" class="sd-policy-done-btn">Done</button>
+          </label>
+        </section>
+        <section class="sd-policy-rule-card" data-policy-card="allowedEmails">
+          <div class="sd-policy-rule-head">
+            <div>
+              <div class="sd-admin-section-kicker">Allowed</div>
+              <h3>Email exceptions</h3>
+              <p>Exact personal emails that should still see the private phone number.</p>
+            </div>
+            <div class="reco-actions sd-policy-rule-actions">
+              <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Allowed email actions" aria-haspopup="menu" aria-expanded="false">
+                <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+              </button>
+              <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
+                <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                  <span>Edit</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="contactAllowedEmailsView" class="sd-policy-rule-values"></div>
+          <label class="sd-policy-rule-edit" hidden>Allowed Email Exceptions
+            <textarea id="contactAllowedEmails" rows="4" placeholder="trusted.person@gmail.com"></textarea>
+            <button type="button" class="sd-policy-done-btn">Done</button>
+          </label>
+        </section>
+        <section class="sd-policy-rule-card" data-policy-card="blockedDomains">
+          <div class="sd-policy-rule-head">
+            <div>
+              <div class="sd-admin-section-kicker">Blocked</div>
+              <h3>Company domains</h3>
+              <p>Company-looking domains that should not reveal the phone number.</p>
+            </div>
+            <div class="reco-actions sd-policy-rule-actions">
+              <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Blocked company domain actions" aria-haspopup="menu" aria-expanded="false">
+                <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+              </button>
+              <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
+                <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                  <span>Edit</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="contactBlockedDomainsView" class="sd-policy-rule-values"></div>
+          <label class="sd-policy-rule-edit" hidden>Blocked Company Domains
+            <textarea id="contactBlockedDomains" rows="4" placeholder="spamdomain.com"></textarea>
+            <button type="button" class="sd-policy-done-btn">Done</button>
+          </label>
+        </section>
+        <section class="sd-policy-rule-card" data-policy-card="allowedDomains">
+          <div class="sd-policy-rule-head">
+            <div>
+              <div class="sd-admin-section-kicker">Tracked</div>
+              <h3>Strategic company domains</h3>
+              <p>Domains to explicitly track as always allowed company targets.</p>
+            </div>
+            <div class="reco-actions sd-policy-rule-actions">
+              <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Allowed company domain actions" aria-haspopup="menu" aria-expanded="false">
+                <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+              </button>
+              <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
+                <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                  <span>Edit</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="contactAllowedDomainsView" class="sd-policy-rule-values"></div>
+          <label class="sd-policy-rule-edit" hidden>Always Allowed Company Domains
+            <textarea id="contactAllowedDomains" rows="3" placeholder="google.com&#10;salesforce.com"></textarea>
+            <button type="button" class="sd-policy-done-btn">Done</button>
+          </label>
+        </section>
         <label>Test Email
           <input id="contactTestEmail" type="email" placeholder="recruiter@google.com">
         </label>

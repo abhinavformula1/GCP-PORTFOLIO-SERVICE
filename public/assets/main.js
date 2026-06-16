@@ -142,6 +142,12 @@ import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-la
 
   function refreshAdminNav() {
     setAdminNavVisible(false);
+    fetch('/api/local-preview')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (data && data.enabled) setAdminNavVisible(true);
+      })
+      .catch(function () {});
     if (!siteProfile || siteProfile.type === 'guest') return;
     authedFetch('/api/admin/me').then(function (data) {
       setAdminNavVisible(!!(data && data.isAdmin));

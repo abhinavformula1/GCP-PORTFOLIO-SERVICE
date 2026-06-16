@@ -27,6 +27,16 @@ async function requireAuth(req, res, next) {
 }
 
 async function requireAdmin(req, res, next) {
+  if (config.admin.localPreview) {
+    req.user = {
+      uid: 'local-admin-preview',
+      email: 'local-admin@localhost',
+      name: 'Local Admin Preview',
+      picture: '',
+    };
+    return next();
+  }
+
   await requireAuth(req, res, (err) => {
     if (err) return next(err);
 

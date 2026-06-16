@@ -58,6 +58,11 @@ const config = {
       .split(',')
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean),
+    // Local-only CMS preview mode for UX work. This is ignored in production
+    // and on Cloud Run even if the env var is accidentally set there.
+    localPreview: process.env.ADMIN_LOCAL_PREVIEW === 'true'
+      && (process.env.NODE_ENV || 'development') !== 'production'
+      && !process.env.K_SERVICE,
   },
 
   // ── Contact-reveal policy ──────────────────────────────────────────

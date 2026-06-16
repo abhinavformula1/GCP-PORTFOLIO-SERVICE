@@ -138,6 +138,13 @@ router.get('/admin/me', requireAuth, async (req, res) => {
   });
 });
 
+router.get('/local-preview', (_req, res) => {
+  return res.status(200).json({
+    success: true,
+    enabled: config.admin.localPreview,
+  });
+});
+
 router.get('/admin/contact-policy', requireAdmin, async (_req, res, next) => {
   try {
     const policy = await contactPolicy.getContactPolicyConfig();
@@ -204,6 +211,18 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
     }
 
     const article = Object.assign({}, req.body, { id: req.params.id });
+    if (config.admin.localPreview) {
+      return res.status(200).json({
+        success: true,
+        article: Object.assign({}, article, {
+          updatedAt: Date.now(),
+          updatedBy: req.user.email,
+        }),
+        version: 'local-preview',
+        source: 'local-preview',
+      });
+    }
+
     const result = await firestore.upsertSystemDesignArticle(article, {
       publishedBy: req.user.email,
     });
@@ -219,6 +238,15 @@ router.post('/admin/system-design/seed', requireAdmin, async (req, res, next) =>
     const raw = await fs.readFile(SEED_FILE, 'utf8');
     const articles = JSON.parse(raw);
     if (!Array.isArray(articles)) throw new ValidationError('Seed file must contain an article array.');
+
+    if (config.admin.localPreview) {
+      return res.status(200).json({
+        success: true,
+        imported: articles.length,
+        results: articles.map((article) => ({ id: article.id, version: 'local-preview' })),
+        source: 'local-preview',
+      });
+    }
 
     const results = [];
     for (const article of articles) {

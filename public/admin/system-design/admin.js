@@ -1,4 +1,4 @@
-/* global URL, atob, console, document, fetch, google, localStorage, sessionStorage, setTimeout */
+/* global DOMParser, URL, atob, clearTimeout, document, fetch, google, localStorage, sessionStorage, setTimeout */
 
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import {
@@ -28,6 +28,18 @@ let credential = readAdminHandoffCredential() || googleCredential || '';
 let articles = [];
 let selectedId = '';
 let contactPolicyState = null;
+let adminAvatarObjectUrl = '';
+let autosaveTimer = 0;
+let articleSections = [];
+
+const SECTION_TYPES = [
+  { value: 'overview', label: 'Overview', title: 'Overview' },
+  { value: 'problem', label: 'Problem statement', title: 'Problem statement' },
+  { value: 'solution', label: 'Solution', title: 'Solution' },
+  { value: 'tradeoffs', label: 'Trade-offs', title: 'Trade-offs' },
+  { value: 'risks', label: 'Risks', title: 'Risks' },
+  { value: 'conclusion', label: 'Conclusion', title: 'Conclusion' },
+];
 
 renderTopbar('#sharedTopbar', {
   className: 'topbar sd-admin-topbar',
@@ -62,16 +74,22 @@ const els = {
   workspace:       document.getElementById('adminWorkspace'),
   modules:         document.getElementById('adminModules'),
   policyWorkspace: document.getElementById('contactPolicyWorkspace'),
+  togglePolicyInfoBtn: document.getElementById('toggleContactPolicyInfoBtn'),
   policyMeta:      document.getElementById('contactPolicyMeta'),
   allowedDomains:  document.getElementById('contactAllowedDomains'),
   personalDomains: document.getElementById('contactPersonalDomains'),
   allowedEmails:   document.getElementById('contactAllowedEmails'),
   blockedDomains:  document.getElementById('contactBlockedDomains'),
+  allowedDomainsView: document.getElementById('contactAllowedDomainsView'),
+  personalDomainsView: document.getElementById('contactPersonalDomainsView'),
+  allowedEmailsView: document.getElementById('contactAllowedEmailsView'),
+  blockedDomainsView: document.getElementById('contactBlockedDomainsView'),
   testEmail:       document.getElementById('contactTestEmail'),
   policyTest:      document.getElementById('contactPolicyTestResult'),
   testPolicyBtn:   document.getElementById('testContactPolicyBtn'),
   savePolicyBtn:   document.getElementById('saveContactPolicyBtn'),
   list:            document.getElementById('articleList'),
+  toggleLibraryBtn: document.getElementById('toggleArticleLibraryBtn'),
   totalCount:      document.getElementById('articleTotalCount'),
   publishedCount:  document.getElementById('articlePublishedCount'),
   draftCount:      document.getElementById('articleDraftCount'),
@@ -83,13 +101,22 @@ const els = {
   icon:            document.getElementById('articleIcon'),
   readMinutes:     document.getElementById('articleReadMinutes'),
   order:           document.getElementById('articleOrder'),
+  detailsTitle:    document.getElementById('articleDetailsTitle'),
+  detailsSubtitle: document.getElementById('articleDetailsSubtitle'),
+  detailsTags:     document.getElementById('articleDetailsTags'),
+  detailsForm:     document.getElementById('articleDetailsForm'),
+  detailsActionsBtn: document.getElementById('articleDetailsActionsBtn'),
+  detailsActionsMenu: document.getElementById('articleDetailsActionsMenu'),
+  editDetailsBtn:  document.getElementById('editArticleDetailsBtn'),
+  doneDetailsBtn:  document.getElementById('doneArticleDetailsBtn'),
   title:           document.getElementById('articleTitle'),
   subtitle:        document.getElementById('articleSubtitle'),
   tags:            document.getElementById('articleTags'),
   body:            document.getElementById('articleBody'),
+  sections:        document.getElementById('articleSections'),
+  addSectionBtn:   document.getElementById('addArticleSectionBtn'),
   systemStatus:    document.getElementById('systemDesignStatus'),
   saveState:       document.getElementById('articleSaveState'),
-  saveDraftBtn:    document.getElementById('saveDraftBtn'),
   previewBtn:      document.getElementById('previewBtn'),
   publishBtn:      document.getElementById('publishBtn'),
   previewState:    document.getElementById('previewStateBadge'),
@@ -178,6 +205,28 @@ function isTrustedGoogleProfilePhoto(url) {
   }
 }
 
+function clearAdminAvatarPhoto() {
+  if (adminAvatarObjectUrl) {
+    URL.revokeObjectURL(adminAvatarObjectUrl);
+    adminAvatarObjectUrl = '';
+  }
+  els.userPhoto.removeAttribute('src');
+  delete els.avatarBtn.dataset.hasPhoto;
+}
+
+async function loadAdminAvatarPhoto(photoUrl) {
+  if (!isTrustedGoogleProfilePhoto(photoUrl)) return;
+  const resp = await fetch(photoUrl, { referrerPolicy: 'no-referrer' });
+  if (!resp.ok) return;
+  const type = resp.headers.get('content-type') || '';
+  if (!type.startsWith('image/')) return;
+  const blob = await resp.blob();
+  clearAdminAvatarPhoto();
+  adminAvatarObjectUrl = URL.createObjectURL(blob);
+  els.userPhoto.src = adminAvatarObjectUrl;
+  els.avatarBtn.dataset.hasPhoto = 'true';
+}
+
 async function verifySharedSession(token) {
   const resp = await fetch('/api/session/start', {
     method:  'POST',
@@ -220,21 +269,14 @@ function updateAdminChrome(profile) {
   if (!signedIn) {
     els.userName.textContent = '';
     delete els.avatarBtn.dataset.initials;
-    delete els.avatarBtn.dataset.hasPhoto;
-    els.userPhoto.removeAttribute('src');
+    clearAdminAvatarPhoto();
     els.userPhoto.alt = 'Signed-in admin profile photo';
     return;
   }
   const displayName = safeDisplayName(profile);
   els.userName.textContent = displayName;
   els.avatarBtn.dataset.initials = initialsFor(profile);
-  if (profile.verified && isTrustedGoogleProfilePhoto(profile.picture)) {
-    els.userPhoto.src = profile.picture;
-    els.avatarBtn.dataset.hasPhoto = 'true';
-  } else {
-    els.userPhoto.removeAttribute('src');
-    delete els.avatarBtn.dataset.hasPhoto;
-  }
+  if (!profile.verified) clearAdminAvatarPhoto();
   els.userPhoto.alt = displayName + ' profile';
 }
 
@@ -264,10 +306,28 @@ async function startAdminSession(token) {
   try {
     const verifiedProfile = await verifySharedSession(credential);
     updateAdminChrome(verifiedProfile);
-  } catch (err) {
-    console.warn('[admin] Verified profile lookup failed:', err.message);
+    await loadAdminAvatarPhoto(verifiedProfile.picture);
+  } catch (_err) {
+    setStatus('Verified profile photo is unavailable. Using initials.', 'info');
   }
   await loadArticles();
+}
+
+async function startLocalAdminPreview() {
+  const resp = await fetch('/api/local-preview');
+  const data = await resp.json().catch(function () { return {}; });
+  if (!resp.ok || !data.enabled) return false;
+  credential = 'local-admin-preview';
+  const profile = {
+    sub: 'local-admin-preview',
+    name: 'Local Admin Preview',
+    email: 'local-admin@localhost',
+  };
+  setGoogleCredential(credential);
+  setSiteProfile(profile);
+  updateAdminChrome(profile);
+  await loadArticles();
+  return true;
 }
 
 function slugify(value) {
@@ -334,6 +394,39 @@ function domainFromEmail(email) {
   return value.slice(at + 1);
 }
 
+function renderPolicyValues(target, values, emptyText) {
+  target.textContent = '';
+  if (!values.length) {
+    const empty = document.createElement('span');
+    empty.className = 'sd-policy-empty';
+    empty.textContent = emptyText;
+    target.appendChild(empty);
+    return;
+  }
+  values.forEach(function (value) {
+    const chip = document.createElement('span');
+    chip.className = 'sd-admin-chip sd-admin-chip-muted';
+    chip.textContent = value;
+    target.appendChild(chip);
+  });
+}
+
+function renderPolicyRuleCards() {
+  renderPolicyValues(els.personalDomainsView, parseListInput(els.personalDomains), 'No personal domains configured.');
+  renderPolicyValues(els.allowedEmailsView, parseListInput(els.allowedEmails), 'No email exceptions configured.');
+  renderPolicyValues(els.blockedDomainsView, parseListInput(els.blockedDomains), 'No blocked company domains.');
+  renderPolicyValues(els.allowedDomainsView, parseListInput(els.allowedDomains), 'No strategic domains configured.');
+}
+
+function closePolicyRuleMenus() {
+  document.querySelectorAll('.sd-policy-rule-menu').forEach(function (menu) {
+    menu.hidden = true;
+  });
+  document.querySelectorAll('.sd-policy-rule-action-btn[aria-expanded="true"]').forEach(function (trigger) {
+    trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
 function renderContactPolicy(policy) {
   contactPolicyState = policy || {};
   const allowedDomains = Array.isArray(contactPolicyState.allowedDomains) ? contactPolicyState.allowedDomains : [];
@@ -344,6 +437,7 @@ function renderContactPolicy(policy) {
   els.personalDomains.value = personalDomains.join('\n');
   els.allowedEmails.value = allowedEmails.join('\n');
   els.blockedDomains.value = blockedDomains.join('\n');
+  renderPolicyRuleCards();
   const source = contactPolicyState.source === 'firestore' ? 'Firestore override' : 'Environment defaults';
   const updated = contactPolicyState.updatedAt
     ? new Date(contactPolicyState.updatedAt).toLocaleString()
@@ -359,6 +453,26 @@ function setActiveModule(moduleName) {
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
+}
+
+function setArticleLibraryCollapsed(collapsed) {
+  els.workspace.classList.toggle('sd-admin-workspace-library-collapsed', collapsed);
+  els.toggleLibraryBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  els.toggleLibraryBtn.setAttribute('aria-label', collapsed ? 'Expand article library' : 'Collapse article library');
+  els.toggleLibraryBtn.title = collapsed ? 'Expand article library' : 'Collapse article library';
+  const icon = els.toggleLibraryBtn.querySelector('.material-symbols-outlined');
+  const label = els.toggleLibraryBtn.querySelector('.sd-admin-collapse-label');
+  if (icon) icon.textContent = collapsed ? 'left_panel_open' : 'left_panel_close';
+  if (label) label.textContent = collapsed ? 'Expand' : 'Collapse';
+}
+
+function setContactPolicyInfoCollapsed(collapsed) {
+  els.policyWorkspace.classList.toggle('sd-admin-policy-info-collapsed', collapsed);
+  els.togglePolicyInfoBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  els.togglePolicyInfoBtn.setAttribute('aria-label', collapsed ? 'Expand policy info' : 'Collapse policy info');
+  els.togglePolicyInfoBtn.title = collapsed ? 'Expand policy info' : 'Collapse policy info';
+  const icon = els.togglePolicyInfoBtn.querySelector('.material-symbols-outlined');
+  if (icon) icon.textContent = collapsed ? 'left_panel_open' : 'left_panel_close';
 }
 
 async function loadContactPolicy() {
@@ -419,8 +533,133 @@ function testContactPolicy() {
   setSectionStatus(els.policyTest, 'Allowed. ' + domain + ' looks like a company domain.', 'success');
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function inlineMarkdown(value) {
+  let text = escapeHtml(value);
+  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return text;
+}
+
+function markdownToHtml(markdown) {
+  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+  const html = [];
+  let paragraph = [];
+  let list = [];
+
+  function flushParagraph() {
+    if (!paragraph.length) return;
+    html.push('<p>' + inlineMarkdown(paragraph.join(' ')) + '</p>');
+    paragraph = [];
+  }
+
+  function flushList() {
+    if (!list.length) return;
+    html.push('<ul>' + list.map(function (item) {
+      return '<li>' + inlineMarkdown(item) + '</li>';
+    }).join('') + '</ul>');
+    list = [];
+  }
+
+  lines.forEach(function (line) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+    const heading = /^(#{2,3})\s+(.+)$/.exec(trimmed);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      const tag = heading[1].length === 2 ? 'h3' : 'h4';
+      html.push('<' + tag + '>' + inlineMarkdown(heading[2]) + '</' + tag + '>');
+      return;
+    }
+    const bullet = /^[-*]\s+(.+)$/.exec(trimmed);
+    if (bullet) {
+      flushParagraph();
+      list.push(bullet[1]);
+      return;
+    }
+    flushList();
+    paragraph.push(trimmed);
+  });
+
+  flushParagraph();
+  flushList();
+  return html.join('');
+}
+
+function sectionTemplate(type) {
+  const meta = SECTION_TYPES.find(function (item) { return item.value === type; }) || SECTION_TYPES[0];
+  return {
+    id: 'section-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+    type: meta.value,
+    title: meta.title,
+    body: '',
+  };
+}
+
+function nextSectionType() {
+  const used = new Set(articleSections.map(function (section) { return section.type; }));
+  const next = SECTION_TYPES.find(function (type) { return !used.has(type.value); });
+  return next ? next.value : 'solution';
+}
+
+function sectionsToHtml(sections) {
+  return sections
+    .filter(function (section) { return section.body; })
+    .map(function (section) {
+      const title = (SECTION_TYPES.find(function (item) { return item.value === section.type; }) || SECTION_TYPES[0]).title;
+      return '<h3>' + inlineMarkdown(title) + '</h3>' + markdownToHtml(section.body);
+    })
+    .join('');
+}
+
+function htmlToSections(html) {
+  const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+  const sections = [];
+  let current = null;
+
+  function bodyText(node) {
+    if (node.matches && node.matches('ul,ol')) {
+      return Array.from(node.querySelectorAll('li')).map(function (li) {
+        return '- ' + li.textContent.trim();
+      }).join('\n');
+    }
+    return node.textContent.trim();
+  }
+
+  Array.from(doc.body.children).forEach(function (node) {
+    if (node.matches('h1,h2,h3,h4,h5,h6')) {
+      current = sectionTemplate('overview');
+      current.title = node.textContent.trim() || 'Overview';
+      current.body = '';
+      sections.push(current);
+      return;
+    }
+    if (!current) {
+      current = sectionTemplate('overview');
+      sections.push(current);
+    }
+    const text = bodyText(node);
+    if (text) current.body += (current.body ? '\n\n' : '') + text;
+  });
+  return sections.length ? sections : [sectionTemplate('overview')];
+}
+
 function articleFromForm() {
   const id = slugify(els.id.value || els.title.value);
+  const bodyHtml = sectionsToHtml(articleSections);
   return {
     id,
     status:      els.statusField.value,
@@ -433,35 +672,228 @@ function articleFromForm() {
     en: {
       title:    els.title.value.trim(),
       subtitle: els.subtitle.value.trim(),
-      body:     els.body.value.trim(),
+      body:     bodyHtml,
     },
     fr: {
       title:    els.title.value.trim(),
       subtitle: els.subtitle.value.trim(),
-      body:     els.body.value.trim(),
+      body:     bodyHtml,
     },
   };
 }
 
-function updateWorkflowChrome(status, saveLabel) {
+function syncSectionFromCard(card) {
+  const section = articleSections.find(function (item) { return item.id === card.dataset.sectionId; });
+  if (!section) return;
+  const bodyEl = card.querySelector('.sd-section-body-input');
+  section.body = bodyEl ? bodyEl.value.trim() : section.body;
+}
+
+function renderSectionBuilder() {
+  els.sections.textContent = '';
+  articleSections.forEach(function (section, index) {
+    const card = document.createElement('article');
+    card.className = 'sd-section-card';
+    card.dataset.sectionId = section.id;
+
+    const head = document.createElement('div');
+    head.className = 'sd-section-card-head';
+    const number = document.createElement('span');
+    number.className = 'sd-section-number';
+    number.textContent = String(index + 1).padStart(2, '0');
+    const typeMeta = SECTION_TYPES.find(function (type) { return type.value === section.type; }) || SECTION_TYPES[0];
+    const typeLabel = document.createElement('div');
+    typeLabel.className = 'sd-section-type-label';
+    typeLabel.textContent = typeMeta.label;
+    const actions = document.createElement('div');
+    actions.className = 'reco-actions sd-section-actions';
+    const actionTrigger = document.createElement('button');
+    actionTrigger.type = 'button';
+    actionTrigger.className = 'reco-actions-trigger sd-section-actions-trigger';
+    actionTrigger.setAttribute('aria-label', 'Section actions');
+    actionTrigger.setAttribute('aria-haspopup', 'menu');
+    actionTrigger.setAttribute('aria-expanded', 'false');
+    const actionIcon = document.createElement('span');
+    actionIcon.className = 'material-symbols-outlined';
+    actionIcon.setAttribute('aria-hidden', 'true');
+    actionIcon.textContent = 'more_vert';
+    actionTrigger.appendChild(actionIcon);
+
+    const actionMenu = document.createElement('div');
+    actionMenu.className = 'reco-actions-menu sd-section-actions-menu';
+    actionMenu.setAttribute('role', 'menu');
+    actionMenu.hidden = true;
+
+    const editAction = document.createElement('button');
+    editAction.type = 'button';
+    editAction.className = 'reco-action-item sd-section-action-item';
+    editAction.setAttribute('role', 'menuitem');
+    const editIcon = document.createElement('span');
+    editIcon.className = 'material-symbols-outlined';
+    editIcon.setAttribute('aria-hidden', 'true');
+    editIcon.textContent = 'edit';
+    const editLabel = document.createElement('span');
+    editLabel.textContent = 'Edit';
+    editAction.append(editIcon, editLabel);
+
+    const deleteAction = document.createElement('button');
+    deleteAction.type = 'button';
+    deleteAction.className = 'reco-action-item reco-action-item-destructive sd-section-action-item';
+    deleteAction.setAttribute('role', 'menuitem');
+    const deleteIcon = document.createElement('span');
+    deleteIcon.className = 'material-symbols-outlined';
+    deleteIcon.setAttribute('aria-hidden', 'true');
+    deleteIcon.textContent = 'delete';
+    const deleteLabel = document.createElement('span');
+    deleteLabel.textContent = 'Delete';
+    deleteAction.append(deleteIcon, deleteLabel);
+
+    actionMenu.addEventListener('click', function (event) { event.stopPropagation(); });
+    actionMenu.append(editAction, deleteAction);
+    actions.append(actionTrigger, actionMenu);
+    head.append(number, typeLabel, actions);
+
+    const readOnlyBody = document.createElement('div');
+    readOnlyBody.className = 'sd-section-body-readonly';
+    readOnlyBody.textContent = section.body || 'No content yet. Use Edit to write this section.';
+
+    const body = document.createElement('textarea');
+    body.className = 'sd-section-body-input';
+    body.rows = 5;
+    body.placeholder = 'Write this section in plain language. Bullets, **bold**, and `code` are supported.';
+    body.value = section.body || '';
+    body.hidden = true;
+
+    const editBar = document.createElement('div');
+    editBar.className = 'sd-section-edit-bar';
+    editBar.hidden = true;
+    const doneEdit = document.createElement('button');
+    doneEdit.type = 'button';
+    doneEdit.textContent = 'Done';
+    editBar.appendChild(doneEdit);
+
+    card.append(head, readOnlyBody, body, editBar);
+    card.addEventListener('input', function () {
+      syncSectionFromCard(card);
+      renderPreview();
+      markDirty();
+    });
+    card.addEventListener('change', function () {
+      syncSectionFromCard(card);
+      renderPreview();
+      markDirty();
+    });
+    actionTrigger.addEventListener('click', function (event) {
+      event.stopPropagation();
+      const willOpen = actionMenu.hidden;
+      closeSectionActionMenus();
+      closeArticleDetailsMenu();
+      actionMenu.hidden = !willOpen;
+      actionTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+    editAction.addEventListener('click', function () {
+      closeSectionActionMenus();
+      readOnlyBody.hidden = true;
+      body.hidden = false;
+      editBar.hidden = false;
+      body.focus();
+    });
+    doneEdit.addEventListener('click', function () {
+      syncSectionFromCard(card);
+      readOnlyBody.textContent = section.body || 'No content yet. Use Edit to write this section.';
+      readOnlyBody.hidden = false;
+      body.hidden = true;
+      editBar.hidden = true;
+      renderPreview();
+      markDirty();
+    });
+    deleteAction.addEventListener('click', function () {
+      closeSectionActionMenus();
+      articleSections = articleSections.filter(function (item) { return item.id !== section.id; });
+      if (!articleSections.length) articleSections.push(sectionTemplate('overview'));
+      renderSectionBuilder();
+      renderPreview();
+      markDirty();
+    });
+    els.sections.appendChild(card);
+  });
+}
+
+function renderArticleDetails() {
+  const title = els.title.value.trim();
+  const subtitle = els.subtitle.value.trim();
+  const tags = els.tags.value.split(',').map(function (tag) { return tag.trim(); }).filter(Boolean);
+  els.detailsTitle.textContent = title || 'Untitled article';
+  els.detailsSubtitle.textContent = subtitle || 'No subtitle yet.';
+  els.detailsTags.textContent = '';
+  tags.forEach(function (tag) {
+    const chip = document.createElement('span');
+    chip.className = 'sd-admin-chip sd-admin-chip-muted';
+    chip.textContent = tag;
+    els.detailsTags.appendChild(chip);
+  });
+}
+
+function closeSectionActionMenus() {
+  document.querySelectorAll('.sd-section-actions-menu').forEach(function (menu) {
+    menu.hidden = true;
+  });
+  document.querySelectorAll('.sd-section-actions-trigger[aria-expanded="true"]').forEach(function (trigger) {
+    trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function closeArticleDetailsMenu() {
+  els.detailsActionsMenu.hidden = true;
+  els.detailsActionsBtn.setAttribute('aria-expanded', 'false');
+}
+
+function updateWorkflowChrome(status, saveLabel, saveKind) {
   const effectiveStatus = status || els.statusField.value || 'Draft';
   els.previewState.textContent = effectiveStatus;
   els.previewState.dataset.status = effectiveStatus;
   if (saveLabel !== undefined) {
     els.saveState.textContent = saveLabel || 'Unsaved changes';
-    els.saveState.dataset.status = saveLabel ? 'saved' : 'dirty';
+    els.saveState.dataset.status = saveKind || (saveLabel ? 'saved' : 'dirty');
   }
-  els.publishBtn.hidden = effectiveStatus === 'Published';
 }
 
 function markDirty() {
   updateWorkflowChrome(els.statusField.value, '');
+  scheduleDraftAutosave();
+}
+
+function clearDraftAutosave() {
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = 0;
+  }
+}
+
+function canAutosaveDraft(article) {
+  return article.status === 'Draft'
+    && article.id
+    && article.en.title.length >= 3
+    && !!article.en.body;
+}
+
+function scheduleDraftAutosave() {
+  clearDraftAutosave();
+  const article = articleFromForm();
+  if (!canAutosaveDraft(article)) return;
+  autosaveTimer = setTimeout(function () {
+    autosaveTimer = 0;
+    updateWorkflowChrome('Draft', 'Autosaving...', 'saving');
+    saveArticleWithStatus('Draft', { silent: true }).catch(function () {
+      updateWorkflowChrome('Draft', 'Autosave failed', 'error');
+    });
+  }, 1200);
 }
 
 function fillForm(article) {
   const item = article || {
     id: '',
-    status: 'Published',
+    status: 'Draft',
     category: 'integration',
     icon: 'article',
     readMinutes: 5,
@@ -472,7 +904,7 @@ function fillForm(article) {
   const en = item.en || {};
   selectedId = item.id || '';
   els.id.value = item.id || '';
-  els.statusField.value = item.status || 'Published';
+  els.statusField.value = item.status || 'Draft';
   els.category.value = item.category || 'integration';
   els.icon.value = item.icon || 'article';
   els.readMinutes.value = item.readMinutes || 5;
@@ -480,9 +912,13 @@ function fillForm(article) {
   els.title.value = en.title || '';
   els.subtitle.value = en.subtitle || '';
   els.tags.value = Array.isArray(item.tags) ? item.tags.join(', ') : '';
-  els.body.value = en.body || '';
+  els.detailsForm.hidden = true;
+  renderArticleDetails();
+  articleSections = htmlToSections(en.body || '');
+  els.body.value = '';
+  renderSectionBuilder();
   renderPreview();
-  updateWorkflowChrome(els.statusField.value, item.id ? 'Saved in Firestore' : 'Not saved yet');
+  updateWorkflowChrome(els.statusField.value, item.id ? 'Saved in Firestore' : 'New draft', item.id ? 'saved' : 'new');
   renderList();
 }
 
@@ -548,7 +984,7 @@ function renderPreview() {
   els.previewTitle.textContent = article.en.title || 'Untitled article';
   els.previewSubtitle.textContent = article.en.subtitle || '';
   els.previewBody.textContent = article.en.body
-    ? 'Preview will render on the public System Design page after publishing.'
+    ? articleSections.length + ' structured section' + (articleSections.length === 1 ? '' : 's') + ' will render as the public article.'
     : 'Nothing to preview yet.';
 }
 
@@ -566,16 +1002,18 @@ async function loadArticles() {
   setActiveModule('system-design');
 }
 
-async function saveArticleWithStatus(status) {
+async function saveArticleWithStatus(status, opts) {
+  const options = opts || {};
   const article = articleFromForm();
   article.status = status;
   article.stub = status === 'Coming soon';
   if (!article.id || !article.en.title || !article.en.body) {
+    if (options.silent) return;
     setSectionStatus(els.systemStatus, 'Slug, title, and body are required.', 'error');
     return;
   }
   const action = status === 'Published' ? 'Publishing...' : 'Saving ' + status.toLowerCase() + '...';
-  setSectionStatus(els.systemStatus, action, 'info');
+  if (!options.silent) setSectionStatus(els.systemStatus, action, 'info');
   const data = await authedJson('/api/admin/system-design/articles/' + article.id, {
     method: 'PUT',
     body:   JSON.stringify(article),
@@ -583,21 +1021,21 @@ async function saveArticleWithStatus(status) {
   const saved = data.article;
   articles = articles.filter(function (item) { return item.id !== saved.id; }).concat(saved)
     .sort(function (a, b) { return Number(a.order || 999) - Number(b.order || 999); });
-  fillForm(saved);
+  if (options.silent) {
+    selectedId = saved.id;
+    renderList();
+  } else {
+    fillForm(saved);
+  }
   const done = status === 'Published'
     ? 'Published version ' + data.version + '.'
     : status + ' saved to Firestore.';
-  updateWorkflowChrome(saved.status, status === 'Published' ? 'Published just now' : 'Saved just now');
-  setSectionStatus(els.systemStatus, done, 'success');
-}
-
-function saveDraft() {
-  els.statusField.value = 'Draft';
-  renderPreview();
-  return saveArticleWithStatus('Draft');
+  updateWorkflowChrome(saved.status, options.silent ? 'Auto-saved to Firestore' : (status === 'Published' ? 'Published just now' : 'Saved just now'), 'saved');
+  if (!options.silent) setSectionStatus(els.systemStatus, done, 'success');
 }
 
 function publishArticle() {
+  clearDraftAutosave();
   els.statusField.value = 'Published';
   renderPreview();
   return saveArticleWithStatus('Published');
@@ -673,9 +1111,82 @@ els.savePolicyBtn.addEventListener('click', function () {
   saveContactPolicy().catch(function (err) { setSectionStatus(els.policyTest, err.message, 'error'); });
 });
 els.testPolicyBtn.addEventListener('click', testContactPolicy);
+document.addEventListener('click', function () {
+  closeSectionActionMenus();
+  closeArticleDetailsMenu();
+  closePolicyRuleMenus();
+});
+document.addEventListener('keydown', function (event) {
+  if (event.key === 'Escape') {
+    closeSectionActionMenus();
+    closeArticleDetailsMenu();
+    closePolicyRuleMenus();
+  }
+});
+els.detailsActionsBtn.addEventListener('click', function (event) {
+  event.stopPropagation();
+  const willOpen = els.detailsActionsMenu.hidden;
+  closeSectionActionMenus();
+  closeArticleDetailsMenu();
+  els.detailsActionsMenu.hidden = !willOpen;
+  els.detailsActionsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+});
+els.detailsActionsMenu.addEventListener('click', function (event) { event.stopPropagation(); });
+els.editDetailsBtn.addEventListener('click', function () {
+  closeArticleDetailsMenu();
+  els.detailsForm.hidden = false;
+  els.title.focus();
+});
+els.doneDetailsBtn.addEventListener('click', function () {
+  els.detailsForm.hidden = true;
+  renderArticleDetails();
+  renderPreview();
+  markDirty();
+});
+document.querySelectorAll('.sd-policy-rule-card').forEach(function (card) {
+  const trigger = card.querySelector('.sd-policy-rule-action-btn');
+  const menu = card.querySelector('.sd-policy-rule-menu');
+  const edit = card.querySelector('.sd-policy-edit-btn');
+  const form = card.querySelector('.sd-policy-rule-edit');
+  const done = card.querySelector('.sd-policy-done-btn');
+  if (!trigger || !menu || !edit || !form || !done) return;
+  trigger.addEventListener('click', function (event) {
+    event.stopPropagation();
+    const willOpen = menu.hidden;
+    closeSectionActionMenus();
+    closeArticleDetailsMenu();
+    closePolicyRuleMenus();
+    menu.hidden = !willOpen;
+    trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  });
+  menu.addEventListener('click', function (event) { event.stopPropagation(); });
+  edit.addEventListener('click', function () {
+    closePolicyRuleMenus();
+    form.hidden = false;
+    const field = form.querySelector('textarea');
+    if (field) field.focus();
+  });
+  done.addEventListener('click', function () {
+    form.hidden = true;
+    renderPolicyRuleCards();
+  });
+});
+els.toggleLibraryBtn.addEventListener('click', function () {
+  setArticleLibraryCollapsed(!els.workspace.classList.contains('sd-admin-workspace-library-collapsed'));
+});
+els.togglePolicyInfoBtn.addEventListener('click', function () {
+  setContactPolicyInfoCollapsed(!els.policyWorkspace.classList.contains('sd-admin-policy-info-collapsed'));
+});
+els.addSectionBtn.addEventListener('click', function () {
+  articleSections.push(sectionTemplate(nextSectionType()));
+  renderSectionBuilder();
+  renderPreview();
+  markDirty();
+});
 
 els.title.addEventListener('input', function () {
   if (!selectedId) els.id.value = slugify(els.title.value);
+  renderArticleDetails();
   renderPreview();
   markDirty();
 });
@@ -684,18 +1195,17 @@ els.title.addEventListener('input', function () {
   els.subtitle, els.tags, els.body,
 ].forEach(function (el) {
   el.addEventListener('input', function () {
+    renderArticleDetails();
     renderPreview();
     markDirty();
   });
   el.addEventListener('change', function () {
+    renderArticleDetails();
     renderPreview();
     markDirty();
   });
 });
-els.previewBtn.addEventListener('click', renderPreview);
-els.saveDraftBtn.addEventListener('click', function () {
-  saveDraft().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
-});
+if (els.previewBtn) els.previewBtn.addEventListener('click', renderPreview);
 els.publishBtn.addEventListener('click', function () {
   publishArticle().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
 });
@@ -705,6 +1215,7 @@ els.seedBtn.addEventListener('click', function () {
 els.newBtn.addEventListener('click', function () {
   selectedId = '';
   fillForm(null);
+  els.title.scrollIntoView({ behavior: 'smooth', block: 'center' });
   els.title.focus();
 });
 els.signOut.addEventListener('click', function () {
@@ -728,4 +1239,10 @@ renderAtlasShell('#sharedAtlasShell', {
   restartAssistant,
 });
 initChat();
-initGoogle();
+startLocalAdminPreview()
+  .then(function (enabled) {
+    if (!enabled) initGoogle();
+  })
+  .catch(function () {
+    initGoogle();
+  });
