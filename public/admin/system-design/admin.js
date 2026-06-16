@@ -1,6 +1,15 @@
-/* global document, fetch, google, sessionStorage, setTimeout */
+/* global atob, document, fetch, google, sessionStorage, setTimeout */
 
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
+import { initTheme } from '../../assets/core/theme.js';
+import {
+  closeAssistant,
+  initChat,
+  minimiseAssistant,
+  openAssistant,
+  restartAssistant,
+  toggleChatTeaser,
+} from '../../assets/chat/chat.js';
 
 const STORAGE_KEY = 'portfolio_admin_credential';
 
@@ -9,7 +18,12 @@ let articles = [];
 let selectedId = '';
 
 const els = {
-  googleBtn:       document.getElementById('adminGoogleBtn'),
+  topbarSignIn:    document.getElementById('adminTopbarSignInBtn'),
+  topbarUser:      document.getElementById('adminTopbarUser'),
+  avatarBtn:       document.getElementById('adminAvatarBtn'),
+  userPhoto:       document.getElementById('adminUserPhoto'),
+  userName:        document.getElementById('adminUserName'),
+  dropdown:        document.getElementById('adminTopbarDropdown'),
   signOut:         document.getElementById('adminSignOut'),
   status:          document.getElementById('adminStatus'),
   workspace:       document.getElementById('adminWorkspace'),
@@ -36,6 +50,30 @@ const els = {
 function setStatus(message, kind) {
   els.status.textContent = message;
   els.status.dataset.kind = kind || 'info';
+  els.status.hidden = !message;
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const payload = token.split('.')[1] || '';
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    return JSON.parse(atob(padded));
+  } catch (_) {
+    return {};
+  }
+}
+
+function updateAdminChrome(profile) {
+  const signedIn = !!profile;
+  els.topbarSignIn.hidden = signedIn;
+  els.googleBtn.hidden = signedIn;
+  els.topbarUser.hidden = !signedIn;
+  els.signOut.hidden = !signedIn;
+  if (!signedIn) return;
+  els.userName.textContent = profile.email || profile.name || 'Admin';
+  els.userPhoto.src = profile.picture || '';
+  els.userPhoto.alt = (profile.name || 'Admin') + ' profile photo';
 }
 
 function slugify(value) {
@@ -145,9 +183,11 @@ function renderList() {
     btn.dataset.id = article.id;
     const title = document.createElement('strong');
     title.textContent = en.title || article.id;
+    const subtitle = document.createElement('small');
+    subtitle.textContent = en.subtitle || article.id;
     const meta = document.createElement('span');
     meta.textContent = (article.status || 'Draft') + ' · ' + (article.category || '');
-    btn.append(title, meta);
+    btn.append(title, subtitle, meta);
     btn.addEventListener('click', function () {
       const article = articles.find(function (item) { return item.id === btn.dataset.id; });
       fillForm(article);
@@ -215,6 +255,7 @@ function initGoogle() {
     callback: function (resp) {
       credential = resp.credential || '';
       sessionStorage.setItem(STORAGE_KEY, credential);
+      updateAdminChrome(decodeJwtPayload(credential));
       loadArticles().catch(function (err) {
         setStatus(err.message, 'error');
       });
@@ -223,20 +264,27 @@ function initGoogle() {
     use_fedcm_for_prompt: true,
     use_fedcm_for_button: true,
   });
-  google.accounts.id.renderButton(els.googleBtn, {
-    theme: 'filled_black',
-    size:  'large',
-    text:  'continue_with',
-    width: 260,
-  });
   if (credential) {
+    updateAdminChrome(decodeJwtPayload(credential));
     loadArticles().catch(function () {
       sessionStorage.removeItem(STORAGE_KEY);
       credential = '';
-      setStatus('Sign in with your approved Google account.', 'info');
+      updateAdminChrome(null);
+      setStatus('', 'info');
     });
+  } else {
+    updateAdminChrome(null);
   }
 }
+
+els.topbarSignIn.addEventListener('click', function () {
+  if (globalThis.google?.accounts) google.accounts.id.prompt();
+  setStatus('', 'info');
+});
+
+els.avatarBtn.addEventListener('click', function () {
+  els.dropdown.toggleAttribute('hidden');
+});
 
 els.title.addEventListener('input', function () {
   if (!selectedId) els.id.value = slugify(els.title.value);
@@ -265,8 +313,16 @@ els.signOut.addEventListener('click', function () {
   credential = '';
   sessionStorage.removeItem(STORAGE_KEY);
   els.workspace.hidden = true;
-  els.signOut.hidden = true;
-  setStatus('Signed out.', 'info');
+  els.dropdown.hidden = true;
+  updateAdminChrome(null);
+  setStatus('', 'info');
 });
 
+initTheme();
+globalThis.toggleChatTeaser = toggleChatTeaser;
+globalThis.openAssistant = openAssistant;
+globalThis.closeAssistant = closeAssistant;
+globalThis.minimiseAssistant = minimiseAssistant;
+globalThis.restartAssistant = restartAssistant;
+initChat();
 initGoogle();
