@@ -1,4 +1,4 @@
-/* global atob, document, fetch, google, localStorage, sessionStorage, setTimeout */
+/* global URL, atob, console, document, fetch, google, localStorage, sessionStorage, setTimeout */
 
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import {
@@ -88,8 +88,11 @@ const els = {
   tags:            document.getElementById('articleTags'),
   body:            document.getElementById('articleBody'),
   systemStatus:    document.getElementById('systemDesignStatus'),
+  saveState:       document.getElementById('articleSaveState'),
+  saveDraftBtn:    document.getElementById('saveDraftBtn'),
   previewBtn:      document.getElementById('previewBtn'),
   publishBtn:      document.getElementById('publishBtn'),
+  previewState:    document.getElementById('previewStateBadge'),
   previewMeta:     document.getElementById('previewMeta'),
   previewTitle:    document.getElementById('previewTitle'),
   previewSubtitle: document.getElementById('previewSubtitle'),
@@ -158,8 +161,42 @@ function readAdminHandoffCredential() {
 function saveSharedSession(token) {
   const profile = profileFromCredential(token);
   setGoogleCredential(token);
-  setSiteProfile(profile);
+  setSiteProfile({
+    sub:   profile.sub,
+    name:  profile.name,
+    email: profile.email,
+  });
   return profile;
+}
+
+function isTrustedGoogleProfilePhoto(url) {
+  try {
+    const parsed = new URL(String(url || ''));
+    return parsed.protocol === 'https:' && parsed.hostname.endsWith('googleusercontent.com');
+  } catch (_) {
+    return false;
+  }
+}
+
+async function verifySharedSession(token) {
+  const resp = await fetch('/api/session/start', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ credential: token }),
+  });
+  const data = await resp.json().catch(function () { return {}; });
+  if (!resp.ok || data.success === false) {
+    throw new Error(data.error || data.message || 'Session verification failed.');
+  }
+  const verifiedProfile = {
+    sub:      data.sub,
+    name:     data.name,
+    email:    data.email,
+    picture:  isTrustedGoogleProfilePhoto(data.picture) ? data.picture : '',
+    verified: true,
+  };
+  setSiteProfile(verifiedProfile);
+  return verifiedProfile;
 }
 
 function safeDisplayName(profile) {
@@ -183,6 +220,7 @@ function updateAdminChrome(profile) {
   if (!signedIn) {
     els.userName.textContent = '';
     delete els.avatarBtn.dataset.initials;
+    delete els.avatarBtn.dataset.hasPhoto;
     els.userPhoto.removeAttribute('src');
     els.userPhoto.alt = 'Signed-in admin profile photo';
     return;
@@ -190,7 +228,13 @@ function updateAdminChrome(profile) {
   const displayName = safeDisplayName(profile);
   els.userName.textContent = displayName;
   els.avatarBtn.dataset.initials = initialsFor(profile);
-  els.userPhoto.removeAttribute('src');
+  if (profile.verified && isTrustedGoogleProfilePhoto(profile.picture)) {
+    els.userPhoto.src = profile.picture;
+    els.avatarBtn.dataset.hasPhoto = 'true';
+  } else {
+    els.userPhoto.removeAttribute('src');
+    delete els.avatarBtn.dataset.hasPhoto;
+  }
   els.userPhoto.alt = displayName + ' profile';
 }
 
@@ -211,6 +255,19 @@ function signOutAdmin(opts) {
   resetAdminSession();
   setStatus('', 'info');
   if ((opts || {}).broadcast !== false) broadcastSignOut();
+}
+
+async function startAdminSession(token) {
+  credential = token || '';
+  saveSharedSession(credential);
+  updateAdminChrome(profileFromCredential(credential));
+  try {
+    const verifiedProfile = await verifySharedSession(credential);
+    updateAdminChrome(verifiedProfile);
+  } catch (err) {
+    console.warn('[admin] Verified profile lookup failed:', err.message);
+  }
+  await loadArticles();
 }
 
 function slugify(value) {
@@ -386,6 +443,21 @@ function articleFromForm() {
   };
 }
 
+function updateWorkflowChrome(status, saveLabel) {
+  const effectiveStatus = status || els.statusField.value || 'Draft';
+  els.previewState.textContent = effectiveStatus;
+  els.previewState.dataset.status = effectiveStatus;
+  if (saveLabel !== undefined) {
+    els.saveState.textContent = saveLabel || 'Unsaved changes';
+    els.saveState.dataset.status = saveLabel ? 'saved' : 'dirty';
+  }
+  els.publishBtn.hidden = effectiveStatus === 'Published';
+}
+
+function markDirty() {
+  updateWorkflowChrome(els.statusField.value, '');
+}
+
 function fillForm(article) {
   const item = article || {
     id: '',
@@ -410,6 +482,7 @@ function fillForm(article) {
   els.tags.value = Array.isArray(item.tags) ? item.tags.join(', ') : '';
   els.body.value = en.body || '';
   renderPreview();
+  updateWorkflowChrome(els.statusField.value, item.id ? 'Saved in Firestore' : 'Not saved yet');
   renderList();
 }
 
@@ -470,6 +543,7 @@ function renderList() {
 
 function renderPreview() {
   const article = articleFromForm();
+  updateWorkflowChrome(article.status);
   els.previewMeta.textContent = (article.status || 'Draft') + ' · ' + (article.category || 'integration') + ' · ' + article.readMinutes + ' min read';
   els.previewTitle.textContent = article.en.title || 'Untitled article';
   els.previewSubtitle.textContent = article.en.subtitle || '';
@@ -492,13 +566,16 @@ async function loadArticles() {
   setActiveModule('system-design');
 }
 
-async function publishArticle() {
+async function saveArticleWithStatus(status) {
   const article = articleFromForm();
+  article.status = status;
+  article.stub = status === 'Coming soon';
   if (!article.id || !article.en.title || !article.en.body) {
     setSectionStatus(els.systemStatus, 'Slug, title, and body are required.', 'error');
     return;
   }
-  setSectionStatus(els.systemStatus, 'Publishing...', 'info');
+  const action = status === 'Published' ? 'Publishing...' : 'Saving ' + status.toLowerCase() + '...';
+  setSectionStatus(els.systemStatus, action, 'info');
   const data = await authedJson('/api/admin/system-design/articles/' + article.id, {
     method: 'PUT',
     body:   JSON.stringify(article),
@@ -507,7 +584,23 @@ async function publishArticle() {
   articles = articles.filter(function (item) { return item.id !== saved.id; }).concat(saved)
     .sort(function (a, b) { return Number(a.order || 999) - Number(b.order || 999); });
   fillForm(saved);
-  setSectionStatus(els.systemStatus, 'Published version ' + data.version + '.', 'success');
+  const done = status === 'Published'
+    ? 'Published version ' + data.version + '.'
+    : status + ' saved to Firestore.';
+  updateWorkflowChrome(saved.status, status === 'Published' ? 'Published just now' : 'Saved just now');
+  setSectionStatus(els.systemStatus, done, 'success');
+}
+
+function saveDraft() {
+  els.statusField.value = 'Draft';
+  renderPreview();
+  return saveArticleWithStatus('Draft');
+}
+
+function publishArticle() {
+  els.statusField.value = 'Published';
+  renderPreview();
+  return saveArticleWithStatus('Published');
 }
 
 async function seedArticles() {
@@ -529,11 +622,8 @@ function initGoogle() {
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: function (resp) {
-      credential = resp.credential || '';
       hideWelcomeOverlay();
-      saveSharedSession(credential);
-      updateAdminChrome(profileFromCredential(credential));
-      loadArticles().catch(function (err) {
+      startAdminSession(resp.credential || '').catch(function (err) {
         handleAdminLoadError(err);
       });
     },
@@ -551,9 +641,7 @@ function initGoogle() {
     });
   }
   if (credential) {
-    saveSharedSession(credential);
-    updateAdminChrome(profileFromCredential(credential));
-    loadArticles().catch(function (err) {
+    startAdminSession(credential).catch(function (err) {
       handleAdminLoadError(err);
     });
   } else {
@@ -589,15 +677,25 @@ els.testPolicyBtn.addEventListener('click', testContactPolicy);
 els.title.addEventListener('input', function () {
   if (!selectedId) els.id.value = slugify(els.title.value);
   renderPreview();
+  markDirty();
 });
 [
   els.id, els.statusField, els.category, els.icon, els.readMinutes, els.order,
   els.subtitle, els.tags, els.body,
 ].forEach(function (el) {
-  el.addEventListener('input', renderPreview);
-  el.addEventListener('change', renderPreview);
+  el.addEventListener('input', function () {
+    renderPreview();
+    markDirty();
+  });
+  el.addEventListener('change', function () {
+    renderPreview();
+    markDirty();
+  });
 });
 els.previewBtn.addEventListener('click', renderPreview);
+els.saveDraftBtn.addEventListener('click', function () {
+  saveDraft().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
+});
 els.publishBtn.addEventListener('click', function () {
   publishArticle().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
 });
