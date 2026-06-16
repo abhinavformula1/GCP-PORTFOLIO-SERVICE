@@ -1,6 +1,12 @@
 /* global atob, document, fetch, google, sessionStorage, setTimeout */
 
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
+import {
+  STORAGE_CREDENTIAL,
+  STORAGE_PROFILE,
+  setGoogleCredential,
+  setSiteProfile,
+} from '../../assets/core/state.js';
 import { initTheme } from '../../assets/core/theme.js';
 import { hideWelcomeOverlay, showWelcomeOverlay } from '../../assets/ui/welcome.js';
 import { renderTechFooter, renderTopbar } from '../../assets/ui/shared-layout.js';
@@ -13,9 +19,11 @@ import {
   toggleChatTeaser,
 } from '../../assets/chat/chat.js';
 
-const STORAGE_KEY = 'portfolio_admin_credential';
+const LEGACY_ADMIN_STORAGE_KEY = 'portfolio_admin_credential';
 
-let credential = sessionStorage.getItem(STORAGE_KEY) || '';
+let credential = sessionStorage.getItem(STORAGE_CREDENTIAL)
+  || sessionStorage.getItem(LEGACY_ADMIN_STORAGE_KEY)
+  || '';
 let articles = [];
 let selectedId = '';
 
@@ -88,6 +96,24 @@ function decodeJwtPayload(token) {
   }
 }
 
+function profileFromCredential(token) {
+  const payload = decodeJwtPayload(token);
+  return {
+    sub:     payload.sub,
+    name:    payload.name,
+    email:   payload.email,
+    picture: payload.picture,
+  };
+}
+
+function saveSharedSession(token) {
+  const profile = profileFromCredential(token);
+  setGoogleCredential(token);
+  setSiteProfile(profile);
+  sessionStorage.removeItem(LEGACY_ADMIN_STORAGE_KEY);
+  return profile;
+}
+
 function updateAdminChrome(profile) {
   const signedIn = !!profile;
   els.topbarSignIn.hidden = signedIn;
@@ -106,7 +132,11 @@ function updateAdminChrome(profile) {
 
 function resetAdminSession() {
   credential = '';
-  sessionStorage.removeItem(STORAGE_KEY);
+  setGoogleCredential(null);
+  setSiteProfile(null);
+  sessionStorage.removeItem(STORAGE_CREDENTIAL);
+  sessionStorage.removeItem(STORAGE_PROFILE);
+  sessionStorage.removeItem(LEGACY_ADMIN_STORAGE_KEY);
   els.workspace.hidden = true;
   els.dropdown.hidden = true;
   updateAdminChrome(null);
@@ -145,9 +175,19 @@ async function authedJson(url, options) {
   });
   const data = await resp.json().catch(function () { return {}; });
   if (!resp.ok || data.success === false) {
-    throw new Error(data.error || data.message || 'Request failed.');
+    const err = new Error(data.error || data.message || 'Request failed.');
+    err.status = resp.status;
+    throw err;
   }
   return data;
+}
+
+function handleAdminLoadError(err) {
+  els.workspace.hidden = true;
+  if (err?.status === 401) {
+    resetAdminSession();
+  }
+  setStatus(err.message, 'error');
 }
 
 function articleFromForm() {
@@ -290,12 +330,11 @@ function initGoogle() {
     client_id: GOOGLE_CLIENT_ID,
     callback: function (resp) {
       credential = resp.credential || '';
-      sessionStorage.setItem(STORAGE_KEY, credential);
       hideWelcomeOverlay();
-      updateAdminChrome(decodeJwtPayload(credential));
+      const profile = saveSharedSession(credential);
+      updateAdminChrome(profile);
       loadArticles().catch(function (err) {
-        resetAdminSession();
-        setStatus(err.message, 'error');
+        handleAdminLoadError(err);
       });
     },
     ux_mode: 'popup',
@@ -312,14 +351,9 @@ function initGoogle() {
     });
   }
   if (credential) {
-    updateAdminChrome(decodeJwtPayload(credential));
+    updateAdminChrome(saveSharedSession(credential));
     loadArticles().catch(function (err) {
-      resetAdminSession();
-      if (err?.message) {
-        setStatus(err.message, 'error');
-        return;
-      }
-      setStatus('', 'info');
+      handleAdminLoadError(err);
     });
   } else {
     updateAdminChrome(null);

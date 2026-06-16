@@ -303,21 +303,12 @@ import { renderTechFooter, renderTopbar } from './ui/shared-layout.js';
   // Wire the M3 outlined-select to setLang. Listen on `change` (fires when
   // the user picks an option from the dropdown menu).
   //
-  // Also: force the inner <md-outlined-field>'s height to 40px so the
-  // select harmonises with the 40px theme-toggle and Sign-in button. The
-  // public --md-outlined-field-container-height token *is* set on the
-  // host, but @material/web@1.5.1 hard-codes a `min-height: 56px` on the
-  // internal field that the token doesn't override.
   customElements.whenDefined('md-outlined-select').then(function () {
     const langSelect = document.getElementById('langSelect');
     if (!langSelect) return;
     langSelect.addEventListener('change', function () {
       setLang(langSelect.value);
     });
-    injectShadowStyle(
-      langSelect,
-      'md-outlined-field { min-height: 40px !important; height: 40px !important; }'
-    );
   });
 
   // Force breathing space inside <md-filled-button> for our two brand

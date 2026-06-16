@@ -22,6 +22,33 @@ function materialIcon(name, attrs) {
   });
 }
 
+function injectShadowStyle(host, css) {
+  if (!host || !host.shadowRoot) return;
+  const sr = host.shadowRoot;
+  try {
+    if (typeof CSSStyleSheet === 'function' && Array.isArray(sr.adoptedStyleSheets)) {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(css);
+      sr.adoptedStyleSheets = sr.adoptedStyleSheets.concat(sheet);
+    } else {
+      const style = document.createElement('style');
+      style.textContent = css;
+      sr.appendChild(style);
+    }
+  } catch (_) {}
+}
+
+function syncTopbarControlHeights(root) {
+  customElements.whenDefined('md-outlined-select').then(function () {
+    root.querySelectorAll('.lang-select').forEach(function (langSelect) {
+      injectShadowStyle(
+        langSelect,
+        'md-outlined-field { min-height: 40px !important; height: 40px !important; }'
+      );
+    });
+  });
+}
+
 function renderLanguageSelect(id) {
   return createEl('md-outlined-select', {
     id,
@@ -131,6 +158,7 @@ export function renderTopbar(target, options) {
   ]);
 
   root.replaceChildren(topbar);
+  syncTopbarControlHeights(root);
 }
 
 export function renderTechFooter(target, options) {
