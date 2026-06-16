@@ -555,7 +555,8 @@ a:hover { text-decoration: underline; }
 .home-btn,
 .refer-btn,
 .recos-cta,
-.systemdesign-btn {
+.systemdesign-btn,
+.admin-btn {
   --md-outlined-button-container-height: 48px;
   --md-outlined-button-outline-color: #0070D2;
   --md-outlined-button-label-text-color: #0070D2;
@@ -582,7 +583,8 @@ a:hover { text-decoration: underline; }
 .home-btn [slot="icon"],
 .refer-btn [slot="icon"],
 .recos-cta [slot="icon"],
-.systemdesign-btn [slot="icon"] { margin-inline-end: 4px; }
+.systemdesign-btn [slot="icon"],
+.admin-btn [slot="icon"] { margin-inline-end: 4px; }
 
 .home-btn[aria-pressed="true"],
 .systemdesign-btn[aria-pressed="true"] {

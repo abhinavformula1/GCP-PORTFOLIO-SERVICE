@@ -76,6 +76,7 @@ import {
   function saveSiteProfile(p) {
     setSiteProfile(p);
     updateTopbarUser(p);
+    refreshAdminNav();
     // The contact reveal lives in sessionStorage too — on reload we want the
     // phone to stay revealed without re-asking the server until the token
     // expires. We re-apply whatever the server last decided.
@@ -98,6 +99,7 @@ import {
     setMyRecommendation(null);
     if (typeof updateRecommendationCta === 'function') updateRecommendationCta();
     updateTopbarUser(null);
+    refreshAdminNav();
     closeUserMenu();
     if (window.google && window.google.accounts) {
       google.accounts.id.disableAutoSelect();
@@ -113,6 +115,19 @@ import {
     showWelcomeOverlayWithGsi();
   }
   window.signOut = signOut;
+
+  function setAdminNavVisible(visible) {
+    const adminBtn = document.getElementById('systemDesignAdminBtn');
+    if (adminBtn) adminBtn.toggleAttribute('hidden', !visible);
+  }
+
+  function refreshAdminNav() {
+    setAdminNavVisible(false);
+    if (!siteProfile || siteProfile.type === 'guest') return;
+    authedFetch('/api/admin/me').then(function (data) {
+      setAdminNavVisible(!!(data && data.isAdmin));
+    });
+  }
 
   // initGoogleSignIn → ./core/auth.js. We wrap the module function so we
   // can inject the GOOGLE_CLIENT_ID + handleGoogleSignIn callback. The
@@ -323,7 +338,7 @@ import {
   // outlined CTAs share the same internal padding as the filled brand
   // buttons.
   customElements.whenDefined('md-outlined-button').then(function () {
-    document.querySelectorAll('.hire-me-btn-neutral, .home-btn, .refer-btn, .recos-cta, .systemdesign-btn').forEach(function (btn) {
+    document.querySelectorAll('.hire-me-btn-neutral, .home-btn, .refer-btn, .recos-cta, .systemdesign-btn, .admin-btn').forEach(function (btn) {
       injectShadowStyle(btn, BRAND_BUTTON_CSS);
     });
   });
@@ -340,6 +355,7 @@ import {
   // Restore topbar user if session exists
   if (siteProfile) {
     updateTopbarUser(siteProfile);
+    refreshAdminNav();
     // Re-apply the cached server contact-reveal decision so a returning
     // signed-in viewer's phone stays revealed across reloads (until token
     // expiry / sign-out clears the profile).
