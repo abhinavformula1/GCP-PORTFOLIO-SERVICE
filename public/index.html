@@ -76,45 +76,7 @@
     </div>
   </md-dialog>
 
-  <!-- ── Top bar ── -->
-  <div class="topbar">
-    <div class="topbar-inner">
-      <!-- M3 outlined select — floating "Language" label, dropdown menu -->
-      <md-outlined-select id="langSelect" class="lang-select" label="Language" value="en" aria-label="Language">
-        <md-select-option value="en" selected>
-          <div slot="headline">English</div>
-        </md-select-option>
-        <md-select-option value="fr">
-          <div slot="headline">Français</div>
-        </md-select-option>
-      </md-outlined-select>
-
-      <!-- M3 outlined icon button — circular outline + filled-on-toggle state.
-           Mirrors the Google reference (Material Components -> outlined icon button). -->
-      <md-outlined-icon-button id="themeToggleBtn" class="theme-toggle" toggle aria-label="Switch to light mode"
-        title="Switch theme">
-        <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
-        <span class="material-symbols-outlined" slot="selected" aria-hidden="true">dark_mode</span>
-      </md-outlined-icon-button>
-
-      <!-- Sign-in button (right side, shown for guests / signed-out users) -->
-      <button class="topbar-signin-btn" id="topbarSignInBtn" hidden aria-label="Sign in">
-        <span class="material-symbols-outlined" aria-hidden="true">login</span>
-        <span data-i18n="topbarSignIn">Sign in</span>
-      </button>
-
-      <!-- Signed-in user avatar (right side) -->
-      <div class="topbar-user" id="topbarUser" hidden>
-        <button class="topbar-avatar-btn" id="topbarAvatarBtn" onclick="toggleUserMenu()" aria-label="User menu">
-          <img class="topbar-user-photo" id="topbarUserPhoto" src="" alt="Signed-in user profile photo" />
-        </button>
-        <div class="topbar-dropdown" id="topbarDropdown" hidden>
-          <div class="topbar-dropdown-name" id="topbarUserName"></div>
-          <button class="topbar-signout" onclick="signOut()">Sign out</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div id="sharedTopbar"></div>
 
   <div class="page">
 
@@ -840,45 +802,7 @@
     </form>
   </md-dialog>
 
-  <!-- ── Tech-stack footer ──
-       Phrasing changed from "Trusted & powered by" to "Built with" so the
-       row reads as descriptive ("here's what I built this on") rather than
-       endorsement ("these companies vouch for me"). LinkedIn was removed
-       because it isn't part of the technical stack — that profile link
-       belongs in the Contact Info modal, where it already lives. The
-       trademark line below makes nominative-fair-use intent explicit. -->
-  <footer class="sponsors-footer">
-    <div class="sponsors-inner">
-      <span class="sponsors-label" data-i18n="footerBuiltWith">Built with</span>
-      <div class="sponsors-logos">
-
-        <!-- Google Cloud — full official brand lockup (multi-color cloud mark
-             + "Google Cloud" wordmark). SVG asset stored in /assets/img/.
-             The wordmark text is inside the SVG so we don't need a separate
-             <span class="sponsor-name"> label here. -->
-        <a href="https://cloud.google.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-gcp"
-          aria-label="Google Cloud">
-          <img class="sponsor-logo" src="/assets/img/google-cloud.svg" alt="Google Cloud" width="155" height="24" />
-        </a>
-
-        <span class="sponsor-divider"></span>
-
-        <!-- Salesforce — full official brand mark (blue cloud with the
-             "salesforce" cursive wordmark inside). The wordmark is integral
-             to the brand mark, so we don't add a separate text label
-             alongside it. -->
-        <a href="https://www.salesforce.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-sf"
-          aria-label="Salesforce">
-          <img class="sponsor-logo" src="/assets/img/salesforce.svg" alt="Salesforce" width="50" height="36" />
-        </a>
-
-      </div>
-    </div>
-    <p class="sponsors-disclaimer" data-i18n="footerTrademarkNote">
-      Trademarks are property of their respective owners. This is a personal portfolio; no endorsement or sponsorship is
-      implied.
-    </p>
-  </footer>
+  <div id="sharedFooter"></div>
 
   <!-- ── Chat Launcher (bottom-right floating button) ── -->
   <div id="chatLauncher" class="chat-launcher" hidden>

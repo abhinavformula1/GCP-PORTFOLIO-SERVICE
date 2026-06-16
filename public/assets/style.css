@@ -178,6 +178,11 @@ md-fab:not(:defined) { visibility: hidden; }
   justify-content: flex-end;
   gap: 12px;
 }
+.topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 /* keep the FOUC guard from earlier — extend it for the new components */
 md-outlined-select:not(:defined),
 md-select-option:not(:defined),

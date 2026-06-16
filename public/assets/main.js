@@ -63,9 +63,20 @@ import {
 import {
   initSystemDesign, openSystemDesign, closeSystemDesign,
 } from './ui/systemdesign.js';
+import { renderTechFooter, renderTopbar } from './ui/shared-layout.js';
 
 (function () {
   'use strict';
+
+  renderTopbar('#sharedTopbar', {
+    signInHidden: true,
+    signInI18nKey: 'topbarSignIn',
+    handlers: {
+      toggleUserMenu: 'toggleUserMenu()',
+      signOut: 'signOut()',
+    },
+  });
+  renderTechFooter('#sharedFooter');
 
   // Shared state (siteProfile, googleCredential, pendingChatHistory,
   // myRecommendation) lives in ./core/state.js. Reads use the live

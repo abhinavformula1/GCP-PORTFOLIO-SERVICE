@@ -24,42 +24,7 @@
   <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
 </head>
 <body class="sd-admin-page">
-  <div class="topbar sd-admin-topbar">
-    <div class="topbar-inner">
-      <a class="sd-admin-back" href="/">
-        <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
-        <span>Back to portfolio</span>
-      </a>
-      <div class="sd-admin-auth">
-        <md-outlined-select id="langSelect" class="lang-select" label="Language" value="en" aria-label="Language">
-          <md-select-option value="en" selected>
-            <div slot="headline">English</div>
-          </md-select-option>
-          <md-select-option value="fr">
-            <div slot="headline">Français</div>
-          </md-select-option>
-        </md-outlined-select>
-        <md-outlined-icon-button id="themeToggleBtn" class="theme-toggle" toggle aria-label="Switch to light mode"
-          title="Switch theme">
-          <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
-          <span class="material-symbols-outlined" slot="selected" aria-hidden="true">dark_mode</span>
-        </md-outlined-icon-button>
-        <button class="topbar-signin-btn" id="adminTopbarSignInBtn" aria-label="Sign in">
-          <span class="material-symbols-outlined" aria-hidden="true">login</span>
-          <span>Sign in</span>
-        </button>
-        <div class="topbar-user" id="adminTopbarUser" hidden>
-          <button class="topbar-avatar-btn" id="adminAvatarBtn" aria-label="User menu">
-            <img class="topbar-user-photo" id="adminUserPhoto" src="" alt="Signed-in admin profile photo">
-          </button>
-          <div class="topbar-dropdown" id="adminTopbarDropdown" hidden>
-            <div class="topbar-dropdown-name" id="adminUserName"></div>
-            <button class="topbar-signout" id="adminSignOut">Sign out</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div id="sharedTopbar"></div>
 
   <!-- ── Welcome / Login Dialog (same sign-in surface as portfolio home) ── -->
   <md-dialog id="welcomeOverlay" aria-labelledby="welcomeTitleId">
@@ -189,26 +154,7 @@
       </section>
     </section>
 
-    <footer class="sponsors-footer sd-admin-footer">
-      <div class="sponsors-inner">
-        <span class="sponsors-label">Built with</span>
-        <div class="sponsors-logos">
-          <a href="https://cloud.google.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-gcp"
-            aria-label="Google Cloud">
-            <img class="sponsor-logo" src="/assets/img/google-cloud.svg" alt="Google Cloud" width="155" height="24">
-          </a>
-          <span class="sponsor-divider"></span>
-          <a href="https://www.salesforce.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-sf"
-            aria-label="Salesforce">
-            <img class="sponsor-logo" src="/assets/img/salesforce.svg" alt="Salesforce" width="50" height="36">
-          </a>
-        </div>
-      </div>
-      <p class="sponsors-disclaimer">
-        Trademarks are property of their respective owners. This is a personal portfolio; no endorsement or sponsorship is
-        implied.
-      </p>
-    </footer>
+    <div id="sharedFooter"></div>
   </main>
 
   <!-- ── Chat Launcher (bottom-right floating button) ── -->
