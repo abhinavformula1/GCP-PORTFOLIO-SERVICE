@@ -73,13 +73,23 @@ const config = {
   //   - This is identity-aware authorisation, the same pattern used by
   //     Google IAP / Cloud Endpoints (audience claim → policy decision).
   contactPolicy: {
-    // Comma-separated list of trusted email domains. Override via env in
-    // production. Defaults are the only two orgs the portfolio targets.
-    //
-    // Nullish coalescing (??) — not || — so that explicitly setting the
-    // env var to '' is honoured as a "deny all" override rather than
-    // silently falling back to the defaults.
-    allowedDomains: (process.env.CONTACT_ALLOWED_DOMAINS ?? 'google.com,salesforce.com')
+    // Optional strategic company domains. The policy already allows company
+    // email domains by default; this list is kept for explicit tracking.
+    allowedDomains: (process.env.CONTACT_ALLOWED_DOMAINS ?? '')
+      .split(',')
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean),
+    // Personal/public domains are blocked by default. Add exact email
+    // exceptions below for trusted people using personal accounts.
+    personalDomains: (process.env.CONTACT_PERSONAL_DOMAINS ?? 'gmail.com,yahoo.com,outlook.com,hotmail.com,icloud.com,proton.me,aol.com,live.com,msn.com')
+      .split(',')
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean),
+    allowedEmails: (process.env.CONTACT_ALLOWED_EMAILS ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+    blockedDomains: (process.env.CONTACT_BLOCKED_DOMAINS ?? '')
       .split(',')
       .map((d) => d.trim().toLowerCase())
       .filter(Boolean),

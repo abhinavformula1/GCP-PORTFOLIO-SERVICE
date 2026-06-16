@@ -662,18 +662,35 @@ async function getContactPolicyConfig() {
   if (!snap.exists) return null;
   const data = snap.data() || {};
   return {
-    allowedDomains: Array.isArray(data.allowedDomains) ? data.allowedDomains.map(String) : [],
+    allowedDomains: Object.prototype.hasOwnProperty.call(data, 'allowedDomains') && Array.isArray(data.allowedDomains)
+      ? data.allowedDomains.map(String)
+      : undefined,
+    personalDomains: Object.prototype.hasOwnProperty.call(data, 'personalDomains') && Array.isArray(data.personalDomains)
+      ? data.personalDomains.map(String)
+      : undefined,
+    allowedEmails: Object.prototype.hasOwnProperty.call(data, 'allowedEmails') && Array.isArray(data.allowedEmails)
+      ? data.allowedEmails.map(String)
+      : undefined,
+    blockedDomains: Object.prototype.hasOwnProperty.call(data, 'blockedDomains') && Array.isArray(data.blockedDomains)
+      ? data.blockedDomains.map(String)
+      : undefined,
     updatedBy:      data.updatedBy || null,
     updatedAt:      data.updatedAt && data.updatedAt.toMillis ? data.updatedAt.toMillis() : null,
   };
 }
 
-async function upsertContactPolicyConfig({ allowedDomains, updatedBy }) {
-  const cleanDomains = Array.isArray(allowedDomains)
-    ? allowedDomains.map((domain) => String(domain).trim().toLowerCase()).filter(Boolean)
+function cleanStringList(values) {
+  return Array.isArray(values)
+    ? values.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
     : [];
+}
+
+async function upsertContactPolicyConfig({ allowedDomains, personalDomains, allowedEmails, blockedDomains, updatedBy }) {
   await getDb().collection(APP_CONFIG_COLLECTION).doc(CONTACT_POLICY_DOC).set({
-    allowedDomains: cleanDomains,
+    allowedDomains:  cleanStringList(allowedDomains),
+    personalDomains: cleanStringList(personalDomains),
+    allowedEmails:   cleanStringList(allowedEmails),
+    blockedDomains:  cleanStringList(blockedDomains),
     updatedBy:      updatedBy || null,
     updatedAt:      FieldValue.serverTimestamp(),
   }, { merge: true });

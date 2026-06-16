@@ -72,12 +72,24 @@ const validateArticle = [
 ];
 
 function validateDomains(domains) {
-  if (!Array.isArray(domains)) throw new ValidationError('Allowed domains must be an array.');
+  if (!Array.isArray(domains)) throw new ValidationError('Domains must be an array.');
   const clean = contactPolicy.normaliseDomains(domains);
-  if (clean.length > 20) throw new ValidationError('Allowed domain list cannot exceed 20 entries.');
+  if (clean.length > 50) throw new ValidationError('Domain lists cannot exceed 50 entries.');
   for (const domain of clean) {
     if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain) || domain.includes('..')) {
-      throw new ValidationError('Allowed domains must be valid domain names.');
+      throw new ValidationError('Domains must be valid domain names.');
+    }
+  }
+  return Array.from(new Set(clean));
+}
+
+function validateEmails(emails) {
+  if (!Array.isArray(emails)) throw new ValidationError('Allowed emails must be an array.');
+  const clean = contactPolicy.normaliseEmails(emails);
+  if (clean.length > 50) throw new ValidationError('Allowed email list cannot exceed 50 entries.');
+  for (const email of clean) {
+    if (!/^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) {
+      throw new ValidationError('Allowed emails must be valid email addresses.');
     }
   }
   return Array.from(new Set(clean));
@@ -137,13 +149,19 @@ router.get('/admin/contact-policy', requireAdmin, async (_req, res, next) => {
 
 router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
   try {
-    const allowedDomains = validateDomains(req.body?.allowedDomains);
+    const allowedDomains = validateDomains(req.body?.allowedDomains || []);
+    const personalDomains = validateDomains(req.body?.personalDomains || []);
+    const allowedEmails = validateEmails(req.body?.allowedEmails || []);
+    const blockedDomains = validateDomains(req.body?.blockedDomains || []);
     if (canUseLocalSeedFallback()) {
       return res.status(200).json({
         success: true,
         policy: {
           source: 'local-dev',
           allowedDomains,
+          personalDomains,
+          allowedEmails,
+          blockedDomains,
           updatedBy: req.user.email,
           updatedAt: Date.now(),
           privatePhoneConfigured: !!config.contactPolicy.privatePhone,
@@ -152,6 +170,9 @@ router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
     }
     const saved = await firestore.upsertContactPolicyConfig({
       allowedDomains,
+      personalDomains,
+      allowedEmails,
+      blockedDomains,
       updatedBy: req.user.email,
     });
     return res.status(200).json({
@@ -159,6 +180,9 @@ router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
       policy: {
         source: 'firestore',
         allowedDomains: saved.allowedDomains,
+        personalDomains: saved.personalDomains,
+        allowedEmails: saved.allowedEmails,
+        blockedDomains: saved.blockedDomains,
         updatedBy: saved.updatedBy,
         updatedAt: saved.updatedAt,
         privatePhoneConfigured: !!config.contactPolicy.privatePhone,
