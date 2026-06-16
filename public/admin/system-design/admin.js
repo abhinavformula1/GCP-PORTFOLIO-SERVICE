@@ -39,11 +39,21 @@ function setStatus(message, kind) {
 }
 
 function slugify(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '')
-    .slice(0, 80);
+  const source = String(value || '').toLowerCase();
+  let slug = '';
+  let pendingDash = false;
+  for (const ch of source) {
+    const isSafe = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
+    if (isSafe) {
+      if (pendingDash && slug) slug += '-';
+      slug += ch;
+      pendingDash = false;
+    } else {
+      pendingDash = true;
+    }
+    if (slug.length >= 80) break;
+  }
+  return slug;
 }
 
 function authHeaders() {
