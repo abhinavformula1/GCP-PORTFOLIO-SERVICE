@@ -14,6 +14,7 @@ const els = {
   status:          document.getElementById('adminStatus'),
   workspace:       document.getElementById('adminWorkspace'),
   list:            document.getElementById('articleList'),
+  seedBtn:         document.getElementById('seedArticlesBtn'),
   newBtn:          document.getElementById('newArticleBtn'),
   id:              document.getElementById('articleId'),
   statusField:     document.getElementById('articleStatus'),
@@ -183,6 +184,13 @@ async function publishArticle() {
   setStatus('Published version ' + data.version + '.', 'success');
 }
 
+async function seedArticles() {
+  setStatus('Importing seed articles...', 'info');
+  const data = await authedJson('/api/admin/system-design/seed', { method: 'POST' });
+  setStatus('Imported ' + data.imported + ' seed articles.', 'success');
+  await loadArticles();
+}
+
 function initGoogle() {
   if (!GOOGLE_CLIENT_ID) {
     setStatus('Google Sign-In is not configured.', 'error');
@@ -234,6 +242,9 @@ els.title.addEventListener('input', function () {
 els.previewBtn.addEventListener('click', renderPreview);
 els.publishBtn.addEventListener('click', function () {
   publishArticle().catch(function (err) { setStatus(err.message, 'error'); });
+});
+els.seedBtn.addEventListener('click', function () {
+  seedArticles().catch(function (err) { setStatus(err.message, 'error'); });
 });
 els.newBtn.addEventListener('click', function () {
   selectedId = '';

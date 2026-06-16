@@ -8,6 +8,8 @@
  * fallback content for local/dev outages or an empty CMS collection.
  */
 
+const fs = require('node:fs/promises');
+const path = require('node:path');
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { requireAdmin } = require('../middleware/auth');
@@ -16,6 +18,7 @@ const { ValidationError } = require('../errors');
 
 const router = express.Router();
 const BODY_MAX_LEN = 60000;
+const SEED_FILE = path.join(__dirname, '../../content/system-design/articles.seed.json');
 
 const validateArticle = [
   body('id').trim().matches(/^[a-z0-9-]{3,80}$/).withMessage('Slug must use lowercase letters, numbers, and hyphens.'),
@@ -81,6 +84,25 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
     });
     const saved = await firestore.getSystemDesignArticle(result.id);
     return res.status(200).json({ success: true, article: saved, version: result.version });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/admin/system-design/seed', requireAdmin, async (req, res, next) => {
+  try {
+    const raw = await fs.readFile(SEED_FILE, 'utf8');
+    const articles = JSON.parse(raw);
+    if (!Array.isArray(articles)) throw new ValidationError('Seed file must contain an article array.');
+
+    const results = [];
+    for (const article of articles) {
+      results.push(await firestore.upsertSystemDesignArticle(article, {
+        publishedBy: req.user.email,
+      }));
+    }
+
+    return res.status(200).json({ success: true, imported: results.length, results });
   } catch (err) {
     return next(err);
   }
