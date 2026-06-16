@@ -10,36 +10,104 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0">
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/admin/system-design/styles.css">
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('portfolio_theme');
+        var theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) { /* localStorage may be blocked in privacy mode */ }
+    })();
+  </script>
+  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
 </head>
 <body class="sd-admin-page">
+  <div class="topbar sd-admin-topbar">
+    <div class="topbar-inner">
+      <a class="sd-admin-back" href="/">
+        <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+        <span>Back to portfolio</span>
+      </a>
+      <div class="sd-admin-auth">
+        <md-outlined-select id="langSelect" class="lang-select" label="Language" value="en" aria-label="Language">
+          <md-select-option value="en" selected>
+            <div slot="headline">English</div>
+          </md-select-option>
+          <md-select-option value="fr">
+            <div slot="headline">Français</div>
+          </md-select-option>
+        </md-outlined-select>
+        <md-outlined-icon-button id="themeToggleBtn" class="theme-toggle" toggle aria-label="Switch to light mode"
+          title="Switch theme">
+          <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
+          <span class="material-symbols-outlined" slot="selected" aria-hidden="true">dark_mode</span>
+        </md-outlined-icon-button>
+        <button class="topbar-signin-btn" id="adminTopbarSignInBtn" aria-label="Sign in">
+          <span class="material-symbols-outlined" aria-hidden="true">login</span>
+          <span>Sign in</span>
+        </button>
+        <div class="topbar-user" id="adminTopbarUser" hidden>
+          <button class="topbar-avatar-btn" id="adminAvatarBtn" aria-label="User menu">
+            <img class="topbar-user-photo" id="adminUserPhoto" src="" alt="Signed-in admin profile photo">
+          </button>
+          <div class="topbar-dropdown" id="adminTopbarDropdown" hidden>
+            <div class="topbar-dropdown-name" id="adminUserName"></div>
+            <button class="topbar-signout" id="adminSignOut">Sign out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <main class="sd-admin-shell">
     <header class="sd-admin-header">
-      <div>
-        <a class="sd-admin-back" href="/">Portfolio</a>
+      <div class="sd-admin-hero-copy">
+        <div class="sd-admin-eyebrow">Internal publishing console</div>
         <h1>System Design Admin</h1>
-        <p>Edit articles, preview them, and publish directly to Firestore.</p>
+        <p>Manage architecture notes with the same Google Cloud + Salesforce publishing stack that powers the portfolio.</p>
+        <div class="sd-admin-trust-row" aria-label="Admin platform">
+          <span><span class="material-symbols-outlined" aria-hidden="true">cloud</span> Google Cloud</span>
+          <span><span class="material-symbols-outlined" aria-hidden="true">database</span> Firestore CMS</span>
+          <span><span class="material-symbols-outlined" aria-hidden="true">verified_user</span> Google Sign-In</span>
+        </div>
       </div>
-      <div class="sd-admin-auth">
-        <div id="adminGoogleBtn"></div>
-        <button type="button" id="adminSignOut" hidden>Sign out</button>
+      <div class="exp-badge sd-admin-badge">
+        <div class="years">CMS</div>
+        <div class="label">Firestore</div>
       </div>
     </header>
 
-    <output id="adminStatus" class="sd-admin-status">Sign in with your approved Google account.</output>
+    <output id="adminStatus" class="sd-admin-status" hidden></output>
 
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
       <aside class="sd-admin-list-panel">
         <div class="sd-admin-list-head">
-          <h2>Articles</h2>
+          <div>
+            <div class="sd-admin-section-kicker">Content library</div>
+            <h2>Articles</h2>
+          </div>
           <div class="sd-admin-list-actions">
-            <button type="button" id="seedArticlesBtn">Import seed</button>
             <button type="button" id="newArticleBtn">New</button>
           </div>
         </div>
         <div id="articleList" class="sd-admin-list"></div>
+        <details class="sd-admin-migration">
+          <summary>Migration tools</summary>
+          <p>Use this only to bootstrap the original hardcoded articles into Firestore.</p>
+          <button type="button" id="seedArticlesBtn">Import seed articles</button>
+        </details>
       </aside>
 
       <section class="sd-admin-editor">
+        <div class="sd-admin-editor-head">
+          <div>
+            <div class="sd-admin-section-kicker">Article editor</div>
+            <h2>Draft and publish</h2>
+          </div>
+          <span class="sd-admin-save-state">Versioned in Firestore</span>
+        </div>
         <div class="sd-admin-grid">
           <label>Slug
             <input id="articleId" type="text" placeholder="salesforce-mulesoft-authentication">
@@ -97,7 +165,76 @@
         </article>
       </section>
     </section>
+
+    <footer class="sponsors-footer sd-admin-footer">
+      <div class="sponsors-inner">
+        <span class="sponsors-label">Built with</span>
+        <div class="sponsors-logos">
+          <a href="https://cloud.google.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-gcp"
+            aria-label="Google Cloud">
+            <img class="sponsor-logo" src="/assets/img/google-cloud.svg" alt="Google Cloud" width="155" height="24">
+          </a>
+          <span class="sponsor-divider"></span>
+          <a href="https://www.salesforce.com" target="_blank" rel="noopener" class="sponsor-link sponsor-link-sf"
+            aria-label="Salesforce">
+            <img class="sponsor-logo" src="/assets/img/salesforce.svg" alt="Salesforce" width="50" height="36">
+          </a>
+        </div>
+      </div>
+      <p class="sponsors-disclaimer">
+        Trademarks are property of their respective owners. This is a personal portfolio; no endorsement or sponsorship is
+        implied.
+      </p>
+    </footer>
   </main>
+
+  <!-- ── Chat Launcher (bottom-right floating button) ── -->
+  <div id="chatLauncher" class="chat-launcher" hidden>
+    <div id="chatTeaser" class="chat-teaser" hidden>
+      <button class="chat-teaser-close" id="chatTeaserClose">&times;</button>
+      <div class="chat-teaser-text">Hi! Looking to hire a Salesforce engineer?</div>
+      <button class="chat-teaser-cta" onclick="openAssistant()">Let's talk</button>
+    </div>
+    <div class="chat-fab-wrap">
+      <md-fab id="chatFab" variant="primary" aria-label="Open assistant" onclick="toggleChatTeaser()">
+        <span class="material-symbols-outlined" slot="icon" id="chatFabIcon" aria-hidden="true">chat</span>
+      </md-fab>
+      <span class="chat-fab-ping" aria-hidden="true"></span>
+    </div>
+  </div>
+
+  <!-- ── Guided Assistant Overlay ── -->
+  <div id="assistantOverlay" class="ga-overlay" hidden role="dialog" aria-modal="true"
+    aria-label="Schedule a conversation">
+    <div class="ga-modal">
+      <div class="ga-resize-handle" id="gaResizeHandle" title="Drag to resize"></div>
+
+      <div class="ga-header">
+        <div class="ga-avatar">AK</div>
+        <div class="ga-header-info">
+          <div class="ga-header-name">Atlas</div>
+          <div class="ga-header-status">
+            <span class="ga-status-dot"></span> virtual assistant
+          </div>
+        </div>
+        <div class="ga-header-actions">
+          <button class="ga-header-btn" id="gaStartOverBtn" onclick="restartAssistant()" aria-label="Start over"
+            title="Start over" hidden>&#x21bb;</button>
+          <button class="ga-header-btn" onclick="minimiseAssistant()" aria-label="Minimise"
+            title="Minimise">&#8722;</button>
+          <button class="ga-header-btn ga-close" onclick="closeAssistant()" aria-label="Close"
+            title="Close">&times;</button>
+        </div>
+      </div>
+
+      <div class="ga-progress-track">
+        <div class="ga-progress-bar" id="gaProgressBar"></div>
+      </div>
+
+      <div class="ga-messages" id="gaMessages"></div>
+      <div class="ga-input-area" id="gaInputArea"></div>
+    </div>
+  </div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script type="module" src="/admin/system-design/admin.js"></script>
