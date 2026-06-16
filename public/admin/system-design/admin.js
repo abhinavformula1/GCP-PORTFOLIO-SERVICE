@@ -2,6 +2,7 @@
 
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import { initTheme } from '../../assets/core/theme.js';
+import { hideWelcomeOverlay, showWelcomeOverlay } from '../../assets/ui/welcome.js';
 import {
   closeAssistant,
   initChat,
@@ -25,6 +26,9 @@ const els = {
   userName:        document.getElementById('adminUserName'),
   dropdown:        document.getElementById('adminTopbarDropdown'),
   signOut:         document.getElementById('adminSignOut'),
+  welcomeGoogle:   document.getElementById('welcomeGoogleBtn'),
+  welcomeClose:    document.getElementById('welcomeCloseBtn'),
+  welcomeGuest:    document.getElementById('welcomeGuestBtn'),
   status:          document.getElementById('adminStatus'),
   workspace:       document.getElementById('adminWorkspace'),
   list:            document.getElementById('articleList'),
@@ -255,6 +259,7 @@ function initGoogle() {
     callback: function (resp) {
       credential = resp.credential || '';
       sessionStorage.setItem(STORAGE_KEY, credential);
+      hideWelcomeOverlay();
       updateAdminChrome(decodeJwtPayload(credential));
       loadArticles().catch(function (err) {
         setStatus(err.message, 'error');
@@ -264,6 +269,15 @@ function initGoogle() {
     use_fedcm_for_prompt: true,
     use_fedcm_for_button: true,
   });
+  if (els.welcomeGoogle && els.welcomeGoogle.childElementCount === 0) {
+    google.accounts.id.renderButton(els.welcomeGoogle, {
+      theme: 'filled_black',
+      size:  'large',
+      text:  'continue_with',
+      shape: 'rectangular',
+      width: 280,
+    });
+  }
   if (credential) {
     updateAdminChrome(decodeJwtPayload(credential));
     loadArticles().catch(function () {
@@ -278,13 +292,20 @@ function initGoogle() {
 }
 
 els.topbarSignIn.addEventListener('click', function () {
-  if (globalThis.google?.accounts) google.accounts.id.prompt();
+  showWelcomeOverlay({
+    onShown: function () {
+      if (globalThis.google?.accounts) initGoogle();
+    },
+  });
   setStatus('', 'info');
 });
 
 els.avatarBtn.addEventListener('click', function () {
   els.dropdown.toggleAttribute('hidden');
 });
+
+els.welcomeClose.addEventListener('click', hideWelcomeOverlay);
+els.welcomeGuest.addEventListener('click', hideWelcomeOverlay);
 
 els.title.addEventListener('input', function () {
   if (!selectedId) els.id.value = slugify(els.title.value);

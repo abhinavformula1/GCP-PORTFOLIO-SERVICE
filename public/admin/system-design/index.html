@@ -61,6 +61,29 @@
     </div>
   </div>
 
+  <!-- ── Welcome / Login Dialog (same sign-in surface as portfolio home) ── -->
+  <md-dialog id="welcomeOverlay" aria-labelledby="welcomeTitleId">
+    <div slot="headline" class="welcome-headline">
+      <div class="welcome-brand">
+        <div class="welcome-avatar">AK</div>
+        <div>
+          <div class="welcome-title" id="welcomeTitleId">Abhinav's Portfolio</div>
+          <div class="welcome-sub">Senior Salesforce Application Engineer</div>
+        </div>
+      </div>
+      <button type="button" class="welcome-close" id="welcomeCloseBtn" aria-label="Close">&times;</button>
+    </div>
+
+    <div slot="content" class="welcome-content">
+      <div id="welcomeGoogleBtn" class="welcome-google-wrap"></div>
+      <div class="welcome-sep"><span>or</span></div>
+      <md-outlined-button id="welcomeGuestBtn" class="welcome-guest-btn">
+        <span>Maybe later</span>
+      </md-outlined-button>
+      <p class="welcome-note">Your details are only used to verify admin access for this CMS.</p>
+    </div>
+  </md-dialog>
+
   <main class="sd-admin-shell">
     <header class="sd-admin-header">
       <div class="sd-admin-hero-copy">
