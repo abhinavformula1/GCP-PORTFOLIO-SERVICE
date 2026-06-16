@@ -120,10 +120,6 @@
   font-size: 13px;
 }
 
-.sd-admin-status[hidden] {
-  display: none;
-}
-
 .sd-admin-status[data-kind="success"] { border-color: rgba(25, 128, 56, 0.28); }
 .sd-admin-status[data-kind="error"] { border-color: rgba(186, 26, 26, 0.32); color: #ba1a1a; }
 

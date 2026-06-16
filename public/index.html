@@ -37,7 +37,9 @@
        Single ESM import registers all custom elements (<md-dialog>, <md-filled-button>,
        <md-outlined-text-field>, <md-fab>, etc.). Components inherit theme from
        --md-sys-color-* tokens already defined in style.css. -->
-  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
+  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"
+    integrity="sha384-vYjlhciU4XykQhy4Ji8/h761GRmwimZjeTNKeE+m7Oc9RgFWD9ilIl2R2DhbV4A3"
+    crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -174,7 +176,7 @@
           </md-outlined-button>
           <md-outlined-button class="admin-btn" id="systemDesignAdminBtn" aria-label="Admin" hidden
             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
-            onclick="window.open('/admin/system-design/', '_blank', 'noopener')">
+            onclick="window.openSystemDesignAdmin && window.openSystemDesignAdmin()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">admin_panel_settings</span>
             <span>Admin</span>
           </md-outlined-button>
@@ -804,59 +806,7 @@
 
   <div id="sharedFooter"></div>
 
-  <!-- ── Chat Launcher (bottom-right floating button) ── -->
-  <div id="chatLauncher" class="chat-launcher" hidden>
-    <div id="chatTeaser" class="chat-teaser" hidden>
-      <button class="chat-teaser-close" id="chatTeaserClose">&times;</button>
-      <div class="chat-teaser-text">Hi! Looking to hire a Salesforce engineer?</div>
-      <button class="chat-teaser-cta" onclick="openAssistant()">Let's talk</button>
-    </div>
-    <div class="chat-fab-wrap">
-      <md-fab id="chatFab" variant="primary" aria-label="Open assistant" onclick="toggleChatTeaser()">
-        <span class="material-symbols-outlined" slot="icon" id="chatFabIcon" aria-hidden="true">chat</span>
-      </md-fab>
-      <span class="chat-fab-ping" aria-hidden="true"></span>
-    </div>
-  </div>
-
-  <!-- ── Guided Assistant Overlay ── -->
-  <div id="assistantOverlay" class="ga-overlay" hidden role="dialog" aria-modal="true"
-    aria-label="Schedule a conversation">
-    <div class="ga-modal">
-      <div class="ga-resize-handle" id="gaResizeHandle" title="Drag to resize"></div>
-
-      <!-- Header -->
-      <div class="ga-header">
-        <div class="ga-avatar">AK</div>
-        <div class="ga-header-info">
-          <div class="ga-header-name">Atlas</div>
-          <div class="ga-header-status">
-            <span class="ga-status-dot"></span> virtual assistant
-          </div>
-        </div>
-        <div class="ga-header-actions">
-          <button class="ga-header-btn" id="gaStartOverBtn" onclick="restartAssistant()" aria-label="Start over"
-            title="Start over" hidden>&#x21bb;</button>
-          <button class="ga-header-btn" onclick="minimiseAssistant()" aria-label="Minimise"
-            title="Minimise">&#8722;</button>
-          <button class="ga-header-btn ga-close" onclick="closeAssistant()" aria-label="Close"
-            title="Close">&times;</button>
-        </div>
-      </div>
-
-      <!-- Progress bar -->
-      <div class="ga-progress-track">
-        <div class="ga-progress-bar" id="gaProgressBar"></div>
-      </div>
-
-      <!-- Messages -->
-      <div class="ga-messages" id="gaMessages"></div>
-
-      <!-- Input area (dynamically rendered) -->
-      <div class="ga-input-area" id="gaInputArea"></div>
-
-    </div>
-  </div>
+  <div id="sharedAtlasShell"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- type="module" enables ES `import`/`export` so main.js can pull in

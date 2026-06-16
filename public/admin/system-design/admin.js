@@ -1,4 +1,4 @@
-/* global atob, document, fetch, google, sessionStorage, setTimeout */
+/* global atob, document, fetch, google, localStorage, sessionStorage, setTimeout */
 
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import {
@@ -9,7 +9,7 @@ import {
 } from '../../assets/core/state.js';
 import { initTheme } from '../../assets/core/theme.js';
 import { hideWelcomeOverlay, showWelcomeOverlay } from '../../assets/ui/welcome.js';
-import { renderTechFooter, renderTopbar } from '../../assets/ui/shared-layout.js';
+import { renderAtlasShell, renderTechFooter, renderTopbar } from '../../assets/ui/shared-layout.js';
 import {
   closeAssistant,
   initChat,
@@ -20,8 +20,10 @@ import {
 } from '../../assets/chat/chat.js';
 
 const LEGACY_ADMIN_STORAGE_KEY = 'portfolio_admin_credential';
+const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 
 let credential = sessionStorage.getItem(STORAGE_CREDENTIAL)
+  || readAdminHandoffCredential()
   || sessionStorage.getItem(LEGACY_ADMIN_STORAGE_KEY)
   || '';
 let articles = [];
@@ -57,7 +59,6 @@ const els = {
   welcomeGoogle:   document.getElementById('welcomeGoogleBtn'),
   welcomeClose:    document.getElementById('welcomeCloseBtn'),
   welcomeGuest:    document.getElementById('welcomeGuestBtn'),
-  status:          document.getElementById('adminStatus'),
   workspace:       document.getElementById('adminWorkspace'),
   list:            document.getElementById('articleList'),
   seedBtn:         document.getElementById('seedArticlesBtn'),
@@ -80,9 +81,19 @@ const els = {
 };
 
 function setStatus(message, kind) {
-  els.status.textContent = message;
-  els.status.dataset.kind = kind || 'info';
-  els.status.hidden = !message;
+  let status = document.getElementById('adminStatus');
+  if (!message) {
+    if (status) status.remove();
+    return;
+  }
+  if (!status) {
+    status = document.createElement('output');
+    status.id = 'adminStatus';
+    status.className = 'sd-admin-status';
+    els.workspace.before(status);
+  }
+  status.textContent = message;
+  status.dataset.kind = kind || 'info';
 }
 
 function decodeJwtPayload(token) {
@@ -106,6 +117,26 @@ function profileFromCredential(token) {
   };
 }
 
+function readAdminHandoffCredential() {
+  try {
+    const raw = localStorage.getItem(ADMIN_HANDOFF_KEY);
+    if (!raw) return '';
+    localStorage.removeItem(ADMIN_HANDOFF_KEY);
+    const handoff = JSON.parse(raw);
+    if (!handoff || Number(handoff.expiresAt || 0) < Date.now()) return '';
+    if (handoff.profile && typeof handoff.profile === 'object') {
+      sessionStorage.setItem(STORAGE_PROFILE, JSON.stringify(handoff.profile));
+      setSiteProfile(handoff.profile);
+    }
+    if (handoff.credential) {
+      sessionStorage.setItem(STORAGE_CREDENTIAL, handoff.credential);
+      setGoogleCredential(handoff.credential);
+      return handoff.credential;
+    }
+  } catch (_) {}
+  return '';
+}
+
 function saveSharedSession(token) {
   const profile = profileFromCredential(token);
   setGoogleCredential(token);
@@ -125,7 +156,7 @@ function updateAdminChrome(profile) {
     els.userPhoto.alt = 'Signed-in admin profile photo';
     return;
   }
-  els.userName.textContent = profile.email || profile.name || 'Admin';
+  els.userName.textContent = profile.name || profile.email || 'Admin';
   els.userPhoto.src = profile.picture || '';
   els.userPhoto.alt = (profile.name || 'Admin') + ' profile photo';
 }
@@ -287,7 +318,7 @@ async function loadArticles() {
   articles = Array.isArray(data.articles) ? data.articles : [];
   els.workspace.hidden = false;
   els.signOut.hidden = false;
-  setStatus('Signed in. You can edit and publish articles.', 'success');
+  setStatus('', 'info');
   renderList();
   fillForm(articles[0] || null);
 }
@@ -410,5 +441,12 @@ globalThis.openAssistant = openAssistant;
 globalThis.closeAssistant = closeAssistant;
 globalThis.minimiseAssistant = minimiseAssistant;
 globalThis.restartAssistant = restartAssistant;
+renderAtlasShell('#sharedAtlasShell', {
+  toggleChatTeaser,
+  openAssistant,
+  closeAssistant,
+  minimiseAssistant,
+  restartAssistant,
+});
 initChat();
 initGoogle();
