@@ -15,6 +15,7 @@
  */
 
 const config = require('../config');
+const firestore = require('./firestore');
 
 /**
  * Extract a normalised lowercase domain from an email address.
@@ -27,24 +28,21 @@ function domainOf(email) {
   return email.slice(at + 1).trim().toLowerCase();
 }
 
-/**
- * Resolve the contact view for a viewer.
- *
- * @param {{email?: string} | null} viewer
- * @returns {{
- *   canSeePhone: boolean,
- *   phone: string | null,
- *   matchedDomain: string | null
- * }}
- */
-function resolveContactView(viewer) {
+function normaliseDomains(domains) {
+  return (Array.isArray(domains) ? domains : [])
+    .map((domain) => String(domain).trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function canUseLocalDefaults() {
+  return config.server.env !== 'production' && !process.env.K_SERVICE;
+}
+
+function resolveWithAllowedDomains(viewer, allowedDomains) {
   const email = viewer && viewer.email;
   const domain = domainOf(email);
-  const allowed = config.contactPolicy.allowedDomains;
+  const allowed = normaliseDomains(allowedDomains);
 
-  // Match on suffix so subdomains (e.g. corp.google.com) are also accepted.
-  // Note: we deliberately don't accept arbitrary partial matches — only
-  // exact-domain or *.<allowed-domain>.
   const matched = allowed.find(
     (d) => domain === d || domain.endsWith('.' + d)
   );
@@ -60,4 +58,62 @@ function resolveContactView(viewer) {
   };
 }
 
-module.exports = { resolveContactView, domainOf };
+/**
+ * Resolve the contact view for a viewer.
+ *
+ * @param {{email?: string} | null} viewer
+ * @returns {{
+ *   canSeePhone: boolean,
+ *   phone: string | null,
+ *   matchedDomain: string | null
+ * }}
+ */
+function resolveContactView(viewer) {
+  return resolveWithAllowedDomains(viewer, config.contactPolicy.allowedDomains);
+}
+
+async function getContactPolicyConfig() {
+  if (canUseLocalDefaults()) {
+    return {
+      source: 'environment',
+      allowedDomains: normaliseDomains(config.contactPolicy.allowedDomains),
+      updatedBy: null,
+      updatedAt: null,
+      privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+    };
+  }
+  try {
+    const stored = await firestore.getContactPolicyConfig();
+    if (stored && Array.isArray(stored.allowedDomains) && stored.allowedDomains.length) {
+      return {
+        source: 'firestore',
+        allowedDomains: normaliseDomains(stored.allowedDomains),
+        updatedBy: stored.updatedBy || null,
+        updatedAt: stored.updatedAt || null,
+        privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+      };
+    }
+  } catch (err) {
+    console.warn('[contact-policy] Firestore config read failed:', err.message);
+  }
+  return {
+    source: 'environment',
+    allowedDomains: normaliseDomains(config.contactPolicy.allowedDomains),
+    updatedBy: null,
+    updatedAt: null,
+    privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+  };
+}
+
+async function resolveContactViewAsync(viewer) {
+  const policy = await getContactPolicyConfig();
+  return resolveWithAllowedDomains(viewer, policy.allowedDomains);
+}
+
+module.exports = {
+  resolveContactView,
+  resolveContactViewAsync,
+  getContactPolicyConfig,
+  normaliseDomains,
+  domainOf,
+};

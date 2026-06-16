@@ -69,6 +69,19 @@
       </div>
     </header>
 
+    <section id="adminModules" class="sd-admin-modules" hidden aria-label="Admin modules">
+      <button type="button" class="sd-admin-module sd-admin-module-active" data-module="system-design">
+        <span class="material-symbols-outlined" aria-hidden="true">article</span>
+        <strong>System Design</strong>
+        <small>Publish architecture notes</small>
+      </button>
+      <button type="button" class="sd-admin-module" data-module="contact-policy">
+        <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
+        <strong>Contact Policy</strong>
+        <small>Configure phone reveal domains</small>
+      </button>
+    </section>
+
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
       <aside class="sd-admin-list-panel">
         <div class="sd-admin-list-head">
@@ -152,6 +165,28 @@
           <div id="previewBody" class="sd-article-body"></div>
         </article>
       </section>
+    </section>
+
+    <section id="contactPolicyWorkspace" class="sd-admin-policy" hidden>
+      <div class="sd-admin-policy-copy">
+        <div class="sd-admin-section-kicker">Contact policy</div>
+        <h2>Domain allowlist</h2>
+        <p>Visitors signed in with these verified email domains can see the private phone number on the portfolio contact card.</p>
+        <div id="contactPolicyMeta" class="sd-admin-policy-meta"></div>
+      </div>
+      <div class="sd-admin-policy-card">
+        <label>Allowed Domains
+          <textarea id="contactAllowedDomains" rows="8" placeholder="google.com&#10;salesforce.com"></textarea>
+        </label>
+        <label>Test Email
+          <input id="contactTestEmail" type="email" placeholder="recruiter@google.com">
+        </label>
+        <div id="contactPolicyTestResult" class="sd-admin-policy-result"></div>
+        <div class="sd-admin-actions">
+          <button type="button" id="testContactPolicyBtn">Test access</button>
+          <button type="button" id="saveContactPolicyBtn" class="sd-admin-primary">Save policy</button>
+        </div>
+      </div>
     </section>
 
     <div id="sharedFooter"></div>

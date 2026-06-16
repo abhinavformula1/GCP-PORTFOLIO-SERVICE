@@ -15,11 +15,45 @@ const { body, validationResult } = require('express-validator');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const config = require('../config');
 const firestore = require('../services/firestore');
+const contactPolicy = require('../services/contactPolicy');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
 const BODY_MAX_LEN = 60000;
 const SEED_FILE = path.join(__dirname, '../../content/system-design/articles.seed.json');
+
+function canUseLocalSeedFallback() {
+  return config.server.env !== 'production' && !process.env.K_SERVICE;
+}
+
+async function loadSeedArticles({ publishedOnly } = {}) {
+  const raw = await fs.readFile(SEED_FILE, 'utf8');
+  const articles = JSON.parse(raw);
+  if (!Array.isArray(articles)) throw new ValidationError('Seed file must contain an article array.');
+  return articles
+    .filter((article) => {
+      if (!publishedOnly) return true;
+      const status = String(article.status || 'Published').toLowerCase();
+      return status === 'published' || article.stub;
+    })
+    .sort((a, b) => Number(a.order || 999) - Number(b.order || 999)
+      || String(a.en?.title || a.id || '').localeCompare(String(b.en?.title || b.id || '')));
+}
+
+async function localSeedFallback(res, { publishedOnly, articleId } = {}) {
+  if (!canUseLocalSeedFallback()) return false;
+  const articles = await loadSeedArticles({ publishedOnly });
+  if (articleId) {
+    const article = articles.find((item) => item.id === articleId);
+    if (!article) return false;
+    res.set('Cache-Control', 'no-store');
+    res.status(200).json({ success: true, article, source: 'local-seed' });
+    return true;
+  }
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json({ success: true, articles, source: 'local-seed' });
+  return true;
+}
 
 const validateArticle = [
   body('id').trim().matches(/^[a-z0-9-]{3,80}$/).withMessage('Slug must use lowercase letters, numbers, and hyphens.'),
@@ -37,8 +71,21 @@ const validateArticle = [
   body('fr.body').optional().trim().isLength({ max: BODY_MAX_LEN }),
 ];
 
+function validateDomains(domains) {
+  if (!Array.isArray(domains)) throw new ValidationError('Allowed domains must be an array.');
+  const clean = contactPolicy.normaliseDomains(domains);
+  if (clean.length > 20) throw new ValidationError('Allowed domain list cannot exceed 20 entries.');
+  for (const domain of clean) {
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain) || domain.includes('..')) {
+      throw new ValidationError('Allowed domains must be valid domain names.');
+    }
+  }
+  return Array.from(new Set(clean));
+}
+
 router.get('/system-design/articles', async (_req, res) => {
   try {
+    if (await localSeedFallback(res, { publishedOnly: true })) return;
     const articles = await firestore.listPublishedSystemDesignArticles();
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
     return res.status(200).json({ success: true, articles });
@@ -50,6 +97,7 @@ router.get('/system-design/articles', async (_req, res) => {
 
 router.get('/system-design/articles/:id', async (req, res) => {
   try {
+    if (await localSeedFallback(res, { publishedOnly: true, articleId: req.params.id })) return;
     const article = await firestore.getSystemDesignArticle(req.params.id);
     if (!article) return res.status(404).json({ success: false, error: 'Article not found.' });
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
@@ -62,6 +110,7 @@ router.get('/system-design/articles/:id', async (req, res) => {
 
 router.get('/admin/system-design/articles', requireAdmin, async (_req, res, next) => {
   try {
+    if (await localSeedFallback(res)) return;
     const articles = await firestore.listSystemDesignArticles();
     return res.status(200).json({ success: true, articles });
   } catch (err) {
@@ -75,6 +124,49 @@ router.get('/admin/me', requireAuth, async (req, res) => {
     success: true,
     isAdmin: config.admin.allowedEmails.includes(email),
   });
+});
+
+router.get('/admin/contact-policy', requireAdmin, async (_req, res, next) => {
+  try {
+    const policy = await contactPolicy.getContactPolicyConfig();
+    return res.status(200).json({ success: true, policy });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
+  try {
+    const allowedDomains = validateDomains(req.body?.allowedDomains);
+    if (canUseLocalSeedFallback()) {
+      return res.status(200).json({
+        success: true,
+        policy: {
+          source: 'local-dev',
+          allowedDomains,
+          updatedBy: req.user.email,
+          updatedAt: Date.now(),
+          privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+        },
+      });
+    }
+    const saved = await firestore.upsertContactPolicyConfig({
+      allowedDomains,
+      updatedBy: req.user.email,
+    });
+    return res.status(200).json({
+      success: true,
+      policy: {
+        source: 'firestore',
+        allowedDomains: saved.allowedDomains,
+        updatedBy: saved.updatedBy,
+        updatedAt: saved.updatedAt,
+        privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
 });
 
 router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, async (req, res, next) => {

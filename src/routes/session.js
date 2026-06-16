@@ -78,7 +78,7 @@ router.post('/session/start', async (req, res, next) => {
     // 4. Apply the contact-reveal policy. The phone number lives only on
     //    the server; it's returned to the client only when the verified
     //    email is in an allow-listed domain.
-    const contact = contactPolicy.resolveContactView({ email });
+    const contact = await contactPolicy.resolveContactViewAsync({ email });
 
     // 5. Respond with the bits the frontend needs to greet the user.
     //    firstSeenAt/lastSeenAt come back as Firestore Timestamps — convert.

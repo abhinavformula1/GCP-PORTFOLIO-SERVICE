@@ -274,9 +274,14 @@ md-outlined-icon-button:not(:defined) { visibility: hidden; }
   border-radius: 5px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s, color 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
-.topbar-signout:hover { border-color: var(--accent); color: var(--accent); }
+.topbar-signout:hover,
+.topbar-signout:focus-visible {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
 /* ── M3 outlined select for language ──
    In @material/web 1.5.1, <md-outlined-select> wraps an internal
    <md-outlined-field>, so the *field-level* tokens are what actually
