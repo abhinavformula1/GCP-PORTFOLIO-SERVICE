@@ -386,7 +386,7 @@ function normaliseSystemDesignArticle(id, data) {
     readMinutes: Number(v.readMinutes || 5),
     stub:        !!v.stub,
     order:       Number(v.order || 999),
-    updatedAt:   v.updatedAt && v.updatedAt.toMillis ? v.updatedAt.toMillis() : null,
+    updatedAt:   v.updatedAt?.toMillis ? v.updatedAt.toMillis() : null,
     en: {
       title:    String(en.title || v.title || id),
       subtitle: String(en.subtitle || v.subtitle || ''),
@@ -451,9 +451,10 @@ async function upsertSystemDesignArticle(article, { publishedBy } = {}) {
     if (!snap.exists) payload.createdAt = now;
 
     tx.set(ref, payload, { merge: true });
-    tx.set(ref.collection('versions').doc(String(nextVersion)), Object.assign({}, payload, {
+    tx.set(ref.collection('versions').doc(String(nextVersion)), {
+      ...payload,
       capturedAt: now,
-    }));
+    });
     return { id, version: nextVersion };
   });
 }

@@ -2,8 +2,8 @@
 
 require('dotenv').config();
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const firestore = require('../src/services/firestore');
 
 async function main() {
@@ -14,7 +14,7 @@ async function main() {
     return;
   }
 
-  const filePath = path.resolve(process.cwd(), input);
+  const filePath = path.join(process.cwd(), input);
   const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   const articles = Array.isArray(payload) ? payload : [payload];
 

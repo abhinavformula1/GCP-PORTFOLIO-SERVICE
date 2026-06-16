@@ -1,6 +1,6 @@
-/* global document, fetch, google, sessionStorage, setTimeout, window */
+/* global document, fetch, google, sessionStorage, setTimeout */
 
-import { GOOGLE_CLIENT_ID } from '/assets/core/config.js';
+import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 
 const STORAGE_KEY = 'portfolio_admin_credential';
 
@@ -40,8 +40,8 @@ function setStatus(message, kind) {
 function slugify(value) {
   return String(value || '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '')
     .slice(0, 80);
 }
 
@@ -53,9 +53,11 @@ function authHeaders() {
 }
 
 async function authedJson(url, options) {
-  const resp = await fetch(url, Object.assign({}, options || {}, {
-    headers: Object.assign({}, authHeaders(), (options && options.headers) || {}),
-  }));
+  const extraHeaders = options?.headers || {};
+  const resp = await fetch(url, {
+    ...(options || {}),
+    headers: { ...authHeaders(), ...extraHeaders },
+  });
   const data = await resp.json().catch(function () { return {}; });
   if (!resp.ok || data.success === false) {
     throw new Error(data.error || data.message || 'Request failed.');
@@ -115,23 +117,31 @@ function fillForm(article) {
 }
 
 function renderList() {
+  els.list.textContent = '';
   if (!articles.length) {
-    els.list.innerHTML = '<div class="sd-admin-empty">No articles in Firestore yet.</div>';
+    const empty = document.createElement('div');
+    empty.className = 'sd-admin-empty';
+    empty.textContent = 'No articles in Firestore yet.';
+    els.list.appendChild(empty);
     return;
   }
-  els.list.innerHTML = articles.map(function (article) {
+  articles.forEach(function (article) {
     const en = article.en || {};
-    const active = article.id === selectedId ? ' sd-admin-article-active' : '';
-    return '<button type="button" class="sd-admin-article' + active + '" data-id="' + article.id + '">' +
-      '<strong>' + escapeHtml(en.title || article.id) + '</strong>' +
-      '<span>' + escapeHtml(article.status || 'Draft') + ' · ' + escapeHtml(article.category || '') + '</span>' +
-      '</button>';
-  }).join('');
-  els.list.querySelectorAll('.sd-admin-article').forEach(function (btn) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sd-admin-article';
+    if (article.id === selectedId) btn.classList.add('sd-admin-article-active');
+    btn.dataset.id = article.id;
+    const title = document.createElement('strong');
+    title.textContent = en.title || article.id;
+    const meta = document.createElement('span');
+    meta.textContent = (article.status || 'Draft') + ' · ' + (article.category || '');
+    btn.append(title, meta);
     btn.addEventListener('click', function () {
       const article = articles.find(function (item) { return item.id === btn.dataset.id; });
       fillForm(article);
     });
+    els.list.appendChild(btn);
   });
 }
 
@@ -139,16 +149,9 @@ function renderPreview() {
   const article = articleFromForm();
   els.previewTitle.textContent = article.en.title || 'Untitled article';
   els.previewSubtitle.textContent = article.en.subtitle || '';
-  els.previewBody.innerHTML = article.en.body || '<p>Nothing to preview yet.</p>';
-}
-
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  els.previewBody.textContent = article.en.body
+    ? 'Preview will render on the public System Design page after publishing.'
+    : 'Nothing to preview yet.';
 }
 
 async function loadArticles() {
@@ -185,7 +188,7 @@ function initGoogle() {
     setStatus('Google Sign-In is not configured.', 'error');
     return;
   }
-  if (!window.google || !window.google.accounts) {
+  if (!globalThis.google?.accounts) {
     setTimeout(initGoogle, 200);
     return;
   }

@@ -54,8 +54,8 @@ const CATEGORY_LABELS = {
 
 function topicById(id) {
   const topics = getTopics();
-  for (let i = 0; i < topics.length; i++) {
-    if (topics[i].id === id) return topics[i];
+  for (const topic of topics) {
+    if (topic.id === id) return topic;
   }
   return null;
 }
@@ -131,6 +131,20 @@ function normaliseCmsTopic(article) {
   };
 }
 
+function rerenderSystemDesignView() {
+  renderTopicList();
+  if (_activeView !== 'sysdesign') return;
+  if (_activeTopic) renderTopicDetail();
+  else renderLanding();
+}
+
+function applyCmsTopics(topics) {
+  if (!topics.length) return;
+  _cmsTopics = topics;
+  highlightActiveTopic();
+  if (_activeTopic && !topicById(_activeTopic)) _activeTopic = topics[0].id;
+}
+
 async function loadCmsTopics() {
   if (_cmsLoadStarted) return;
   _cmsLoadStarted = true;
@@ -143,24 +157,12 @@ async function loadCmsTopics() {
     const data = await resp.json();
     const articles = Array.isArray(data.articles) ? data.articles : [];
     const topics = articles.map(normaliseCmsTopic).filter(Boolean);
-    if (!topics.length) return;
-    _cmsTopics = topics;
-    renderTopicList();
-    highlightActiveTopic();
-    if (_activeView === 'sysdesign') {
-      if (_activeTopic && !topicById(_activeTopic)) _activeTopic = topics[0].id;
-      if (_activeTopic) renderTopicDetail();
-      else renderLanding();
-    }
-  } catch (_err) {
-    // Keep the empty fallback if Firestore is unavailable locally.
+    applyCmsTopics(topics);
+  } catch (err) {
+    console.warn('[system-design] content load failed:', err.message);
   } finally {
     _cmsLoaded = true;
-    if (_activeView === 'sysdesign') {
-      renderTopicList();
-      if (_activeTopic) renderTopicDetail();
-      else renderLanding();
-    }
+    rerenderSystemDesignView();
   }
 }
 
@@ -216,8 +218,7 @@ function renderTopicList() {
     let group = '';
     let groupCount = 0;
     const topics = getTopics();
-    for (let i = 0; i < topics.length; i++) {
-      const t = topics[i];
+    for (const t of topics) {
       if ((t.category || 'architecture') !== category) continue;
       const loc = localeOf(t);
       const haystack = normaliseText(loc.title + ' ' + loc.subtitle + ' ' + (t.tags || []).join(' '));
