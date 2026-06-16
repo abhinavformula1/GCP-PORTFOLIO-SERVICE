@@ -1,0 +1,196 @@
+.sd-admin-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(1, 118, 211, 0.16), transparent 34rem),
+    var(--md-sys-color-background, #f7f9fc);
+  color: var(--md-sys-color-on-background, #172033);
+  font-family: "Roboto Flex", system-ui, sans-serif;
+}
+
+.sd-admin-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 56px;
+}
+
+.sd-admin-header,
+.sd-admin-workspace,
+.sd-admin-editor,
+.sd-admin-list-panel,
+.sd-admin-preview,
+.sd-admin-status {
+  border: 1px solid rgba(1, 118, 211, 0.14);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 45px rgba(15, 40, 75, 0.08);
+}
+
+.sd-admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px;
+}
+
+.sd-admin-header h1 {
+  margin: 8px 0 6px;
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.sd-admin-header p,
+.sd-admin-status,
+.sd-admin-empty,
+.sd-admin-article span {
+  color: #5d6b82;
+}
+
+.sd-admin-back {
+  color: #0176d3;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sd-admin-auth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sd-admin-status {
+  margin: 18px 0;
+  padding: 14px 18px;
+}
+
+.sd-admin-status[data-kind="success"] { border-color: rgba(25, 128, 56, 0.28); }
+.sd-admin-status[data-kind="error"] { border-color: rgba(186, 26, 26, 0.32); color: #ba1a1a; }
+
+.sd-admin-workspace {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+}
+
+.sd-admin-list-panel,
+.sd-admin-editor {
+  padding: 18px;
+}
+
+.sd-admin-list-head,
+.sd-admin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sd-admin-list-head h2 {
+  margin: 0;
+}
+
+.sd-admin-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sd-admin-article {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid rgba(1, 118, 211, 0.16);
+  border-radius: 16px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.sd-admin-article-active {
+  border-color: #0176d3;
+  box-shadow: 0 0 0 3px rgba(1, 118, 211, 0.12);
+}
+
+.sd-admin-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.sd-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sd-admin-editor label {
+  display: grid;
+  gap: 7px;
+  font-weight: 700;
+  color: #25364d;
+}
+
+.sd-admin-editor input,
+.sd-admin-editor select,
+.sd-admin-editor textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(1, 118, 211, 0.18);
+  border-radius: 14px;
+  padding: 11px 12px;
+  font: inherit;
+  background: #fff;
+  color: #172033;
+}
+
+.sd-admin-editor textarea {
+  min-height: 320px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.55;
+}
+
+.sd-admin-actions {
+  justify-content: flex-end;
+}
+
+.sd-admin-actions button,
+.sd-admin-list-head button,
+#adminSignOut {
+  border: 1px solid rgba(1, 118, 211, 0.24);
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #fff;
+  color: #0176d3;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sd-admin-actions .sd-admin-primary {
+  border-color: #0176d3;
+  background: #0176d3;
+  color: #fff;
+}
+
+.sd-admin-preview {
+  padding: 22px;
+}
+
+.sd-admin-preview h2 {
+  margin: 8px 0 6px;
+}
+
+@media (max-width: 900px) {
+  .sd-admin-header,
+  .sd-admin-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sd-admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sd-admin-grid {
+    grid-template-columns: 1fr;
+  }
+}

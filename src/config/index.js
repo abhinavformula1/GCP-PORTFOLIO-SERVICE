@@ -51,6 +51,15 @@ const config = {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
   },
 
+  admin: {
+    // Comma-separated list of Google-authenticated editor emails allowed to
+    // publish System Design content. Empty means locked down by default.
+    allowedEmails: (process.env.ADMIN_ALLOWED_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  },
+
   // ── Contact-reveal policy ──────────────────────────────────────────
   // The portfolio masks the phone number by default. When a viewer signs
   // in with Google, the server checks whether their verified email belongs
