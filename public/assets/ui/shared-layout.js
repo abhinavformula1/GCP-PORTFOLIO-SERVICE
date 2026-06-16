@@ -2,10 +2,47 @@ function createEl(tag, attrs, children) {
   const el = document.createElement(tag);
   Object.entries(attrs || {}).forEach(function ([key, value]) {
     if (value === false || value === null || value === undefined) return;
-    if (key === 'className') el.className = value;
-    else if (key === 'text') el.textContent = value;
-    else if (key === 'hidden' && value) el.setAttribute('hidden', '');
-    else el.setAttribute(key, value === true ? '' : value);
+    if (key === 'className') {
+      el.className = value;
+    } else if (key === 'text') {
+      el.textContent = value;
+    } else if (key === 'hidden' && value) {
+      el.hidden = true;
+    } else if (key === 'id') {
+      el.id = value;
+    } else if (key === 'slot') {
+      el.slot = value;
+    } else if (key === 'value') {
+      el.value = value;
+    } else if (key === 'title') {
+      el.title = value;
+    } else if (key === 'href') {
+      el.href = value;
+    } else if (key === 'target') {
+      el.target = value;
+    } else if (key === 'rel') {
+      el.rel = value;
+    } else if (key === 'src') {
+      el.src = value;
+    } else if (key === 'alt') {
+      el.alt = value;
+    } else if (key === 'width') {
+      el.width = value;
+    } else if (key === 'height') {
+      el.height = value;
+    } else if (key === 'label') {
+      el.label = value;
+    } else if (key === 'selected' && value) {
+      el.selected = true;
+    } else if (key === 'toggle' && value) {
+      el.toggle = true;
+    } else if (key === 'aria-hidden') {
+      el.ariaHidden = value;
+    } else if (key === 'aria-label') {
+      el.ariaLabel = value;
+    } else if (key === 'data-i18n') {
+      el.dataset.i18n = value;
+    }
   });
   (children || []).forEach(function (child) {
     if (child) el.appendChild(child);
@@ -93,29 +130,34 @@ function renderSignInButton(id, initiallyHidden, i18nKey) {
 }
 
 function renderUserMenu(ids, handlers) {
-  const avatarButtonAttrs = {
+  const avatarButton = createEl('button', {
     id: ids.avatarBtn,
     className: 'topbar-avatar-btn',
     'aria-label': 'User menu',
-  };
-  if (handlers?.toggleUserMenu) avatarButtonAttrs.onclick = handlers.toggleUserMenu;
+  }, [
+    createEl('img', {
+      id: ids.userPhoto,
+      className: 'topbar-user-photo',
+      src: '',
+      alt: ids.photoAlt || 'Signed-in user profile photo',
+    }),
+  ]);
+  if (typeof handlers?.toggleUserMenu === 'function') {
+    avatarButton.addEventListener('click', handlers.toggleUserMenu);
+  }
 
   const signOutAttrs = { className: 'topbar-signout', text: 'Sign out' };
   if (ids.signOutBtn) signOutAttrs.id = ids.signOutBtn;
-  if (handlers?.signOut) signOutAttrs.onclick = handlers.signOut;
+  const signOutButton = createEl('button', signOutAttrs);
+  if (typeof handlers?.signOut === 'function') {
+    signOutButton.addEventListener('click', handlers.signOut);
+  }
 
   return createEl('div', { id: ids.user, className: 'topbar-user', hidden: true }, [
-    createEl('button', avatarButtonAttrs, [
-      createEl('img', {
-        id: ids.userPhoto,
-        className: 'topbar-user-photo',
-        src: '',
-        alt: ids.photoAlt || 'Signed-in user profile photo',
-      }),
-    ]),
+    avatarButton,
     createEl('div', { id: ids.dropdown, className: 'topbar-dropdown', hidden: true }, [
       createEl('div', { id: ids.userName, className: 'topbar-dropdown-name' }),
-      createEl('button', signOutAttrs),
+      signOutButton,
     ]),
   ]);
 }

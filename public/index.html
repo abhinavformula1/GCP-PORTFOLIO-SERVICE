@@ -37,7 +37,9 @@
        Single ESM import registers all custom elements (<md-dialog>, <md-filled-button>,
        <md-outlined-text-field>, <md-fab>, etc.). Components inherit theme from
        --md-sys-color-* tokens already defined in style.css. -->
-  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
+  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"
+    integrity="sha384-vYjlhciU4XykQhy4Ji8/h761GRmwimZjeTNKeE+m7Oc9RgFWD9ilIl2R2DhbV4A3"
+    crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -174,7 +176,7 @@
           </md-outlined-button>
           <md-outlined-button class="admin-btn" id="systemDesignAdminBtn" aria-label="Admin" hidden
             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
-            onclick="window.open('/admin/system-design/', '_blank', 'noopener')">
+            onclick="window.openSystemDesignAdmin && window.openSystemDesignAdmin()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">admin_panel_settings</span>
             <span>Admin</span>
           </md-outlined-button>
@@ -812,7 +814,8 @@
       <button class="chat-teaser-cta" onclick="openAssistant()">Let's talk</button>
     </div>
     <div class="chat-fab-wrap">
-      <md-fab id="chatFab" variant="primary" aria-label="Open assistant" onclick="toggleChatTeaser()">
+      <md-fab id="chatFab" variant="primary" aria-label="Open assistant" onclick="toggleChatTeaser()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}">
         <span class="material-symbols-outlined" slot="icon" id="chatFabIcon" aria-hidden="true">chat</span>
       </md-fab>
       <span class="chat-fab-ping" aria-hidden="true"></span>

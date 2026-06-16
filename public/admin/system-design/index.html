@@ -21,7 +21,9 @@
       } catch (e) { /* localStorage may be blocked in privacy mode */ }
     })();
   </script>
-  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
+  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"
+    integrity="sha384-vYjlhciU4XykQhy4Ji8/h761GRmwimZjeTNKeE+m7Oc9RgFWD9ilIl2R2DhbV4A3"
+    crossorigin="anonymous"></script>
 </head>
 <body class="sd-admin-page">
   <div id="sharedTopbar"></div>
@@ -66,8 +68,6 @@
         <div class="label">Firestore</div>
       </div>
     </header>
-
-    <output id="adminStatus" class="sd-admin-status" hidden></output>
 
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
       <aside class="sd-admin-list-panel">
@@ -165,7 +165,8 @@
       <button class="chat-teaser-cta" onclick="openAssistant()">Let's talk</button>
     </div>
     <div class="chat-fab-wrap">
-      <md-fab id="chatFab" variant="primary" aria-label="Open assistant" onclick="toggleChatTeaser()">
+      <md-fab id="chatFab" variant="primary" aria-label="Open assistant" onclick="toggleChatTeaser()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}">
         <span class="material-symbols-outlined" slot="icon" id="chatFabIcon" aria-hidden="true">chat</span>
       </md-fab>
       <span class="chat-fab-ping" aria-hidden="true"></span>

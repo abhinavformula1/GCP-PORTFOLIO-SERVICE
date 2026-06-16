@@ -23,7 +23,8 @@ import {
 import { initTheme }         from './core/theme.js';
 import { initLocationPopover } from './ui/location.js';
 import {
-  siteProfile,         setSiteProfile,
+  googleCredential,    siteProfile,
+                       setSiteProfile,
                        setGoogleCredential,
                        setPendingChatHistory,
                        setMyRecommendation,
@@ -68,14 +69,6 @@ import { renderTechFooter, renderTopbar } from './ui/shared-layout.js';
 (function () {
   'use strict';
 
-  renderTopbar('#sharedTopbar', {
-    signInHidden: true,
-    signInI18nKey: 'topbarSignIn',
-    handlers: {
-      toggleUserMenu: 'toggleUserMenu()',
-      signOut: 'signOut()',
-    },
-  });
   renderTechFooter('#sharedFooter');
 
   // Shared state (siteProfile, googleCredential, pendingChatHistory,
@@ -126,6 +119,14 @@ import { renderTechFooter, renderTopbar } from './ui/shared-layout.js';
     showWelcomeOverlayWithGsi();
   }
   window.signOut = signOut;
+  renderTopbar('#sharedTopbar', {
+    signInHidden: true,
+    signInI18nKey: 'topbarSignIn',
+    handlers: {
+      toggleUserMenu,
+      signOut,
+    },
+  });
 
   function setAdminNavVisible(visible) {
     const adminBtn = document.getElementById('systemDesignAdminBtn');
@@ -139,6 +140,20 @@ import { renderTechFooter, renderTopbar } from './ui/shared-layout.js';
       setAdminNavVisible(!!(data && data.isAdmin));
     });
   }
+
+  function openSystemDesignAdmin() {
+    try {
+      if (googleCredential && siteProfile && siteProfile.type !== 'guest') {
+        localStorage.setItem('portfolio_admin_handoff', JSON.stringify({
+          credential: googleCredential,
+          profile:    siteProfile,
+          expiresAt:  Date.now() + 60000,
+        }));
+      }
+    } catch (_) {}
+    window.open('/admin/system-design/', '_blank', 'noopener');
+  }
+  window.openSystemDesignAdmin = openSystemDesignAdmin;
 
   // initGoogleSignIn → ./core/auth.js. We wrap the module function so we
   // can inject the GOOGLE_CLIENT_ID + handleGoogleSignIn callback. The
