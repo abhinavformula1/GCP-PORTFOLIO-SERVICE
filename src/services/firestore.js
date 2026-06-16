@@ -193,6 +193,7 @@ const ATLAS_USAGE_COLLECTION = 'atlasUsage';
 const ATLAS_CACHE_COLLECTION = 'atlasCache';
 const MAX_ATLAS_TURNS  = 40;
 const ATLAS_MONTHLY_BUDGET_INR = 100;
+const SYSTEM_DESIGN_COLLECTION = 'systemDesignArticles';
 
 function atlasActiveDocRef(uid) {
   return getDb()
@@ -363,6 +364,97 @@ async function saveAtlasCacheEntry(cacheKey, entry) {
     createdAt:          FieldValue.serverTimestamp(),
     expiresAtMs:        Number(entry.expiresAtMs || 0),
     hitCount:           0,
+  });
+}
+
+// ── System Design content CMS ─────────────────────────────────────────────────
+//
+// Public article content lives in Firestore so fixing wording/typos does not
+// require rebuilding the Cloud Run container. The checked-in JS topics remain
+// a frontend fallback for local/dev outages while the CMS collection is empty.
+
+function normaliseSystemDesignArticle(id, data) {
+  const v = data || {};
+  const en = v.en && typeof v.en === 'object' ? v.en : {};
+  const fr = v.fr && typeof v.fr === 'object' ? v.fr : {};
+  return {
+    id,
+    category:    String(v.category || 'architecture'),
+    icon:        String(v.icon || 'article'),
+    status:      String(v.status || 'Published'),
+    tags:        Array.isArray(v.tags) ? v.tags.map(String).slice(0, 12) : [],
+    readMinutes: Number(v.readMinutes || 5),
+    stub:        !!v.stub,
+    order:       Number(v.order || 999),
+    updatedAt:   v.updatedAt && v.updatedAt.toMillis ? v.updatedAt.toMillis() : null,
+    en: {
+      title:    String(en.title || v.title || id),
+      subtitle: String(en.subtitle || v.subtitle || ''),
+      body:     String(en.body || v.bodyHtml || ''),
+    },
+    fr: {
+      title:    String(fr.title || en.title || v.title || id),
+      subtitle: String(fr.subtitle || en.subtitle || v.subtitle || ''),
+      body:     String(fr.body || en.body || v.bodyHtml || ''),
+    },
+  };
+}
+
+async function listPublishedSystemDesignArticles() {
+  const snap = await getDb().collection(SYSTEM_DESIGN_COLLECTION).get();
+  return snap.docs
+    .map((doc) => normaliseSystemDesignArticle(doc.id, doc.data()))
+    .filter((article) => article.status.toLowerCase() === 'published' || article.stub)
+    .sort((a, b) => a.order - b.order || a.en.title.localeCompare(b.en.title));
+}
+
+async function listSystemDesignArticles() {
+  const snap = await getDb().collection(SYSTEM_DESIGN_COLLECTION).get();
+  return snap.docs
+    .map((doc) => normaliseSystemDesignArticle(doc.id, doc.data()))
+    .sort((a, b) => a.order - b.order || a.en.title.localeCompare(b.en.title));
+}
+
+async function getSystemDesignArticle(id) {
+  const snap = await getDb().collection(SYSTEM_DESIGN_COLLECTION).doc(id).get();
+  if (!snap.exists) return null;
+  return normaliseSystemDesignArticle(snap.id, snap.data());
+}
+
+async function upsertSystemDesignArticle(article, { publishedBy } = {}) {
+  if (!article || typeof article !== 'object') {
+    throw new Error('upsertSystemDesignArticle: article object is required.');
+  }
+  const id = String(article.id || article.slug || '').trim();
+  if (!id) throw new Error('upsertSystemDesignArticle: id or slug is required.');
+
+  const ref = getDb().collection(SYSTEM_DESIGN_COLLECTION).doc(id);
+  return getDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const previous = snap.exists ? (snap.data() || {}) : {};
+    const nextVersion = Number(previous.version || 0) + 1;
+    const now = FieldValue.serverTimestamp();
+    const payload = {
+      category:    String(article.category || previous.category || 'architecture'),
+      icon:        String(article.icon || previous.icon || 'article'),
+      status:      String(article.status || previous.status || 'Published'),
+      tags:        Array.isArray(article.tags) ? article.tags.map(String).slice(0, 12) : [],
+      readMinutes: Number(article.readMinutes || previous.readMinutes || 5),
+      stub:        !!article.stub,
+      order:       Number(article.order || previous.order || 999),
+      en:          article.en && typeof article.en === 'object' ? article.en : {},
+      fr:          article.fr && typeof article.fr === 'object' ? article.fr : {},
+      version:     nextVersion,
+      updatedAt:   now,
+      updatedBy:   String(publishedBy || 'local-script'),
+    };
+    if (!snap.exists) payload.createdAt = now;
+
+    tx.set(ref, payload, { merge: true });
+    tx.set(ref.collection('versions').doc(String(nextVersion)), Object.assign({}, payload, {
+      capturedAt: now,
+    }));
+    return { id, version: nextVersion };
   });
 }
 
@@ -575,6 +667,10 @@ module.exports = {
   appendAtlasUsageEvent,
   getAtlasCacheEntry,
   saveAtlasCacheEntry,
+  listPublishedSystemDesignArticles,
+  listSystemDesignArticles,
+  getSystemDesignArticle,
+  upsertSystemDesignArticle,
   upsertRecommendation,
   listActiveRecommendations,
   writeRecommendationReply,

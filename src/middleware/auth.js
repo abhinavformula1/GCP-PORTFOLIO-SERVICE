@@ -10,6 +10,7 @@
  */
 
 const googleAuth = require('../services/googleAuth');
+const config = require('../config');
 const { AppError } = require('../errors');
 
 async function requireAuth(req, res, next) {
@@ -25,4 +26,16 @@ async function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth };
+async function requireAdmin(req, res, next) {
+  await requireAuth(req, res, (err) => {
+    if (err) return next(err);
+
+    const email = String(req.user && req.user.email || '').toLowerCase();
+    if (!config.admin.allowedEmails.length || !config.admin.allowedEmails.includes(email)) {
+      return next(new AppError('Admin access is not allowed for this account.', 403, 'FORBIDDEN'));
+    }
+    return next();
+  });
+}
+
+module.exports = { requireAuth, requireAdmin };

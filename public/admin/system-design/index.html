@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Design Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0">
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/admin/system-design/styles.css">
+  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
+</head>
+<body class="sd-admin-page">
+  <main class="sd-admin-shell">
+    <header class="sd-admin-header">
+      <div>
+        <a class="sd-admin-back" href="/">Portfolio</a>
+        <h1>System Design Admin</h1>
+        <p>Edit articles, preview them, and publish directly to Firestore.</p>
+      </div>
+      <div class="sd-admin-auth">
+        <div id="adminGoogleBtn"></div>
+        <button type="button" id="adminSignOut" hidden>Sign out</button>
+      </div>
+    </header>
+
+    <section id="adminStatus" class="sd-admin-status" role="status">Sign in with your approved Google account.</section>
+
+    <section id="adminWorkspace" class="sd-admin-workspace" hidden>
+      <aside class="sd-admin-list-panel">
+        <div class="sd-admin-list-head">
+          <h2>Articles</h2>
+          <button type="button" id="newArticleBtn">New</button>
+        </div>
+        <div id="articleList" class="sd-admin-list"></div>
+      </aside>
+
+      <section class="sd-admin-editor">
+        <div class="sd-admin-grid">
+          <label>Slug
+            <input id="articleId" type="text" placeholder="salesforce-mulesoft-authentication">
+          </label>
+          <label>Status
+            <select id="articleStatus">
+              <option>Draft</option>
+              <option selected>Published</option>
+              <option>Coming soon</option>
+            </select>
+          </label>
+          <label>Category
+            <select id="articleCategory">
+              <option value="integration">Integration</option>
+              <option value="architecture">Architecture</option>
+              <option value="scale">Scale</option>
+              <option value="security">Security</option>
+              <option value="delivery">Delivery</option>
+            </select>
+          </label>
+          <label>Icon
+            <input id="articleIcon" type="text" value="article">
+          </label>
+          <label>Read Minutes
+            <input id="articleReadMinutes" type="number" min="1" max="60" value="5">
+          </label>
+          <label>Order
+            <input id="articleOrder" type="number" min="1" max="9999" value="100">
+          </label>
+        </div>
+
+        <label>Title
+          <input id="articleTitle" type="text" placeholder="Article title">
+        </label>
+        <label>Subtitle
+          <input id="articleSubtitle" type="text" placeholder="Short article subtitle">
+        </label>
+        <label>Tags
+          <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
+        </label>
+        <label>Article Body HTML
+          <textarea id="articleBody" rows="18" placeholder="<h3>Problem</h3><p>Write the article body here.</p>"></textarea>
+        </label>
+
+        <div class="sd-admin-actions">
+          <button type="button" id="previewBtn">Preview</button>
+          <button type="button" id="publishBtn" class="sd-admin-primary">Publish</button>
+        </div>
+
+        <article class="sd-admin-preview">
+          <div class="sd-article-eyebrow">Preview</div>
+          <h2 id="previewTitle">Untitled article</h2>
+          <p id="previewSubtitle"></p>
+          <div id="previewBody" class="sd-article-body"></div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script type="module" src="/admin/system-design/admin.js"></script>
+</body>
+</html>

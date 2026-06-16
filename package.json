@@ -8,6 +8,8 @@
     "dev": "node --watch server.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "content:publish-system-design": "node scripts/publish-system-design-article.js",
+    "content:seed-system-design": "node scripts/publish-system-design-article.js content/system-design/articles.seed.json",
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky"
   },
