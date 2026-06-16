@@ -4,6 +4,9 @@ import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import {
   STORAGE_CREDENTIAL,
   STORAGE_PROFILE,
+  googleCredential,
+  broadcastSignOut,
+  onCrossTabSignOut,
   setGoogleCredential,
   setSiteProfile,
 } from '../../assets/core/state.js';
@@ -19,15 +22,12 @@ import {
   toggleChatTeaser,
 } from '../../assets/chat/chat.js';
 
-const LEGACY_ADMIN_STORAGE_KEY = 'portfolio_admin_credential';
 const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 
-let credential = sessionStorage.getItem(STORAGE_CREDENTIAL)
-  || readAdminHandoffCredential()
-  || sessionStorage.getItem(LEGACY_ADMIN_STORAGE_KEY)
-  || '';
+let credential = readAdminHandoffCredential() || googleCredential || '';
 let articles = [];
 let selectedId = '';
+let contactPolicyState = null;
 
 renderTopbar('#sharedTopbar', {
   className: 'topbar sd-admin-topbar',
@@ -60,6 +60,14 @@ const els = {
   welcomeClose:    document.getElementById('welcomeCloseBtn'),
   welcomeGuest:    document.getElementById('welcomeGuestBtn'),
   workspace:       document.getElementById('adminWorkspace'),
+  modules:         document.getElementById('adminModules'),
+  policyWorkspace: document.getElementById('contactPolicyWorkspace'),
+  policyMeta:      document.getElementById('contactPolicyMeta'),
+  allowedDomains:  document.getElementById('contactAllowedDomains'),
+  testEmail:       document.getElementById('contactTestEmail'),
+  policyTest:      document.getElementById('contactPolicyTestResult'),
+  testPolicyBtn:   document.getElementById('testContactPolicyBtn'),
+  savePolicyBtn:   document.getElementById('saveContactPolicyBtn'),
   list:            document.getElementById('articleList'),
   seedBtn:         document.getElementById('seedArticlesBtn'),
   newBtn:          document.getElementById('newArticleBtn'),
@@ -125,11 +133,9 @@ function readAdminHandoffCredential() {
     const handoff = JSON.parse(raw);
     if (!handoff || Number(handoff.expiresAt || 0) < Date.now()) return '';
     if (handoff.profile && typeof handoff.profile === 'object') {
-      sessionStorage.setItem(STORAGE_PROFILE, JSON.stringify(handoff.profile));
       setSiteProfile(handoff.profile);
     }
     if (handoff.credential) {
-      sessionStorage.setItem(STORAGE_CREDENTIAL, handoff.credential);
       setGoogleCredential(handoff.credential);
       return handoff.credential;
     }
@@ -141,7 +147,6 @@ function saveSharedSession(token) {
   const profile = profileFromCredential(token);
   setGoogleCredential(token);
   setSiteProfile(profile);
-  sessionStorage.removeItem(LEGACY_ADMIN_STORAGE_KEY);
   return profile;
 }
 
@@ -167,10 +172,17 @@ function resetAdminSession() {
   setSiteProfile(null);
   sessionStorage.removeItem(STORAGE_CREDENTIAL);
   sessionStorage.removeItem(STORAGE_PROFILE);
-  sessionStorage.removeItem(LEGACY_ADMIN_STORAGE_KEY);
   els.workspace.hidden = true;
+  els.modules.hidden = true;
+  els.policyWorkspace.hidden = true;
   els.dropdown.hidden = true;
   updateAdminChrome(null);
+}
+
+function signOutAdmin(opts) {
+  resetAdminSession();
+  setStatus('', 'info');
+  if ((opts || {}).broadcast !== false) broadcastSignOut();
 }
 
 function slugify(value) {
@@ -215,10 +227,84 @@ async function authedJson(url, options) {
 
 function handleAdminLoadError(err) {
   els.workspace.hidden = true;
+  els.modules.hidden = true;
+  els.policyWorkspace.hidden = true;
   if (err?.status === 401) {
     resetAdminSession();
   }
   setStatus(err.message, 'error');
+}
+
+function parseDomainsInput() {
+  return els.allowedDomains.value
+    .split(/\n|,/)
+    .map(function (domain) { return domain.trim().toLowerCase(); })
+    .filter(Boolean);
+}
+
+function domainFromEmail(email) {
+  const value = String(email || '').trim().toLowerCase();
+  const at = value.lastIndexOf('@');
+  if (at <= 0 || at === value.length - 1) return '';
+  return value.slice(at + 1);
+}
+
+function renderContactPolicy(policy) {
+  contactPolicyState = policy || {};
+  const domains = Array.isArray(contactPolicyState.allowedDomains) ? contactPolicyState.allowedDomains : [];
+  els.allowedDomains.value = domains.join('\n');
+  const source = contactPolicyState.source === 'firestore' ? 'Firestore override' : 'Environment defaults';
+  const updated = contactPolicyState.updatedAt
+    ? new Date(contactPolicyState.updatedAt).toLocaleString()
+    : 'Not edited yet';
+  els.policyMeta.textContent = source + ' · ' + domains.length + ' domains · Updated: ' + updated;
+  els.policyTest.textContent = '';
+  delete els.policyTest.dataset.kind;
+}
+
+function setActiveModule(moduleName) {
+  const isPolicy = moduleName === 'contact-policy';
+  els.workspace.hidden = isPolicy;
+  els.policyWorkspace.hidden = !isPolicy;
+  els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
+    btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
+  });
+}
+
+async function loadContactPolicy() {
+  const data = await authedJson('/api/admin/contact-policy');
+  renderContactPolicy(data.policy || {});
+}
+
+async function saveContactPolicy() {
+  const allowedDomains = parseDomainsInput();
+  setStatus('Saving contact policy...', 'info');
+  const data = await authedJson('/api/admin/contact-policy', {
+    method: 'PUT',
+    body:   JSON.stringify({ allowedDomains }),
+  });
+  renderContactPolicy(data.policy || {});
+  setStatus('Contact policy saved.', 'success');
+}
+
+function testContactPolicy() {
+  const domain = domainFromEmail(els.testEmail.value);
+  const domains = parseDomainsInput();
+  const matched = domains.find(function (allowed) {
+    return domain === allowed || domain.endsWith('.' + allowed);
+  });
+  if (!domain) {
+    els.policyTest.textContent = 'Enter a valid email to test.';
+    els.policyTest.dataset.kind = 'error';
+    return;
+  }
+  if (matched) {
+    els.policyTest.textContent = 'Allowed. ' + els.testEmail.value + ' matches ' + matched + '.';
+    els.policyTest.dataset.kind = 'success';
+    return;
+  }
+  els.policyTest.textContent = 'Blocked. ' + els.testEmail.value + ' does not match the allowlist.';
+  els.policyTest.dataset.kind = 'error';
 }
 
 function articleFromForm() {
@@ -316,11 +402,14 @@ async function loadArticles() {
   setStatus('Loading articles...', 'info');
   const data = await authedJson('/api/admin/system-design/articles');
   articles = Array.isArray(data.articles) ? data.articles : [];
+  els.modules.hidden = false;
   els.workspace.hidden = false;
   els.signOut.hidden = false;
   setStatus('', 'info');
   renderList();
   fillForm(articles[0] || null);
+  await loadContactPolicy();
+  setActiveModule('system-design');
 }
 
 async function publishArticle() {
@@ -406,6 +495,15 @@ els.avatarBtn.addEventListener('click', function () {
 
 els.welcomeClose.addEventListener('click', hideWelcomeOverlay);
 els.welcomeGuest.addEventListener('click', hideWelcomeOverlay);
+els.modules.addEventListener('click', function (event) {
+  const btn = event.target.closest('.sd-admin-module');
+  if (!btn) return;
+  setActiveModule(btn.dataset.module || 'system-design');
+});
+els.savePolicyBtn.addEventListener('click', function () {
+  saveContactPolicy().catch(function (err) { setStatus(err.message, 'error'); });
+});
+els.testPolicyBtn.addEventListener('click', testContactPolicy);
 
 els.title.addEventListener('input', function () {
   if (!selectedId) els.id.value = slugify(els.title.value);
@@ -431,11 +529,13 @@ els.newBtn.addEventListener('click', function () {
   els.title.focus();
 });
 els.signOut.addEventListener('click', function () {
-  resetAdminSession();
-  setStatus('', 'info');
+  signOutAdmin();
 });
 
 initTheme();
+onCrossTabSignOut(function () {
+  signOutAdmin({ broadcast: false });
+});
 globalThis.toggleChatTeaser = toggleChatTeaser;
 globalThis.openAssistant = openAssistant;
 globalThis.closeAssistant = closeAssistant;

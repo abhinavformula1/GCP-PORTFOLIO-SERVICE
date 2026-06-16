@@ -27,6 +27,7 @@
 export const STORAGE_PROFILE    = 'portfolio_profile';
 export const STORAGE_CREDENTIAL = 'portfolio_credential';
 export const STORAGE_TOAST_FLAG = 'welcome_toast_shown';
+export const STORAGE_SIGNOUT_EVENT = 'portfolio_signout_event';
 
 // ── siteProfile ──────────────────────────────────────────────────────────────
 // The persisted snapshot of the signed-in (or guest) visitor. Shape:
@@ -58,6 +59,20 @@ export function setGoogleCredential(token) {
     if (token) sessionStorage.setItem(STORAGE_CREDENTIAL, token);
     else       sessionStorage.removeItem(STORAGE_CREDENTIAL);
   } catch (_) {}
+}
+
+export function broadcastSignOut() {
+  try {
+    localStorage.setItem(STORAGE_SIGNOUT_EVENT, String(Date.now()));
+  } catch (_) {}
+}
+
+export function onCrossTabSignOut(callback) {
+  if (typeof callback !== 'function') return;
+  window.addEventListener('storage', function (event) {
+    if (event.key !== STORAGE_SIGNOUT_EVENT) return;
+    callback();
+  });
 }
 
 // ── pendingChatHistory (in-memory only) ──────────────────────────────────────

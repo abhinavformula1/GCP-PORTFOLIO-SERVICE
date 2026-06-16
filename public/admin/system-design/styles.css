@@ -123,6 +123,50 @@
 .sd-admin-status[data-kind="success"] { border-color: rgba(25, 128, 56, 0.28); }
 .sd-admin-status[data-kind="error"] { border-color: rgba(186, 26, 26, 0.32); color: #ba1a1a; }
 
+.sd-admin-modules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.sd-admin-module {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sd-admin-module .material-symbols-outlined {
+  grid-row: span 2;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--surface-2);
+}
+
+.sd-admin-module strong {
+  color: var(--text);
+  font-size: 0.96rem;
+}
+
+.sd-admin-module small {
+  color: var(--text-secondary);
+}
+
+.sd-admin-module-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .sd-admin-workspace {
   display: grid;
   grid-template-columns: 330px minmax(0, 1fr);
@@ -272,8 +316,7 @@
 }
 
 .sd-admin-actions button,
-.sd-admin-list-head button,
-#adminSignOut {
+.sd-admin-list-head button {
   border: 1px solid var(--accent);
   border-radius: 999px;
   padding: 10px 16px;
@@ -297,6 +340,67 @@
   margin: 8px 0 6px;
 }
 
+.sd-admin-policy {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.sd-admin-policy[hidden] {
+  display: none;
+}
+
+.sd-admin-policy-copy,
+.sd-admin-policy-card {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.sd-admin-policy-copy h2 {
+  margin: 4px 0 10px;
+}
+
+.sd-admin-policy-copy p,
+.sd-admin-policy-meta,
+.sd-admin-policy-result {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.sd-admin-policy-card {
+  display: grid;
+  gap: 14px;
+}
+
+.sd-admin-policy-card label {
+  display: grid;
+  gap: 7px;
+  font-weight: 700;
+  color: #25364d;
+}
+
+.sd-admin-policy-card input,
+.sd-admin-policy-card textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 12px;
+  font: inherit;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.sd-admin-policy-result[data-kind="success"] { color: #198038; }
+.sd-admin-policy-result[data-kind="error"] { color: #ba1a1a; }
+
 .sd-admin-footer {
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
@@ -305,7 +409,8 @@
 
 @media (max-width: 900px) {
   .sd-admin-header,
-  .sd-admin-workspace {
+  .sd-admin-workspace,
+  .sd-admin-policy {
     grid-template-columns: 1fr;
   }
 
@@ -314,6 +419,10 @@
   }
 
   .sd-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sd-admin-modules {
     grid-template-columns: 1fr;
   }
 }

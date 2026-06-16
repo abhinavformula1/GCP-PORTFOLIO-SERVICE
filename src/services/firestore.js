@@ -194,6 +194,8 @@ const ATLAS_CACHE_COLLECTION = 'atlasCache';
 const MAX_ATLAS_TURNS  = 40;
 const ATLAS_MONTHLY_BUDGET_INR = 100;
 const SYSTEM_DESIGN_COLLECTION = 'systemDesignArticles';
+const APP_CONFIG_COLLECTION = 'appConfig';
+const CONTACT_POLICY_DOC = 'contactPolicy';
 
 function atlasActiveDocRef(uid) {
   return getDb()
@@ -653,6 +655,31 @@ async function deleteRecommendation(uid) {
   return { deleted: true };
 }
 
+// ── Admin-managed app configuration ──────────────────────────────────────────
+
+async function getContactPolicyConfig() {
+  const snap = await getDb().collection(APP_CONFIG_COLLECTION).doc(CONTACT_POLICY_DOC).get();
+  if (!snap.exists) return null;
+  const data = snap.data() || {};
+  return {
+    allowedDomains: Array.isArray(data.allowedDomains) ? data.allowedDomains.map(String) : [],
+    updatedBy:      data.updatedBy || null,
+    updatedAt:      data.updatedAt && data.updatedAt.toMillis ? data.updatedAt.toMillis() : null,
+  };
+}
+
+async function upsertContactPolicyConfig({ allowedDomains, updatedBy }) {
+  const cleanDomains = Array.isArray(allowedDomains)
+    ? allowedDomains.map((domain) => String(domain).trim().toLowerCase()).filter(Boolean)
+    : [];
+  await getDb().collection(APP_CONFIG_COLLECTION).doc(CONTACT_POLICY_DOC).set({
+    allowedDomains: cleanDomains,
+    updatedBy:      updatedBy || null,
+    updatedAt:      FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return getContactPolicyConfig();
+}
+
 module.exports = {
   getDb,
   getUser,
@@ -676,4 +703,6 @@ module.exports = {
   listActiveRecommendations,
   writeRecommendationReply,
   deleteRecommendation,
+  getContactPolicyConfig,
+  upsertContactPolicyConfig,
 };

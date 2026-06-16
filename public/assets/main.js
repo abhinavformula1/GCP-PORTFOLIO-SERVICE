@@ -28,6 +28,8 @@ import {
                        setGoogleCredential,
                        setPendingChatHistory,
                        setMyRecommendation,
+                       broadcastSignOut,
+                       onCrossTabSignOut,
 } from './core/state.js';
 import {
   applyPageLang, t,
@@ -91,7 +93,8 @@ import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-la
   // topbar avatar button keeps resolving (extracted module is ESM-private).
   window.toggleUserMenu = toggleUserMenu;
 
-  function signOut() {
+  function signOut(opts) {
+    const options = opts || {};
     saveSiteProfile(null); // clears sessionStorage + topbar + phone reveal
     try { sessionStorage.removeItem('welcome_toast_shown'); } catch (_) {}
     setGoogleCredential(null);
@@ -116,9 +119,13 @@ import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-la
       forceCloseAssistant();
     }
 
-    showWelcomeOverlayWithGsi();
+    if (options.broadcast !== false) broadcastSignOut();
+    if (options.showOverlay !== false) showWelcomeOverlayWithGsi();
   }
   window.signOut = signOut;
+  onCrossTabSignOut(function () {
+    signOut({ broadcast: false, showOverlay: false });
+  });
   renderTopbar('#sharedTopbar', {
     signInHidden: true,
     signInI18nKey: 'topbarSignIn',
