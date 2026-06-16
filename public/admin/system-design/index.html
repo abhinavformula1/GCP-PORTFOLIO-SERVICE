@@ -55,8 +55,8 @@
     <header class="sd-admin-header">
       <div class="sd-admin-hero-copy">
         <div class="sd-admin-eyebrow">Internal publishing console</div>
-        <h1>System Design Admin</h1>
-        <p>Manage architecture notes with the same Google Cloud + Salesforce publishing stack that powers the portfolio.</p>
+        <h1>System Design CMS</h1>
+        <p>Plan, edit, preview, and publish architecture notes with the same Google Cloud + Salesforce stack that powers the public portfolio.</p>
         <div id="adminModules" class="sd-admin-modules" hidden aria-label="Admin modules">
           <button type="button" class="sd-admin-module sd-admin-module-active" data-module="system-design">
             <span class="material-symbols-outlined" aria-hidden="true">article</span>
@@ -68,21 +68,50 @@
           </button>
         </div>
       </div>
-      <div class="exp-badge sd-admin-badge">
-        <div class="years">CMS</div>
-        <div class="label">Firestore</div>
+      <div class="sd-admin-badge">
+        <div class="sd-admin-badge-icon material-symbols-outlined" aria-hidden="true">auto_stories</div>
+        <div>
+          <div class="years">CMS</div>
+          <div class="label">Firestore</div>
+        </div>
       </div>
     </header>
 
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
+      <div class="sd-admin-command">
+        <div>
+          <div class="sd-admin-section-kicker">Publishing cockpit</div>
+          <h2>System Design Library</h2>
+          <p>Keep public architecture notes sharp, reviewable, and ready to publish.</p>
+        </div>
+        <div class="sd-admin-metrics" aria-label="Article summary">
+          <div class="sd-admin-metric">
+            <span id="articleTotalCount">0</span>
+            <small>Total</small>
+          </div>
+          <div class="sd-admin-metric">
+            <span id="articlePublishedCount">0</span>
+            <small>Published</small>
+          </div>
+          <div class="sd-admin-metric">
+            <span id="articleDraftCount">0</span>
+            <small>Drafts</small>
+          </div>
+        </div>
+      </div>
+
       <aside class="sd-admin-list-panel">
         <div class="sd-admin-list-head">
           <div>
-            <div class="sd-admin-section-kicker">Content library</div>
+            <div class="sd-admin-section-kicker">Step 1</div>
             <h2>Articles</h2>
+            <p>Select an article or start a fresh draft.</p>
           </div>
           <div class="sd-admin-list-actions">
-            <button type="button" id="newArticleBtn">New</button>
+            <button type="button" id="newArticleBtn">
+              <span class="material-symbols-outlined" aria-hidden="true">add</span>
+              <span>New</span>
+            </button>
           </div>
         </div>
         <div id="articleList" class="sd-admin-list"></div>
@@ -93,71 +122,95 @@
         </details>
       </aside>
 
-      <section class="sd-admin-editor">
-        <div class="sd-admin-editor-head">
-          <div>
-            <div class="sd-admin-section-kicker">Article editor</div>
-            <h2>Draft and publish</h2>
+      <section class="sd-admin-editor-shell">
+        <section class="sd-admin-editor">
+          <div class="sd-admin-editor-head">
+            <div>
+              <div class="sd-admin-section-kicker">Step 2</div>
+              <h2>Write the story</h2>
+              <p>Focus on the reader-facing title, promise, and article body first.</p>
+            </div>
+            <span class="sd-admin-save-state">Versioned in Firestore</span>
           </div>
-          <span class="sd-admin-save-state">Versioned in Firestore</span>
-        </div>
-        <div class="sd-admin-grid">
-          <label>Slug
-            <input id="articleId" type="text" placeholder="salesforce-mulesoft-authentication">
-          </label>
-          <label>Status
-            <select id="articleStatus">
-              <option>Draft</option>
-              <option selected>Published</option>
-              <option>Coming soon</option>
-            </select>
-          </label>
-          <label>Category
-            <select id="articleCategory">
-              <option value="integration">Integration</option>
-              <option value="architecture">Architecture</option>
-              <option value="scale">Scale</option>
-              <option value="security">Security</option>
-              <option value="delivery">Delivery</option>
-            </select>
-          </label>
-          <label>Icon
-            <input id="articleIcon" type="text" value="article">
-          </label>
-          <label>Read Minutes
-            <input id="articleReadMinutes" type="number" min="1" max="60" value="5">
-          </label>
-          <label>Order
-            <input id="articleOrder" type="number" min="1" max="9999" value="100">
-          </label>
-        </div>
 
-        <label>Title
-          <input id="articleTitle" type="text" placeholder="Article title">
-        </label>
-        <label>Subtitle
-          <input id="articleSubtitle" type="text" placeholder="Short article subtitle">
-        </label>
-        <label>Tags
-          <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
-        </label>
-        <label>Article Body HTML
-          <textarea id="articleBody" rows="18" placeholder="<h3>Problem</h3><p>Write the article body here.</p>"></textarea>
-        </label>
+          <div class="sd-admin-primary-fields">
+            <label>Title
+              <input id="articleTitle" type="text" placeholder="Article title">
+            </label>
+            <label>Subtitle
+              <input id="articleSubtitle" type="text" placeholder="Short article subtitle">
+            </label>
+            <label>Tags
+              <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
+            </label>
+            <label>Article Body HTML
+              <textarea id="articleBody" rows="18" placeholder="<h3>Problem</h3><p>Write the article body here.</p>"></textarea>
+            </label>
+          </div>
 
-        <div id="systemDesignStatus" class="sd-admin-section-status"></div>
+          <details class="sd-admin-advanced">
+            <summary>
+              <span>Advanced publishing settings</span>
+              <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+            </summary>
+            <div class="sd-admin-grid">
+              <label>Slug
+                <input id="articleId" type="text" placeholder="salesforce-mulesoft-authentication">
+              </label>
+              <label>Status
+                <select id="articleStatus">
+                  <option>Draft</option>
+                  <option selected>Published</option>
+                  <option>Coming soon</option>
+                </select>
+              </label>
+              <label>Category
+                <select id="articleCategory">
+                  <option value="integration">Integration</option>
+                  <option value="architecture">Architecture</option>
+                  <option value="scale">Scale</option>
+                  <option value="security">Security</option>
+                  <option value="delivery">Delivery</option>
+                </select>
+              </label>
+              <label>Icon
+                <input id="articleIcon" type="text" value="article">
+              </label>
+              <label>Read Minutes
+                <input id="articleReadMinutes" type="number" min="1" max="60" value="5">
+              </label>
+              <label>Order
+                <input id="articleOrder" type="number" min="1" max="9999" value="100">
+              </label>
+            </div>
+          </details>
+        </section>
 
-        <div class="sd-admin-actions">
-          <button type="button" id="previewBtn">Preview</button>
-          <button type="button" id="publishBtn" class="sd-admin-primary">Publish</button>
-        </div>
-
-        <article class="sd-admin-preview">
-          <div class="sd-article-eyebrow">Preview</div>
-          <h2 id="previewTitle">Untitled article</h2>
-          <p id="previewSubtitle"></p>
-          <div id="previewBody" class="sd-article-body"></div>
-        </article>
+        <aside class="sd-admin-preview-panel">
+          <div class="sd-admin-preview-head">
+            <div>
+              <div class="sd-admin-section-kicker">Step 3</div>
+              <h2>Preview & publish</h2>
+            </div>
+            <button type="button" id="previewBtn">Refresh</button>
+          </div>
+          <article class="sd-admin-preview">
+            <div class="sd-admin-preview-chrome">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="sd-article-eyebrow" id="previewMeta">Draft preview</div>
+            <h2 id="previewTitle">Untitled article</h2>
+            <p id="previewSubtitle"></p>
+            <div id="previewBody" class="sd-article-body"></div>
+          </article>
+          <div id="systemDesignStatus" class="sd-admin-section-status"></div>
+          <div class="sd-admin-actions">
+            <button type="button" id="publishBtn" class="sd-admin-primary">
+              <span class="material-symbols-outlined" aria-hidden="true">publish</span>
+              <span>Publish article</span>
+            </button>
+          </div>
+        </aside>
       </section>
     </section>
 

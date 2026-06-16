@@ -126,3 +126,14 @@ test('allowed email exception reveals phone for trusted personal email', () => {
   assert.equal(decision.canSeePhone, true);
   assert.equal(decision.reason, 'allowed-email');
 });
+
+test('admin email reveals phone even when it uses a personal domain', () => {
+  const policy = loadFreshPolicy({
+    ADMIN_ALLOWED_EMAILS: 'abhinavformula1@gmail.com',
+    CONTACT_PERSONAL_DOMAINS: 'gmail.com,yahoo.com',
+    PRIVATE_PHONE: '+91 98765 43210',
+  });
+  const decision = policy.resolveContactView({ email: 'abhinavformula1@gmail.com' });
+  assert.equal(decision.canSeePhone, true);
+  assert.equal(decision.reason, 'allowed-email');
+});

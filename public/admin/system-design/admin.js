@@ -72,6 +72,9 @@ const els = {
   testPolicyBtn:   document.getElementById('testContactPolicyBtn'),
   savePolicyBtn:   document.getElementById('saveContactPolicyBtn'),
   list:            document.getElementById('articleList'),
+  totalCount:      document.getElementById('articleTotalCount'),
+  publishedCount:  document.getElementById('articlePublishedCount'),
+  draftCount:      document.getElementById('articleDraftCount'),
   seedBtn:         document.getElementById('seedArticlesBtn'),
   newBtn:          document.getElementById('newArticleBtn'),
   id:              document.getElementById('articleId'),
@@ -87,6 +90,7 @@ const els = {
   systemStatus:    document.getElementById('systemDesignStatus'),
   previewBtn:      document.getElementById('previewBtn'),
   publishBtn:      document.getElementById('publishBtn'),
+  previewMeta:     document.getElementById('previewMeta'),
   previewTitle:    document.getElementById('previewTitle'),
   previewSubtitle: document.getElementById('previewSubtitle'),
   previewBody:     document.getElementById('previewBody'),
@@ -409,12 +413,25 @@ function fillForm(article) {
   renderList();
 }
 
+function updateArticleStats() {
+  const published = articles.filter(function (article) { return article.status === 'Published'; }).length;
+  const drafts = articles.filter(function (article) { return article.status === 'Draft'; }).length;
+  els.totalCount.textContent = String(articles.length);
+  els.publishedCount.textContent = String(published);
+  els.draftCount.textContent = String(drafts);
+}
+
 function renderList() {
   els.list.textContent = '';
+  updateArticleStats();
   if (!articles.length) {
     const empty = document.createElement('div');
     empty.className = 'sd-admin-empty';
-    empty.textContent = 'No articles in Firestore yet.';
+    const title = document.createElement('strong');
+    title.textContent = 'No articles yet.';
+    const hint = document.createElement('span');
+    hint.textContent = 'Start with a new draft or import the seed articles.';
+    empty.append(title, hint);
     els.list.appendChild(empty);
     return;
   }
@@ -425,13 +442,24 @@ function renderList() {
     btn.className = 'sd-admin-article';
     if (article.id === selectedId) btn.classList.add('sd-admin-article-active');
     btn.dataset.id = article.id;
+    const top = document.createElement('span');
+    top.className = 'sd-admin-article-top';
+    const status = document.createElement('span');
+    status.className = 'sd-admin-chip';
+    status.dataset.status = article.status || 'Draft';
+    status.textContent = article.status || 'Draft';
+    const category = document.createElement('span');
+    category.className = 'sd-admin-chip sd-admin-chip-muted';
+    category.textContent = article.category || 'uncategorized';
+    top.append(status, category);
     const title = document.createElement('strong');
     title.textContent = en.title || article.id;
     const subtitle = document.createElement('small');
     subtitle.textContent = en.subtitle || article.id;
     const meta = document.createElement('span');
-    meta.textContent = (article.status || 'Draft') + ' · ' + (article.category || '');
-    btn.append(title, subtitle, meta);
+    meta.className = 'sd-admin-article-meta';
+    meta.textContent = (article.readMinutes || 5) + ' min read · Order ' + (article.order || 100);
+    btn.append(top, title, subtitle, meta);
     btn.addEventListener('click', function () {
       const article = articles.find(function (item) { return item.id === btn.dataset.id; });
       fillForm(article);
@@ -442,6 +470,7 @@ function renderList() {
 
 function renderPreview() {
   const article = articleFromForm();
+  els.previewMeta.textContent = (article.status || 'Draft') + ' · ' + (article.category || 'integration') + ' · ' + article.readMinutes + ' min read';
   els.previewTitle.textContent = article.en.title || 'Untitled article';
   els.previewSubtitle.textContent = article.en.subtitle || '';
   els.previewBody.textContent = article.en.body

@@ -52,7 +52,10 @@ function defaultPolicy() {
   return {
     allowedDomains:  normaliseDomains(config.contactPolicy.allowedDomains),
     personalDomains: normaliseDomains(config.contactPolicy.personalDomains),
-    allowedEmails:   normaliseEmails(config.contactPolicy.allowedEmails),
+    allowedEmails:   Array.from(new Set(normaliseEmails([
+      ...config.admin.allowedEmails,
+      ...config.contactPolicy.allowedEmails,
+    ]))),
     blockedDomains:  normaliseDomains(config.contactPolicy.blockedDomains),
   };
 }
