@@ -130,7 +130,16 @@
               <h2>Write the story</h2>
               <p>Focus on the reader-facing title, promise, and article body first.</p>
             </div>
-            <span class="sd-admin-save-state">Versioned in Firestore</span>
+            <div class="sd-admin-editor-controls">
+              <label class="sd-admin-status-control">Visibility
+                <select id="articleStatus">
+                  <option>Draft</option>
+                  <option selected>Published</option>
+                  <option>Coming soon</option>
+                </select>
+              </label>
+              <span id="articleSaveState" class="sd-admin-save-state">Not saved yet</span>
+            </div>
           </div>
 
           <div class="sd-admin-primary-fields">
@@ -143,26 +152,22 @@
             <label>Tags
               <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
             </label>
-            <label>Article Body HTML
-              <textarea id="articleBody" rows="18" placeholder="<h3>Problem</h3><p>Write the article body here.</p>"></textarea>
+            <label>Article body
+              <textarea id="articleBody" rows="18" placeholder="<h3>Problem</h3><p>Write the article body here. HTML is supported.</p>"></textarea>
             </label>
           </div>
 
           <details class="sd-admin-advanced">
             <summary>
-              <span>Advanced publishing settings</span>
+              <span>
+                <strong>SEO & ordering</strong>
+                <small>Slug, category, icon, read time, and display order.</small>
+              </span>
               <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
             </summary>
             <div class="sd-admin-grid">
               <label>Slug
                 <input id="articleId" type="text" placeholder="salesforce-mulesoft-authentication">
-              </label>
-              <label>Status
-                <select id="articleStatus">
-                  <option>Draft</option>
-                  <option selected>Published</option>
-                  <option>Coming soon</option>
-                </select>
               </label>
               <label>Category
                 <select id="articleCategory">
@@ -192,7 +197,7 @@
               <div class="sd-admin-section-kicker">Step 3</div>
               <h2>Preview & publish</h2>
             </div>
-            <button type="button" id="previewBtn">Refresh</button>
+            <span id="previewStateBadge" class="sd-admin-preview-state">Draft</span>
           </div>
           <article class="sd-admin-preview">
             <div class="sd-admin-preview-chrome">
@@ -205,6 +210,11 @@
           </article>
           <div id="systemDesignStatus" class="sd-admin-section-status"></div>
           <div class="sd-admin-actions">
+            <button type="button" id="saveDraftBtn">
+              <span class="material-symbols-outlined" aria-hidden="true">save</span>
+              <span>Save draft</span>
+            </button>
+            <button type="button" id="previewBtn">Refresh preview</button>
             <button type="button" id="publishBtn" class="sd-admin-primary">
               <span class="material-symbols-outlined" aria-hidden="true">publish</span>
               <span>Publish article</span>
