@@ -12,7 +12,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
+const config = require('../config');
 const firestore = require('../services/firestore');
 const { ValidationError } = require('../errors');
 
@@ -66,6 +67,14 @@ router.get('/admin/system-design/articles', requireAdmin, async (_req, res, next
   } catch (err) {
     return next(err);
   }
+});
+
+router.get('/admin/me', requireAuth, async (req, res) => {
+  const email = String(req.user?.email || '').toLowerCase();
+  return res.status(200).json({
+    success: true,
+    isAdmin: config.admin.allowedEmails.includes(email),
+  });
 });
 
 router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, async (req, res, next) => {

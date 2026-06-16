@@ -210,6 +210,12 @@
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">schema</span>
             <span data-i18n="systemDesign">System Design</span>
           </md-outlined-button>
+          <md-outlined-button class="admin-btn" id="systemDesignAdminBtn" aria-label="Admin" hidden
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
+            onclick="location.href='/admin/system-design/'">
+            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">admin_panel_settings</span>
+            <span>Admin</span>
+          </md-outlined-button>
           <!-- Direct resume download — no form, no friction. Highest-frequency
                recruiter action; placing it inline in the hero converts more
                than hiding it behind a modal.
