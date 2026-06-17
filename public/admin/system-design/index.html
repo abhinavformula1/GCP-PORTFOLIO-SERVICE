@@ -66,6 +66,10 @@
             <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
             <span>Contact Policy</span>
           </button>
+          <button type="button" class="sd-admin-module" data-module="article-settings">
+            <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+            <span>Article Settings</span>
+          </button>
         </div>
       </div>
       <div class="sd-admin-badge">
@@ -136,16 +140,12 @@
               <p>Focus on the reader-facing title, promise, and article body first.</p>
             </div>
             <div class="sd-admin-editor-controls">
-              <label class="sd-admin-status-control">
-                <span class="sd-admin-status-label">Status</span>
-                <select id="articleStatus">
-                  <option selected>Draft</option>
-                  <option>Published</option>
-                  <option>Coming soon</option>
-                </select>
-              </label>
-              <span id="articleSaveState" class="sd-admin-save-state">Not saved yet</span>
+              <input id="articleStatus" type="hidden" value="Draft">
               <div class="sd-admin-editor-actions">
+                <button type="button" id="previewBtn" class="sd-admin-secondary">
+                  <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+                  <span>Preview</span>
+                </button>
                 <button type="button" id="publishBtn" class="sd-admin-primary">
                   <span class="material-symbols-outlined" aria-hidden="true">publish</span>
                   <span>Publish</span>
@@ -155,8 +155,8 @@
           </div>
 
           <div class="sd-admin-primary-fields">
-            <section class="sd-article-details-card">
-              <div class="sd-article-details-head">
+            <section class="sd-authoring-card sd-article-details-card">
+              <div class="sd-authoring-card-head sd-article-details-head">
                 <div>
                   <div class="sd-admin-section-kicker">Article details</div>
                   <h3 id="articleDetailsTitle">Untitled article</h3>
@@ -185,7 +185,7 @@
                 <label>Tags
                   <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
                 </label>
-                <div class="sd-section-edit-bar">
+                <div class="sd-article-details-toolbar">
                   <button type="button" id="doneArticleDetailsBtn">Done</button>
                 </div>
               </div>
@@ -202,64 +202,40 @@
                   <span>Add section</span>
                 </button>
               </div>
+              <div id="sectionPicker" class="sd-section-picker" hidden>
+                <div>
+                  <div class="sd-admin-section-kicker">Choose section</div>
+                  <h4>What do you want to add?</h4>
+                </div>
+                <div id="sectionPickerOptions" class="sd-section-picker-options"></div>
+                <label class="sd-section-custom-field">Custom section
+                  <input id="customSectionTitle" type="text" placeholder="Example: Cost model">
+                </label>
+                <div class="sd-section-picker-actions">
+                  <button type="button" id="cancelSectionPickerBtn">Cancel</button>
+                  <button type="button" id="createCustomSectionBtn">Create custom</button>
+                </div>
+              </div>
               <div id="articleSections" class="sd-section-list"></div>
               <textarea id="articleBody" hidden></textarea>
             </section>
           </div>
 
-          <details class="sd-admin-advanced">
-            <summary>
-              <span>
-                <strong>SEO & ordering</strong>
-                <small>Slug, category, icon, read time, and display order.</small>
-              </span>
-              <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
-            </summary>
-            <div class="sd-admin-grid">
-              <label>Slug
-                <input id="articleId" type="text" placeholder="salesforce-mulesoft-authentication">
-              </label>
-              <label>Category
-                <select id="articleCategory">
-                  <option value="integration">Integration</option>
-                  <option value="architecture">Architecture</option>
-                  <option value="scale">Scale</option>
-                  <option value="security">Security</option>
-                  <option value="delivery">Delivery</option>
-                </select>
-              </label>
-              <label>Icon
-                <input id="articleIcon" type="text" value="article">
-              </label>
-              <label>Read Minutes
-                <input id="articleReadMinutes" type="number" min="1" max="60" value="5">
-              </label>
-              <label>Order
-                <input id="articleOrder" type="number" min="1" max="9999" value="100">
-              </label>
-            </div>
-          </details>
-        </section>
-
-        <aside class="sd-admin-preview-panel">
-          <div class="sd-admin-preview-head">
-            <div>
-              <div class="sd-admin-section-kicker">Step 3</div>
-              <h2>Preview & publish</h2>
-            </div>
-            <span id="previewStateBadge" class="sd-admin-preview-state">Draft</span>
+          <div class="sd-admin-metadata-fields" hidden>
+            <input id="articleId" type="text" placeholder="salesforce-mulesoft-authentication">
+            <select id="articleCategory">
+              <option value="integration">Integration</option>
+              <option value="architecture">Architecture</option>
+              <option value="scale">Scale</option>
+              <option value="security">Security</option>
+              <option value="delivery">Delivery</option>
+            </select>
+            <input id="articleIcon" type="text" value="article">
+            <input id="articleReadMinutes" type="number" min="1" max="60" value="5">
+            <input id="articleOrder" type="number" min="1" max="9999" value="100">
           </div>
-          <article class="sd-admin-preview">
-            <div class="sd-admin-preview-chrome">
-              <span></span><span></span><span></span>
-            </div>
-            <div class="sd-article-eyebrow" id="previewMeta">Draft preview</div>
-            <h2 id="previewTitle">Untitled article</h2>
-            <p id="previewSubtitle"></p>
-            <div id="previewBody" class="sd-article-body"></div>
-          </article>
           <div id="systemDesignStatus" class="sd-admin-section-status"></div>
-        </aside>
+        </section>
       </section>
     </section>
 
@@ -281,8 +257,8 @@
         <div class="sd-admin-rail-label" aria-hidden="true">Policy</div>
       </div>
       <div class="sd-admin-policy-card">
-        <section class="sd-policy-rule-card" data-policy-card="personalDomains">
-          <div class="sd-policy-rule-head">
+        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="personalDomains">
+          <div class="sd-authoring-card-head sd-policy-rule-head">
             <div>
               <div class="sd-admin-section-kicker">Blocked</div>
               <h3>Personal domains</h3>
@@ -306,8 +282,8 @@
             <button type="button" class="sd-policy-done-btn">Done</button>
           </label>
         </section>
-        <section class="sd-policy-rule-card" data-policy-card="allowedEmails">
-          <div class="sd-policy-rule-head">
+        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="allowedEmails">
+          <div class="sd-authoring-card-head sd-policy-rule-head">
             <div>
               <div class="sd-admin-section-kicker">Allowed</div>
               <h3>Email exceptions</h3>
@@ -331,8 +307,8 @@
             <button type="button" class="sd-policy-done-btn">Done</button>
           </label>
         </section>
-        <section class="sd-policy-rule-card" data-policy-card="blockedDomains">
-          <div class="sd-policy-rule-head">
+        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="blockedDomains">
+          <div class="sd-authoring-card-head sd-policy-rule-head">
             <div>
               <div class="sd-admin-section-kicker">Blocked</div>
               <h3>Company domains</h3>
@@ -356,8 +332,8 @@
             <button type="button" class="sd-policy-done-btn">Done</button>
           </label>
         </section>
-        <section class="sd-policy-rule-card" data-policy-card="allowedDomains">
-          <div class="sd-policy-rule-head">
+        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="allowedDomains">
+          <div class="sd-authoring-card-head sd-policy-rule-head">
             <div>
               <div class="sd-admin-section-kicker">Tracked</div>
               <h3>Strategic company domains</h3>
@@ -391,6 +367,94 @@
         </div>
       </div>
     </section>
+
+    <section id="articleSettingsWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Library controls</div>
+          <h2>Article Settings</h2>
+          <p>Manage SEO, order, category, icon, and read time for every System Design article from one place.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <button type="button" id="autoFixArticleOrderBtn">Auto-fix order</button>
+          <button type="button" id="saveArticleSettingsBtn" class="sd-admin-primary">Save settings</button>
+        </div>
+      </div>
+      <div id="articleSettingsStatus" class="sd-admin-section-status"></div>
+      <div id="articleSettingsList" class="sd-article-settings-list"></div>
+    </section>
+
+    <md-dialog id="publishReviewDialog" class="sd-publish-dialog" aria-labelledby="publishReviewTitle">
+      <div slot="headline" class="sd-publish-dialog-head">
+        <div>
+          <h2 id="publishReviewTitle">Ready to publish?</h2>
+          <p id="publishReviewDescription">Review the public version before it goes live.</p>
+        </div>
+        <button type="button" id="closePublishReviewBtn" class="sd-publish-close-btn" aria-label="Close publish review">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
+      <div slot="content" class="sd-publish-dialog-content">
+        <article id="publishPreviewPanel" class="sd-admin-preview sd-publish-dialog-preview">
+          <div class="sd-admin-preview-chrome">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="sd-article-eyebrow" id="publishReviewMeta">Draft preview</div>
+          <h2 id="publishReviewArticleTitle">Untitled article</h2>
+          <p id="publishReviewSubtitle"></p>
+          <div id="publishReviewBody" class="sd-article-body"></div>
+        </article>
+        <section id="publishSeoPanel" class="sd-publish-seo-panel" hidden>
+          <div>
+            <span class="sd-publish-step-label">Final check</span>
+            <h3>SEO & ordering</h3>
+            <p>Confirm how this article appears in the public System Design library.</p>
+          </div>
+          <dl class="sd-publish-seo-list">
+            <div>
+              <dt><label for="publishSeoSlug">Slug</label></dt>
+              <dd><input id="publishSeoSlug" type="text" placeholder="salesforce-mulesoft-authentication"></dd>
+            </div>
+            <div>
+              <dt><label for="publishSeoCategory">Category</label></dt>
+              <dd>
+                <select id="publishSeoCategory">
+                  <option value="integration">Integration</option>
+                  <option value="architecture">Architecture</option>
+                  <option value="scale">Scale</option>
+                  <option value="security">Security</option>
+                  <option value="delivery">Delivery</option>
+                </select>
+              </dd>
+            </div>
+            <div>
+              <dt><label for="publishSeoIcon">Icon</label></dt>
+              <dd><input id="publishSeoIcon" type="text" placeholder="article"></dd>
+            </div>
+            <div>
+              <dt><label for="publishSeoReadMinutes">Read time</label></dt>
+              <dd><input id="publishSeoReadMinutes" type="number" min="1" max="60"></dd>
+            </div>
+            <div>
+              <dt><label for="publishSeoOrder">Order</label></dt>
+              <dd><input id="publishSeoOrder" type="number" min="1" max="9999"></dd>
+            </div>
+          </dl>
+          <div id="publishOrderWarning" class="sd-publish-order-warning" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">priority_high</span>
+            <p id="publishOrderWarningText"></p>
+            <button id="useNextOrderBtn" type="button">Use next available order</button>
+          </div>
+        </section>
+      </div>
+      <div slot="actions" class="sd-publish-dialog-actions">
+        <md-outlined-button id="continueEditingBtn" type="button">Continue editing</md-outlined-button>
+        <md-filled-button id="confirmPublishBtn" type="button">
+          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">publish</span>
+          <span id="publishActionLabel">Publish</span>
+        </md-filled-button>
+      </div>
+    </md-dialog>
 
     <div id="sharedFooter"></div>
   </main>

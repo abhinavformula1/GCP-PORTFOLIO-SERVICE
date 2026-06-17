@@ -461,6 +461,12 @@ async function upsertSystemDesignArticle(article, { publishedBy } = {}) {
   });
 }
 
+async function deleteSystemDesignArticle(id) {
+  const articleId = String(id || '').trim();
+  if (!articleId) return;
+  await getDb().collection(SYSTEM_DESIGN_COLLECTION).doc(articleId).delete();
+}
+
 /**
  * Moves the active chat into /users/{uid}/inquiries and clears it. Used after
  * a successful Recruiter_Inquiry__c create so we keep history but the next
@@ -716,6 +722,7 @@ module.exports = {
   listSystemDesignArticles,
   getSystemDesignArticle,
   upsertSystemDesignArticle,
+  deleteSystemDesignArticle,
   upsertRecommendation,
   listActiveRecommendations,
   writeRecommendationReply,

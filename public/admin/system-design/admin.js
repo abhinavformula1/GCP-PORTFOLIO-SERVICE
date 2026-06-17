@@ -1,4 +1,4 @@
-/* global DOMParser, URL, atob, clearTimeout, document, fetch, google, localStorage, sessionStorage, setTimeout */
+/* global DOMParser, URL, atob, clearTimeout, customElements, document, fetch, google, localStorage, sessionStorage, setTimeout */
 
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import {
@@ -40,6 +40,8 @@ const SECTION_TYPES = [
   { value: 'risks', label: 'Risks', title: 'Risks' },
   { value: 'conclusion', label: 'Conclusion', title: 'Conclusion' },
 ];
+const ARTICLE_CATEGORIES = ['integration', 'architecture', 'scale', 'security', 'delivery'];
+const CUSTOM_SECTION_TYPE = 'custom';
 
 renderTopbar('#sharedTopbar', {
   className: 'topbar sd-admin-topbar',
@@ -74,6 +76,11 @@ const els = {
   workspace:       document.getElementById('adminWorkspace'),
   modules:         document.getElementById('adminModules'),
   policyWorkspace: document.getElementById('contactPolicyWorkspace'),
+  articleSettingsWorkspace: document.getElementById('articleSettingsWorkspace'),
+  articleSettingsList: document.getElementById('articleSettingsList'),
+  articleSettingsStatus: document.getElementById('articleSettingsStatus'),
+  autoFixArticleOrderBtn: document.getElementById('autoFixArticleOrderBtn'),
+  saveArticleSettingsBtn: document.getElementById('saveArticleSettingsBtn'),
   togglePolicyInfoBtn: document.getElementById('toggleContactPolicyInfoBtn'),
   policyMeta:      document.getElementById('contactPolicyMeta'),
   allowedDomains:  document.getElementById('contactAllowedDomains'),
@@ -115,15 +122,35 @@ const els = {
   body:            document.getElementById('articleBody'),
   sections:        document.getElementById('articleSections'),
   addSectionBtn:   document.getElementById('addArticleSectionBtn'),
+  sectionPicker:   document.getElementById('sectionPicker'),
+  sectionPickerOptions: document.getElementById('sectionPickerOptions'),
+  customSectionTitle: document.getElementById('customSectionTitle'),
+  createCustomSectionBtn: document.getElementById('createCustomSectionBtn'),
+  cancelSectionPickerBtn: document.getElementById('cancelSectionPickerBtn'),
   systemStatus:    document.getElementById('systemDesignStatus'),
-  saveState:       document.getElementById('articleSaveState'),
   previewBtn:      document.getElementById('previewBtn'),
   publishBtn:      document.getElementById('publishBtn'),
-  previewState:    document.getElementById('previewStateBadge'),
-  previewMeta:     document.getElementById('previewMeta'),
-  previewTitle:    document.getElementById('previewTitle'),
-  previewSubtitle: document.getElementById('previewSubtitle'),
-  previewBody:     document.getElementById('previewBody'),
+  publishDialog:   document.getElementById('publishReviewDialog'),
+  publishReviewHeading: document.getElementById('publishReviewTitle'),
+  publishReviewDescription: document.getElementById('publishReviewDescription'),
+  publishReviewMeta: document.getElementById('publishReviewMeta'),
+  publishReviewTitle: document.getElementById('publishReviewArticleTitle'),
+  publishReviewSubtitle: document.getElementById('publishReviewSubtitle'),
+  publishReviewBody: document.getElementById('publishReviewBody'),
+  publishPreviewPanel: document.getElementById('publishPreviewPanel'),
+  publishSeoPanel: document.getElementById('publishSeoPanel'),
+  publishSeoSlug: document.getElementById('publishSeoSlug'),
+  publishSeoCategory: document.getElementById('publishSeoCategory'),
+  publishSeoIcon: document.getElementById('publishSeoIcon'),
+  publishSeoReadMinutes: document.getElementById('publishSeoReadMinutes'),
+  publishSeoOrder: document.getElementById('publishSeoOrder'),
+  publishOrderWarning: document.getElementById('publishOrderWarning'),
+  publishOrderWarningText: document.getElementById('publishOrderWarningText'),
+  useNextOrderBtn: document.getElementById('useNextOrderBtn'),
+  closePublishReviewBtn: document.getElementById('closePublishReviewBtn'),
+  continueEditingBtn: document.getElementById('continueEditingBtn'),
+  confirmPublishBtn: document.getElementById('confirmPublishBtn'),
+  publishActionLabel: document.getElementById('publishActionLabel'),
 };
 
 function setStatus(message, kind) {
@@ -147,6 +174,205 @@ function setSectionStatus(el, message, kind) {
   el.textContent = message || '';
   if (message) el.dataset.kind = kind || 'info';
   else delete el.dataset.kind;
+}
+
+function createMaterialIcon(name) {
+  const icon = document.createElement('span');
+  icon.className = 'material-symbols-outlined';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = name;
+  return icon;
+}
+
+function createAuthoringActionItem(action) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'reco-action-item' + (action.destructive ? ' reco-action-item-destructive' : '');
+  if (action.className) button.className += ' ' + action.className;
+  button.setAttribute('role', 'menuitem');
+  button.append(createMaterialIcon(action.icon), document.createTextNode(action.label));
+  button.addEventListener('click', function (event) {
+    event.stopPropagation();
+    if (action.onClick) action.onClick(event);
+  });
+  return button;
+}
+
+function createAuthoringActions(options) {
+  const actions = document.createElement('div');
+  actions.className = 'reco-actions' + (options.className ? ' ' + options.className : '');
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'reco-actions-trigger' + (options.triggerClassName ? ' ' + options.triggerClassName : '');
+  trigger.setAttribute('aria-label', options.label || 'Authoring actions');
+  trigger.setAttribute('aria-haspopup', 'menu');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.appendChild(createMaterialIcon('more_vert'));
+
+  const menu = document.createElement('div');
+  menu.className = 'reco-actions-menu' + (options.menuClassName ? ' ' + options.menuClassName : '');
+  menu.setAttribute('role', 'menu');
+  menu.hidden = true;
+  menu.addEventListener('click', function (event) { event.stopPropagation(); });
+  (options.items || []).forEach(function (action) {
+    menu.appendChild(createAuthoringActionItem(action));
+  });
+
+  trigger.addEventListener('click', function (event) {
+    event.stopPropagation();
+    const willOpen = menu.hidden;
+    if (options.onBeforeOpen) options.onBeforeOpen();
+    menu.hidden = !willOpen;
+    trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  });
+
+  actions.append(trigger, menu);
+  return { actions, trigger, menu };
+}
+
+function createAuthoringToolbar(options) {
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sd-authoring-toolbar' + (options.className ? ' ' + options.className : '');
+  toolbar.hidden = true;
+
+  (options.items || []).forEach(function (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sd-authoring-toolbar-btn' + (action.primary ? ' sd-authoring-toolbar-btn-primary' : '');
+    button.append(createMaterialIcon(action.icon), document.createTextNode(action.label));
+    button.addEventListener('click', function (event) {
+      event.stopPropagation();
+      if (!action.onClick) return;
+      const previous = button.disabled;
+      button.disabled = true;
+      Promise.resolve()
+        .then(function () { return action.onClick({ event, button }); })
+        .finally(function () { button.disabled = previous; });
+    });
+    toolbar.appendChild(button);
+  });
+
+  if (options.doneAction) {
+    const spacer = document.createElement('span');
+    spacer.className = 'sd-authoring-toolbar-spacer';
+    spacer.setAttribute('aria-hidden', 'true');
+    toolbar.appendChild(spacer);
+
+    const doneButton = document.createElement('button');
+    doneButton.type = 'button';
+    doneButton.className = 'sd-authoring-toolbar-btn sd-authoring-toolbar-done';
+    doneButton.textContent = 'Done';
+    doneButton.addEventListener('click', function (event) {
+      event.stopPropagation();
+      options.doneAction();
+    });
+    toolbar.appendChild(doneButton);
+  }
+
+  return toolbar;
+}
+
+function createAuthoringCard(options) {
+  const card = document.createElement(options.tagName || 'article');
+  card.className = 'sd-authoring-card' + (options.className ? ' ' + options.className : '');
+  Object.entries(options.dataset || {}).forEach(function ([key, value]) {
+    card.dataset[key] = value;
+  });
+
+  const head = document.createElement('div');
+  head.className = 'sd-authoring-card-head' + (options.headClassName ? ' ' + options.headClassName : '');
+  if (options.leading) head.appendChild(options.leading);
+
+  const title = document.createElement('div');
+  title.className = 'sd-authoring-card-title' + (options.titleClassName ? ' ' + options.titleClassName : '');
+  title.textContent = options.title || 'Untitled';
+  head.appendChild(title);
+
+  let editor = null;
+  let titleEditor = null;
+  let toolbar = null;
+  const readOnly = options.renderReadOnly ? options.renderReadOnly() : document.createElement('div');
+
+  function setEditing(editing) {
+    card.classList.toggle('sd-authoring-card-editing', editing);
+    title.hidden = editing && !!titleEditor;
+    if (titleEditor) titleEditor.hidden = !editing;
+    readOnly.hidden = editing;
+    if (editor) editor.hidden = !editing;
+    if (toolbar) toolbar.hidden = !editing;
+    if (editing && options.onEdit) options.onEdit({ card, editor, readOnly, title, titleEditor, toolbar });
+  }
+
+  const customActions = (options.actions || []).map(function (action) {
+    return Object.assign({}, action, {
+      onClick: function (event) {
+        if (options.onBeforeOpen) options.onBeforeOpen();
+        if (action.onClick) action.onClick({ card, editor, readOnly, setEditing, event });
+      },
+    });
+  });
+  const actions = createAuthoringActions({
+    label: options.actionsLabel,
+    className: options.actionsClassName,
+    triggerClassName: options.triggerClassName,
+    menuClassName: options.menuClassName,
+    onBeforeOpen: options.onBeforeOpen,
+    items: customActions.concat([
+      {
+        icon:    'edit',
+        label:   'Edit',
+        onClick: function () {
+          if (options.onBeforeOpen) options.onBeforeOpen();
+          setEditing(true);
+        },
+      },
+    ].concat(options.deleteAction ? [{
+      icon:        'delete',
+      label:       'Delete',
+      destructive: true,
+      onClick:     options.deleteAction,
+    }] : [])),
+  });
+  head.appendChild(actions.actions);
+
+  titleEditor = options.renderTitleEditor ? options.renderTitleEditor() : null;
+  if (titleEditor) {
+    titleEditor.hidden = true;
+    head.insertBefore(titleEditor, actions.actions);
+  }
+
+  editor = options.renderEditor ? options.renderEditor() : null;
+  if (editor) editor.hidden = true;
+  toolbar = createAuthoringToolbar({
+    className: options.toolbarClassName,
+    items: (options.toolbarActions || []).map(function (action) {
+      return Object.assign({}, action, {
+        onClick: function (toolbarApi) {
+          return action.onClick({
+            card,
+            editor,
+            readOnly,
+            title,
+            titleEditor,
+            toolbar,
+            setEditing,
+            event: toolbarApi.event,
+            button: toolbarApi.button,
+          });
+        },
+      });
+    }),
+    doneAction: function () {
+      if (options.onDone) options.onDone({ card, editor, readOnly, title, titleEditor });
+      setEditing(false);
+    },
+  });
+
+  card.append(head, readOnly);
+  if (editor) card.appendChild(editor);
+  if (options.toolbarActions?.length) card.appendChild(toolbar);
+  return { card, readOnly, editor, toolbar, setEditing };
 }
 
 function decodeJwtPayload(token) {
@@ -289,6 +515,7 @@ function resetAdminSession() {
   els.workspace.hidden = true;
   els.modules.hidden = true;
   els.policyWorkspace.hidden = true;
+  els.articleSettingsWorkspace.hidden = true;
   els.dropdown.hidden = true;
   updateAdminChrome(null);
 }
@@ -348,6 +575,39 @@ function slugify(value) {
   return slug;
 }
 
+function articleDisplayName(article) {
+  const en = article && article.en ? article.en : {};
+  return en.title || (article && article.id) || 'Untitled article';
+}
+
+function currentArticleIds() {
+  const ids = [];
+  if (selectedId) ids.push(selectedId);
+  const currentId = slugify(els.id.value || els.title.value);
+  if (currentId && !ids.includes(currentId)) ids.push(currentId);
+  return ids;
+}
+
+function findOrderConflict(order, excludedIds) {
+  const numericOrder = Number(order);
+  if (!numericOrder) return null;
+  const excluded = excludedIds || [];
+  return articles.find(function (article) {
+    return Number(article.order || 0) === numericOrder && !excluded.includes(article.id);
+  }) || null;
+}
+
+function nextAvailableOrder(excludedIds) {
+  const excluded = excludedIds || [];
+  const usedOrders = new Set(articles
+    .filter(function (article) { return !excluded.includes(article.id); })
+    .map(function (article) { return Number(article.order || 0); })
+    .filter(function (order) { return order > 0; }));
+  let order = 10;
+  while (usedOrders.has(order)) order += 10;
+  return order;
+}
+
 function authHeaders() {
   return {
     Authorization: 'Bearer ' + credential,
@@ -370,10 +630,54 @@ async function authedJson(url, options) {
   return data;
 }
 
+async function improveSectionWithAi(section, cardApi, mode) {
+  const { card, editor, readOnly, setEditing } = cardApi;
+  if (!editor) return;
+  syncSectionFromCard(card);
+  const sectionBody = String(section.body || editor.value || '').trim();
+  if (!sectionBody) {
+    setSectionStatus(els.systemStatus, 'Write a rough draft first, then AI can improve it.', 'error');
+    setEditing(true);
+    editor.focus();
+    return;
+  }
+
+  const typeMeta = SECTION_TYPES.find(function (type) { return type.value === section.type; }) || SECTION_TYPES[0];
+  const assistMode = mode || 'improve';
+  const modeLabel = assistMode === 'concise' ? 'making concise'
+    : assistMode === 'grammar' ? 'fixing grammar'
+      : 'improving';
+  setSectionStatus(els.systemStatus, 'AI is ' + modeLabel + ' the ' + typeMeta.label + ' section...', 'info');
+  const data = await authedJson('/api/admin/system-design/writing-assist', {
+    method: 'POST',
+    body:   JSON.stringify({
+      articleTitle:    els.title.value.trim(),
+      articleSubtitle: els.subtitle.value.trim(),
+      sectionType:     section.type,
+      sectionLabel:    typeMeta.label,
+      sectionBody,
+      mode:           assistMode,
+    }),
+  });
+  const suggestion = String(data.suggestion || '').trim();
+  if (!suggestion) throw new Error('AI returned an empty suggestion.');
+
+  section.body = suggestion;
+  editor.value = suggestion;
+  readOnly.textContent = suggestion;
+  setEditing(true);
+  renderPreview();
+  markDirty();
+  const source = data.source === 'local-preview' ? 'local preview' : 'Gemini';
+  const tokenText = data.usage?.totalTokens ? ' · ' + data.usage.totalTokens + ' tokens' : '';
+  setSectionStatus(els.systemStatus, 'AI suggestion applied from ' + source + tokenText + '. Review and press Done.', 'success');
+}
+
 function handleAdminLoadError(err) {
   els.workspace.hidden = true;
   els.modules.hidden = true;
   els.policyWorkspace.hidden = true;
+  els.articleSettingsWorkspace.hidden = true;
   if (err?.status === 401) {
     resetAdminSession();
   }
@@ -448,8 +752,11 @@ function renderContactPolicy(policy) {
 
 function setActiveModule(moduleName) {
   const isPolicy = moduleName === 'contact-policy';
-  els.workspace.hidden = isPolicy;
+  const isSettings = moduleName === 'article-settings';
+  els.workspace.hidden = isPolicy || isSettings;
   els.policyWorkspace.hidden = !isPolicy;
+  els.articleSettingsWorkspace.hidden = !isSettings;
+  if (isSettings) renderArticleSettings();
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
@@ -609,17 +916,29 @@ function sectionTemplate(type) {
   };
 }
 
-function nextSectionType() {
-  const used = new Set(articleSections.map(function (section) { return section.type; }));
-  const next = SECTION_TYPES.find(function (type) { return !used.has(type.value); });
-  return next ? next.value : 'solution';
+function customSectionTemplate(title) {
+  const cleanTitle = String(title || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  return {
+    id: 'section-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+    type: CUSTOM_SECTION_TYPE,
+    title: cleanTitle || 'Custom section',
+    body: '',
+  };
+}
+
+function sectionMeta(section) {
+  if (section.type === CUSTOM_SECTION_TYPE) {
+    const title = String(section.title || 'Custom section').trim() || 'Custom section';
+    return { value: CUSTOM_SECTION_TYPE, label: title, title };
+  }
+  return SECTION_TYPES.find(function (type) { return type.value === section.type; }) || SECTION_TYPES[0];
 }
 
 function sectionsToHtml(sections) {
   return sections
     .filter(function (section) { return section.body; })
     .map(function (section) {
-      const title = (SECTION_TYPES.find(function (item) { return item.value === section.type; }) || SECTION_TYPES[0]).title;
+      const title = sectionMeta(section).title;
       return '<h3>' + inlineMarkdown(title) + '</h3>' + markdownToHtml(section.body);
     })
     .join('');
@@ -630,19 +949,94 @@ function htmlToSections(html) {
   const sections = [];
   let current = null;
 
+  function cleanText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function sectionTypeForHeading(heading) {
+    const value = cleanText(heading).toLowerCase();
+    if (/problem|question|shape/.test(value)) return 'problem';
+    if (/alternative|trade|option|comparison/.test(value)) return 'tradeoffs';
+    if (/risk|failure|bearer|trust|boundary|threat|security/.test(value)) return 'risks';
+    if (/conclusion|summary|takeaway|decision/.test(value)) return sections.length ? 'conclusion' : 'overview';
+    if (/solution|goal|architecture|implementation|property|flow|design/.test(value)) return 'solution';
+    return sections.length ? CUSTOM_SECTION_TYPE : 'overview';
+  }
+
+  function labelledCardText(card) {
+    if (card.parentElement?.matches('.sd-sequence')) {
+      const step = cleanText(card.querySelector('b')?.textContent);
+      const detailText = cleanText(card.querySelector('span')?.textContent || card.textContent);
+      return (step ? step + '. ' : '- ') + detailText;
+    }
+    const title = cleanText(card.querySelector('strong')?.textContent || card.querySelector('span')?.textContent);
+    const status = cleanText(card.querySelector(':scope > span')?.textContent);
+    const detail = cleanText(Array.from(card.children)
+      .filter(function (child) {
+        return child.tagName !== 'STRONG'
+          && !(child.tagName === 'SPAN' && child === card.querySelector(':scope > span'));
+      })
+      .map(function (child) { return child.textContent; })
+      .join(' '));
+    if (card.parentElement?.matches('.sd-decision-grid')) {
+      const label = cleanText(card.querySelector('span')?.textContent);
+      const value = cleanText(card.querySelector('strong')?.textContent);
+      return label && value ? '- **' + label + ':** ' + value : cleanText(card.textContent);
+    }
+    if (status && detail && status !== title) return '- **' + title + ' (' + status + '):** ' + detail;
+    if (title && detail) return '- **' + title + ':** ' + detail;
+    if (title) return '- ' + title;
+    return cleanText(card.textContent);
+  }
+
   function bodyText(node) {
     if (node.matches && node.matches('ul,ol')) {
       return Array.from(node.querySelectorAll('li')).map(function (li) {
-        return '- ' + li.textContent.trim();
+        return '- ' + cleanText(li.textContent);
       }).join('\n');
     }
-    return node.textContent.trim();
+    if (node.matches && node.matches('.sd-card-grid,.sd-decision-grid,.sd-risk-grid,.sd-comparison,.sd-sequence')) {
+      return Array.from(node.children).map(labelledCardText).filter(Boolean).join('\n');
+    }
+    if (node.matches && node.matches('.sd-flow')) {
+      return Array.from(node.children).map(function (child) { return cleanText(child.textContent); }).filter(Boolean).join(' -> ');
+    }
+    if (node.matches && node.matches('table')) {
+      return Array.from(node.querySelectorAll('tr')).map(function (row) {
+        return '- **' + cleanText(row.querySelector('th')?.textContent) + ':** ' + cleanText(row.querySelector('td')?.textContent);
+      }).filter(function (line) { return !line.endsWith(':**'); }).join('\n');
+    }
+    if (node.matches && node.matches('section')) {
+      return Array.from(node.children)
+        .filter(function (child) { return !child.matches('h1,h2,h3,h4,h5,h6,.sd-kicker'); })
+        .map(bodyText)
+        .filter(Boolean)
+        .join('\n\n');
+    }
+    return cleanText(node.textContent);
   }
 
   Array.from(doc.body.children).forEach(function (node) {
+    if (node.matches && node.matches('section')) {
+      const heading = node.querySelector('h1,h2,h3,h4,h5,h6');
+      if (heading) {
+        current = sectionTemplate(sectionTypeForHeading(heading.textContent));
+        current.title = cleanText(heading.textContent) || current.title;
+        sections.push(current);
+      }
+      const text = bodyText(node);
+      if (text) {
+        if (!current) {
+          current = sectionTemplate('overview');
+          sections.push(current);
+        }
+        current.body += (current.body ? '\n\n' : '') + text;
+      }
+      return;
+    }
     if (node.matches('h1,h2,h3,h4,h5,h6')) {
-      current = sectionTemplate('overview');
-      current.title = node.textContent.trim() || 'Overview';
+      current = sectionTemplate(sectionTypeForHeading(node.textContent));
+      current.title = cleanText(node.textContent) || current.title;
       current.body = '';
       sections.push(current);
       return;
@@ -689,90 +1083,155 @@ function syncSectionFromCard(card) {
   section.body = bodyEl ? bodyEl.value.trim() : section.body;
 }
 
+function closeSectionPicker() {
+  els.sectionPicker.hidden = true;
+  els.addSectionBtn.setAttribute('aria-expanded', 'false');
+}
+
+function openSectionPicker() {
+  els.sectionPicker.hidden = false;
+  els.addSectionBtn.setAttribute('aria-expanded', 'true');
+  els.customSectionTitle.focus();
+}
+
+function addSection(section) {
+  articleSections.push(section);
+  closeSectionPicker();
+  renderSectionBuilder();
+  renderPreview();
+  markDirty();
+}
+
+function renderSectionPickerOptions() {
+  els.sectionPickerOptions.textContent = '';
+  SECTION_TYPES.forEach(function (type) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sd-section-picker-option';
+    const used = articleSections.some(function (section) { return section.type === type.value; });
+    if (used) button.dataset.used = 'true';
+    const title = document.createElement('strong');
+    title.textContent = type.label;
+    const hint = document.createElement('span');
+    hint.textContent = used ? 'Already used. Add another if this article needs it.' : 'Standard article section';
+    button.append(title, hint);
+    button.addEventListener('click', function () {
+      addSection(sectionTemplate(type.value));
+    });
+    els.sectionPickerOptions.appendChild(button);
+  });
+}
+
 function renderSectionBuilder() {
   els.sections.textContent = '';
   articleSections.forEach(function (section, index) {
-    const card = document.createElement('article');
-    card.className = 'sd-section-card';
-    card.dataset.sectionId = section.id;
-
-    const head = document.createElement('div');
-    head.className = 'sd-section-card-head';
     const number = document.createElement('span');
     number.className = 'sd-section-number';
     number.textContent = String(index + 1).padStart(2, '0');
-    const typeMeta = SECTION_TYPES.find(function (type) { return type.value === section.type; }) || SECTION_TYPES[0];
-    const typeLabel = document.createElement('div');
-    typeLabel.className = 'sd-section-type-label';
-    typeLabel.textContent = typeMeta.label;
-    const actions = document.createElement('div');
-    actions.className = 'reco-actions sd-section-actions';
-    const actionTrigger = document.createElement('button');
-    actionTrigger.type = 'button';
-    actionTrigger.className = 'reco-actions-trigger sd-section-actions-trigger';
-    actionTrigger.setAttribute('aria-label', 'Section actions');
-    actionTrigger.setAttribute('aria-haspopup', 'menu');
-    actionTrigger.setAttribute('aria-expanded', 'false');
-    const actionIcon = document.createElement('span');
-    actionIcon.className = 'material-symbols-outlined';
-    actionIcon.setAttribute('aria-hidden', 'true');
-    actionIcon.textContent = 'more_vert';
-    actionTrigger.appendChild(actionIcon);
-
-    const actionMenu = document.createElement('div');
-    actionMenu.className = 'reco-actions-menu sd-section-actions-menu';
-    actionMenu.setAttribute('role', 'menu');
-    actionMenu.hidden = true;
-
-    const editAction = document.createElement('button');
-    editAction.type = 'button';
-    editAction.className = 'reco-action-item sd-section-action-item';
-    editAction.setAttribute('role', 'menuitem');
-    const editIcon = document.createElement('span');
-    editIcon.className = 'material-symbols-outlined';
-    editIcon.setAttribute('aria-hidden', 'true');
-    editIcon.textContent = 'edit';
-    const editLabel = document.createElement('span');
-    editLabel.textContent = 'Edit';
-    editAction.append(editIcon, editLabel);
-
-    const deleteAction = document.createElement('button');
-    deleteAction.type = 'button';
-    deleteAction.className = 'reco-action-item reco-action-item-destructive sd-section-action-item';
-    deleteAction.setAttribute('role', 'menuitem');
-    const deleteIcon = document.createElement('span');
-    deleteIcon.className = 'material-symbols-outlined';
-    deleteIcon.setAttribute('aria-hidden', 'true');
-    deleteIcon.textContent = 'delete';
-    const deleteLabel = document.createElement('span');
-    deleteLabel.textContent = 'Delete';
-    deleteAction.append(deleteIcon, deleteLabel);
-
-    actionMenu.addEventListener('click', function (event) { event.stopPropagation(); });
-    actionMenu.append(editAction, deleteAction);
-    actions.append(actionTrigger, actionMenu);
-    head.append(number, typeLabel, actions);
-
-    const readOnlyBody = document.createElement('div');
-    readOnlyBody.className = 'sd-section-body-readonly';
-    readOnlyBody.textContent = section.body || 'No content yet. Use Edit to write this section.';
-
-    const body = document.createElement('textarea');
-    body.className = 'sd-section-body-input';
-    body.rows = 5;
-    body.placeholder = 'Write this section in plain language. Bullets, **bold**, and `code` are supported.';
-    body.value = section.body || '';
-    body.hidden = true;
-
-    const editBar = document.createElement('div');
-    editBar.className = 'sd-section-edit-bar';
-    editBar.hidden = true;
-    const doneEdit = document.createElement('button');
-    doneEdit.type = 'button';
-    doneEdit.textContent = 'Done';
-    editBar.appendChild(doneEdit);
-
-    card.append(head, readOnlyBody, body, editBar);
+    const typeMeta = sectionMeta(section);
+    const authoringCard = createAuthoringCard({
+      className: 'sd-section-card',
+      headClassName: 'sd-section-card-head',
+      dataset: { sectionId: section.id },
+      leading: number,
+      title: typeMeta.label,
+      titleClassName: 'sd-section-type-label',
+      actionsLabel: 'Section actions',
+      actionsClassName: 'sd-section-actions',
+      triggerClassName: 'sd-section-actions-trigger',
+      menuClassName: 'sd-section-actions-menu',
+      onBeforeOpen: function () {
+        closeSectionActionMenus();
+        closeArticleDetailsMenu();
+        closePolicyRuleMenus();
+      },
+      toolbarActions: [{
+        icon:    'auto_awesome',
+        label:   'AI Improve',
+        primary: true,
+        onClick: function (cardApi) {
+          return improveSectionWithAi(section, cardApi, 'improve').catch(function (err) {
+            setSectionStatus(els.systemStatus, err.message, 'error');
+          });
+        },
+      }, {
+        icon:  'short_text',
+        label: 'Concise',
+        onClick: function (cardApi) {
+          return improveSectionWithAi(section, cardApi, 'concise').catch(function (err) {
+            setSectionStatus(els.systemStatus, err.message, 'error');
+          });
+        },
+      }, {
+        icon:  'spellcheck',
+        label: 'Grammar',
+        onClick: function (cardApi) {
+          return improveSectionWithAi(section, cardApi, 'grammar').catch(function (err) {
+            setSectionStatus(els.systemStatus, err.message, 'error');
+          });
+        },
+      }],
+      renderReadOnly: function () {
+        const readOnlyBody = document.createElement('div');
+        readOnlyBody.className = 'sd-section-body-readonly';
+        readOnlyBody.textContent = section.body || 'No content yet. Use Edit to write this section.';
+        return readOnlyBody;
+      },
+      renderTitleEditor: function () {
+        const typeSelect = document.createElement('select');
+        typeSelect.className = 'sd-section-type-select';
+        typeSelect.setAttribute('aria-label', 'Section category');
+        SECTION_TYPES.forEach(function (type) {
+          const option = document.createElement('option');
+          option.value = type.value;
+          option.textContent = type.label;
+          typeSelect.appendChild(option);
+        });
+        const customOption = document.createElement('option');
+        customOption.value = CUSTOM_SECTION_TYPE;
+        customOption.textContent = section.type === CUSTOM_SECTION_TYPE ? typeMeta.label : 'Custom section';
+        typeSelect.appendChild(customOption);
+        typeSelect.value = section.type;
+        return typeSelect;
+      },
+      renderEditor: function () {
+        const body = document.createElement('textarea');
+        body.className = 'sd-section-body-input';
+        body.rows = 5;
+        body.placeholder = 'Write this section in plain language. Bullets, **bold**, and `code` are supported.';
+        body.value = section.body || '';
+        return body;
+      },
+      onEdit: function ({ editor }) {
+        if (editor) editor.focus();
+      },
+      onDone: function ({ editor, readOnly, title, titleEditor }) {
+        if (titleEditor) {
+          section.type = titleEditor.value;
+          if (section.type !== CUSTOM_SECTION_TYPE) {
+            const updatedMeta = SECTION_TYPES.find(function (type) { return type.value === section.type; }) || SECTION_TYPES[0];
+            section.title = updatedMeta.title;
+            title.textContent = updatedMeta.label;
+          } else {
+            section.title = section.title || 'Custom section';
+            title.textContent = section.title;
+          }
+        }
+        section.body = editor ? editor.value.trim() : section.body;
+        readOnly.textContent = section.body || 'No content yet. Use Edit to write this section.';
+        renderPreview();
+        markDirty();
+      },
+      deleteAction: function () {
+        closeSectionActionMenus();
+        articleSections = articleSections.filter(function (item) { return item.id !== section.id; });
+        if (!articleSections.length) articleSections.push(sectionTemplate('overview'));
+        renderSectionBuilder();
+        renderPreview();
+        markDirty();
+      },
+    });
+    const card = authoringCard.card;
     card.addEventListener('input', function () {
       syncSectionFromCard(card);
       renderPreview();
@@ -780,38 +1239,6 @@ function renderSectionBuilder() {
     });
     card.addEventListener('change', function () {
       syncSectionFromCard(card);
-      renderPreview();
-      markDirty();
-    });
-    actionTrigger.addEventListener('click', function (event) {
-      event.stopPropagation();
-      const willOpen = actionMenu.hidden;
-      closeSectionActionMenus();
-      closeArticleDetailsMenu();
-      actionMenu.hidden = !willOpen;
-      actionTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-    });
-    editAction.addEventListener('click', function () {
-      closeSectionActionMenus();
-      readOnlyBody.hidden = true;
-      body.hidden = false;
-      editBar.hidden = false;
-      body.focus();
-    });
-    doneEdit.addEventListener('click', function () {
-      syncSectionFromCard(card);
-      readOnlyBody.textContent = section.body || 'No content yet. Use Edit to write this section.';
-      readOnlyBody.hidden = false;
-      body.hidden = true;
-      editBar.hidden = true;
-      renderPreview();
-      markDirty();
-    });
-    deleteAction.addEventListener('click', function () {
-      closeSectionActionMenus();
-      articleSections = articleSections.filter(function (item) { return item.id !== section.id; });
-      if (!articleSections.length) articleSections.push(sectionTemplate('overview'));
-      renderSectionBuilder();
       renderPreview();
       markDirty();
     });
@@ -848,14 +1275,8 @@ function closeArticleDetailsMenu() {
   els.detailsActionsBtn.setAttribute('aria-expanded', 'false');
 }
 
-function updateWorkflowChrome(status, saveLabel, saveKind) {
-  const effectiveStatus = status || els.statusField.value || 'Draft';
-  els.previewState.textContent = effectiveStatus;
-  els.previewState.dataset.status = effectiveStatus;
-  if (saveLabel !== undefined) {
-    els.saveState.textContent = saveLabel || 'Unsaved changes';
-    els.saveState.dataset.status = saveKind || (saveLabel ? 'saved' : 'dirty');
-  }
+function updateWorkflowChrome(status) {
+  els.statusField.value = status || els.statusField.value || 'Draft';
 }
 
 function markDirty() {
@@ -870,9 +1291,8 @@ function clearDraftAutosave() {
   }
 }
 
-function canAutosaveDraft(article) {
-  return article.status === 'Draft'
-    && article.id
+function canAutosaveArticle(article) {
+  return article.id
     && article.en.title.length >= 3
     && !!article.en.body;
 }
@@ -880,12 +1300,11 @@ function canAutosaveDraft(article) {
 function scheduleDraftAutosave() {
   clearDraftAutosave();
   const article = articleFromForm();
-  if (!canAutosaveDraft(article)) return;
+  if (!canAutosaveArticle(article)) return;
   autosaveTimer = setTimeout(function () {
     autosaveTimer = 0;
-    updateWorkflowChrome('Draft', 'Autosaving...', 'saving');
-    saveArticleWithStatus('Draft', { silent: true }).catch(function () {
-      updateWorkflowChrome('Draft', 'Autosave failed', 'error');
+    saveArticleWithStatus(article.status || 'Draft', { silent: true }).catch(function () {
+      setSectionStatus(els.systemStatus, 'Autosave failed.', 'error');
     });
   }, 1200);
 }
@@ -897,7 +1316,7 @@ function fillForm(article) {
     category: 'integration',
     icon: 'article',
     readMinutes: 5,
-    order: 100,
+    order: nextAvailableOrder(),
     tags: [],
     en: { title: '', subtitle: '', body: '' },
   };
@@ -977,15 +1396,299 @@ function renderList() {
   });
 }
 
+function createArticleSettingsField(labelText, field, value, type) {
+  const label = document.createElement('label');
+  label.className = 'sd-article-settings-field';
+  const labelSpan = document.createElement('span');
+  labelSpan.textContent = labelText;
+  let input;
+  if (field === 'category') {
+    input = document.createElement('select');
+    ARTICLE_CATEGORIES.forEach(function (category) {
+      const option = document.createElement('option');
+      option.value = category;
+      option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+      input.appendChild(option);
+    });
+    input.value = value || 'integration';
+  } else {
+    input = document.createElement('input');
+    input.type = type || 'text';
+    input.value = value || '';
+    if (field === 'readMinutes') {
+      input.min = '1';
+      input.max = '60';
+    }
+    if (field === 'order') {
+      input.min = '1';
+      input.max = '9999';
+    }
+  }
+  input.dataset.field = field;
+  label.append(labelSpan, input);
+  return label;
+}
+
+function renderArticleSettingsWarnings() {
+  const cards = Array.from(els.articleSettingsList.querySelectorAll('.sd-article-settings-card'));
+  const orderMap = new Map();
+  const slugMap = new Map();
+  cards.forEach(function (card) {
+    const orderInput = card.querySelector('[data-field="order"]');
+    const slugInput = card.querySelector('[data-field="id"]');
+    const order = Number(orderInput?.value || 0);
+    const slug = slugify(slugInput?.value || '');
+    if (!orderMap.has(order)) orderMap.set(order, []);
+    if (order) orderMap.get(order).push(card);
+    if (!slugMap.has(slug)) slugMap.set(slug, []);
+    if (slug) slugMap.get(slug).push(card);
+  });
+
+  let conflictCount = 0;
+  cards.forEach(function (card) {
+    const warning = card.querySelector('.sd-article-settings-warning');
+    const order = Number(card.querySelector('[data-field="order"]')?.value || 0);
+    const slug = slugify(card.querySelector('[data-field="id"]')?.value || '');
+    const orderConflicts = orderMap.get(order) || [];
+    const slugConflicts = slugMap.get(slug) || [];
+    const messages = [];
+    if (orderConflicts.length > 1) {
+      const names = orderConflicts
+        .filter(function (item) { return item !== card; })
+        .map(function (item) { return item.dataset.title || item.dataset.id; })
+        .join(', ');
+      messages.push('Order ' + order + ' also used by ' + names + '.');
+    }
+    if (slugConflicts.length > 1) {
+      messages.push('Slug "' + slug + '" is used by another article.');
+    }
+    if (messages.length) {
+      warning.textContent = messages.join(' ');
+      warning.hidden = false;
+      conflictCount += 1;
+    } else {
+      warning.textContent = '';
+      warning.hidden = true;
+    }
+  });
+
+  if (conflictCount) {
+    setSectionStatus(els.articleSettingsStatus, conflictCount + ' setting conflict' + (conflictCount === 1 ? '' : 's') + ' found. Use Auto-fix order or edit manually.', 'error');
+  } else {
+    setSectionStatus(els.articleSettingsStatus, '', 'info');
+  }
+  return conflictCount;
+}
+
+function renderArticleSettings() {
+  els.articleSettingsList.textContent = '';
+  if (!articles.length) {
+    const empty = document.createElement('div');
+    empty.className = 'sd-admin-empty';
+    const title = document.createElement('strong');
+    title.textContent = 'No articles to configure yet.';
+    const hint = document.createElement('span');
+    hint.textContent = 'Create or import articles first, then manage their settings here.';
+    empty.append(title, hint);
+    els.articleSettingsList.appendChild(empty);
+    return;
+  }
+
+  articles.forEach(function (article) {
+    const card = document.createElement('article');
+    const en = article.en || {};
+    card.className = 'sd-article-settings-card';
+    card.dataset.id = article.id;
+    card.dataset.title = articleDisplayName(article);
+
+    const head = document.createElement('div');
+    head.className = 'sd-article-settings-card-head';
+    const copy = document.createElement('div');
+    const status = document.createElement('span');
+    status.className = 'sd-admin-chip';
+    status.dataset.status = article.status || 'Draft';
+    status.textContent = article.status || 'Draft';
+    const title = document.createElement('h3');
+    title.textContent = articleDisplayName(article);
+    const subtitle = document.createElement('p');
+    subtitle.textContent = en.subtitle || article.id;
+    copy.append(status, title, subtitle);
+    head.appendChild(copy);
+
+    const grid = document.createElement('div');
+    grid.className = 'sd-article-settings-grid';
+    grid.append(
+      createArticleSettingsField('Slug', 'id', article.id),
+      createArticleSettingsField('Category', 'category', article.category || 'integration'),
+      createArticleSettingsField('Icon', 'icon', article.icon || 'article'),
+      createArticleSettingsField('Read time', 'readMinutes', String(article.readMinutes || 5), 'number'),
+      createArticleSettingsField('Order', 'order', String(article.order || 100), 'number')
+    );
+
+    const warning = document.createElement('div');
+    warning.className = 'sd-article-settings-warning';
+    warning.hidden = true;
+    card.append(head, grid, warning);
+    card.querySelectorAll('input, select').forEach(function (input) {
+      input.addEventListener('input', renderArticleSettingsWarnings);
+      input.addEventListener('change', renderArticleSettingsWarnings);
+    });
+    els.articleSettingsList.appendChild(card);
+  });
+  renderArticleSettingsWarnings();
+}
+
+function autoFixArticleSettingsOrder() {
+  const cards = Array.from(els.articleSettingsList.querySelectorAll('.sd-article-settings-card'));
+  cards
+    .sort(function (a, b) {
+      const aOrder = Number(a.querySelector('[data-field="order"]')?.value || 9999);
+      const bOrder = Number(b.querySelector('[data-field="order"]')?.value || 9999);
+      return aOrder - bOrder || String(a.dataset.title || '').localeCompare(String(b.dataset.title || ''));
+    })
+    .forEach(function (card, index) {
+      const orderInput = card.querySelector('[data-field="order"]');
+      orderInput.value = String((index + 1) * 10);
+    });
+  renderArticleSettingsWarnings();
+  setSectionStatus(els.articleSettingsStatus, 'Order reset to clean 10, 20, 30 sequence. Save settings to publish the change.', 'success');
+}
+
+function articleSettingsPayloadFromCard(card) {
+  const original = articles.find(function (article) { return article.id === card.dataset.id; });
+  if (!original) return null;
+  const input = function (field) {
+    return card.querySelector('[data-field="' + field + '"]');
+  };
+  return {
+    previousId: original.id,
+    article: Object.assign({}, original, {
+      id: slugify(input('id').value || original.id),
+      category: input('category').value || 'integration',
+      icon: input('icon').value.trim() || 'article',
+      readMinutes: Number(input('readMinutes').value || 5),
+      order: Number(input('order').value || 100),
+    }),
+  };
+}
+
+async function saveArticleSettings() {
+  if (renderArticleSettingsWarnings()) return;
+  const cards = Array.from(els.articleSettingsList.querySelectorAll('.sd-article-settings-card'));
+  if (!cards.length) return;
+  setSectionStatus(els.articleSettingsStatus, 'Saving article settings...', 'info');
+  const savedRecords = [];
+  for (const card of cards) {
+    const payload = articleSettingsPayloadFromCard(card);
+    if (!payload || !payload.article.id) continue;
+    const data = await authedJson('/api/admin/system-design/articles/' + payload.previousId, {
+      method: 'PUT',
+      body:   JSON.stringify(payload.article),
+    });
+    savedRecords.push({ previousId: payload.previousId, article: data.article });
+  }
+  savedRecords.forEach(function (record) {
+    articles = articles.filter(function (article) {
+      return article.id !== record.previousId && article.id !== record.article.id;
+    }).concat(record.article);
+  });
+  articles = articles.sort(function (a, b) { return Number(a.order || 999) - Number(b.order || 999); });
+  const selectedRecord = savedRecords.find(function (record) { return record.previousId === selectedId; });
+  if (selectedRecord) selectedId = selectedRecord.article.id;
+  const current = articles.find(function (article) { return article.id === selectedId; });
+  if (current) fillForm(current);
+  renderList();
+  renderArticleSettings();
+  setSectionStatus(els.articleSettingsStatus, 'Article settings saved.', 'success');
+}
+
+function renderStructuredPreview(target) {
+  target.textContent = '';
+  const visibleSections = articleSections.filter(function (section) { return String(section.body || '').trim(); });
+  if (!visibleSections.length) {
+    const empty = document.createElement('p');
+    empty.className = 'sd-preview-empty';
+    empty.textContent = 'Nothing to preview yet. Add content to a section and it will appear here.';
+    target.appendChild(empty);
+    return;
+  }
+
+  visibleSections.forEach(function (section) {
+    const previewSection = document.createElement('section');
+    previewSection.className = 'sd-preview-section';
+    const heading = document.createElement('h3');
+    heading.textContent = sectionMeta(section).title;
+    const body = document.createElement('div');
+    body.className = 'sd-preview-section-body';
+    body.innerHTML = markdownToHtml(section.body);
+    previewSection.append(heading, body);
+    target.appendChild(previewSection);
+  });
+}
+
 function renderPreview() {
   const article = articleFromForm();
   updateWorkflowChrome(article.status);
-  els.previewMeta.textContent = (article.status || 'Draft') + ' · ' + (article.category || 'integration') + ' · ' + article.readMinutes + ' min read';
-  els.previewTitle.textContent = article.en.title || 'Untitled article';
-  els.previewSubtitle.textContent = article.en.subtitle || '';
-  els.previewBody.textContent = article.en.body
-    ? articleSections.length + ' structured section' + (articleSections.length === 1 ? '' : 's') + ' will render as the public article.'
-    : 'Nothing to preview yet.';
+}
+
+function renderPublishReview() {
+  const article = articleFromForm();
+  els.publishReviewMeta.textContent = (article.status || 'Draft') + ' · ' + (article.category || 'integration') + ' · ' + article.readMinutes + ' min read';
+  els.publishReviewTitle.textContent = article.en.title || 'Untitled article';
+  els.publishReviewSubtitle.textContent = article.en.subtitle || '';
+  els.publishSeoSlug.value = article.id || '';
+  els.publishSeoCategory.value = article.category || 'integration';
+  els.publishSeoIcon.value = article.icon || 'article';
+  els.publishSeoReadMinutes.value = String(article.readMinutes || 5);
+  els.publishSeoOrder.value = String(article.order || 100);
+  renderPublishOrderWarning();
+  renderStructuredPreview(els.publishReviewBody);
+}
+
+function publishSeoExcludedIds() {
+  const ids = currentArticleIds();
+  const modalId = slugify(els.publishSeoSlug.value || els.title.value);
+  if (modalId && !ids.includes(modalId)) ids.push(modalId);
+  return ids;
+}
+
+function renderPublishOrderWarning() {
+  const order = Number(els.publishSeoOrder.value || 0);
+  const conflict = findOrderConflict(order, publishSeoExcludedIds());
+  if (!conflict) {
+    els.publishOrderWarning.hidden = true;
+    els.publishOrderWarningText.textContent = '';
+    return null;
+  }
+  const nextOrder = nextAvailableOrder(publishSeoExcludedIds());
+  els.publishOrderWarning.hidden = false;
+  els.publishOrderWarningText.textContent = 'Order ' + order + ' is already used by "' + articleDisplayName(conflict) + '". Use order ' + nextOrder + ' to keep the library sequence clean.';
+  return conflict;
+}
+
+function syncPublishSeoToForm() {
+  els.id.value = slugify(els.publishSeoSlug.value || els.title.value);
+  els.publishSeoSlug.value = els.id.value;
+  els.category.value = els.publishSeoCategory.value || 'integration';
+  els.icon.value = els.publishSeoIcon.value.trim() || 'article';
+  els.readMinutes.value = els.publishSeoReadMinutes.value || '5';
+  els.order.value = els.publishSeoOrder.value || '100';
+  renderArticleDetails();
+  renderPreview();
+  markDirty();
+}
+
+function setPublishReviewStep(step) {
+  const isSeoStep = step === 'seo';
+  els.publishDialog.dataset.publishStep = isSeoStep ? 'seo' : 'preview';
+  els.publishPreviewPanel.hidden = isSeoStep;
+  els.publishSeoPanel.hidden = !isSeoStep;
+  els.publishReviewHeading.textContent = isSeoStep ? 'Final check' : 'Ready to publish?';
+  els.publishReviewDescription.textContent = isSeoStep
+    ? 'Confirm SEO and ordering before this article goes live.'
+    : 'Review the public version before it goes live.';
+  els.continueEditingBtn.textContent = isSeoStep ? 'Back to preview' : 'Continue editing';
+  els.publishActionLabel.textContent = isSeoStep ? 'Publish now' : 'Publish';
 }
 
 async function loadArticles() {
@@ -1014,7 +1717,8 @@ async function saveArticleWithStatus(status, opts) {
   }
   const action = status === 'Published' ? 'Publishing...' : 'Saving ' + status.toLowerCase() + '...';
   if (!options.silent) setSectionStatus(els.systemStatus, action, 'info');
-  const data = await authedJson('/api/admin/system-design/articles/' + article.id, {
+  const routeId = selectedId || article.id;
+  const data = await authedJson('/api/admin/system-design/articles/' + routeId, {
     method: 'PUT',
     body:   JSON.stringify(article),
   });
@@ -1026,6 +1730,7 @@ async function saveArticleWithStatus(status, opts) {
     renderList();
   } else {
     fillForm(saved);
+    els.detailsForm.hidden = true;
   }
   const done = status === 'Published'
     ? 'Published version ' + data.version + '.'
@@ -1039,6 +1744,33 @@ function publishArticle() {
   els.statusField.value = 'Published';
   renderPreview();
   return saveArticleWithStatus('Published');
+}
+
+function openPublishReview() {
+  renderPreview();
+  renderPublishReview();
+  setPublishReviewStep('preview');
+  if (typeof els.publishDialog.show === 'function') {
+    els.publishDialog.show();
+    return;
+  }
+  customElements.whenDefined('md-dialog').then(function () {
+    els.publishDialog.show();
+  });
+}
+
+function closePublishReview() {
+  els.publishDialog.close();
+}
+
+function handlePublishDialogBack() {
+  if (els.publishDialog.dataset.publishStep === 'seo') {
+    syncPublishSeoToForm();
+    renderPublishReview();
+    setPublishReviewStep('preview');
+    return;
+  }
+  closePublishReview();
 }
 
 async function seedArticles() {
@@ -1111,6 +1843,10 @@ els.savePolicyBtn.addEventListener('click', function () {
   saveContactPolicy().catch(function (err) { setSectionStatus(els.policyTest, err.message, 'error'); });
 });
 els.testPolicyBtn.addEventListener('click', testContactPolicy);
+els.autoFixArticleOrderBtn.addEventListener('click', autoFixArticleSettingsOrder);
+els.saveArticleSettingsBtn.addEventListener('click', function () {
+  saveArticleSettings().catch(function (err) { setSectionStatus(els.articleSettingsStatus, err.message, 'error'); });
+});
 document.addEventListener('click', function () {
   closeSectionActionMenus();
   closeArticleDetailsMenu();
@@ -1177,11 +1913,30 @@ els.toggleLibraryBtn.addEventListener('click', function () {
 els.togglePolicyInfoBtn.addEventListener('click', function () {
   setContactPolicyInfoCollapsed(!els.policyWorkspace.classList.contains('sd-admin-policy-info-collapsed'));
 });
+els.addSectionBtn.setAttribute('aria-haspopup', 'dialog');
+els.addSectionBtn.setAttribute('aria-expanded', 'false');
 els.addSectionBtn.addEventListener('click', function () {
-  articleSections.push(sectionTemplate(nextSectionType()));
-  renderSectionBuilder();
-  renderPreview();
-  markDirty();
+  renderSectionPickerOptions();
+  if (els.sectionPicker.hidden) openSectionPicker();
+  else closeSectionPicker();
+});
+els.cancelSectionPickerBtn.addEventListener('click', closeSectionPicker);
+els.createCustomSectionBtn.addEventListener('click', function () {
+  const title = els.customSectionTitle.value.trim();
+  if (!title) {
+    els.customSectionTitle.focus();
+    return;
+  }
+  addSection(customSectionTemplate(title));
+  els.customSectionTitle.value = '';
+});
+els.customSectionTitle.addEventListener('keydown', function (event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    els.createCustomSectionBtn.click();
+  } else if (event.key === 'Escape') {
+    closeSectionPicker();
+  }
 });
 
 els.title.addEventListener('input', function () {
@@ -1205,9 +1960,43 @@ els.title.addEventListener('input', function () {
     markDirty();
   });
 });
-if (els.previewBtn) els.previewBtn.addEventListener('click', renderPreview);
+if (els.previewBtn) els.previewBtn.addEventListener('click', function () {
+  openPublishReview();
+});
 els.publishBtn.addEventListener('click', function () {
-  publishArticle().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
+  openPublishReview();
+});
+els.closePublishReviewBtn.addEventListener('click', closePublishReview);
+els.continueEditingBtn.addEventListener('click', handlePublishDialogBack);
+[
+  els.publishSeoSlug,
+  els.publishSeoCategory,
+  els.publishSeoIcon,
+  els.publishSeoReadMinutes,
+  els.publishSeoOrder,
+].forEach(function (el) {
+  el.addEventListener('input', renderPublishOrderWarning);
+  el.addEventListener('change', renderPublishOrderWarning);
+});
+els.useNextOrderBtn.addEventListener('click', function () {
+  els.publishSeoOrder.value = String(nextAvailableOrder(publishSeoExcludedIds()));
+  renderPublishOrderWarning();
+  els.publishSeoOrder.focus();
+});
+els.confirmPublishBtn.addEventListener('click', function () {
+  if (els.publishDialog.dataset.publishStep !== 'seo') {
+    renderPublishReview();
+    setPublishReviewStep('seo');
+    return;
+  }
+  if (renderPublishOrderWarning()) {
+    els.publishSeoOrder.focus();
+    return;
+  }
+  syncPublishSeoToForm();
+  publishArticle()
+    .then(closePublishReview)
+    .catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
 });
 els.seedBtn.addEventListener('click', function () {
   seedArticles().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
