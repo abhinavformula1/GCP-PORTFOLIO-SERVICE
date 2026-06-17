@@ -16,6 +16,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const config = require('../config');
 const firestore = require('../services/firestore');
 const contactPolicy = require('../services/contactPolicy');
+const { generateChatResponse } = require('../services/gemini');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -70,6 +71,88 @@ const validateArticle = [
   body('fr.subtitle').optional().trim().isLength({ max: 240 }),
   body('fr.body').optional().trim().isLength({ max: BODY_MAX_LEN }),
 ];
+
+const validateWritingAssist = [
+  body('articleTitle').optional().trim().isLength({ max: 140 }),
+  body('articleSubtitle').optional().trim().isLength({ max: 240 }),
+  body('sectionType').trim().isLength({ min: 2, max: 60 }).withMessage('Section type is required.'),
+  body('sectionLabel').optional().trim().isLength({ max: 80 }),
+  body('sectionBody').trim().isLength({ min: 1, max: 8000 }).withMessage('Section body is required.'),
+  body('mode').optional().trim().isIn(['improve', 'concise', 'grammar']).withMessage('Writing mode is invalid.'),
+];
+
+function localWritingAssist({ sectionBody, mode }) {
+  const bodyText = String(sectionBody || '').trim().replace(/\s+/g, ' ');
+  if (mode === 'concise') {
+    return bodyText.split('. ').slice(0, 2).join('. ') + (bodyText.includes('.') ? '.' : '');
+  }
+  if (mode === 'grammar') {
+    return bodyText
+      .replace(/\bwa[mn]\b/gi, 'was')
+      .replace(/\bfro\b/gi, 'for')
+      .replace(/\s+/g, ' ');
+  }
+  return [
+    bodyText,
+    '',
+    'This section now reads as a clearer system-design narrative while preserving the original technical decision and risk focus.',
+  ].join('\n');
+}
+
+function stripSectionHeading(text, sectionLabel) {
+  const label = String(sectionLabel || '').trim();
+  let value = String(text || '').trim();
+  if (!label) return value;
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const headingPattern = new RegExp('^(?:#{1,6}\\s*)?(?:\\*\\*)?' + escaped + '(?:\\*\\*)?\\s*\\n+', 'i');
+  value = value.replace(headingPattern, '').trim();
+  return value;
+}
+
+async function generateWritingAssist(payload) {
+  if (config.admin.localPreview) {
+    return {
+      suggestion: stripSectionHeading(localWritingAssist(payload), payload.sectionLabel),
+      usage: null,
+      source: 'local-preview',
+    };
+  }
+
+  const mode = payload.mode || 'improve';
+  const modeInstruction = mode === 'concise'
+    ? 'Make the section shorter and sharper. Remove repetition. Keep only the strongest points.'
+    : mode === 'grammar'
+      ? 'Fix grammar, spelling, punctuation, and flow. Do not change the technical meaning or add new content.'
+      : 'Improve clarity, structure, and executive readability while keeping it technically accurate.';
+
+  const systemPrompt = [
+    'You are an expert system-design editor for an enterprise engineering portfolio.',
+    'Rewrite only the provided article section.',
+    'Do not include the section heading or article title in the response.',
+    'Preserve the author intent and technical facts. Do not invent systems, metrics, vendors, claims, or diagrams.',
+    'Return plain Markdown only. No HTML. No preamble. No code fences unless the user provided code.',
+    'Prefer crisp sentences, clear bullets where useful, and language suitable for Google, Salesforce, Meta, or Palantir reviewers.',
+  ].join(' ');
+
+  const userMessage = [
+    'Article title: ' + (payload.articleTitle || 'Untitled article'),
+    'Article subtitle: ' + (payload.articleSubtitle || 'No subtitle'),
+    'Section: ' + (payload.sectionLabel || payload.sectionType),
+    '',
+    'Current section draft:',
+    payload.sectionBody,
+    '',
+    modeInstruction,
+  ].join('\n');
+
+  const result = await generateChatResponse({
+    model: 'flash-lite',
+    systemPrompt,
+    userMessage,
+    generationConfig: { temperature: 0.35, topP: 0.85, maxOutputTokens: 900 },
+  });
+  return { suggestion: stripSectionHeading(result.text, payload.sectionLabel), usage: result.usage, source: 'gemini' };
+}
 
 function validateDomains(domains) {
   if (!Array.isArray(domains)) throw new ValidationError('Domains must be an array.');
@@ -200,6 +283,36 @@ router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
   }
 });
 
+router.post('/admin/system-design/writing-assist', requireAdmin, validateWritingAssist, async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError(
+        errors.array()[0].msg,
+        errors.array().map((e) => ({ field: e.path, message: e.msg }))
+      );
+    }
+
+    const result = await generateWritingAssist({
+      articleTitle:    req.body.articleTitle,
+      articleSubtitle: req.body.articleSubtitle,
+      sectionType:     req.body.sectionType,
+      sectionLabel:    req.body.sectionLabel,
+      sectionBody:     req.body.sectionBody,
+      mode:            req.body.mode || 'improve',
+    });
+
+    return res.status(200).json({
+      success: true,
+      suggestion: result.suggestion,
+      usage: result.usage,
+      source: result.source,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -210,7 +323,8 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
       );
     }
 
-    const article = Object.assign({}, req.body, { id: req.params.id });
+    const previousId = String(req.params.id || '').trim();
+    const article = Object.assign({}, req.body, { id: String(req.body.id || previousId).trim() });
     if (config.admin.localPreview) {
       return res.status(200).json({
         success: true,
@@ -226,6 +340,9 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
     const result = await firestore.upsertSystemDesignArticle(article, {
       publishedBy: req.user.email,
     });
+    if (previousId && previousId !== result.id) {
+      await firestore.deleteSystemDesignArticle(previousId);
+    }
     const saved = await firestore.getSystemDesignArticle(result.id);
     return res.status(200).json({ success: true, article: saved, version: result.version });
   } catch (err) {
