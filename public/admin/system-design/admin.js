@@ -709,23 +709,63 @@ function articleFromForm() {
 }
 
 function buildSectionTypeSelect(section) {
+  const isPreset = SECTION_TYPES.includes(section.type);
+  const wrap = document.createElement('span');
+  wrap.className = 'sd-section-type-wrap';
+
+  // --- Select ---
   const select = document.createElement('select');
   select.className = 'sd-section-type-select';
-  const options = SECTION_TYPES.slice();
-  if (section.type && !options.includes(section.type)) options.unshift(section.type);
-  options.forEach(function (type) {
-    const option = document.createElement('option');
-    option.value = type;
-    option.textContent = type;
-    select.appendChild(option);
+  SECTION_TYPES.forEach(function (type) {
+    const opt = document.createElement('option');
+    opt.value = type;
+    opt.textContent = type;
+    select.appendChild(opt);
   });
-  select.value = section.type || SECTION_TYPES[0];
-  select.addEventListener('change', function () {
-    section.type = select.value;
+  const customOpt = document.createElement('option');
+  customOpt.value = '__custom__';
+  customOpt.textContent = 'Custom…';
+  select.appendChild(customOpt);
+  select.value = isPreset ? section.type : '__custom__';
+
+  // --- Custom text input (shown only when Custom is selected) ---
+  const customInput = document.createElement('input');
+  customInput.type = 'text';
+  customInput.className = 'sd-section-type-custom-input';
+  customInput.placeholder = 'Enter section name';
+  customInput.spellcheck = false;
+  customInput.autocomplete = 'off';
+  customInput.value = isPreset ? '' : (section.type || '');
+  customInput.hidden = isPreset;
+
+  function commitCustom() {
+    const val = customInput.value.trim();
+    if (!val) { customInput.value = section.type || ''; return; }
+    section.type = val;
     renderPreview();
     markDirty();
+  }
+
+  select.addEventListener('change', function () {
+    if (select.value === '__custom__') {
+      customInput.hidden = false;
+      customInput.focus();
+      customInput.select();
+    } else {
+      customInput.hidden = true;
+      section.type = select.value;
+      renderPreview();
+      markDirty();
+    }
   });
-  return select;
+
+  customInput.addEventListener('blur', commitCustom);
+  customInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); commitCustom(); customInput.blur(); }
+  });
+
+  wrap.append(select, customInput);
+  return wrap;
 }
 
 function buildSectionCard(section, index) {

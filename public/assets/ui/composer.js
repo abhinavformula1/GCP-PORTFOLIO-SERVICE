@@ -165,8 +165,8 @@ export function createComposer(options) {
     // Also lock/unlock the section-type dropdown in the parent ribbon if present
     const ribbon = element.closest('.sd-section-editor');
     if (ribbon) {
-      const select = ribbon.querySelector('.sd-section-type-select');
-      if (select) select.disabled = !editable;
+      ribbon.querySelectorAll('.sd-section-type-select, .sd-section-type-custom-input')
+        .forEach(function (el) { el.disabled = !editable; });
     }
     if (editBtn) {
       editBtn.classList.toggle('composer-tool-active', editable);
