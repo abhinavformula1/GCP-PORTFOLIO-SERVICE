@@ -375,10 +375,31 @@ async function saveAtlasCacheEntry(cacheKey, entry) {
 // require rebuilding the Cloud Run container. The checked-in JS topics remain
 // a frontend fallback for local/dev outages while the CMS collection is empty.
 
+function sanitiseArticleBlocks(blocks) {
+  if (!Array.isArray(blocks)) return [];
+  return blocks
+    .map((block) => {
+      if (!block || typeof block !== 'object') return null;
+      let plain;
+      try {
+        plain = JSON.parse(JSON.stringify(block));
+      } catch {
+        return null;
+      }
+      if (!plain || typeof plain !== 'object') return null;
+      plain.id = String(plain.id || '');
+      plain.type = String(plain.type || 'paragraph');
+      return plain;
+    })
+    .filter(Boolean)
+    .slice(0, 200);
+}
+
 function normaliseSystemDesignArticle(id, data) {
   const v = data || {};
   const en = v.en && typeof v.en === 'object' ? v.en : {};
   const fr = v.fr && typeof v.fr === 'object' ? v.fr : {};
+  const blocks = sanitiseArticleBlocks(v.blocks);
   return {
     id,
     category:    String(v.category || 'architecture'),
@@ -388,6 +409,7 @@ function normaliseSystemDesignArticle(id, data) {
     readMinutes: Number(v.readMinutes || 5),
     stub:        !!v.stub,
     order:       Number(v.order || 999),
+    blocks,
     updatedAt:   v.updatedAt?.toMillis ? v.updatedAt.toMillis() : null,
     en: {
       title:    String(en.title || v.title || id),
@@ -444,6 +466,7 @@ async function upsertSystemDesignArticle(article, { publishedBy } = {}) {
       readMinutes: Number(article.readMinutes || previous.readMinutes || 5),
       stub:        !!article.stub,
       order:       Number(article.order || previous.order || 999),
+      blocks:      sanitiseArticleBlocks(article.blocks),
       en:          article.en && typeof article.en === 'object' ? article.en : {},
       fr:          article.fr && typeof article.fr === 'object' ? article.fr : {},
       version:     nextVersion,

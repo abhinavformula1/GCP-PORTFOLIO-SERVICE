@@ -186,7 +186,11 @@
                   <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
                 </label>
                 <div class="sd-article-details-toolbar">
-                  <button type="button" id="doneArticleDetailsBtn">Done</button>
+                  <span id="articleDetailsSaveStatus" class="sd-details-save-status" hidden></span>
+                  <button type="button" id="saveArticleDetailsBtn" class="sd-details-save-btn">
+                    <span class="material-symbols-outlined" aria-hidden="true">save</span>
+                    <span>Save</span>
+                  </button>
                 </div>
               </div>
             </section>
@@ -194,29 +198,17 @@
               <div class="sd-section-builder-head">
                 <div>
                   <div class="sd-admin-section-kicker">Article body</div>
-                  <h3 id="sectionBuilderTitle">Structured sections</h3>
-                  <p>Add standard sections so every article follows a clean system-design narrative.</p>
+                  <h3 id="sectionBuilderTitle">Write the article</h3>
+                  <p>Just write. Use the toolbar to format text, insert a table or design block, or ask AI to improve &mdash; what you see is exactly what readers get.</p>
                 </div>
-                <button type="button" id="addArticleSectionBtn">
-                  <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                  <span>Add section</span>
-                </button>
-              </div>
-              <div id="sectionPicker" class="sd-section-picker" hidden>
-                <div>
-                  <div class="sd-admin-section-kicker">Choose section</div>
-                  <h4>What do you want to add?</h4>
-                </div>
-                <div id="sectionPickerOptions" class="sd-section-picker-options"></div>
-                <label class="sd-section-custom-field">Custom section
-                  <input id="customSectionTitle" type="text" placeholder="Example: Cost model">
-                </label>
-                <div class="sd-section-picker-actions">
-                  <button type="button" id="cancelSectionPickerBtn">Cancel</button>
-                  <button type="button" id="createCustomSectionBtn">Create custom</button>
+                <div class="sd-add-section">
+                  <button type="button" id="addSectionBtn">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                    <span>Add section</span>
+                  </button>
                 </div>
               </div>
-              <div id="articleSections" class="sd-section-list"></div>
+              <div id="articleSections" class="sd-composer-host"></div>
               <textarea id="articleBody" hidden></textarea>
             </section>
           </div>
@@ -395,15 +387,28 @@
         </button>
       </div>
       <div slot="content" class="sd-publish-dialog-content">
-        <article id="publishPreviewPanel" class="sd-admin-preview sd-publish-dialog-preview">
-          <div class="sd-admin-preview-chrome">
-            <span></span><span></span><span></span>
-          </div>
-          <div class="sd-article-eyebrow" id="publishReviewMeta">Draft preview</div>
-          <h2 id="publishReviewArticleTitle">Untitled article</h2>
-          <p id="publishReviewSubtitle"></p>
-          <div id="publishReviewBody" class="sd-article-body"></div>
-        </article>
+        <div id="publishPreviewPanel" class="sd-publish-dialog-preview">
+          <div class="sd-public-preview-label">Previewing as public page</div>
+          <article class="sd-article sd-public-preview-article">
+            <header class="sd-article-head">
+              <div class="sd-article-eyebrow" id="publishReviewMeta">Design note</div>
+              <h2 class="sd-article-title" id="publishReviewArticleTitle">Untitled article</h2>
+              <p class="sd-article-sub" id="publishReviewSubtitle"></p>
+              <div class="sd-article-meta">
+                <div class="sd-tags" id="publishReviewTags"></div>
+                <span class="sd-readtime" id="publishReviewReadTime">
+                  <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+                  <span>5 min</span>
+                </span>
+                <span class="sd-export-btn sd-public-preview-export" aria-hidden="true">
+                  <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
+                  <span>Export PDF</span>
+                </span>
+              </div>
+            </header>
+            <div id="publishReviewBody" class="sd-article-body"></div>
+          </article>
+        </div>
         <section id="publishSeoPanel" class="sd-publish-seo-panel" hidden>
           <div>
             <span class="sd-publish-step-label">Final check</span>

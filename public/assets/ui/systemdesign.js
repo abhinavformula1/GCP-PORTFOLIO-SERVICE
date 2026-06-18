@@ -23,6 +23,7 @@
  */
 
 import { currentLang } from '../core/i18n.js';
+import { blocksToHtml } from './sdblocks.js';
 
 // ── Topic catalogue ──────────────────────────────────────────────────────────
 //
@@ -110,6 +111,7 @@ function normaliseCmsTopic(article) {
   if (!id) return null;
   const en = article.en && typeof article.en === 'object' ? article.en : {};
   const fr = article.fr && typeof article.fr === 'object' ? article.fr : {};
+  const blocks = Array.isArray(article.blocks) ? article.blocks : [];
   return {
     id,
     category:    article.category || 'architecture',
@@ -118,6 +120,7 @@ function normaliseCmsTopic(article) {
     tags:        Array.isArray(article.tags) ? article.tags : [],
     readMinutes: Number(article.readMinutes || 5),
     stub:        !!article.stub,
+    blocks,
     en: {
       title:    en.title || article.title || id,
       subtitle: en.subtitle || article.subtitle || '',
@@ -353,7 +356,8 @@ function renderTopicDetail() {
   html += '</button>';
   html += '</div>';
   html += '</header>';
-  html += '<div class="sd-article-body">' + (loc.body || '') + '</div>';
+  const bodyHtml = (topic.blocks && topic.blocks.length) ? blocksToHtml(topic.blocks) : (loc.body || '');
+  html += '<div class="sd-article-body">' + bodyHtml + '</div>';
   html += '</article>';
   _sdDetail.innerHTML = html;
   const exportBtn = _sdDetail.querySelector('.sd-export-btn');
