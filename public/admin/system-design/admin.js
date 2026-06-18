@@ -1,4 +1,4 @@
-/* global DOMParser, URL, atob, clearTimeout, customElements, document, fetch, google, localStorage, sessionStorage, setTimeout */
+/* global URL, atob, clearTimeout, customElements, document, fetch, google, localStorage, sessionStorage, setTimeout */
 
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import {
@@ -21,6 +21,12 @@ import {
   restartAssistant,
   toggleChatTeaser,
 } from '../../assets/chat/chat.js';
+import {
+  blocksToHtml,
+  cloneBlocks,
+  htmlToBlocks,
+} from '../../assets/ui/sdblocks.js';
+import { createComposer } from '../../assets/ui/composer.js';
 
 const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 
@@ -31,17 +37,9 @@ let contactPolicyState = null;
 let adminAvatarObjectUrl = '';
 let autosaveTimer = 0;
 let articleSections = [];
+let sectionSeq = 0;
 
-const SECTION_TYPES = [
-  { value: 'overview', label: 'Overview', title: 'Overview' },
-  { value: 'problem', label: 'Problem statement', title: 'Problem statement' },
-  { value: 'solution', label: 'Solution', title: 'Solution' },
-  { value: 'tradeoffs', label: 'Trade-offs', title: 'Trade-offs' },
-  { value: 'risks', label: 'Risks', title: 'Risks' },
-  { value: 'conclusion', label: 'Conclusion', title: 'Conclusion' },
-];
 const ARTICLE_CATEGORIES = ['integration', 'architecture', 'scale', 'security', 'delivery'];
-const CUSTOM_SECTION_TYPE = 'custom';
 
 renderTopbar('#sharedTopbar', {
   className: 'topbar sd-admin-topbar',
@@ -115,18 +113,15 @@ const els = {
   detailsActionsBtn: document.getElementById('articleDetailsActionsBtn'),
   detailsActionsMenu: document.getElementById('articleDetailsActionsMenu'),
   editDetailsBtn:  document.getElementById('editArticleDetailsBtn'),
-  doneDetailsBtn:  document.getElementById('doneArticleDetailsBtn'),
   title:           document.getElementById('articleTitle'),
   subtitle:        document.getElementById('articleSubtitle'),
   tags:            document.getElementById('articleTags'),
   body:            document.getElementById('articleBody'),
-  sections:        document.getElementById('articleSections'),
-  addSectionBtn:   document.getElementById('addArticleSectionBtn'),
-  sectionPicker:   document.getElementById('sectionPicker'),
-  sectionPickerOptions: document.getElementById('sectionPickerOptions'),
-  customSectionTitle: document.getElementById('customSectionTitle'),
-  createCustomSectionBtn: document.getElementById('createCustomSectionBtn'),
-  cancelSectionPickerBtn: document.getElementById('cancelSectionPickerBtn'),
+  sections:             document.getElementById('articleSections'),
+  sectionBuilder:       document.querySelector('.sd-section-builder'),
+  addSectionBtn:        document.getElementById('addSectionBtn'),
+  saveDetailsBtn:       document.getElementById('saveArticleDetailsBtn'),
+  detailsSaveStatus:    document.getElementById('articleDetailsSaveStatus'),
   systemStatus:    document.getElementById('systemDesignStatus'),
   previewBtn:      document.getElementById('previewBtn'),
   publishBtn:      document.getElementById('publishBtn'),
@@ -136,6 +131,8 @@ const els = {
   publishReviewMeta: document.getElementById('publishReviewMeta'),
   publishReviewTitle: document.getElementById('publishReviewArticleTitle'),
   publishReviewSubtitle: document.getElementById('publishReviewSubtitle'),
+  publishReviewTags: document.getElementById('publishReviewTags'),
+  publishReviewReadTime: document.getElementById('publishReviewReadTime'),
   publishReviewBody: document.getElementById('publishReviewBody'),
   publishPreviewPanel: document.getElementById('publishPreviewPanel'),
   publishSeoPanel: document.getElementById('publishSeoPanel'),
@@ -176,203 +173,12 @@ function setSectionStatus(el, message, kind) {
   else delete el.dataset.kind;
 }
 
-function createMaterialIcon(name) {
+function makeIcon(name) {
   const icon = document.createElement('span');
   icon.className = 'material-symbols-outlined';
   icon.setAttribute('aria-hidden', 'true');
   icon.textContent = name;
   return icon;
-}
-
-function createAuthoringActionItem(action) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'reco-action-item' + (action.destructive ? ' reco-action-item-destructive' : '');
-  if (action.className) button.className += ' ' + action.className;
-  button.setAttribute('role', 'menuitem');
-  button.append(createMaterialIcon(action.icon), document.createTextNode(action.label));
-  button.addEventListener('click', function (event) {
-    event.stopPropagation();
-    if (action.onClick) action.onClick(event);
-  });
-  return button;
-}
-
-function createAuthoringActions(options) {
-  const actions = document.createElement('div');
-  actions.className = 'reco-actions' + (options.className ? ' ' + options.className : '');
-
-  const trigger = document.createElement('button');
-  trigger.type = 'button';
-  trigger.className = 'reco-actions-trigger' + (options.triggerClassName ? ' ' + options.triggerClassName : '');
-  trigger.setAttribute('aria-label', options.label || 'Authoring actions');
-  trigger.setAttribute('aria-haspopup', 'menu');
-  trigger.setAttribute('aria-expanded', 'false');
-  trigger.appendChild(createMaterialIcon('more_vert'));
-
-  const menu = document.createElement('div');
-  menu.className = 'reco-actions-menu' + (options.menuClassName ? ' ' + options.menuClassName : '');
-  menu.setAttribute('role', 'menu');
-  menu.hidden = true;
-  menu.addEventListener('click', function (event) { event.stopPropagation(); });
-  (options.items || []).forEach(function (action) {
-    menu.appendChild(createAuthoringActionItem(action));
-  });
-
-  trigger.addEventListener('click', function (event) {
-    event.stopPropagation();
-    const willOpen = menu.hidden;
-    if (options.onBeforeOpen) options.onBeforeOpen();
-    menu.hidden = !willOpen;
-    trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-  });
-
-  actions.append(trigger, menu);
-  return { actions, trigger, menu };
-}
-
-function createAuthoringToolbar(options) {
-  const toolbar = document.createElement('div');
-  toolbar.className = 'sd-authoring-toolbar' + (options.className ? ' ' + options.className : '');
-  toolbar.hidden = true;
-
-  (options.items || []).forEach(function (action) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'sd-authoring-toolbar-btn' + (action.primary ? ' sd-authoring-toolbar-btn-primary' : '');
-    button.append(createMaterialIcon(action.icon), document.createTextNode(action.label));
-    button.addEventListener('click', function (event) {
-      event.stopPropagation();
-      if (!action.onClick) return;
-      const previous = button.disabled;
-      button.disabled = true;
-      Promise.resolve()
-        .then(function () { return action.onClick({ event, button }); })
-        .finally(function () { button.disabled = previous; });
-    });
-    toolbar.appendChild(button);
-  });
-
-  if (options.doneAction) {
-    const spacer = document.createElement('span');
-    spacer.className = 'sd-authoring-toolbar-spacer';
-    spacer.setAttribute('aria-hidden', 'true');
-    toolbar.appendChild(spacer);
-
-    const doneButton = document.createElement('button');
-    doneButton.type = 'button';
-    doneButton.className = 'sd-authoring-toolbar-btn sd-authoring-toolbar-done';
-    doneButton.textContent = 'Done';
-    doneButton.addEventListener('click', function (event) {
-      event.stopPropagation();
-      options.doneAction();
-    });
-    toolbar.appendChild(doneButton);
-  }
-
-  return toolbar;
-}
-
-function createAuthoringCard(options) {
-  const card = document.createElement(options.tagName || 'article');
-  card.className = 'sd-authoring-card' + (options.className ? ' ' + options.className : '');
-  Object.entries(options.dataset || {}).forEach(function ([key, value]) {
-    card.dataset[key] = value;
-  });
-
-  const head = document.createElement('div');
-  head.className = 'sd-authoring-card-head' + (options.headClassName ? ' ' + options.headClassName : '');
-  if (options.leading) head.appendChild(options.leading);
-
-  const title = document.createElement('div');
-  title.className = 'sd-authoring-card-title' + (options.titleClassName ? ' ' + options.titleClassName : '');
-  title.textContent = options.title || 'Untitled';
-  head.appendChild(title);
-
-  let editor = null;
-  let titleEditor = null;
-  let toolbar = null;
-  const readOnly = options.renderReadOnly ? options.renderReadOnly() : document.createElement('div');
-
-  function setEditing(editing) {
-    card.classList.toggle('sd-authoring-card-editing', editing);
-    title.hidden = editing && !!titleEditor;
-    if (titleEditor) titleEditor.hidden = !editing;
-    readOnly.hidden = editing;
-    if (editor) editor.hidden = !editing;
-    if (toolbar) toolbar.hidden = !editing;
-    if (editing && options.onEdit) options.onEdit({ card, editor, readOnly, title, titleEditor, toolbar });
-  }
-
-  const customActions = (options.actions || []).map(function (action) {
-    return Object.assign({}, action, {
-      onClick: function (event) {
-        if (options.onBeforeOpen) options.onBeforeOpen();
-        if (action.onClick) action.onClick({ card, editor, readOnly, setEditing, event });
-      },
-    });
-  });
-  const actions = createAuthoringActions({
-    label: options.actionsLabel,
-    className: options.actionsClassName,
-    triggerClassName: options.triggerClassName,
-    menuClassName: options.menuClassName,
-    onBeforeOpen: options.onBeforeOpen,
-    items: customActions.concat([
-      {
-        icon:    'edit',
-        label:   'Edit',
-        onClick: function () {
-          if (options.onBeforeOpen) options.onBeforeOpen();
-          setEditing(true);
-        },
-      },
-    ].concat(options.deleteAction ? [{
-      icon:        'delete',
-      label:       'Delete',
-      destructive: true,
-      onClick:     options.deleteAction,
-    }] : [])),
-  });
-  head.appendChild(actions.actions);
-
-  titleEditor = options.renderTitleEditor ? options.renderTitleEditor() : null;
-  if (titleEditor) {
-    titleEditor.hidden = true;
-    head.insertBefore(titleEditor, actions.actions);
-  }
-
-  editor = options.renderEditor ? options.renderEditor() : null;
-  if (editor) editor.hidden = true;
-  toolbar = createAuthoringToolbar({
-    className: options.toolbarClassName,
-    items: (options.toolbarActions || []).map(function (action) {
-      return Object.assign({}, action, {
-        onClick: function (toolbarApi) {
-          return action.onClick({
-            card,
-            editor,
-            readOnly,
-            title,
-            titleEditor,
-            toolbar,
-            setEditing,
-            event: toolbarApi.event,
-            button: toolbarApi.button,
-          });
-        },
-      });
-    }),
-    doneAction: function () {
-      if (options.onDone) options.onDone({ card, editor, readOnly, title, titleEditor });
-      setEditing(false);
-    },
-  });
-
-  card.append(head, readOnly);
-  if (editor) card.appendChild(editor);
-  if (options.toolbarActions?.length) card.appendChild(toolbar);
-  return { card, readOnly, editor, toolbar, setEditing };
 }
 
 function decodeJwtPayload(token) {
@@ -630,47 +436,21 @@ async function authedJson(url, options) {
   return data;
 }
 
-async function improveSectionWithAi(section, cardApi, mode) {
-  const { card, editor, readOnly, setEditing } = cardApi;
-  if (!editor) return;
-  syncSectionFromCard(card);
-  const sectionBody = String(section.body || editor.value || '').trim();
-  if (!sectionBody) {
-    setSectionStatus(els.systemStatus, 'Write a rough draft first, then AI can improve it.', 'error');
-    setEditing(true);
-    editor.focus();
-    return;
-  }
-
-  const typeMeta = SECTION_TYPES.find(function (type) { return type.value === section.type; }) || SECTION_TYPES[0];
-  const assistMode = mode || 'improve';
-  const modeLabel = assistMode === 'concise' ? 'making concise'
-    : assistMode === 'grammar' ? 'fixing grammar'
-      : 'improving';
-  setSectionStatus(els.systemStatus, 'AI is ' + modeLabel + ' the ' + typeMeta.label + ' section...', 'info');
+async function composerAiAssist(text, mode) {
   const data = await authedJson('/api/admin/system-design/writing-assist', {
     method: 'POST',
     body:   JSON.stringify({
       articleTitle:    els.title.value.trim(),
       articleSubtitle: els.subtitle.value.trim(),
-      sectionType:     section.type,
-      sectionLabel:    typeMeta.label,
-      sectionBody,
-      mode:           assistMode,
+      sectionType:     'paragraph',
+      sectionLabel:    'Paragraph',
+      sectionBody:     text,
+      mode:            mode || 'improve',
     }),
   });
   const suggestion = String(data.suggestion || '').trim();
   if (!suggestion) throw new Error('AI returned an empty suggestion.');
-
-  section.body = suggestion;
-  editor.value = suggestion;
-  readOnly.textContent = suggestion;
-  setEditing(true);
-  renderPreview();
-  markDirty();
-  const source = data.source === 'local-preview' ? 'local preview' : 'Gemini';
-  const tokenText = data.usage?.totalTokens ? ' · ' + data.usage.totalTokens + ' tokens' : '';
-  setSectionStatus(els.systemStatus, 'AI suggestion applied from ' + source + tokenText + '. Review and press Done.', 'success');
+  return suggestion;
 }
 
 function handleAdminLoadError(err) {
@@ -840,220 +620,71 @@ function testContactPolicy() {
   setSectionStatus(els.policyTest, 'Allowed. ' + domain + ' looks like a company domain.', 'success');
 }
 
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+const SECTION_TYPES = ['Overview', 'Problem Statement', 'Solution'];
+
+function nextSectionId() {
+  sectionSeq += 1;
+  return 'section-' + Date.now().toString(36) + '-' + sectionSeq;
 }
 
-function inlineMarkdown(value) {
-  let text = escapeHtml(value);
-  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-  return text;
-}
-
-function markdownToHtml(markdown) {
-  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
-  const html = [];
-  let paragraph = [];
-  let list = [];
-
-  function flushParagraph() {
-    if (!paragraph.length) return;
-    html.push('<p>' + inlineMarkdown(paragraph.join(' ')) + '</p>');
-    paragraph = [];
-  }
-
-  function flushList() {
-    if (!list.length) return;
-    html.push('<ul>' + list.map(function (item) {
-      return '<li>' + inlineMarkdown(item) + '</li>';
-    }).join('') + '</ul>');
-    list = [];
-  }
-
-  lines.forEach(function (line) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      flushParagraph();
-      flushList();
-      return;
-    }
-    const heading = /^(#{2,3})\s+(.+)$/.exec(trimmed);
-    if (heading) {
-      flushParagraph();
-      flushList();
-      const tag = heading[1].length === 2 ? 'h3' : 'h4';
-      html.push('<' + tag + '>' + inlineMarkdown(heading[2]) + '</' + tag + '>');
-      return;
-    }
-    const bullet = /^[-*]\s+(.+)$/.exec(trimmed);
-    if (bullet) {
-      flushParagraph();
-      list.push(bullet[1]);
-      return;
-    }
-    flushList();
-    paragraph.push(trimmed);
+// Pull the latest blocks out of each section's composer into the model.
+function syncSectionBlocks() {
+  articleSections.forEach(function (section) {
+    if (section.composer) section.blocks = section.composer.getBlocks();
   });
-
-  flushParagraph();
-  flushList();
-  return html.join('');
 }
 
-function sectionTemplate(type) {
-  const meta = SECTION_TYPES.find(function (item) { return item.value === type; }) || SECTION_TYPES[0];
-  return {
-    id: 'section-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-    type: meta.value,
-    title: meta.title,
-    body: '',
-  };
+// Sections → flat blocks: each section is a heading (its type) + its body.
+function sectionsToBlocks() {
+  const blocks = [];
+  articleSections.forEach(function (section) {
+    const body = section.composer ? section.composer.getBlocks() : (section.blocks || []);
+    const type = (section.type || '').trim();
+    if (type) blocks.push({ type: 'heading', text: type });
+    body.forEach(function (block) { blocks.push(block); });
+  });
+  return blocks;
 }
 
-function customSectionTemplate(title) {
-  const cleanTitle = String(title || '').trim().replace(/\s+/g, ' ').slice(0, 80);
-  return {
-    id: 'section-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-    type: CUSTOM_SECTION_TYPE,
-    title: cleanTitle || 'Custom section',
-    body: '',
-  };
-}
-
-function sectionMeta(section) {
-  if (section.type === CUSTOM_SECTION_TYPE) {
-    const title = String(section.title || 'Custom section').trim() || 'Custom section';
-    return { value: CUSTOM_SECTION_TYPE, label: title, title };
-  }
-  return SECTION_TYPES.find(function (type) { return type.value === section.type; }) || SECTION_TYPES[0];
-}
-
-function sectionsToHtml(sections) {
-  return sections
-    .filter(function (section) { return section.body; })
-    .map(function (section) {
-      const title = sectionMeta(section).title;
-      return '<h3>' + inlineMarkdown(title) + '</h3>' + markdownToHtml(section.body);
-    })
-    .join('');
-}
-
-function htmlToSections(html) {
-  const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+// Flat blocks → sections: a heading starts a new section; its text is the type.
+function blocksToSections(blocks) {
+  const list = Array.isArray(blocks) ? blocks : [];
   const sections = [];
   let current = null;
-
-  function cleanText(value) {
-    return String(value || '').replace(/\s+/g, ' ').trim();
-  }
-
-  function sectionTypeForHeading(heading) {
-    const value = cleanText(heading).toLowerCase();
-    if (/problem|question|shape/.test(value)) return 'problem';
-    if (/alternative|trade|option|comparison/.test(value)) return 'tradeoffs';
-    if (/risk|failure|bearer|trust|boundary|threat|security/.test(value)) return 'risks';
-    if (/conclusion|summary|takeaway|decision/.test(value)) return sections.length ? 'conclusion' : 'overview';
-    if (/solution|goal|architecture|implementation|property|flow|design/.test(value)) return 'solution';
-    return sections.length ? CUSTOM_SECTION_TYPE : 'overview';
-  }
-
-  function labelledCardText(card) {
-    if (card.parentElement?.matches('.sd-sequence')) {
-      const step = cleanText(card.querySelector('b')?.textContent);
-      const detailText = cleanText(card.querySelector('span')?.textContent || card.textContent);
-      return (step ? step + '. ' : '- ') + detailText;
-    }
-    const title = cleanText(card.querySelector('strong')?.textContent || card.querySelector('span')?.textContent);
-    const status = cleanText(card.querySelector(':scope > span')?.textContent);
-    const detail = cleanText(Array.from(card.children)
-      .filter(function (child) {
-        return child.tagName !== 'STRONG'
-          && !(child.tagName === 'SPAN' && child === card.querySelector(':scope > span'));
-      })
-      .map(function (child) { return child.textContent; })
-      .join(' '));
-    if (card.parentElement?.matches('.sd-decision-grid')) {
-      const label = cleanText(card.querySelector('span')?.textContent);
-      const value = cleanText(card.querySelector('strong')?.textContent);
-      return label && value ? '- **' + label + ':** ' + value : cleanText(card.textContent);
-    }
-    if (status && detail && status !== title) return '- **' + title + ' (' + status + '):** ' + detail;
-    if (title && detail) return '- **' + title + ':** ' + detail;
-    if (title) return '- ' + title;
-    return cleanText(card.textContent);
-  }
-
-  function bodyText(node) {
-    if (node.matches && node.matches('ul,ol')) {
-      return Array.from(node.querySelectorAll('li')).map(function (li) {
-        return '- ' + cleanText(li.textContent);
-      }).join('\n');
-    }
-    if (node.matches && node.matches('.sd-card-grid,.sd-decision-grid,.sd-risk-grid,.sd-comparison,.sd-sequence')) {
-      return Array.from(node.children).map(labelledCardText).filter(Boolean).join('\n');
-    }
-    if (node.matches && node.matches('.sd-flow')) {
-      return Array.from(node.children).map(function (child) { return cleanText(child.textContent); }).filter(Boolean).join(' -> ');
-    }
-    if (node.matches && node.matches('table')) {
-      return Array.from(node.querySelectorAll('tr')).map(function (row) {
-        return '- **' + cleanText(row.querySelector('th')?.textContent) + ':** ' + cleanText(row.querySelector('td')?.textContent);
-      }).filter(function (line) { return !line.endsWith(':**'); }).join('\n');
-    }
-    if (node.matches && node.matches('section')) {
-      return Array.from(node.children)
-        .filter(function (child) { return !child.matches('h1,h2,h3,h4,h5,h6,.sd-kicker'); })
-        .map(bodyText)
-        .filter(Boolean)
-        .join('\n\n');
-    }
-    return cleanText(node.textContent);
-  }
-
-  Array.from(doc.body.children).forEach(function (node) {
-    if (node.matches && node.matches('section')) {
-      const heading = node.querySelector('h1,h2,h3,h4,h5,h6');
-      if (heading) {
-        current = sectionTemplate(sectionTypeForHeading(heading.textContent));
-        current.title = cleanText(heading.textContent) || current.title;
-        sections.push(current);
-      }
-      const text = bodyText(node);
-      if (text) {
-        if (!current) {
-          current = sectionTemplate('overview');
-          sections.push(current);
-        }
-        current.body += (current.body ? '\n\n' : '') + text;
-      }
-      return;
-    }
-    if (node.matches('h1,h2,h3,h4,h5,h6')) {
-      current = sectionTemplate(sectionTypeForHeading(node.textContent));
-      current.title = cleanText(node.textContent) || current.title;
-      current.body = '';
+  list.forEach(function (block) {
+    if (block && block.type === 'heading') {
+      current = { id: nextSectionId(), type: String(block.text || 'Overview'), blocks: [], composer: null };
       sections.push(current);
       return;
     }
     if (!current) {
-      current = sectionTemplate('overview');
+      current = { id: nextSectionId(), type: 'Overview', blocks: [], composer: null };
       sections.push(current);
     }
-    const text = bodyText(node);
-    if (text) current.body += (current.body ? '\n\n' : '') + text;
+    current.blocks.push(block);
   });
-  return sections.length ? sections : [sectionTemplate('overview')];
+  if (!sections.length) sections.push({ id: nextSectionId(), type: 'Overview', blocks: [], composer: null });
+  return sections;
+}
+
+async function saveArticleFromComposer() {
+  const article = articleFromForm();
+  if (!article.id || !article.en.title) {
+    throw new Error('Add a title before saving.');
+  }
+  if (!article.en.body) {
+    throw new Error('Add some content before saving.');
+  }
+  clearDraftAutosave();
+  const status = els.statusField.value === 'Published' ? 'Published' : 'Draft';
+  await saveArticleWithStatus(status, { silent: true });
+  return status === 'Published' ? 'Published to Firestore.' : 'Draft saved to Firestore.';
 }
 
 function articleFromForm() {
   const id = slugify(els.id.value || els.title.value);
-  const bodyHtml = sectionsToHtml(articleSections);
+  const blocks = sectionsToBlocks();
+  const bodyHtml = blocksToHtml(blocks);
   return {
     id,
     status:      els.statusField.value,
@@ -1063,6 +694,7 @@ function articleFromForm() {
     order:       Number(els.order.value || 100),
     tags:        els.tags.value.split(',').map(function (tag) { return tag.trim(); }).filter(Boolean),
     stub:        els.statusField.value === 'Coming soon',
+    blocks:      cloneBlocks(blocks),
     en: {
       title:    els.title.value.trim(),
       subtitle: els.subtitle.value.trim(),
@@ -1076,174 +708,145 @@ function articleFromForm() {
   };
 }
 
-function syncSectionFromCard(card) {
-  const section = articleSections.find(function (item) { return item.id === card.dataset.sectionId; });
-  if (!section) return;
-  const bodyEl = card.querySelector('.sd-section-body-input');
-  section.body = bodyEl ? bodyEl.value.trim() : section.body;
+function buildSectionTypeSelect(section) {
+  const select = document.createElement('select');
+  select.className = 'sd-section-type-select';
+  const options = SECTION_TYPES.slice();
+  if (section.type && !options.includes(section.type)) options.unshift(section.type);
+  options.forEach(function (type) {
+    const option = document.createElement('option');
+    option.value = type;
+    option.textContent = type;
+    select.appendChild(option);
+  });
+  select.value = section.type || SECTION_TYPES[0];
+  select.addEventListener('change', function () {
+    section.type = select.value;
+    renderPreview();
+    markDirty();
+  });
+  return select;
 }
 
-function closeSectionPicker() {
-  els.sectionPicker.hidden = true;
-  els.addSectionBtn.setAttribute('aria-expanded', 'false');
+function buildSectionCard(section, index) {
+  const card = document.createElement('section');
+  card.className = 'sd-section-editor';
+  card.dataset.sectionId = section.id;
+
+  const ribbon = document.createElement('div');
+  ribbon.className = 'sd-section-ribbon';
+
+  const number = document.createElement('span');
+  number.className = 'sd-section-ribbon-number';
+  number.textContent = String(index + 1).padStart(2, '0');
+
+  const select = buildSectionTypeSelect(section);
+
+  const controls = document.createElement('div');
+  controls.className = 'sd-section-ribbon-controls';
+
+  const up = document.createElement('button');
+  up.type = 'button';
+  up.className = 'sd-section-ribbon-btn';
+  up.title = 'Move section up';
+  up.setAttribute('aria-label', 'Move section up');
+  up.appendChild(makeIcon('arrow_upward'));
+  up.disabled = index === 0;
+  up.addEventListener('click', function () { moveSection(section, -1); });
+
+  const down = document.createElement('button');
+  down.type = 'button';
+  down.className = 'sd-section-ribbon-btn';
+  down.title = 'Move section down';
+  down.setAttribute('aria-label', 'Move section down');
+  down.appendChild(makeIcon('arrow_downward'));
+  down.disabled = index === articleSections.length - 1;
+  down.addEventListener('click', function () { moveSection(section, 1); });
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'sd-section-ribbon-btn sd-section-ribbon-remove';
+  remove.title = 'Delete section';
+  remove.setAttribute('aria-label', 'Delete section');
+  remove.appendChild(makeIcon('delete'));
+  remove.addEventListener('click', function () { deleteSection(section); });
+
+  controls.append(up, down, remove);
+  ribbon.append(number, select, controls);
+
+  const composer = createComposer({
+    tools: ['format', 'structure', 'insert', 'ai'],
+    toolbarMode: 'inline',
+    editToggle: true,
+    startEditing: section.startEditing === true,
+    ariaLabel: section.type + ' section',
+    placeholder: '',
+    aiAssist: composerAiAssist,
+    onSave: saveArticleFromComposer,
+    value: section.blocks,
+    onChange: function (blocks) {
+      section.blocks = blocks;
+      renderPreview();
+      markDirty();
+    },
+  });
+  section.composer = composer;
+
+  card.append(ribbon, composer.element);
+
+  // Pull the status ribbon out of the composer's flex container and place it
+  // above the card so messages appear above the section, not inside it.
+  const slot = document.createElement('div');
+  slot.className = 'sd-section-slot';
+  const statusEl = composer.element.querySelector('.composer-status');
+  if (statusEl) composer.element.removeChild(statusEl);
+  if (statusEl) slot.appendChild(statusEl);
+  slot.appendChild(card);
+  return slot;
 }
 
-function openSectionPicker() {
-  els.sectionPicker.hidden = false;
-  els.addSectionBtn.setAttribute('aria-expanded', 'true');
-  els.customSectionTitle.focus();
+function renderSectionEditors() {
+  els.sections.replaceChildren();
+  articleSections.forEach(function (section) { section.composer = null; });
+  articleSections.forEach(function (section, index) {
+    els.sections.appendChild(buildSectionCard(section, index));
+  });
 }
 
-function addSection(section) {
+function addSection(type) {
+  syncSectionBlocks();
+  const section = { id: nextSectionId(), type: type || 'Problem Statement', blocks: [], composer: null, startEditing: true };
   articleSections.push(section);
-  closeSectionPicker();
-  renderSectionBuilder();
+  renderSectionEditors();
+  const card = els.sections.lastElementChild;
+  if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (section.composer) section.composer.focus();
   renderPreview();
   markDirty();
 }
 
-function renderSectionPickerOptions() {
-  els.sectionPickerOptions.textContent = '';
-  SECTION_TYPES.forEach(function (type) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'sd-section-picker-option';
-    const used = articleSections.some(function (section) { return section.type === type.value; });
-    if (used) button.dataset.used = 'true';
-    const title = document.createElement('strong');
-    title.textContent = type.label;
-    const hint = document.createElement('span');
-    hint.textContent = used ? 'Already used. Add another if this article needs it.' : 'Standard article section';
-    button.append(title, hint);
-    button.addEventListener('click', function () {
-      addSection(sectionTemplate(type.value));
-    });
-    els.sectionPickerOptions.appendChild(button);
-  });
+function moveSection(section, delta) {
+  syncSectionBlocks();
+  const index = articleSections.findIndex(function (item) { return item.id === section.id; });
+  if (index === -1) return;
+  const target = index + delta;
+  if (target < 0 || target >= articleSections.length) return;
+  const moved = articleSections.splice(index, 1)[0];
+  articleSections.splice(target, 0, moved);
+  renderSectionEditors();
+  renderPreview();
+  markDirty();
 }
 
-function renderSectionBuilder() {
-  els.sections.textContent = '';
-  articleSections.forEach(function (section, index) {
-    const number = document.createElement('span');
-    number.className = 'sd-section-number';
-    number.textContent = String(index + 1).padStart(2, '0');
-    const typeMeta = sectionMeta(section);
-    const authoringCard = createAuthoringCard({
-      className: 'sd-section-card',
-      headClassName: 'sd-section-card-head',
-      dataset: { sectionId: section.id },
-      leading: number,
-      title: typeMeta.label,
-      titleClassName: 'sd-section-type-label',
-      actionsLabel: 'Section actions',
-      actionsClassName: 'sd-section-actions',
-      triggerClassName: 'sd-section-actions-trigger',
-      menuClassName: 'sd-section-actions-menu',
-      onBeforeOpen: function () {
-        closeSectionActionMenus();
-        closeArticleDetailsMenu();
-        closePolicyRuleMenus();
-      },
-      toolbarActions: [{
-        icon:    'auto_awesome',
-        label:   'AI Improve',
-        primary: true,
-        onClick: function (cardApi) {
-          return improveSectionWithAi(section, cardApi, 'improve').catch(function (err) {
-            setSectionStatus(els.systemStatus, err.message, 'error');
-          });
-        },
-      }, {
-        icon:  'short_text',
-        label: 'Concise',
-        onClick: function (cardApi) {
-          return improveSectionWithAi(section, cardApi, 'concise').catch(function (err) {
-            setSectionStatus(els.systemStatus, err.message, 'error');
-          });
-        },
-      }, {
-        icon:  'spellcheck',
-        label: 'Grammar',
-        onClick: function (cardApi) {
-          return improveSectionWithAi(section, cardApi, 'grammar').catch(function (err) {
-            setSectionStatus(els.systemStatus, err.message, 'error');
-          });
-        },
-      }],
-      renderReadOnly: function () {
-        const readOnlyBody = document.createElement('div');
-        readOnlyBody.className = 'sd-section-body-readonly';
-        readOnlyBody.textContent = section.body || 'No content yet. Use Edit to write this section.';
-        return readOnlyBody;
-      },
-      renderTitleEditor: function () {
-        const typeSelect = document.createElement('select');
-        typeSelect.className = 'sd-section-type-select';
-        typeSelect.setAttribute('aria-label', 'Section category');
-        SECTION_TYPES.forEach(function (type) {
-          const option = document.createElement('option');
-          option.value = type.value;
-          option.textContent = type.label;
-          typeSelect.appendChild(option);
-        });
-        const customOption = document.createElement('option');
-        customOption.value = CUSTOM_SECTION_TYPE;
-        customOption.textContent = section.type === CUSTOM_SECTION_TYPE ? typeMeta.label : 'Custom section';
-        typeSelect.appendChild(customOption);
-        typeSelect.value = section.type;
-        return typeSelect;
-      },
-      renderEditor: function () {
-        const body = document.createElement('textarea');
-        body.className = 'sd-section-body-input';
-        body.rows = 5;
-        body.placeholder = 'Write this section in plain language. Bullets, **bold**, and `code` are supported.';
-        body.value = section.body || '';
-        return body;
-      },
-      onEdit: function ({ editor }) {
-        if (editor) editor.focus();
-      },
-      onDone: function ({ editor, readOnly, title, titleEditor }) {
-        if (titleEditor) {
-          section.type = titleEditor.value;
-          if (section.type !== CUSTOM_SECTION_TYPE) {
-            const updatedMeta = SECTION_TYPES.find(function (type) { return type.value === section.type; }) || SECTION_TYPES[0];
-            section.title = updatedMeta.title;
-            title.textContent = updatedMeta.label;
-          } else {
-            section.title = section.title || 'Custom section';
-            title.textContent = section.title;
-          }
-        }
-        section.body = editor ? editor.value.trim() : section.body;
-        readOnly.textContent = section.body || 'No content yet. Use Edit to write this section.';
-        renderPreview();
-        markDirty();
-      },
-      deleteAction: function () {
-        closeSectionActionMenus();
-        articleSections = articleSections.filter(function (item) { return item.id !== section.id; });
-        if (!articleSections.length) articleSections.push(sectionTemplate('overview'));
-        renderSectionBuilder();
-        renderPreview();
-        markDirty();
-      },
-    });
-    const card = authoringCard.card;
-    card.addEventListener('input', function () {
-      syncSectionFromCard(card);
-      renderPreview();
-      markDirty();
-    });
-    card.addEventListener('change', function () {
-      syncSectionFromCard(card);
-      renderPreview();
-      markDirty();
-    });
-    els.sections.appendChild(card);
-  });
+function deleteSection(section) {
+  syncSectionBlocks();
+  articleSections = articleSections.filter(function (item) { return item.id !== section.id; });
+  if (!articleSections.length) {
+    articleSections.push({ id: nextSectionId(), type: 'Overview', blocks: [], composer: null });
+  }
+  renderSectionEditors();
+  renderPreview();
+  markDirty();
 }
 
 function renderArticleDetails() {
@@ -1332,10 +935,13 @@ function fillForm(article) {
   els.subtitle.value = en.subtitle || '';
   els.tags.value = Array.isArray(item.tags) ? item.tags.join(', ') : '';
   els.detailsForm.hidden = true;
+  els.sectionBuilder.hidden = false;
   renderArticleDetails();
-  articleSections = htmlToSections(en.body || '');
-  els.body.value = '';
-  renderSectionBuilder();
+  let blocks = cloneBlocks(item.blocks);
+  if (!blocks.length) blocks = htmlToBlocks(en.body || '');
+  // New articles start with no sections — user adds them via "+ Add section".
+  articleSections = article ? blocksToSections(blocks) : [];
+  renderSectionEditors();
   renderPreview();
   updateWorkflowChrome(els.statusField.value, item.id ? 'Saved in Firestore' : 'New draft', item.id ? 'saved' : 'new');
   renderList();
@@ -1411,6 +1017,25 @@ function createArticleSettingsField(labelText, field, value, type) {
       input.appendChild(option);
     });
     input.value = value || 'integration';
+  } else if (field === 'status') {
+    input = document.createElement('select');
+    input.className = 'sd-status-select';
+    ['Draft', 'Published', 'Retired'].forEach(function (s) {
+      const option = document.createElement('option');
+      option.value = s;
+      option.textContent = s;
+      input.appendChild(option);
+    });
+    input.value = value || 'Draft';
+    // Reflect status visually on the chip in the card head whenever it changes.
+    input.addEventListener('change', function () {
+      const chip = input.closest('.sd-article-settings-card')
+        ?.querySelector('.sd-admin-chip');
+      if (chip) {
+        chip.textContent = input.value;
+        chip.dataset.status = input.value;
+      }
+    });
   } else {
     input = document.createElement('input');
     input.type = type || 'text';
@@ -1522,7 +1147,8 @@ function renderArticleSettings() {
       createArticleSettingsField('Category', 'category', article.category || 'integration'),
       createArticleSettingsField('Icon', 'icon', article.icon || 'article'),
       createArticleSettingsField('Read time', 'readMinutes', String(article.readMinutes || 5), 'number'),
-      createArticleSettingsField('Order', 'order', String(article.order || 100), 'number')
+      createArticleSettingsField('Order', 'order', String(article.order || 100), 'number'),
+      createArticleSettingsField('Status', 'status', article.status || 'Draft')
     );
 
     const warning = document.createElement('div');
@@ -1568,6 +1194,8 @@ function articleSettingsPayloadFromCard(card) {
       icon: input('icon').value.trim() || 'article',
       readMinutes: Number(input('readMinutes').value || 5),
       order: Number(input('order').value || 100),
+      status: input('status').value || original.status || 'Draft',
+      stub: input('status').value === 'Coming soon',
     }),
   };
 }
@@ -1602,30 +1230,6 @@ async function saveArticleSettings() {
   setSectionStatus(els.articleSettingsStatus, 'Article settings saved.', 'success');
 }
 
-function renderStructuredPreview(target) {
-  target.textContent = '';
-  const visibleSections = articleSections.filter(function (section) { return String(section.body || '').trim(); });
-  if (!visibleSections.length) {
-    const empty = document.createElement('p');
-    empty.className = 'sd-preview-empty';
-    empty.textContent = 'Nothing to preview yet. Add content to a section and it will appear here.';
-    target.appendChild(empty);
-    return;
-  }
-
-  visibleSections.forEach(function (section) {
-    const previewSection = document.createElement('section');
-    previewSection.className = 'sd-preview-section';
-    const heading = document.createElement('h3');
-    heading.textContent = sectionMeta(section).title;
-    const body = document.createElement('div');
-    body.className = 'sd-preview-section-body';
-    body.innerHTML = markdownToHtml(section.body);
-    previewSection.append(heading, body);
-    target.appendChild(previewSection);
-  });
-}
-
 function renderPreview() {
   const article = articleFromForm();
   updateWorkflowChrome(article.status);
@@ -1633,16 +1237,25 @@ function renderPreview() {
 
 function renderPublishReview() {
   const article = articleFromForm();
-  els.publishReviewMeta.textContent = (article.status || 'Draft') + ' · ' + (article.category || 'integration') + ' · ' + article.readMinutes + ' min read';
+  els.publishReviewMeta.textContent = 'Design note';
   els.publishReviewTitle.textContent = article.en.title || 'Untitled article';
   els.publishReviewSubtitle.textContent = article.en.subtitle || '';
+  els.publishReviewSubtitle.hidden = !article.en.subtitle;
+  els.publishReviewTags.textContent = '';
+  article.tags.forEach(function (tag) {
+    const chip = document.createElement('span');
+    chip.className = 'sd-tag';
+    chip.textContent = tag;
+    els.publishReviewTags.appendChild(chip);
+  });
+  els.publishReviewReadTime.lastElementChild.textContent = article.readMinutes + ' min';
   els.publishSeoSlug.value = article.id || '';
   els.publishSeoCategory.value = article.category || 'integration';
   els.publishSeoIcon.value = article.icon || 'article';
   els.publishSeoReadMinutes.value = String(article.readMinutes || 5);
   els.publishSeoOrder.value = String(article.order || 100);
   renderPublishOrderWarning();
-  renderStructuredPreview(els.publishReviewBody);
+  els.publishReviewBody.innerHTML = article.en.body || '<p class="sd-preview-empty">Nothing to preview yet. Add content to a section and it will appear here.</p>';
 }
 
 function publishSeoExcludedIds() {
@@ -1871,13 +1484,54 @@ els.detailsActionsMenu.addEventListener('click', function (event) { event.stopPr
 els.editDetailsBtn.addEventListener('click', function () {
   closeArticleDetailsMenu();
   els.detailsForm.hidden = false;
+  setDetailsStatus('', '');
   els.title.focus();
 });
-els.doneDetailsBtn.addEventListener('click', function () {
-  els.detailsForm.hidden = true;
-  renderArticleDetails();
-  renderPreview();
-  markDirty();
+
+function setDetailsStatus(msg, type) {
+  const el = els.detailsSaveStatus;
+  if (!el) return;
+  el.textContent = msg || '';
+  el.hidden = !msg;
+  el.className = 'sd-details-save-status' + (type ? ' sd-details-save-status--' + type : '');
+}
+
+els.saveDetailsBtn.addEventListener('click', async function () {
+  const title = (els.title.value || '').trim();
+  if (!title) {
+    setDetailsStatus('Add a title before saving.', 'error');
+    els.title.focus();
+    return;
+  }
+  els.saveDetailsBtn.disabled = true;
+  setDetailsStatus('Saving…', 'info');
+  try {
+    const article = articleFromForm();
+    article.status = article.status || 'Draft';
+    article.stub = false;
+    // Ensure body is always a string so the server validator doesn't reject it.
+    if (article.en) article.en.body = article.en.body || '';
+    const routeId = selectedId || article.id;
+    const data = await authedJson('/api/admin/system-design/articles/' + routeId, {
+      method: 'PUT',
+      body: JSON.stringify(article),
+    });
+    const saved = data.article;
+    selectedId = saved.id;
+    articles = articles.filter(function (a) { return a.id !== saved.id; }).concat(saved)
+      .sort(function (a, b) { return Number(a.order || 999) - Number(b.order || 999); });
+    renderList();
+    renderArticleDetails();
+    setDetailsStatus('Saved.', 'success');
+    setTimeout(function () {
+      els.detailsForm.hidden = true;
+      setDetailsStatus('', '');
+    }, 1200);
+  } catch (err) {
+    setDetailsStatus(err.message || 'Save failed.', 'error');
+  } finally {
+    els.saveDetailsBtn.disabled = false;
+  }
 });
 document.querySelectorAll('.sd-policy-rule-card').forEach(function (card) {
   const trigger = card.querySelector('.sd-policy-rule-action-btn');
@@ -1913,32 +1567,10 @@ els.toggleLibraryBtn.addEventListener('click', function () {
 els.togglePolicyInfoBtn.addEventListener('click', function () {
   setContactPolicyInfoCollapsed(!els.policyWorkspace.classList.contains('sd-admin-policy-info-collapsed'));
 });
-els.addSectionBtn.setAttribute('aria-haspopup', 'dialog');
-els.addSectionBtn.setAttribute('aria-expanded', 'false');
-els.addSectionBtn.addEventListener('click', function () {
-  renderSectionPickerOptions();
-  if (els.sectionPicker.hidden) openSectionPicker();
-  else closeSectionPicker();
+els.addSectionBtn.addEventListener('click', function (event) {
+  event.stopPropagation();
+  addSection('Problem Statement');
 });
-els.cancelSectionPickerBtn.addEventListener('click', closeSectionPicker);
-els.createCustomSectionBtn.addEventListener('click', function () {
-  const title = els.customSectionTitle.value.trim();
-  if (!title) {
-    els.customSectionTitle.focus();
-    return;
-  }
-  addSection(customSectionTemplate(title));
-  els.customSectionTitle.value = '';
-});
-els.customSectionTitle.addEventListener('keydown', function (event) {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    els.createCustomSectionBtn.click();
-  } else if (event.key === 'Escape') {
-    closeSectionPicker();
-  }
-});
-
 els.title.addEventListener('input', function () {
   if (!selectedId) els.id.value = slugify(els.title.value);
   renderArticleDetails();
@@ -1947,7 +1579,7 @@ els.title.addEventListener('input', function () {
 });
 [
   els.id, els.statusField, els.category, els.icon, els.readMinutes, els.order,
-  els.subtitle, els.tags, els.body,
+  els.subtitle, els.tags,
 ].forEach(function (el) {
   el.addEventListener('input', function () {
     renderArticleDetails();
@@ -2004,6 +1636,10 @@ els.seedBtn.addEventListener('click', function () {
 els.newBtn.addEventListener('click', function () {
   selectedId = '';
   fillForm(null);
+  // Show both Article Details and Article Body together.
+  els.detailsForm.hidden = false;
+  els.sectionBuilder.hidden = false;
+  setDetailsStatus('', '');
   els.title.scrollIntoView({ behavior: 'smooth', block: 'center' });
   els.title.focus();
 });
