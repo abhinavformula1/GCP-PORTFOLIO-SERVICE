@@ -29,7 +29,7 @@ const RICH_SELECTOR = [
 const INSERT_ITEMS = [
   {
     type: 'matrix', label: 'Table', icon: 'table_rows',
-    seed: { type: 'matrix', rows: [{ key: 'Property', value: 'Value' }, { key: 'Property', value: 'Value' }] },
+    seed: { type: 'matrix', rows: [{ key: '', value: '' }, { key: '', value: '' }] },
   },
   {
     type: 'hero', label: 'Selected design', icon: 'stars',
@@ -497,6 +497,122 @@ export function createComposer(options) {
     document.execCommand('defaultParagraphSeparator', false, 'p');
     document.execCommand('styleWithCSS', false, false);
   } catch (_) { /* not supported everywhere; safe to ignore */ }
+
+  // ── Table column resize ───────────────────────────────────────────────────
+  // Lets the author drag the th/td divider to resize the key column.
+  (function attachColumnResize() {
+    let resizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    let targetTable = null;
+
+    surface.addEventListener('mousemove', function (e) {
+      if (!editable || resizing) return;
+      const th = e.target.closest('table.sd-matrix th');
+      if (!th) { surface.style.cursor = ''; return; }
+      const rect = th.getBoundingClientRect();
+      const nearEdge = Math.abs(e.clientX - rect.right) < 6;
+      surface.style.cursor = nearEdge ? 'col-resize' : '';
+    });
+
+    surface.addEventListener('mouseleave', function () {
+      if (!resizing) surface.style.cursor = '';
+    });
+
+    surface.addEventListener('mousedown', function (e) {
+      if (!editable) return;
+      const th = e.target.closest('table.sd-matrix th');
+      if (!th) return;
+      const rect = th.getBoundingClientRect();
+      if (Math.abs(e.clientX - rect.right) >= 6) return;
+      e.preventDefault();
+      resizing = true;
+      startX = e.clientX;
+      startWidth = th.offsetWidth;
+      targetTable = th.closest('table.sd-matrix');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', function (e) {
+      if (!resizing || !targetTable) return;
+      const tableWidth = targetTable.offsetWidth;
+      const newWidth = Math.max(80, Math.min(startWidth + (e.clientX - startX), tableWidth - 80));
+      const pct = ((newWidth / tableWidth) * 100).toFixed(1) + '%';
+      targetTable.querySelectorAll('th').forEach(function (th) { th.style.width = pct; });
+    });
+
+    document.addEventListener('mouseup', function () {
+      if (!resizing) return;
+      resizing = false;
+      targetTable = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      surface.style.cursor = '';
+      emitChange();
+    });
+  }());
+
+  // ── Inline table row controls ─────────────────────────────────────────────
+  // A floating strip that appears on the left of a hovered <tr> inside
+  // the surface, offering "add row below" and "delete row" actions.
+  const rowCtrl = document.createElement('div');
+  rowCtrl.className = 'composer-row-ctrl';
+  rowCtrl.hidden = true;
+  rowCtrl.innerHTML =
+    '<button type="button" class="composer-row-btn" data-action="add" title="Insert row below">' +
+      '<span class="material-symbols-outlined">add</span>' +
+    '</button>' +
+    '<button type="button" class="composer-row-btn" data-action="del" title="Delete row">' +
+      '<span class="material-symbols-outlined">remove</span>' +
+    '</button>';
+  element.appendChild(rowCtrl);
+
+  let activeRow = null;
+
+  function positionRowCtrl(tr) {
+    const surfaceRect = surface.getBoundingClientRect();
+    const trRect = tr.getBoundingClientRect();
+    rowCtrl.hidden = false;
+    rowCtrl.style.top = (trRect.top - surfaceRect.top + surface.scrollTop + (trRect.height / 2) - 20) + 'px';
+  }
+
+  surface.addEventListener('mouseover', function (e) {
+    if (!editable) return;
+    const tr = e.target.closest('tr');
+    if (tr && surface.contains(tr)) {
+      activeRow = tr;
+      positionRowCtrl(tr);
+    }
+  });
+
+  surface.addEventListener('mouseleave', function () {
+    if (!rowCtrl.matches(':hover')) rowCtrl.hidden = true;
+  });
+
+  rowCtrl.addEventListener('mouseleave', function () {
+    rowCtrl.hidden = true;
+    activeRow = null;
+  });
+
+  rowCtrl.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn || !activeRow) return;
+    const tbody = activeRow.closest('tbody');
+    if (!tbody) return;
+    if (btn.dataset.action === 'add') {
+      const newRow = activeRow.cloneNode(true);
+      newRow.querySelectorAll('th, td').forEach(function (cell) { cell.innerHTML = ''; });
+      activeRow.parentNode.insertBefore(newRow, activeRow.nextSibling);
+    } else if (btn.dataset.action === 'del') {
+      if (tbody.rows.length > 1) {
+        activeRow.remove();
+      }
+    }
+    emitChange();
+    rowCtrl.hidden = true;
+    activeRow = null;
+  });
 
   // ── public API ────────────────────────────────────────────────────────────
 

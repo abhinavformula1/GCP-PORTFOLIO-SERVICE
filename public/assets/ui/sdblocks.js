@@ -143,13 +143,15 @@ function sequenceToHtml(block) {
 }
 
 function matrixToHtml(block) {
-  const rows = Array.isArray(block.rows) ? block.rows.filter(function (r) { return r && (r.key || r.value); }) : [];
+  // Keep all rows (including empty ones) so the table renders in the editor.
+  // Only skip null/undefined entries; guard against a completely rowless block.
+  const rows = Array.isArray(block.rows) ? block.rows.filter(function (r) { return r != null; }) : [];
   if (!rows.length) return '';
-  let html = '<table class="sd-matrix"><tbody>';
+  let html = '<div class="sd-matrix-wrap"><table class="sd-matrix"><tbody>';
   rows.forEach(function (row) {
     html += '<tr><th>' + escapeHtml(row.key) + '</th><td>' + inlineMd(row.value) + '</td></tr>';
   });
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   return html;
 }
 

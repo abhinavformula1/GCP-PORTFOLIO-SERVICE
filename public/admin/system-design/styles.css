@@ -1812,6 +1812,40 @@
   outline: none;
 }
 
+/* ── Inline table row controls ─────────────────────────────────────────── */
+.composer-row-ctrl {
+  position: absolute;
+  left: -36px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 30;
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 8px;
+  padding: 3px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+}
+
+.composer-row-ctrl[hidden] { display: none; }
+
+.composer-row-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.composer-row-btn:hover { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.composer-row-btn[data-action="del"]:hover { background: color-mix(in srgb, var(--md-sys-color-error) 14%, transparent); color: var(--md-sys-color-error); }
+.composer-row-btn .material-symbols-outlined { font-size: 16px; }
+
 .composer-menu-item .material-symbols-outlined {
   display: grid;
   place-items: center;
