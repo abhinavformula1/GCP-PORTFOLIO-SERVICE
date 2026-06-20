@@ -1,12 +1,19 @@
 'use strict';
 
 /**
- * Server-side PDF via headless Chrome.
+ * Server-side PDF generation via headless Chrome (Puppeteer).
  *
- * page.pdf() applies @media print rules automatically — no page.evaluate()
- * needed.  Removing all evaluate() calls eliminates the "detached frame"
- * errors that Puppeteer v25 throws when the URL hash changes during SPA
- * routing.
+ * Uses page.setContent(html) instead of page.goto(url).
+ *
+ * Why this matters:
+ *   page.goto() on a hash-route SPA URL causes Puppeteer v25 to track the
+ *   hash fragment as a navigation event, which invalidates the execution
+ *   context and throws "detached frame" on every subsequent page call.
+ *
+ *   page.setContent() does NOT navigate — it writes HTML directly into the
+ *   page.  No URL changes, no frame detachment, no race conditions.
+ *   The full site CSS is embedded in the HTML by articleHtml.js, so
+ *   @media print styles apply exactly as in the browser.
  */
 
 const puppeteer = require('puppeteer-core');
@@ -44,13 +51,11 @@ const LAUNCH_ARGS = [
 ];
 
 /**
- * @param {object} opts
- * @param {string}  opts.url           - Full URL to render (including hash for SPAs).
- * @param {string} [opts.readySelector]- CSS selector to wait for before capture.
- * @param {number} [opts.settleMs]     - Extra ms after selector fires (default 2500).
+ * @param {string} html      - Complete HTML document to render.
+ * @param {number} [settleMs]- Ms to wait after setContent (default 1500).
  * @returns {Promise<Buffer>}
  */
-async function generatePdf({ url, readySelector = 'body', settleMs = 2500 }) {
+async function generatePdfFromHtml(html, settleMs = 1500) {
   const browser = await puppeteer.launch({
     executablePath: resolveChromePath(),
     headless: true,
@@ -61,18 +66,14 @@ async function generatePdf({ url, readySelector = 'body', settleMs = 2500 }) {
     const page = await browser.newPage();
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1.5 });
 
-    await page.goto(url, { waitUntil: 'load', timeout: 30_000 });
+    // setContent writes HTML directly — no URL navigation, no frame detachment.
+    await page.setContent(html, { waitUntil: 'load' });
 
-    if (readySelector !== 'body') {
-      await page.waitForSelector(readySelector, { timeout: 20_000 });
-    }
-
-    // Let images / late API calls finish before capturing.
+    // Wait for images (GCS URLs embedded in the HTML) to load.
     await new Promise(r => setTimeout(r, settleMs));
 
-    // page.pdf() triggers @media print automatically — no evaluate() needed.
-    // Buffer.from() required: Puppeteer v21+ returns Uint8Array, not Buffer;
-    // Express res.send() would JSON-serialise a Uint8Array as { "0":37, ... }.
+    // page.pdf() returns Uint8Array in Puppeteer v21+.
+    // Buffer.from() required so Express res.send() sends binary data.
     return Buffer.from(await page.pdf({
       format:              'A4',
       printBackground:     true,
@@ -81,10 +82,9 @@ async function generatePdf({ url, readySelector = 'body', settleMs = 2500 }) {
       footerTemplate:      '',
       margin: { top: '18mm', right: '18mm', bottom: '22mm', left: '18mm' },
     }));
-
   } finally {
     await browser.close();
   }
 }
 
-module.exports = { generatePdf, resolveChromePath };
+module.exports = { generatePdfFromHtml, resolveChromePath };
