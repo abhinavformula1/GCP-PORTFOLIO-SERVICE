@@ -2,8 +2,10 @@
 
 const express   = require('express');
 const rateLimit = require('express-rate-limit');
-const { AppError }                   = require('../errors');
-const { generatePdf, resolveChromePath } = require('../services/pdf');
+const { AppError }             = require('../errors');
+const { getSystemDesignArticle } = require('../services/firestore');
+const { buildPrintDocument }   = require('../services/articleHtml');
+const { generatePdfFromHtml, resolveChromePath } = require('../services/pdf');
 
 const router = express.Router();
 
@@ -13,6 +15,7 @@ const pdfLimiter = rateLimit({
   message: { success: false, code: 'RATE_LIMITED', error: 'Too many PDF exports. Try again in 15 minutes.' },
 });
 
+// Chrome health-check
 router.get('/health', async (_req, res) => {
   try {
     const puppeteer      = require('puppeteer-core');
@@ -28,6 +31,7 @@ router.get('/health', async (_req, res) => {
   }
 });
 
+// System Design article PDF export
 router.get('/export', pdfLimiter, async (req, res, next) => {
   try {
     const { id } = req.query;
@@ -35,14 +39,17 @@ router.get('/export', pdfLimiter, async (req, res, next) => {
       return res.status(400).json({ success: false, code: 'BAD_REQUEST', error: 'Missing or invalid article id.' });
     }
 
-    const proto   = req.headers['x-forwarded-proto'] || req.protocol;
-    const host    = req.headers['x-forwarded-host']  || req.get('host');
-    const baseUrl = `${proto}://${host}`;
+    // 1. Fetch article from Firestore (same DB the live page uses).
+    const article = await getSystemDesignArticle(id);
+    if (!article) {
+      return res.status(404).json({ success: false, code: 'NOT_FOUND', error: 'Article not found.' });
+    }
 
-    const pdfBuffer = await generatePdf({
-      url:           `${baseUrl}/#/system-design/${encodeURIComponent(id)}`,
-      readySelector: '.sd-article-body',
-    });
+    // 2. Build self-contained HTML (CSS embedded, no external requests needed).
+    const html = buildPrintDocument(article);
+
+    // 3. Render to PDF via headless Chrome — no URL navigation, no frame issues.
+    const pdfBuffer = await generatePdfFromHtml(html);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${id}-system-design.pdf"`);
