@@ -2270,6 +2270,16 @@ col.sd-tbl-action-col { width: 56px; }
   padding: 1px 5px;
   border-radius: 4px;
 }
+.sd-img-ok {
+  font-size: 10px;
+  font-weight: 500;
+  color: #1e8e3e;
+  text-transform: none;
+  letter-spacing: 0;
+  background: rgba(30, 142, 62, 0.12);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
 .sd-img-optional {
   font-size: 10px;
   color: var(--md-sys-color-on-surface-variant);
