@@ -86,11 +86,11 @@ async function uploadMedia({ buffer, mimetype, originalname, size }) {
       contentType: mimetype,
       cacheControl: 'public, max-age=31536000, immutable',
     },
+    // predefinedAcl is omitted — the bucket uses uniform bucket-level access
+    // with allUsers:objectViewer, so every object is public automatically.
+    // Calling file.makePublic() on a uniform-access bucket throws a 400.
     resumable: false,
   });
-
-  // Make file publicly readable.
-  await file.makePublic();
 
   const url = `https://storage.googleapis.com/${bucket.name}/${destName}`;
   return { url, mimeType: mimetype, size };
