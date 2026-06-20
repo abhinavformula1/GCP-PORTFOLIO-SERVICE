@@ -57,8 +57,8 @@ async function generateArticlePdf(articleId, baseUrl) {
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--disable-extensions',
-      '--single-process',       // reduces memory in Cloud Run containers
       '--no-zygote',
+      // Note: --single-process is intentionally excluded; it corrupts PDF output.
     ],
   });
 
@@ -105,7 +105,9 @@ async function generateArticlePdf(articleId, baseUrl) {
     await new Promise(r => setTimeout(r, 400));
 
     // 4. Generate PDF — no browser chrome, exact A4, background colors preserved.
-    const pdfBuffer = await page.pdf({
+    // page.pdf() returns Uint8Array in Puppeteer v21+. Wrap with Buffer.from()
+    // so Express res.send() treats it as binary, not a JSON-serialised object.
+    const pdfBuffer = Buffer.from(await page.pdf({
       format: 'A4',
       printBackground: true,
       displayHeaderFooter: false,   // ← this is the key: zero browser chrome
@@ -117,7 +119,7 @@ async function generateArticlePdf(articleId, baseUrl) {
         bottom: '22mm',
         left:   '18mm',
       },
-    });
+    }));
 
     return pdfBuffer;
   } finally {
