@@ -15,6 +15,7 @@
 
 const express   = require('express');
 const rateLimit = require('express-rate-limit');
+const { AppError } = require('../errors');
 const { generateArticlePdf } = require('../services/pdf');
 
 const router = express.Router();
@@ -25,6 +26,25 @@ const pdfLimiter = rateLimit({
   standardHeaders:  true,
   legacyHeaders:    false,
   message:          { success: false, code: 'RATE_LIMITED', error: 'Too many PDF exports. Try again in 15 minutes.' },
+});
+
+// Quick Chrome health-check — does NOT generate a PDF, just tries to launch
+// and immediately close Chrome. Use this to diagnose startup failures on Cloud Run.
+router.get('/health', async (_req, res) => {
+  try {
+    const puppeteer = require('puppeteer-core');
+    const { resolveChromePath } = require('../services/pdf');
+    const executablePath = resolveChromePath();
+    const browser = await puppeteer.launch({
+      executablePath,
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+    });
+    await browser.close();
+    res.json({ ok: true, chrome: executablePath });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 router.get('/export', pdfLimiter, async (req, res, next) => {
@@ -51,7 +71,9 @@ router.get('/export', pdfLimiter, async (req, res, next) => {
     res.setHeader('Content-Length', pdfBuffer.length);
     res.send(pdfBuffer);
   } catch (err) {
-    next(err);
+    // Surface the real Puppeteer/Chrome error so we can diagnose it.
+    // Wrap as operational so errorHandler forwards the message to the client.
+    next(new AppError('PDF generation failed: ' + err.message, 500, 'PDF_ERROR'));
   }
 });
 
