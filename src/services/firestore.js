@@ -389,6 +389,13 @@ function sanitiseArticleBlocks(blocks) {
       if (!plain || typeof plain !== 'object') return null;
       plain.id = String(plain.id || '');
       plain.type = String(plain.type || 'paragraph');
+      // Firestore does not support nested arrays.
+      // Convert matrix rows from [['c0','c1',...]] to [{cells:['c0','c1',...]}].
+      if (plain.type === 'matrix' && Array.isArray(plain.rows)) {
+        plain.rows = plain.rows.map((row) =>
+          Array.isArray(row) ? { cells: row.map(String) } : row
+        );
+      }
       return plain;
     })
     .filter(Boolean)

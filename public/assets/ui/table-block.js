@@ -22,7 +22,13 @@ function normaliseRow(row, colCount) {
   if (Array.isArray(row)) {
     cells = row.map(function (c) { return String(c == null ? '' : c); });
   } else if (row && typeof row === 'object') {
-    cells = [String(row.key || ''), String(row.value || '')];
+    if (Array.isArray(row.cells)) {
+      // Firestore-safe storage format {cells:['c0','c1',...]}
+      cells = row.cells.map(function (c) { return String(c == null ? '' : c); });
+    } else {
+      // Legacy {key, value} format
+      cells = [String(row.key || ''), String(row.value || '')];
+    }
   } else {
     cells = [];
   }
