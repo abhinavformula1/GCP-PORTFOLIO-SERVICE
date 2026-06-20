@@ -54,11 +54,15 @@ async function generateArticlePdf(articleId, baseUrl) {
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
+      '--disable-dev-shm-usage',      // use /tmp instead of /dev/shm (Cloud Run limit)
       '--disable-gpu',
       '--disable-extensions',
-      '--no-zygote',
-      // Note: --single-process is intentionally excluded; it corrupts PDF output.
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-background-networking',
+      '--disable-sync',
+      // Note: --no-zygote removed — crashes renderer on Cloud Run gVisor sandbox.
+      // Note: --single-process removed — corrupts PDF output.
     ],
   });
 
@@ -70,11 +74,14 @@ async function generateArticlePdf(articleId, baseUrl) {
 
     const url = `${baseUrl}/#/system-design/${encodeURIComponent(articleId)}`;
 
-    // 1. Navigate to the article; networkidle0 catches the Firestore fetch.
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30_000 });
+    // 1. Navigate to the article. Use 'load' (not 'networkidle0') for stability
+    //    on Cloud Run — less strict, avoids race conditions with renderer startup.
+    await page.goto(url, { waitUntil: 'load', timeout: 30_000 });
 
     // 2. Wait until the article body has actually rendered into the DOM.
-    await page.waitForSelector('.sd-article-body', { timeout: 15_000 });
+    //    The SPA fetches article data from /api after load, so we wait for the
+    //    rendered content rather than relying on network idle.
+    await page.waitForSelector('.sd-article-body', { timeout: 20_000 });
 
     // 3. Activate the print-mode class (applies our @media print stylesheet).
     //    Passed as a string so ESLint (Node context) does not flag browser globals
