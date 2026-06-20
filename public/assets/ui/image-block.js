@@ -262,7 +262,16 @@ export function createImageBlock(initialData, onChange) {
     altInput.placeholder = 'Describe the image for screen readers and SEO';
     altInput.disabled = !editable;
     altInput.setAttribute('aria-label', 'Alt text (required for accessibility)');
-    altInput.addEventListener('input', function () { data.alt = altInput.value; emit(); });
+    function updateAltBadge() {
+      altRequired.textContent = altInput.value.trim() ? 'added' : 'required';
+      altRequired.className   = altInput.value.trim() ? 'sd-img-ok' : 'sd-img-required';
+    }
+    updateAltBadge();
+    altInput.addEventListener('input', function () {
+      data.alt = altInput.value;
+      updateAltBadge();
+      emit();
+    });
 
     altRow.appendChild(altLabel);
     altRow.appendChild(altInput);
