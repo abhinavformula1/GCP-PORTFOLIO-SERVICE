@@ -93,8 +93,11 @@ export function createImageBlock(initialData, onChange) {
       formData.append('file', file);
 
       const headers = {};
-      // Attach Google ID token if available (set by admin page auth flow).
-      if (window.__googleIdToken) headers['Authorization'] = 'Bearer ' + window.__googleIdToken;
+      // Use the admin credential (set by admin.js) or fall back to the Google
+      // ID token set by other pages. In local preview mode __adminCredential is
+      // 'local-admin-preview' and the server's requireAdmin bypasses auth entirely.
+      const token = window.__adminCredential || window.__googleIdToken || '';
+      if (token) headers['Authorization'] = 'Bearer ' + token;
 
       const res = await fetch('/api/media/upload', { method: 'POST', headers, body: formData });
       const json = await res.json();
