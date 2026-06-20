@@ -372,39 +372,52 @@ function renderTopicDetail() {
 }
 
 function exportCurrentTopicPdf() {
-  // Inject a designed header that replaces the browser's URL bar
-  const existing = document.getElementById('sd-print-header');
-  if (existing) existing.remove();
+  if (!_activeTopic) return;
 
-  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  const header = document.createElement('div');
-  header.id = 'sd-print-header';
-  header.className = 'sd-print-header';
-  header.setAttribute('aria-hidden', 'true');
-  header.innerHTML =
-    '<span class="sd-print-header-brand">Abhinav Kumar &mdash; System Design</span>' +
-    '<span class="sd-print-header-date">' + dateStr + '</span>';
-
-  // Insert directly before the article so it appears at the top of the print page
-  const article = _sdDetail && _sdDetail.querySelector('.sd-article');
-  if (article) {
-    article.insertAdjacentElement('beforebegin', header);
-  } else {
-    document.body.prepend(header);
+  const btn = _sdDetail && _sdDetail.querySelector('.sd-export-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML =
+      '<span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span>' +
+      '<span>Generating…</span>';
   }
 
-  document.body.classList.add('sd-printing');
+  const token = window.__adminCredential || window.__googleIdToken || '';
+  const headers = token ? { Authorization: 'Bearer ' + token } : {};
 
-  // Let the DOM settle, then print
-  requestAnimationFrame(function () {
-    window.print();
-    setTimeout(function () {
-      document.body.classList.remove('sd-printing');
-      const h = document.getElementById('sd-print-header');
-      if (h) h.remove();
-    }, 800);
-  });
+  fetch('/api/pdf/export?id=' + encodeURIComponent(_activeTopic), { headers })
+    .then(function (res) {
+      if (!res.ok) {
+        return res.json().then(function (body) {
+          throw new Error(body.error || ('HTTP ' + res.status));
+        });
+      }
+      return res.blob();
+    })
+    .then(function (blob) {
+      // Trigger a file download in the browser — clean filename, no dialog.
+      const url  = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href     = url;
+      link.download = _activeTopic + '-system-design.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    })
+    .catch(function (err) {
+       
+      console.error('[PDF export]', err);
+      alert('PDF generation failed: ' + err.message);
+    })
+    .finally(function () {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML =
+          '<span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>' +
+          '<span>' + (typeof uiText === 'function' ? uiText('exportPdf') : 'Export PDF') + '</span>';
+      }
+    });
 }
 
 function highlightActiveTopic() {
