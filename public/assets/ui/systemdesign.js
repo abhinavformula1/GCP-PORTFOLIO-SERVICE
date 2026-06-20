@@ -232,7 +232,11 @@ function renderTopicList() {
       const disabled = t.stub ? ' sd-disabled' : '';
       group += '<li class="sd-topic-item' + active + disabled + '" data-topic-id="' + t.id + '">';
       group += '<button type="button" class="sd-topic-btn" data-topic-id="' + t.id + '"' + (t.id === _activeTopic ? ' aria-current="page"' : '') + '>';
-      group += '<span class="material-symbols-outlined sd-topic-icon" aria-hidden="true">' + (t.icon || 'article') + '</span>';
+      if (t.thumbnail) {
+        group += '<img class="sd-topic-thumb" src="' + escapeHtml(t.thumbnail) + '" alt="" loading="lazy" aria-hidden="true">';
+      } else {
+        group += '<span class="material-symbols-outlined sd-topic-icon" aria-hidden="true">' + (t.icon || 'article') + '</span>';
+      }
       group += '<span class="sd-topic-text">';
       group += '<span class="sd-topic-title" data-i18n="' + topicKey(t.id, 'title') + '">' + escapeHtml(loc.title) + '</span>';
       group += '<span class="sd-topic-sub" data-i18n="' + topicKey(t.id, 'subtitle') + '">' + escapeHtml(loc.subtitle) + '</span>';

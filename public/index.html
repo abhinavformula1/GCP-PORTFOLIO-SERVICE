@@ -727,6 +727,21 @@
     </div>
   </md-dialog>
 
+  <!-- ── B2B Sponsorship Banner ──────────────────────────────────────────────
+       Loaded dynamically from Firestore via GET /api/media/sponsorship.
+       Hidden if no active sponsorship is configured.                         -->
+  <section class="sponsor-section" id="sponsorBanner" hidden aria-label="Sponsored content">
+    <div class="sponsor-inner">
+      <a class="sponsor-link" id="sponsorLink" href="#" target="_blank" rel="noopener noreferrer">
+        <img class="sponsor-img" id="sponsorImg" src="" alt="" loading="lazy">
+        <div class="sponsor-body">
+          <div class="sponsor-badge">Sponsored</div>
+          <p class="sponsor-cta" id="sponsorCta"></p>
+        </div>
+      </a>
+    </div>
+  </section>
+
   <!-- ── Recommendations Section ──
        Public read of /api/recommendations populates this list on page load.
        Submission requires Google Sign-In; the modal below only opens for

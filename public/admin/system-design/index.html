@@ -185,6 +185,34 @@
                 <label>Tags
                   <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
                 </label>
+
+                <!-- Thumbnail -->
+                <div class="sd-thumb-field">
+                  <div class="sd-thumb-label">
+                    <span class="material-symbols-outlined" aria-hidden="true">image</span>
+                    <span>Thumbnail</span>
+                    <span class="sd-thumb-hint">Shown on the home page article card (JPEG, PNG, WebP, max 8 MB)</span>
+                  </div>
+                  <div class="sd-thumb-picker" id="articleThumbPicker">
+                    <div class="sd-thumb-preview-wrap" id="articleThumbPreviewWrap" hidden>
+                      <img id="articleThumbPreview" src="" alt="" class="sd-thumb-preview-img" loading="lazy">
+                      <button type="button" class="sd-thumb-remove-btn" id="articleThumbRemoveBtn"
+                        title="Remove thumbnail" aria-label="Remove thumbnail">
+                        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                      </button>
+                    </div>
+                    <label class="sd-thumb-dropzone" id="articleThumbDropzone" tabindex="0"
+                      role="button" aria-label="Upload thumbnail image">
+                      <input type="file" id="articleThumbInput" class="sd-img-file-input"
+                        accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                        aria-hidden="true">
+                      <span class="material-symbols-outlined sd-thumb-upload-icon">upload</span>
+                      <span class="sd-thumb-drop-text">Upload thumbnail</span>
+                    </label>
+                    <div class="sd-thumb-status" id="articleThumbStatus" hidden></div>
+                  </div>
+                </div>
+
                 <div class="sd-article-details-toolbar">
                   <span id="articleDetailsSaveStatus" class="sd-details-save-status" hidden></span>
                   <button type="button" id="saveArticleDetailsBtn" class="sd-details-save-btn">

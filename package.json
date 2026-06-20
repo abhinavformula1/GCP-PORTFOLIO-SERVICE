@@ -21,12 +21,14 @@
   "dependencies": {
     "@google-cloud/firestore": "^8.6.0",
     "@google-cloud/secret-manager": "^5.6.0",
+    "@google-cloud/storage": "^7.21.0",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "express-validator": "^7.2.1",
     "google-auth-library": "^10.6.2",
-    "jsforce": "^3.10.14"
+    "jsforce": "^3.10.14",
+    "multer": "^2.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

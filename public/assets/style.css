@@ -1526,6 +1526,15 @@ a:hover { text-decoration: underline; }
   font-size: 18px;
   color: #0070D2;
   margin-top: 1px;
+  flex-shrink: 0;
+}
+.sd-topic-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--md-sys-color-surface-container-high);
 }
 
 .sd-topic-text {
@@ -1811,6 +1820,80 @@ a:hover { text-decoration: underline; }
   background: transparent;
   padding: 0;
   font-size: 12.5px;
+}
+
+/* ── B2B Sponsorship Banner ──────────────────────────────────────────────── */
+.sponsor-section {
+  padding: 12px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 18%, transparent);
+}
+.sponsor-inner {
+  max-width: 1128px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.sponsor-link {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: color-mix(in srgb, var(--md-sys-color-surface-container) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent);
+  border-radius: 12px;
+  padding: 12px 16px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.sponsor-link:hover {
+  background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 80%, transparent);
+  border-color: color-mix(in srgb, var(--md-sys-color-outline) 40%, transparent);
+}
+.sponsor-img {
+  width: auto;
+  height: 40px;
+  max-width: 160px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+.sponsor-body { display: flex; flex-direction: column; gap: 2px; }
+.sponsor-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.6;
+}
+.sponsor-cta {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+}
+@media (max-width: 540px) {
+  .sponsor-img { height: 30px; }
+  .sponsor-link { gap: 10px; padding: 10px 12px; }
+}
+
+/* ── Public image block ───────────────────────────────────────────────────── */
+figure.sd-image-block {
+  margin: 20px 0;
+  padding: 0;
+  display: block;
+}
+figure.sd-image-block img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  object-fit: contain;
+}
+figure.sd-image-block figcaption {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: center;
 }
 
 /* ── Code Block (sd-code-block) ────────────────────────────────────────── */

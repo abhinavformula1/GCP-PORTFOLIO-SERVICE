@@ -42,7 +42,7 @@ module.exports = [
 
   // Front-end: ES modules running in the browser.
   {
-    files: ['public/assets/**/*.js'],
+    files: ['public/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
