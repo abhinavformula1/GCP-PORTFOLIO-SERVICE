@@ -713,7 +713,7 @@ function buildSectionTypeSelect(section) {
   const wrap = document.createElement('span');
   wrap.className = 'sd-section-type-wrap';
 
-  // --- Select ---
+  // --- Select (shown when a preset is active) ---
   const select = document.createElement('select');
   select.className = 'sd-section-type-select';
   SECTION_TYPES.forEach(function (type) {
@@ -727,20 +727,39 @@ function buildSectionTypeSelect(section) {
   customOpt.textContent = 'Custom…';
   select.appendChild(customOpt);
   select.value = isPreset ? section.type : '__custom__';
+  select.hidden = !isPreset;
 
-  // --- Custom text input (shown only when Custom is selected) ---
+  // --- Custom input (shown INSTEAD of select when custom is active) ---
   const customInput = document.createElement('input');
   customInput.type = 'text';
   customInput.className = 'sd-section-type-custom-input';
-  customInput.placeholder = 'Enter section name';
+  customInput.placeholder = 'Section name…';
   customInput.spellcheck = false;
   customInput.autocomplete = 'off';
   customInput.value = isPreset ? '' : (section.type || '');
   customInput.hidden = isPreset;
 
+  function showSelect() {
+    customInput.hidden = true;
+    select.hidden = false;
+    select.focus();
+  }
+
+  function showCustom() {
+    select.hidden = true;
+    customInput.hidden = false;
+    customInput.focus();
+    customInput.select();
+  }
+
   function commitCustom() {
     const val = customInput.value.trim();
-    if (!val) { customInput.value = section.type || ''; return; }
+    if (!val) {
+      // Nothing typed — revert to select
+      showSelect();
+      select.value = '__custom__';
+      return;
+    }
     section.type = val;
     renderPreview();
     markDirty();
@@ -748,11 +767,9 @@ function buildSectionTypeSelect(section) {
 
   select.addEventListener('change', function () {
     if (select.value === '__custom__') {
-      customInput.hidden = false;
-      customInput.focus();
-      customInput.select();
+      customInput.value = '';
+      showCustom();
     } else {
-      customInput.hidden = true;
       section.type = select.value;
       renderPreview();
       markDirty();
@@ -762,6 +779,7 @@ function buildSectionTypeSelect(section) {
   customInput.addEventListener('blur', commitCustom);
   customInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); commitCustom(); customInput.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); showSelect(); }
   });
 
   wrap.append(select, customInput);

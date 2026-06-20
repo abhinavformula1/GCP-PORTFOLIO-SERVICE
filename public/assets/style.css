@@ -1981,32 +1981,23 @@ a:hover { text-decoration: underline; }
   text-align: left;
   vertical-align: top;
   line-height: 1.5;
+  border-radius: 0;
 }
 
 .sd-matrix th {
-  width: 36%;
   color: var(--md-sys-color-on-surface, #1c1b1f);
   font-size: 13px;
   font-weight: 700;
-  white-space: nowrap;
   border-right: 1.5px solid var(--md-sys-color-outline-variant, #cad3e0);
-  position: relative;
-}
-
-/* Visual resize affordance on th right border */
-.composer-surface .sd-matrix th::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: -3px;
-  width: 6px;
-  height: 100%;
-  cursor: col-resize;
-  z-index: 1;
 }
 
 .sd-matrix td {
   color: var(--md-sys-color-on-surface-variant, #49454f);
+}
+
+/* Divider between all columns */
+.sd-matrix td:not(:last-child) {
+  border-right: 1.5px solid var(--md-sys-color-outline-variant, #cad3e0);
 }
 
 .sd-matrix tbody tr:hover th,

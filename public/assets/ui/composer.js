@@ -16,6 +16,7 @@
  */
 
 import { blockToHtml, blocksToHtml, htmlToBlocks } from './sdblocks.js';
+import { createTableBlock } from './table-block.js';
 
 const RICH_SELECTOR = [
   'table', 'ul', 'ol',
@@ -29,7 +30,7 @@ const RICH_SELECTOR = [
 const INSERT_ITEMS = [
   {
     type: 'matrix', label: 'Table', icon: 'table_rows',
-    seed: { type: 'matrix', rows: [{ key: '', value: '' }, { key: '', value: '' }] },
+    seed: { type: 'matrix', rows: [['', ''], ['', '']] },
   },
   {
     type: 'hero', label: 'Selected design', icon: 'stars',
@@ -174,6 +175,11 @@ export function createComposer(options) {
       editBtn.title = editable ? 'Lock section (read-only)' : 'Edit section';
     }
     if (saveBtn) saveBtn.disabled = !editable;
+    // Lock/unlock any embedded table components.
+    surface.querySelectorAll('[data-block="matrix"]').forEach(function (el) {
+      // Find the createTableBlock instance via its setEditable method stored on the element.
+      if (typeof el._setEditable === 'function') el._setEditable(editable);
+    });
   }
 
   function focus() {
@@ -205,11 +211,13 @@ export function createComposer(options) {
       const isBlock = isElement && /^(p|h[1-6]|ul|ol|table|section|div|blockquote|figure)$/.test(tag);
       if (isBlock) {
         buffer = null;
-        if (tag === 'div') {
+        if (tag === 'div' && !(node.dataset && node.dataset.block)) {
+          // Generic div → flatten into a paragraph.
           const p = document.createElement('p');
           p.innerHTML = node.innerHTML;
           wrapper.appendChild(p);
         } else {
+          // Structured blocks (including data-block="matrix" table components) pass through as-is.
           wrapper.appendChild(node);
         }
         return;
@@ -264,6 +272,50 @@ export function createComposer(options) {
     document.execCommand('insertHTML', false, html + '<p><br></p>');
     refreshActiveStates();
     emitChange();
+  }
+
+  function insertTableBlock(initialRows) {
+    const block = createTableBlock(initialRows || [], function () { emitChange(); });
+    // Insert as a block-level element — place after current selection or at end.
+    const sel = window.getSelection();
+    const anchor = sel && sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+    let refNode = anchor ? (surface.contains(anchor) ? anchor : null) : null;
+    while (refNode && refNode.parentNode !== surface) refNode = refNode.parentNode;
+    if (refNode && refNode !== surface) {
+      refNode.insertAdjacentElement('afterend', block.element);
+    } else {
+      surface.appendChild(block.element);
+    }
+    // Ensure a paragraph follows for continued typing.
+    const p = document.createElement('p');
+    p.innerHTML = '<br>';
+    block.element.insertAdjacentElement('afterend', p);
+    // Focus first cell.
+    const firstInput = block.element.querySelector('.sd-tbl-input');
+    if (firstInput) firstInput.focus();
+    emitChange();
+  }
+
+  // Replace any legacy sd-matrix-wrap HTML (from setBlocks/load) with live
+  // table components. Called after innerHTML is set on the surface.
+  function mountTableBlocks() {
+    // Mount live table-block components over any static sd-matrix-wrap HTML
+    // left by blocksToHtml (legacy load path). The dedicated component elements
+    // (data-block="matrix") are already live — skip them.
+    surface.querySelectorAll('.sd-matrix-wrap').forEach(function (wrap) {
+      const rows = Array.from(wrap.querySelectorAll('tr')).map(function (tr) {
+        // Collect th (first cell) + all td → array of strings.
+        const cells = [];
+        const th = tr.querySelector('th');
+        if (th) cells.push(th.textContent.trim());
+        tr.querySelectorAll('td').forEach(function (td) { cells.push(td.textContent.trim()); });
+        return cells;
+      }).filter(function (r) { return r.length > 0; });
+      const block = createTableBlock(rows, function () { emitChange(); });
+      block.element._setEditable = block.setEditable;
+      block.setEditable(editable);
+      wrap.replaceWith(block.element);
+    });
   }
 
   function currentTopBlock() {
@@ -369,7 +421,11 @@ export function createComposer(options) {
       row.appendChild(label);
       row.addEventListener('click', function () {
         closeMenu();
-        insertHtml(blockToHtml(item.seed));
+        if (item.seed && item.seed.type === 'matrix') {
+          insertTableBlock(item.seed.rows);
+        } else {
+          insertHtml(blockToHtml(item.seed));
+        }
       });
       menu.appendChild(row);
     });
@@ -498,121 +554,7 @@ export function createComposer(options) {
     document.execCommand('styleWithCSS', false, false);
   } catch (_) { /* not supported everywhere; safe to ignore */ }
 
-  // ── Table column resize ───────────────────────────────────────────────────
-  // Lets the author drag the th/td divider to resize the key column.
-  (function attachColumnResize() {
-    let resizing = false;
-    let startX = 0;
-    let startWidth = 0;
-    let targetTable = null;
-
-    surface.addEventListener('mousemove', function (e) {
-      if (!editable || resizing) return;
-      const th = e.target.closest('table.sd-matrix th');
-      if (!th) { surface.style.cursor = ''; return; }
-      const rect = th.getBoundingClientRect();
-      const nearEdge = Math.abs(e.clientX - rect.right) < 6;
-      surface.style.cursor = nearEdge ? 'col-resize' : '';
-    });
-
-    surface.addEventListener('mouseleave', function () {
-      if (!resizing) surface.style.cursor = '';
-    });
-
-    surface.addEventListener('mousedown', function (e) {
-      if (!editable) return;
-      const th = e.target.closest('table.sd-matrix th');
-      if (!th) return;
-      const rect = th.getBoundingClientRect();
-      if (Math.abs(e.clientX - rect.right) >= 6) return;
-      e.preventDefault();
-      resizing = true;
-      startX = e.clientX;
-      startWidth = th.offsetWidth;
-      targetTable = th.closest('table.sd-matrix');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    });
-
-    document.addEventListener('mousemove', function (e) {
-      if (!resizing || !targetTable) return;
-      const tableWidth = targetTable.offsetWidth;
-      const newWidth = Math.max(80, Math.min(startWidth + (e.clientX - startX), tableWidth - 80));
-      const pct = ((newWidth / tableWidth) * 100).toFixed(1) + '%';
-      targetTable.querySelectorAll('th').forEach(function (th) { th.style.width = pct; });
-    });
-
-    document.addEventListener('mouseup', function () {
-      if (!resizing) return;
-      resizing = false;
-      targetTable = null;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      surface.style.cursor = '';
-      emitChange();
-    });
-  }());
-
-  // ── Inline table row controls ─────────────────────────────────────────────
-  // A floating strip that appears on the left of a hovered <tr> inside
-  // the surface, offering "add row below" and "delete row" actions.
-  const rowCtrl = document.createElement('div');
-  rowCtrl.className = 'composer-row-ctrl';
-  rowCtrl.hidden = true;
-  rowCtrl.innerHTML =
-    '<button type="button" class="composer-row-btn" data-action="add" title="Insert row below">' +
-      '<span class="material-symbols-outlined">add</span>' +
-    '</button>' +
-    '<button type="button" class="composer-row-btn" data-action="del" title="Delete row">' +
-      '<span class="material-symbols-outlined">remove</span>' +
-    '</button>';
-  element.appendChild(rowCtrl);
-
-  let activeRow = null;
-
-  function positionRowCtrl(tr) {
-    const surfaceRect = surface.getBoundingClientRect();
-    const trRect = tr.getBoundingClientRect();
-    rowCtrl.hidden = false;
-    rowCtrl.style.top = (trRect.top - surfaceRect.top + surface.scrollTop + (trRect.height / 2) - 20) + 'px';
-  }
-
-  surface.addEventListener('mouseover', function (e) {
-    if (!editable) return;
-    const tr = e.target.closest('tr');
-    if (tr && surface.contains(tr)) {
-      activeRow = tr;
-      positionRowCtrl(tr);
-    }
-  });
-
-  surface.addEventListener('mouseleave', function () {
-    if (!rowCtrl.matches(':hover')) rowCtrl.hidden = true;
-  });
-
-  rowCtrl.addEventListener('mouseleave', function () {
-    rowCtrl.hidden = true;
-    activeRow = null;
-  });
-
-  rowCtrl.addEventListener('click', function (e) {
-    const btn = e.target.closest('[data-action]');
-    if (!btn || !activeRow) return;
-    const tbody = activeRow.closest('tbody');
-    if (!tbody) return;
-    if (btn.dataset.action === 'add') {
-      const newRow = activeRow.cloneNode(true);
-      newRow.querySelectorAll('th, td').forEach(function (cell) { cell.innerHTML = ''; });
-      activeRow.parentNode.insertBefore(newRow, activeRow.nextSibling);
-    } else if (btn.dataset.action === 'del') {
-      if (tbody.rows.length > 1) {
-        activeRow.remove();
-      }
-    }
-    emitChange();
-    rowCtrl.hidden = true;
-    activeRow = null;
-  });
+  // Table row controls and column resize are now handled by table-block.js.
 
   // ── public API ────────────────────────────────────────────────────────────
 
@@ -620,6 +562,8 @@ export function createComposer(options) {
     suppressChange = true;
     const html = blocksToHtml(Array.isArray(blocks) ? blocks : []);
     surface.innerHTML = html || '';
+    // Replace legacy sd-matrix-wrap HTML with live table components.
+    mountTableBlocks();
     suppressChange = false;
     reflectEmpty();
     refreshActiveStates();

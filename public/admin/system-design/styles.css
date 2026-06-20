@@ -1477,13 +1477,14 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
 }
 
-.sd-section-type-select {
+/* Both select and input share the same size/shape — only one shows at a time */
+.sd-section-type-select,
+.sd-section-type-custom-input {
   min-height: 36px;
   min-width: 148px;
-  max-width: 220px;
+  max-width: 340px;
   border: 1.5px solid var(--md-sys-color-outline-variant, #cad3e0);
   border-radius: 10px;
   padding: 0 10px;
@@ -1492,34 +1493,28 @@
   font: inherit;
   font-size: 0.88rem;
   font-weight: 700;
+}
+
+.sd-section-type-select {
   cursor: pointer;
   appearance: auto;
 }
 
-.sd-section-type-select:focus {
+.sd-section-type-select:focus,
+.sd-section-type-custom-input:focus {
   border-color: var(--md-sys-color-primary);
   outline: 2px solid var(--md-sys-color-primary);
   outline-offset: 1px;
 }
 
-.sd-section-type-custom-input {
-  min-height: 36px;
-  width: 180px;
-  border: 1.5px solid var(--md-sys-color-primary);
-  border-radius: 10px;
-  padding: 0 10px;
+/* Custom input active state — wider + highlight border to signal edit mode */
+.sd-section-type-custom-input:not([hidden]) {
+  min-width: 240px;
+  border-color: var(--md-sys-color-primary);
   background: var(--md-sys-color-surface-container-lowest, #fff);
-  color: var(--md-sys-color-on-surface);
-  font: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
 }
 
-.sd-section-type-custom-input:focus {
-  outline: 2px solid var(--md-sys-color-primary);
-  outline-offset: 1px;
-}
-
+.sd-section-type-select[hidden],
 .sd-section-type-custom-input[hidden] { display: none; }
 
 .sd-section-ribbon-controls {
@@ -1812,39 +1807,143 @@
   outline: none;
 }
 
-/* ── Inline table row controls ─────────────────────────────────────────── */
-.composer-row-ctrl {
-  position: absolute;
-  left: -36px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  z-index: 30;
-  background: var(--md-sys-color-surface-container-high);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: 8px;
-  padding: 3px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+/* ── Dedicated table block component ───────────────────────────────────── */
+.sd-table-block {
+  display: block;
+  margin: 12px 0 16px;
+  outline: none;
 }
 
-.composer-row-ctrl[hidden] { display: none; }
+.sd-tbl-wrap {
+  border: 1.5px solid var(--md-sys-color-outline-variant, #cad3e0);
+  border-radius: 12px;
+  overflow: hidden;
+}
 
-.composer-row-btn {
-  display: grid;
+.sd-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* ── Column control header row ──────────────────────────────────────────── */
+.sd-tbl-col-ctrl {
+  background: var(--md-sys-color-surface-container, #f3f3f7);
+  border-bottom: 1.5px solid var(--md-sys-color-outline-variant, #cad3e0);
+}
+
+.sd-tbl-col-hdr,
+.sd-tbl-action-hdr {
+  padding: 4px 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Delete-column button hidden until column header is hovered */
+.sd-tbl-col-del {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.sd-tbl-col-hdr:hover .sd-tbl-col-del {
+  opacity: 1;
+}
+
+/* Add-column button always subtly visible */
+.sd-tbl-add-col {
+  color: var(--md-sys-color-primary, #1a73e8);
+  background: transparent;
+}
+.sd-tbl-add-col:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent) !important;
+}
+
+/* Hide the entire thead when not editing */
+.sd-table-block:not(.sd-tbl-editing) thead { display: none; }
+
+/* ── Data rows ──────────────────────────────────────────────────────────── */
+.sd-tbl-row:not(:last-child) .sd-tbl-cell,
+.sd-tbl-row:not(:last-child) .sd-tbl-action-cell {
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #cad3e0);
+}
+
+.sd-tbl-cell {
+  padding: 0;
+  vertical-align: middle;
+}
+
+/* Vertical divider between data cells */
+.sd-tbl-cell:not(:last-child) {
+  border-right: 1.5px solid var(--md-sys-color-outline-variant, #cad3e0);
+}
+
+.sd-tbl-input {
+  display: block;
+  width: 100%;
+  height: 44px;
+  border: none;
+  background: transparent;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface, #1c1b1f);
+  outline: none;
+}
+.sd-tbl-input:focus {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 5%, transparent);
+}
+
+/* ── Action column (row add/delete) ─────────────────────────────────────── */
+col.sd-tbl-action-col { width: 72px; }
+
+.sd-tbl-action-cell {
+  padding: 0 6px;
+  vertical-align: middle;
+  text-align: center;
+  border-left: 1.5px solid var(--md-sys-color-outline-variant, #cad3e0);
+  white-space: nowrap;
+}
+
+/* Row action buttons appear on row hover */
+.sd-tbl-action-cell .sd-tbl-btn {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.sd-tbl-row:hover .sd-tbl-action-cell .sd-tbl-btn {
+  opacity: 1;
+}
+
+/* Hide action column entirely when locked */
+.sd-table-block:not(.sd-tbl-editing) .sd-tbl-action-cell,
+.sd-table-block:not(.sd-tbl-editing) col.sd-tbl-action-col {
+  display: none;
+}
+
+/* ── Button base ────────────────────────────────────────────────────────── */
+.sd-tbl-btn {
+  display: inline-grid;
   place-items: center;
   width: 26px;
   height: 26px;
   border: none;
   border-radius: 6px;
-  background: transparent;
+  background: var(--md-sys-color-surface-container-high);
   color: var(--md-sys-color-on-surface-variant);
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.12s, color 0.12s;
 }
+.sd-tbl-btn:hover {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.sd-tbl-del:hover {
+  background: color-mix(in srgb, var(--md-sys-color-error) 14%, transparent);
+  color: var(--md-sys-color-error);
+}
+.sd-tbl-btn .material-symbols-outlined { font-size: 15px; }
+.sd-tbl-btn:disabled { opacity: 0.3; pointer-events: none; }
 
-.composer-row-btn:hover { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
-.composer-row-btn[data-action="del"]:hover { background: color-mix(in srgb, var(--md-sys-color-error) 14%, transparent); color: var(--md-sys-color-error); }
-.composer-row-btn .material-symbols-outlined { font-size: 16px; }
+/* ── Locked state ───────────────────────────────────────────────────────── */
+.sd-tbl-locked .sd-tbl-input { cursor: default; pointer-events: none; }
 
 .composer-menu-item .material-symbols-outlined {
   display: grid;
