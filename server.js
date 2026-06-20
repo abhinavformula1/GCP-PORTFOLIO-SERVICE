@@ -17,6 +17,7 @@ const atlasRoute          = require('./src/routes/atlas');
 const systemDesignRoute   = require('./src/routes/systemDesign');
 const mediaRoute          = require('./src/routes/media');
 const pdfRoute            = require('./src/routes/pdf');
+const printRoute          = require('./src/routes/print');
 const { errorHandler } = require('./src/middleware/errorHandler');
 
 const app  = express();
@@ -49,6 +50,7 @@ app.use('/api', atlasRoute);
 app.use('/api', systemDesignRoute);
 app.use('/api', mediaRoute);
 app.use('/api/pdf', pdfRoute);
+app.use('/print',   printRoute);
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (_req, res) => {
