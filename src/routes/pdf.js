@@ -9,12 +9,12 @@
  * No browser chrome, no URL bar, no date/page-number headers — a clean,
  * branded document indistinguishable from a Stripe or Google design note.
  *
+ * Public endpoint — articles are public, so their PDFs are too.
  * Rate-limited to 10 requests / 15 min per IP to protect Cloud Run CPU.
  */
 
-const express     = require('express');
-const rateLimit   = require('express-rate-limit');
-const { requireAdmin } = require('../middleware/auth');
+const express   = require('express');
+const rateLimit = require('express-rate-limit');
 const { generateArticlePdf } = require('../services/pdf');
 
 const router = express.Router();
@@ -27,7 +27,7 @@ const pdfLimiter = rateLimit({
   message:          { success: false, code: 'RATE_LIMITED', error: 'Too many PDF exports. Try again in 15 minutes.' },
 });
 
-router.get('/export', pdfLimiter, requireAdmin, async (req, res, next) => {
+router.get('/export', pdfLimiter, async (req, res, next) => {
   try {
     const { id } = req.query;
     if (!id || typeof id !== 'string' || !/^[\w-]+$/.test(id)) {

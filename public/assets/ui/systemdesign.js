@@ -382,10 +382,7 @@ function exportCurrentTopicPdf() {
       '<span>Generating…</span>';
   }
 
-  const token = window.__adminCredential || window.__googleIdToken || '';
-  const headers = token ? { Authorization: 'Bearer ' + token } : {};
-
-  fetch('/api/pdf/export?id=' + encodeURIComponent(_activeTopic), { headers })
+  fetch('/api/pdf/export?id=' + encodeURIComponent(_activeTopic))
     .then(function (res) {
       if (!res.ok) {
         return res.json().then(function (body) {
