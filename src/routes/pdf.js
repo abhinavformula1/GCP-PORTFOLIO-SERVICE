@@ -72,7 +72,8 @@ router.get('/export', pdfLimiter, async (req, res, next) => {
       '</div>';
 
     const pdfBuffer = await generatePdf({
-      url:           `${baseUrl}/#/system-design/${encodeURIComponent(id)}`,
+      baseUrl,
+      hash:          `#/system-design/${encodeURIComponent(id)}`,
       readySelector: '.sd-article-body',
       printClass:    'sd-printing',
       headerHtml,
