@@ -1,18 +1,24 @@
 'use strict';
 
 /**
- * Server-side PDF generation via headless Chrome (Puppeteer).
+ * Generic server-side PDF generation via headless Chrome (Puppeteer).
+ *
+ * Decoupled from any specific page or route — the caller passes:
+ *   - url          : full URL to render
+ *   - readySelector: CSS selector to wait for before capturing (default: 'body')
+ *   - printClass   : CSS class to add to <body> for print-mode styles (optional)
+ *   - filename     : suggested download filename
  *
  * Why server-side instead of window.print()?
- *   window.print() cannot suppress Chrome's built-in "Headers and footers"
- *   (URL, date, page number) — that is a browser UI control outside CSS.
- *   Puppeteer's page.pdf() exposes displayHeaderFooter: false, giving us a
- *   completely clean, branded output every time with zero user steps.
+ *   window.print() cannot suppress Chrome's built-in URL/date/page-number headers.
+ *   Puppeteer's page.pdf() exposes displayHeaderFooter: false — zero browser chrome.
  *
- * Chrome path resolution order:
- *   1. CHROME_PATH env var  (set this in .env for local macOS dev)
- *   2. /usr/bin/chromium    (Alpine/Debian Docker image)
- *   3. /usr/bin/chromium-browser (some Alpine builds)
+ * Chrome path resolution:
+ *   1. CHROME_PATH env var  (set in .env for local macOS dev)
+ *   2. /usr/bin/google-chrome-stable  (Dockerfile, Cloud Run)
+ *   3. /usr/bin/google-chrome
+ *   4. /usr/bin/chromium / chromium-browser
+ *   5. macOS app bundle (local fallback)
  */
 
 const puppeteer = require('puppeteer-core');
@@ -20,11 +26,10 @@ const fs        = require('fs');
 
 const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/google-chrome',
   '/usr/bin/chromium',
   '/usr/bin/chromium-browser',
-  '/usr/bin/google-chrome',
-  '/usr/bin/google-chrome-stable',
-  // macOS fallback for local dev
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 ].filter(Boolean);
 
@@ -38,113 +43,97 @@ function resolveChromePath() {
   );
 }
 
+const LAUNCH_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',       // use /tmp instead of /dev/shm (Cloud Run limit)
+  '--disable-gpu',
+  '--disable-extensions',
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--disable-background-networking',
+  '--disable-sync',
+  // --no-zygote    : removed — crashes renderer on Cloud Run gVisor sandbox
+  // --single-process: removed — corrupts PDF output
+];
+
+const PDF_OPTIONS = {
+  format:               'A4',
+  printBackground:      true,
+  displayHeaderFooter:  false,   // zero browser chrome (URL, date, page numbers)
+  headerTemplate:       '',
+  footerTemplate:       '',
+  margin: { top: '18mm', right: '18mm', bottom: '22mm', left: '18mm' },
+};
+
 /**
- * Generate a PDF for a single System Design article.
+ * Render any URL on this service to a PDF.
  *
- * @param {string} articleId  - The article slug / Firestore document ID.
- * @param {string} baseUrl    - The base URL of this service (e.g. https://…run.app)
- * @returns {Promise<Buffer>} - Raw PDF bytes.
+ * @param {object} opts
+ * @param {string}   opts.url           - Full URL to render.
+ * @param {string}  [opts.readySelector]- Wait for this selector before capture.
+ * @param {string}  [opts.printClass]   - CSS class to add to <body> for print styles.
+ * @param {string}  [opts.headerHtml]   - HTML string injected before the ready element.
+ * @param {number}  [opts.settleMs]     - Extra ms to wait after selector (default 2400).
+ * @returns {Promise<Buffer>}            - Raw PDF bytes.
  */
-async function generateArticlePdf(articleId, baseUrl) {
+async function generatePdf({ url, readySelector = 'body', printClass, headerHtml, settleMs = 2400 }) {
   const executablePath = resolveChromePath();
 
   const browser = await puppeteer.launch({
     executablePath,
     headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',      // use /tmp instead of /dev/shm (Cloud Run limit)
-      '--disable-gpu',
-      '--disable-extensions',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-background-networking',
-      '--disable-sync',
-      // Note: --no-zygote removed — crashes renderer on Cloud Run gVisor sandbox.
-      // Note: --single-process removed — corrupts PDF output.
-    ],
+    args: LAUNCH_ARGS,
   });
 
   try {
     const page = await browser.newPage();
 
-    // Viewport matches A4 width at 96 dpi ≈ 794px
+    // A4 width at 96 dpi ≈ 794 px; deviceScaleFactor 1.5 for sharper text.
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1.5 });
 
-    const url = `${baseUrl}/#/system-design/${encodeURIComponent(articleId)}`;
-
-    // 1. Navigate to the article. Use 'load' (not 'networkidle0') for stability
-    //    on Cloud Run — less strict, avoids race conditions with renderer startup.
+    // Navigate. 'load' is more stable than 'networkidle0' on Cloud Run gVisor.
     await page.goto(url, { waitUntil: 'load', timeout: 30_000 });
 
-    // 2. Wait until the article body has actually rendered into the DOM.
-    //    The SPA fetches article data from /api after load, so we wait for the
-    //    rendered content rather than relying on network idle.
-    await page.waitForSelector('.sd-article-body', { timeout: 20_000 });
+    // Wait for the content the caller cares about.
+    await page.waitForSelector(readySelector, { timeout: 20_000 });
 
-    // 3a. Wait for all images inside the article to finish loading so they
-    //     appear in the PDF (not just alt text placeholders).
-    await page.evaluate(`(function () {
-      var imgs = Array.from(document.querySelectorAll('.sd-article-body img'));
-      return Promise.all(imgs.map(function (img) {
-        if (img.complete) return Promise.resolve();
-        return new Promise(function (resolve) {
-          img.addEventListener('load', resolve);
-          img.addEventListener('error', resolve);  // don't block on broken imgs
-        });
-      }));
-    })()`).catch(function () {});  // never let image wait crash the whole job
+    // Extra settle time: lets images/fonts load from GCS / CDN.
+    // Fixed delay is more stable than Promise-based event listeners inside evaluate.
+    await new Promise(r => setTimeout(r, settleMs));
 
-    // 3. Activate the print-mode class (applies our @media print stylesheet).
-    //    Passed as a string so ESLint (Node context) does not flag browser globals
-    //    like `document` — this code executes inside headless Chrome, not Node.
-    await page.evaluate(`(function () {
-      document.body.classList.add('sd-printing');
+    // Inject print class + branded header.
+    // Wrapped in try/catch — a frame hiccup here must not abort the PDF job.
+    if (printClass || headerHtml) {
+      const cls        = printClass  || '';
+      const headerFrag = headerHtml  || '';
+      try {
+        await page.evaluate(`(function () {
+          if ('${cls}') document.body.classList.add('${cls}');
 
-      var existing = document.getElementById('sd-print-header');
-      if (existing) existing.remove();
+          if (${JSON.stringify(Boolean(headerHtml))}) {
+            var existing = document.getElementById('pdf-injected-header');
+            if (existing) existing.remove();
+            var hdr = document.createElement('div');
+            hdr.id = 'pdf-injected-header';
+            hdr.innerHTML = ${JSON.stringify(headerFrag)};
+            var first = document.body.firstElementChild;
+            if (first) document.body.insertBefore(hdr, first);
+            else document.body.prepend(hdr);
+          }
+        })()`);
+      } catch (_) { /* frame hiccup — continue without header */ }
+    }
 
-      var dateStr = new Date().toLocaleDateString('en-US', {
-        year: 'numeric', month: 'long', day: 'numeric',
-      });
-      var header = document.createElement('div');
-      header.id = 'sd-print-header';
-      header.className = 'sd-print-header';
-      header.setAttribute('aria-hidden', 'true');
-      header.innerHTML =
-        '<span class="sd-print-header-brand">Abhinav Kumar \u2014 System Design</span>' +
-        '<span class="sd-print-header-date">' + dateStr + '</span>';
-
-      var article = document.querySelector('.sd-article');
-      if (article) article.insertAdjacentElement('beforebegin', header);
-      else document.body.prepend(header);
-    })()`);
-
-    // Brief settle for CSS transitions and print-class reflows.
+    // Final CSS settle.
     await new Promise(r => setTimeout(r, 400));
 
-    // 4. Generate PDF — no browser chrome, exact A4, background colors preserved.
-    // page.pdf() returns Uint8Array in Puppeteer v21+. Wrap with Buffer.from()
-    // so Express res.send() treats it as binary, not a JSON-serialised object.
-    const pdfBuffer = Buffer.from(await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      displayHeaderFooter: false,   // ← this is the key: zero browser chrome
-      headerTemplate: '',
-      footerTemplate: '',
-      margin: {
-        top:    '18mm',
-        right:  '18mm',
-        bottom: '22mm',
-        left:   '18mm',
-      },
-    }));
-
-    return pdfBuffer;
+    // page.pdf() returns Uint8Array in Puppeteer v21+.
+    // Buffer.from() is required so Express res.send() sends binary, not JSON.
+    return Buffer.from(await page.pdf(PDF_OPTIONS));
   } finally {
     await browser.close();
   }
 }
 
-module.exports = { generateArticlePdf, resolveChromePath };
+module.exports = { generatePdf, resolveChromePath };
