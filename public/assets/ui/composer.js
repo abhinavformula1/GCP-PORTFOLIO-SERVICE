@@ -371,78 +371,83 @@ export function createComposer(options) {
   // For each block type: replace static blocksToHtml output with live component.
   // Skip elements that already have data-block set (already mounted).
   function mountRichBlocks() {
-    surface.querySelectorAll('div.sd-card-grid:not([data-block])').forEach(function (el) {
+    function tryMount(selector, fn) {
+      surface.querySelectorAll(selector).forEach(function (el) {
+        try { fn(el); } catch (e) { console.error('[composer] mountRichBlocks failed for', selector, e); }
+      });
+    }
+
+    tryMount('div.sd-card-grid:not([data-block])', function (el) {
       const items = Array.from(el.querySelectorAll('.sd-info-card')).map(function (c) {
         return {
           title: (c.querySelector('strong') || c).textContent.trim(),
           text:  (c.querySelector('span')   || c).textContent.trim(),
         };
       });
-      const b = createCardsBlock(items, function () { emitChange(); });
+      const b = createCardsBlock(items.length ? items : null, function () { emitChange(); });
       b.setEditable(editable);
       el.replaceWith(b.element);
     });
 
-    surface.querySelectorAll('div.sd-flow:not([data-block])').forEach(function (el) {
+    tryMount('div.sd-flow:not([data-block])', function (el) {
       const steps = Array.from(el.querySelectorAll('span')).map(function (s) { return s.textContent.trim(); }).filter(Boolean);
-      const b = createFlowBlock(steps, function () { emitChange(); });
+      const b = createFlowBlock(steps.length ? steps : null, function () { emitChange(); });
       b.setEditable(editable);
       el.replaceWith(b.element);
     });
 
-    surface.querySelectorAll('div.sd-comparison:not([data-block])').forEach(function (el) {
+    tryMount('div.sd-comparison:not([data-block])', function (el) {
       const rows = Array.from(el.querySelectorAll('.sd-comparison-row')).map(function (r) {
         return {
           title:    (r.querySelector('strong') || r).textContent.trim(),
-          status:   (r.querySelector('span')   || { textContent: 'Considered' }).textContent.trim(),
-          text:     (r.querySelector('p')      || { textContent: '' }).textContent.trim(),
+          status:   r.querySelector('span') ? r.querySelector('span').textContent.trim() : 'Considered',
+          text:     r.querySelector('p') ? r.querySelector('p').textContent.trim() : '',
           selected: r.classList.contains('sd-selected'),
         };
       });
-      const b = createComparisonBlock(rows, function () { emitChange(); });
+      const b = createComparisonBlock(rows.length ? rows : null, function () { emitChange(); });
       b.setEditable(editable);
       el.replaceWith(b.element);
     });
 
-    surface.querySelectorAll('div.sd-sequence:not([data-block])').forEach(function (el) {
+    tryMount('div.sd-sequence:not([data-block])', function (el) {
       const steps = Array.from(el.querySelectorAll('span')).map(function (s) { return s.textContent.trim(); }).filter(Boolean);
-      const b = createSequenceBlock(steps, function () { emitChange(); });
+      const b = createSequenceBlock(steps.length ? steps : null, function () { emitChange(); });
       b.setEditable(editable);
       el.replaceWith(b.element);
     });
 
-    surface.querySelectorAll('div.sd-risk-grid:not([data-block])').forEach(function (el) {
+    tryMount('div.sd-risk-grid:not([data-block])', function (el) {
       const items = Array.from(el.querySelectorAll('.sd-risk')).map(function (r) {
         const level = ['low', 'medium', 'high'].find(function (l) { return r.classList.contains(l); }) || 'medium';
         return {
           level: level,
           title: (r.querySelector('strong') || r).textContent.trim(),
-          text:  (r.querySelector('span')   || { textContent: '' }).textContent.trim(),
+          text:  r.querySelector('span') ? r.querySelector('span').textContent.trim() : '',
         };
       });
-      const b = createRisksBlock(items, function () { emitChange(); });
+      const b = createRisksBlock(items.length ? items : null, function () { emitChange(); });
       b.setEditable(editable);
       el.replaceWith(b.element);
     });
 
-    surface.querySelectorAll('section.sd-hero-block:not([data-block])').forEach(function (el) {
+    tryMount('section.sd-hero-block:not([data-block])', function (el) {
       const kicker  = el.querySelector('.sd-kicker');
       const heading = el.querySelector('h1,h2,h3,h4,h5,h6');
       const para    = el.querySelector('p');
       const grid    = el.querySelector('.sd-decision-grid');
       const cells   = grid ? Array.from(grid.children).map(function (c) {
         return {
-          label: (c.querySelector('span')   || { textContent: '' }).textContent.trim(),
-          value: (c.querySelector('strong') || { textContent: '' }).textContent.trim(),
+          label: c.querySelector('span')   ? c.querySelector('span').textContent.trim()   : '',
+          value: c.querySelector('strong') ? c.querySelector('strong').textContent.trim() : '',
         };
       }) : [];
-      const data = {
+      const b = createHeroBlock({
         kicker:  kicker  ? kicker.textContent.trim()  : '',
-        heading: heading ? heading.textContent.trim()  : '',
-        text:    para    ? para.textContent.trim()     : '',
+        heading: heading ? heading.textContent.trim() : '',
+        text:    para    ? para.textContent.trim()    : '',
         cells,
-      };
-      const b = createHeroBlock(data, function () { emitChange(); });
+      }, function () { emitChange(); });
       b.setEditable(editable);
       el.replaceWith(b.element);
     });

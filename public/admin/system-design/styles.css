@@ -2176,18 +2176,18 @@ col.sd-tbl-action-col { width: 56px; }
 }
 .sd-rich-btn:disabled { opacity: 0.3; pointer-events: none; }
 
-/* Item-level delete — hidden by default, show on row hover */
+/* Item-level delete — always visible, consistent with table UX */
 .sd-rich-item-del {
-  opacity: 0;
-  transition: opacity 0.15s;
   flex-shrink: 0;
+  opacity: 0.35;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
-.sd-rich-item:hover .sd-rich-item-del { opacity: 1; }
 .sd-rich-item-del:hover {
   background: color-mix(in srgb, var(--md-sys-color-error) 12%, transparent) !important;
   color: var(--md-sys-color-error) !important;
-  opacity: 1;
+  opacity: 1 !important;
 }
+.sd-rich-item:focus-within .sd-rich-item-del { opacity: 0.6; }
 
 /* ── Body container ────────────────────────────────────────────────────────── */
 .sd-rich-body {
@@ -2297,9 +2297,89 @@ col.sd-tbl-action-col { width: 56px; }
 .sd-rich-locked .sd-rich-item        { pointer-events: none; }
 
 /* ═══════════════════════════════════════════
-   Cards block
+   Cards block — WYSIWYG tile grid
    ═══════════════════════════════════════════ */
-.sd-rich-block--cards .sd-rich-item { align-items: flex-start; }
+
+/* Grid mirrors the public sd-card-grid */
+.sd-cards-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+/* Each tile mirrors the public sd-info-card */
+.sd-cards-edit-tile {
+  position: relative;
+  background: var(--md-sys-color-surface);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 22%, transparent);
+  border-radius: 12px;
+  padding: 13px 13px 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.sd-cards-edit-tile:focus-within {
+  border-color: color-mix(in srgb, var(--md-sys-color-primary) 50%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+}
+
+/* Delete button — top-right corner, visible but subtle */
+.sd-cards-tile-del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px !important;
+  height: 22px !important;
+  opacity: 0.3;
+  transition: opacity 0.15s;
+}
+.sd-cards-edit-tile:hover .sd-cards-tile-del { opacity: 0.7; }
+.sd-cards-tile-del:hover {
+  background: color-mix(in srgb, var(--md-sys-color-error) 12%, transparent) !important;
+  color: var(--md-sys-color-error) !important;
+  opacity: 1 !important;
+}
+.sd-cards-tile-del .material-symbols-outlined { font-size: 14px !important; }
+
+/* Title input — bold, matches sd-info-card strong */
+.sd-cards-tile-title {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  padding: 0 20px 0 0; /* space for delete btn */
+  margin-bottom: 5px;
+}
+.sd-cards-tile-title::placeholder { color: var(--md-sys-color-on-surface-variant); font-weight: 400; }
+.sd-cards-tile-title:focus { border-bottom: 1px solid var(--md-sys-color-primary); }
+
+/* Description input — small, muted, matches sd-info-card span */
+.sd-cards-tile-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 0;
+}
+.sd-cards-tile-text::placeholder { color: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 60%, transparent); }
+.sd-cards-tile-text:focus { border-bottom: 1px dashed var(--md-sys-color-primary); }
+
+/* Disabled state */
+.sd-rich-locked .sd-cards-tile-title,
+.sd-rich-locked .sd-cards-tile-text { pointer-events: none; }
+.sd-rich-locked .sd-cards-tile-del { display: none; }
 
 /* ═══════════════════════════════════════════
    Flow block
@@ -2339,10 +2419,9 @@ col.sd-tbl-action-col { width: 56px; }
   width: 20px !important;
   height: 20px !important;
   color: var(--md-sys-color-primary) !important;
-  opacity: 0;
+  opacity: 0.4;
   transition: opacity 0.15s;
 }
-.sd-rich-flow-pill:hover .sd-rich-flow-del { opacity: 0.6; }
 .sd-rich-flow-del:hover { opacity: 1 !important; }
 .sd-rich-flow-del .material-symbols-outlined { font-size: 13px !important; }
 

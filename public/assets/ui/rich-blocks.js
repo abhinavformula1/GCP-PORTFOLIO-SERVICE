@@ -149,11 +149,13 @@ export function createCardsBlock(initialItems, onChange) {
 
   function render() {
     element.innerHTML = '';
+
+    // Header bar
     const addBtn = makeAddBtn('Add card', function () {
       items.push({ title: '', text: '' });
       render(); emit();
-      const inputs = element.querySelectorAll('.sd-rich-input');
-      if (inputs[inputs.length - 2]) inputs[inputs.length - 2].focus();
+      const titles = element.querySelectorAll('.sd-cards-tile-title');
+      if (titles[titles.length - 1]) titles[titles.length - 1].focus();
     });
     addBtn.disabled = !editable;
     element.appendChild(makeHeader('grid_view', 'Info cards', element, [
@@ -161,38 +163,49 @@ export function createCardsBlock(initialItems, onChange) {
       makeDeleteBlockBtn(element, onChange),
     ]));
 
-    const body = document.createElement('div');
-    body.className = 'sd-rich-body';
+    // Card grid — mirrors the public sd-card-grid layout
+    const grid = document.createElement('div');
+    grid.className = 'sd-cards-edit-grid';
 
     items.forEach(function (item, i) {
-      const row = document.createElement('div');
-      row.className = 'sd-rich-item';
+      const tile = document.createElement('div');
+      tile.className = 'sd-cards-edit-tile';
 
-      const fields = document.createElement('div');
-      fields.className = 'sd-rich-item-fields';
-      const titleInp = makeInput(item.title, 'Card title', function (v) { item.title = v; emit(); });
-      titleInp.className += ' sd-rich-input--strong';
-      titleInp.disabled = !editable;
-      const textInp = makeInput(item.text, 'Short description', function (v) { item.text = v; emit(); });
-      textInp.disabled = !editable;
-      fields.appendChild(titleInp);
-      fields.appendChild(textInp);
-
+      // Delete button — top-right corner of tile
       const delBtn = makeBtn('close', 'Remove card', (function (idx) {
         return function () {
           if (items.length <= 1) return;
           items.splice(idx, 1);
           render(); emit();
         };
-      }(i)), 'sd-rich-item-del');
+      }(i)), 'sd-cards-tile-del');
       delBtn.disabled = !editable || items.length <= 1;
+      tile.appendChild(delBtn);
 
-      row.appendChild(fields);
-      row.appendChild(delBtn);
-      body.appendChild(row);
+      // Title input — styled as the card title (bold)
+      const titleInp = document.createElement('input');
+      titleInp.type = 'text';
+      titleInp.className = 'sd-cards-tile-title';
+      titleInp.value = item.title;
+      titleInp.placeholder = 'Card title';
+      titleInp.disabled = !editable;
+      titleInp.addEventListener('input', function () { item.title = titleInp.value; emit(); });
+      tile.appendChild(titleInp);
+
+      // Description input — styled as the card description (small, muted)
+      const textInp = document.createElement('input');
+      textInp.type = 'text';
+      textInp.className = 'sd-cards-tile-text';
+      textInp.value = item.text;
+      textInp.placeholder = 'Short description';
+      textInp.disabled = !editable;
+      textInp.addEventListener('input', function () { item.text = textInp.value; emit(); });
+      tile.appendChild(textInp);
+
+      grid.appendChild(tile);
     });
 
-    element.appendChild(body);
+    element.appendChild(grid);
     emit();
   }
 
