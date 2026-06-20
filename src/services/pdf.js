@@ -3,17 +3,13 @@
 /**
  * Server-side PDF generation via headless Chrome (Puppeteer).
  *
- * Uses page.setContent(html) instead of page.goto(url).
+ * Uses page.goto(printUrl) where printUrl is a real HTTP URL served by our
+ * own /print/system-design/:id route — NOT the SPA hash URL.
  *
  * Why this matters:
- *   page.goto() on a hash-route SPA URL causes Puppeteer v25 to track the
- *   hash fragment as a navigation event, which invalidates the execution
- *   context and throws "detached frame" on every subsequent page call.
- *
- *   page.setContent() does NOT navigate — it writes HTML directly into the
- *   page.  No URL changes, no frame detachment, no race conditions.
- *   The full site CSS is embedded in the HTML by articleHtml.js, so
- *   @media print styles apply exactly as in the browser.
+ *   - Real HTTP origin → GCS images load normally (no about:blank restrictions)
+ *   - No hash routing → no Puppeteer v25 frame detachment
+ *   - networkidle0 waits for ALL images to finish loading before pdf()
  */
 
 const puppeteer = require('puppeteer-core');
@@ -51,11 +47,13 @@ const LAUNCH_ARGS = [
 ];
 
 /**
- * @param {string} html      - Complete HTML document to render.
- * @param {number} [settleMs]- Ms to wait after setContent (default 1500).
+ * Generate a PDF by navigating to a real server-rendered URL.
+ *
+ * @param {string} url      - Full URL of the print page (e.g. https://host/print/system-design/id)
+ * @param {number} settleMs - Extra ms to wait after networkidle0 (default 1000)
  * @returns {Promise<Buffer>}
  */
-async function generatePdfFromHtml(html, settleMs = 2000) {
+async function generatePdf(url, settleMs = 1000) {
   const browser = await puppeteer.launch({
     executablePath: resolveChromePath(),
     headless: true,
@@ -66,15 +64,11 @@ async function generatePdfFromHtml(html, settleMs = 2000) {
     const page = await browser.newPage();
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1.5 });
 
-    // setContent writes HTML directly — no URL navigation, no frame detachment.
-    // networkidle0 waits until ALL external requests (GCS images, fonts) finish.
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
-
-    // Extra settle for any lazy-loaded or deferred resources.
+    // Real HTTP URL — no hash routing, no SPA, no frame detachment.
+    // networkidle0 waits until ALL requests (including GCS images) finish.
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 60_000 });
     await new Promise(r => setTimeout(r, settleMs));
 
-    // page.pdf() returns Uint8Array in Puppeteer v21+.
-    // Buffer.from() required so Express res.send() sends binary data.
     return Buffer.from(await page.pdf({
       format:              'A4',
       printBackground:     true,
@@ -88,4 +82,4 @@ async function generatePdfFromHtml(html, settleMs = 2000) {
   }
 }
 
-module.exports = { generatePdfFromHtml, resolveChromePath };
+module.exports = { generatePdf, resolveChromePath };
