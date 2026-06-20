@@ -21,6 +21,7 @@ export const BLOCK_DEFS = [
   { type: 'sequence',   label: 'Sequence',       icon: 'format_list_numbered', hint: 'Numbered steps for an architecture flow.' },
   { type: 'matrix',     label: 'Matrix table',   icon: 'table_rows',     hint: 'Key/value rows, e.g. security properties.' },
   { type: 'risks',      label: 'Risk grid',      icon: 'warning',        hint: 'Risk cards with a severity level.' },
+  { type: 'code',       label: 'Code block',     icon: 'terminal',       hint: 'A code snippet with syntax language label.' },
   { type: 'html',       label: 'Custom HTML',    icon: 'code',           hint: 'Advanced: raw HTML preserved as-is.' },
 ];
 
@@ -53,6 +54,7 @@ export function newBlock(type) {
     case 'sequence':   return Object.assign(base, { steps: [] });
     case 'matrix':     return Object.assign(base, { rows: [] });
     case 'risks':      return Object.assign(base, { items: [] });
+    case 'code':       return Object.assign(base, { lang: 'javascript', code: '' });
     case 'html':       return Object.assign(base, { html: '' });
     default:           return Object.assign(base, { type: 'paragraph', text: '' });
   }
@@ -185,6 +187,13 @@ function risksToHtml(block) {
   return html;
 }
 
+function codeToHtml(block) {
+  const lang = block.lang || 'plaintext';
+  const code = block.code || '';
+  if (!code.trim()) return '';
+  return '<pre class="sd-code-block" data-lang="' + escapeHtml(lang) + '"><code>' + escapeHtml(code) + '</code></pre>';
+}
+
 export function blockToHtml(block) {
   if (!block || !block.type) return '';
   switch (block.type) {
@@ -206,6 +215,7 @@ export function blockToHtml(block) {
     case 'sequence':   return sequenceToHtml(block);
     case 'matrix':     return matrixToHtml(block);
     case 'risks':      return risksToHtml(block);
+    case 'code':       return codeToHtml(block);
     case 'html':       return String(block.html || '');
     default:           return '';
   }
@@ -234,6 +244,7 @@ export function blockSummary(block) {
       return cleanText(cells[0]);
     }).filter(Boolean).join(' · ');
     case 'risks':     return (block.items || []).map(function (i) { return cleanText(i.title); }).filter(Boolean).join(' · ');
+    case 'code':      return (block.code || '').split('\n')[0].slice(0, 60) || (block.lang || 'code') + ' snippet';
     case 'html':      return 'Custom HTML block';
     default:          return '';
   }
@@ -369,6 +380,46 @@ function nodeToBlock(node) {
     return para;
   }
   const tag = node.tagName.toLowerCase();
+
+  // Live rich-block components store typed data in data-block + data-* attrs.
+  // These must be checked before CSS-class fallbacks so live components win.
+  if (node.dataset && node.dataset.block) {
+    const b = node.dataset.block;
+    if (b === 'cards') {
+      const block = newBlock('cards');
+      try { block.items = JSON.parse(node.dataset.items || '[]'); } catch (_) { block.items = []; }
+      return block;
+    }
+    if (b === 'flow') {
+      const block = newBlock('flow');
+      try { block.steps = JSON.parse(node.dataset.steps || '[]'); } catch (_) { block.steps = []; }
+      return block;
+    }
+    if (b === 'comparison') {
+      const block = newBlock('comparison');
+      try { block.rows = JSON.parse(node.dataset.rows || '[]'); } catch (_) { block.rows = []; }
+      return block;
+    }
+    if (b === 'sequence') {
+      const block = newBlock('sequence');
+      try { block.steps = JSON.parse(node.dataset.steps || '[]'); } catch (_) { block.steps = []; }
+      return block;
+    }
+    if (b === 'risks') {
+      const block = newBlock('risks');
+      try { block.items = JSON.parse(node.dataset.items || '[]'); } catch (_) { block.items = []; }
+      return block;
+    }
+    if (b === 'hero') {
+      const block = newBlock('hero');
+      block.kicker  = node.dataset.kicker  || '';
+      block.heading = node.dataset.heading || '';
+      block.text    = node.dataset.body    || '';
+      try { block.cells = JSON.parse(node.dataset.cells || '[]'); } catch (_) { block.cells = []; }
+      return block;
+    }
+  }
+
   if (tag === 'section' && node.classList.contains('sd-hero-block')) return heroFromNode(node);
   if (/^h[1-6]$/.test(tag)) {
     const heading = newBlock('heading');
@@ -397,6 +448,21 @@ function nodeToBlock(node) {
   if (node.classList.contains('sd-sequence')) return sequenceFromNode(node);
   if (node.classList.contains('sd-flow')) return flowFromNode(node);
   if (node.classList.contains('sd-risk-grid')) return risksFromNode(node);
+  // Dedicated code block component — reads pre-computed data attributes.
+  if (node.dataset && node.dataset.block === 'code') {
+    const block = newBlock('code');
+    block.lang = node.dataset.lang || 'javascript';
+    block.code = node.dataset.code || '';
+    return block;
+  }
+  // Static code block from saved HTML.
+  if (tag === 'pre' && node.classList.contains('sd-code-block')) {
+    const block = newBlock('code');
+    block.lang = node.dataset.lang || 'plaintext';
+    const codeEl = node.querySelector('code');
+    block.code = codeEl ? codeEl.textContent : node.textContent;
+    return block;
+  }
   // Dedicated table component — reads pre-computed JSON attribute.
   if (node.dataset && node.dataset.block === 'matrix') {
     const block = newBlock('matrix');

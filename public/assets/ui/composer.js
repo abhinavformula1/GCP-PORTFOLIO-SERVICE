@@ -17,6 +17,15 @@
 
 import { blockToHtml, blocksToHtml, htmlToBlocks } from './sdblocks.js';
 import { createTableBlock } from './table-block.js';
+import { createCodeBlock } from './code-block.js';
+import {
+  createCardsBlock,
+  createFlowBlock,
+  createComparisonBlock,
+  createSequenceBlock,
+  createRisksBlock,
+  createHeroBlock,
+} from './rich-blocks.js';
 
 const RICH_SELECTOR = [
   'table', 'ul', 'ol',
@@ -32,29 +41,15 @@ const INSERT_ITEMS = [
     type: 'matrix', label: 'Table', icon: 'table_rows',
     seed: { type: 'matrix', rows: [['', ''], ['', '']] },
   },
+  { type: 'hero',       label: 'Selected design', icon: 'stars',                component: true },
+  { type: 'cards',      label: 'Info cards',      icon: 'grid_view',            component: true },
+  { type: 'flow',       label: 'Flow',            icon: 'linear_scale',         component: true },
+  { type: 'comparison', label: 'Comparison',      icon: 'compare_arrows',       component: true },
+  { type: 'sequence',   label: 'Sequence',        icon: 'format_list_numbered', component: true },
+  { type: 'risks',      label: 'Risk grid',       icon: 'warning',              component: true },
   {
-    type: 'hero', label: 'Selected design', icon: 'stars',
-    seed: { type: 'hero', kicker: 'Selected design', heading: 'Heading', text: 'One-line summary of the chosen approach.', cells: [{ label: 'Pattern', value: 'Value' }, { label: 'Trade-off', value: 'Value' }] },
-  },
-  {
-    type: 'cards', label: 'Info cards', icon: 'grid_view',
-    seed: { type: 'cards', items: [{ title: 'Title', text: 'Description' }, { title: 'Title', text: 'Description' }] },
-  },
-  {
-    type: 'flow', label: 'Flow', icon: 'linear_scale',
-    seed: { type: 'flow', steps: ['Step one', 'Step two', 'Step three'] },
-  },
-  {
-    type: 'comparison', label: 'Comparison', icon: 'compare_arrows',
-    seed: { type: 'comparison', rows: [{ title: 'Option A', status: 'Chosen', text: 'Why this wins.', selected: true }, { title: 'Option B', status: 'Rejected', text: 'Why not.', selected: false }] },
-  },
-  {
-    type: 'sequence', label: 'Sequence', icon: 'format_list_numbered',
-    seed: { type: 'sequence', steps: ['First step', 'Second step'] },
-  },
-  {
-    type: 'risks', label: 'Risk grid', icon: 'warning',
-    seed: { type: 'risks', items: [{ level: 'medium', title: 'Risk', text: 'Detail and mitigation.' }] },
+    type: 'code', label: 'Code block', icon: 'terminal',
+    seed: { type: 'code', lang: 'javascript', code: '' },
   },
 ];
 
@@ -175,9 +170,8 @@ export function createComposer(options) {
       editBtn.title = editable ? 'Lock section (read-only)' : 'Edit section';
     }
     if (saveBtn) saveBtn.disabled = !editable;
-    // Lock/unlock any embedded table components.
-    surface.querySelectorAll('[data-block="matrix"]').forEach(function (el) {
-      // Find the createTableBlock instance via its setEditable method stored on the element.
+    // Lock/unlock all embedded dedicated block components.
+    surface.querySelectorAll('[data-block]').forEach(function (el) {
       if (typeof el._setEditable === 'function') el._setEditable(editable);
     });
   }
@@ -208,16 +202,19 @@ export function createComposer(options) {
     Array.prototype.slice.call(clone.childNodes).forEach(function (node) {
       const isElement = node.nodeType === 1;
       const tag = isElement ? node.tagName.toLowerCase() : '';
-      const isBlock = isElement && /^(p|h[1-6]|ul|ol|table|section|div|blockquote|figure)$/.test(tag);
+      const isBlock = isElement && /^(p|h[1-6]|ul|ol|table|section|div|pre|blockquote|figure)$/.test(tag);
       if (isBlock) {
         buffer = null;
-        if (tag === 'div' && !(node.dataset && node.dataset.block)) {
+        const SD_BLOCK_CLASSES = ['sd-card-grid', 'sd-decision-grid', 'sd-comparison', 'sd-sequence', 'sd-risk-grid', 'sd-matrix-wrap', 'sd-flow'];
+        const isStructured = (node.dataset && node.dataset.block) ||
+          SD_BLOCK_CLASSES.some(function (cls) { return node.classList && node.classList.contains(cls); });
+        if (tag === 'div' && !isStructured) {
           // Generic div → flatten into a paragraph.
           const p = document.createElement('p');
           p.innerHTML = node.innerHTML;
           wrapper.appendChild(p);
         } else {
-          // Structured blocks (including data-block="matrix" table components) pass through as-is.
+          // All known structured blocks pass through as-is so htmlToBlocks can parse them correctly.
           wrapper.appendChild(node);
         }
         return;
@@ -296,6 +293,39 @@ export function createComposer(options) {
     emitChange();
   }
 
+  function insertCodeBlock(lang, code) {
+    const block = createCodeBlock(lang || 'javascript', code || '', function () { emitChange(); });
+    const sel = window.getSelection();
+    const anchor = sel && sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+    let refNode = anchor ? (surface.contains(anchor) ? anchor : null) : null;
+    while (refNode && refNode.parentNode !== surface) refNode = refNode.parentNode;
+    if (refNode && refNode !== surface) {
+      refNode.insertAdjacentElement('afterend', block.element);
+    } else {
+      surface.appendChild(block.element);
+    }
+    const p = document.createElement('p');
+    p.innerHTML = '<br>';
+    block.element.insertAdjacentElement('afterend', p);
+    // Focus the textarea
+    const ta = block.element.querySelector('.sd-code-textarea');
+    if (ta) ta.focus();
+    emitChange();
+  }
+
+  // Replace any static pre.sd-code-block HTML (from blocksToHtml load path)
+  // with live code-block components. Called after innerHTML is set on the surface.
+  function mountCodeBlocks() {
+    surface.querySelectorAll('pre.sd-code-block').forEach(function (pre) {
+      const lang = pre.dataset.lang || 'javascript';
+      const codeEl = pre.querySelector('code');
+      const code = codeEl ? codeEl.textContent : pre.textContent;
+      const block = createCodeBlock(lang, code, function () { emitChange(); });
+      block.setEditable(editable);
+      pre.replaceWith(block.element);
+    });
+  }
+
   // Replace any legacy sd-matrix-wrap HTML (from setBlocks/load) with live
   // table components. Called after innerHTML is set on the surface.
   function mountTableBlocks() {
@@ -315,6 +345,106 @@ export function createComposer(options) {
       block.element._setEditable = block.setEditable;
       block.setEditable(editable);
       wrap.replaceWith(block.element);
+    });
+  }
+
+
+  // ── generic rich-block insert/mount helpers ──────────────────────────────
+
+  function insertRichBlock(block) {
+    block.setEditable(editable);
+    const sel = window.getSelection();
+    const anchor = sel && sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+    let refNode = anchor ? (surface.contains(anchor) ? anchor : null) : null;
+    while (refNode && refNode.parentNode !== surface) refNode = refNode.parentNode;
+    if (refNode && refNode !== surface) {
+      refNode.insertAdjacentElement('afterend', block.element);
+    } else {
+      surface.appendChild(block.element);
+    }
+    const p = document.createElement('p');
+    p.innerHTML = '<br>';
+    block.element.insertAdjacentElement('afterend', p);
+    emitChange();
+  }
+
+  // For each block type: replace static blocksToHtml output with live component.
+  // Skip elements that already have data-block set (already mounted).
+  function mountRichBlocks() {
+    surface.querySelectorAll('div.sd-card-grid:not([data-block])').forEach(function (el) {
+      const items = Array.from(el.querySelectorAll('.sd-info-card')).map(function (c) {
+        return {
+          title: (c.querySelector('strong') || c).textContent.trim(),
+          text:  (c.querySelector('span')   || c).textContent.trim(),
+        };
+      });
+      const b = createCardsBlock(items, function () { emitChange(); });
+      b.setEditable(editable);
+      el.replaceWith(b.element);
+    });
+
+    surface.querySelectorAll('div.sd-flow:not([data-block])').forEach(function (el) {
+      const steps = Array.from(el.querySelectorAll('span')).map(function (s) { return s.textContent.trim(); }).filter(Boolean);
+      const b = createFlowBlock(steps, function () { emitChange(); });
+      b.setEditable(editable);
+      el.replaceWith(b.element);
+    });
+
+    surface.querySelectorAll('div.sd-comparison:not([data-block])').forEach(function (el) {
+      const rows = Array.from(el.querySelectorAll('.sd-comparison-row')).map(function (r) {
+        return {
+          title:    (r.querySelector('strong') || r).textContent.trim(),
+          status:   (r.querySelector('span')   || { textContent: 'Considered' }).textContent.trim(),
+          text:     (r.querySelector('p')      || { textContent: '' }).textContent.trim(),
+          selected: r.classList.contains('sd-selected'),
+        };
+      });
+      const b = createComparisonBlock(rows, function () { emitChange(); });
+      b.setEditable(editable);
+      el.replaceWith(b.element);
+    });
+
+    surface.querySelectorAll('div.sd-sequence:not([data-block])').forEach(function (el) {
+      const steps = Array.from(el.querySelectorAll('span')).map(function (s) { return s.textContent.trim(); }).filter(Boolean);
+      const b = createSequenceBlock(steps, function () { emitChange(); });
+      b.setEditable(editable);
+      el.replaceWith(b.element);
+    });
+
+    surface.querySelectorAll('div.sd-risk-grid:not([data-block])').forEach(function (el) {
+      const items = Array.from(el.querySelectorAll('.sd-risk')).map(function (r) {
+        const level = ['low', 'medium', 'high'].find(function (l) { return r.classList.contains(l); }) || 'medium';
+        return {
+          level: level,
+          title: (r.querySelector('strong') || r).textContent.trim(),
+          text:  (r.querySelector('span')   || { textContent: '' }).textContent.trim(),
+        };
+      });
+      const b = createRisksBlock(items, function () { emitChange(); });
+      b.setEditable(editable);
+      el.replaceWith(b.element);
+    });
+
+    surface.querySelectorAll('section.sd-hero-block:not([data-block])').forEach(function (el) {
+      const kicker  = el.querySelector('.sd-kicker');
+      const heading = el.querySelector('h1,h2,h3,h4,h5,h6');
+      const para    = el.querySelector('p');
+      const grid    = el.querySelector('.sd-decision-grid');
+      const cells   = grid ? Array.from(grid.children).map(function (c) {
+        return {
+          label: (c.querySelector('span')   || { textContent: '' }).textContent.trim(),
+          value: (c.querySelector('strong') || { textContent: '' }).textContent.trim(),
+        };
+      }) : [];
+      const data = {
+        kicker:  kicker  ? kicker.textContent.trim()  : '',
+        heading: heading ? heading.textContent.trim()  : '',
+        text:    para    ? para.textContent.trim()     : '',
+        cells,
+      };
+      const b = createHeroBlock(data, function () { emitChange(); });
+      b.setEditable(editable);
+      el.replaceWith(b.element);
     });
   }
 
@@ -423,6 +553,20 @@ export function createComposer(options) {
         closeMenu();
         if (item.seed && item.seed.type === 'matrix') {
           insertTableBlock(item.seed.rows);
+        } else if (item.seed && item.seed.type === 'code') {
+          insertCodeBlock(item.seed.lang, item.seed.code);
+        } else if (item.component) {
+          // Dedicated rich-block component
+          let block;
+          switch (item.type) {
+            case 'cards':      block = createCardsBlock(null, function () { emitChange(); }); break;
+            case 'flow':       block = createFlowBlock(null, function () { emitChange(); }); break;
+            case 'comparison': block = createComparisonBlock(null, function () { emitChange(); }); break;
+            case 'sequence':   block = createSequenceBlock(null, function () { emitChange(); }); break;
+            case 'risks':      block = createRisksBlock(null, function () { emitChange(); }); break;
+            case 'hero':       block = createHeroBlock(null, function () { emitChange(); }); break;
+          }
+          if (block) insertRichBlock(block);
         } else {
           insertHtml(blockToHtml(item.seed));
         }
@@ -562,8 +706,10 @@ export function createComposer(options) {
     suppressChange = true;
     const html = blocksToHtml(Array.isArray(blocks) ? blocks : []);
     surface.innerHTML = html || '';
-    // Replace legacy sd-matrix-wrap HTML with live table components.
+    // Replace all static blocksToHtml output with live editable components.
+    mountRichBlocks();
     mountTableBlocks();
+    mountCodeBlocks();
     suppressChange = false;
     reflectEmpty();
     refreshActiveStates();

@@ -1813,6 +1813,43 @@ a:hover { text-decoration: underline; }
   font-size: 12.5px;
 }
 
+/* ── Code Block (sd-code-block) ────────────────────────────────────────── */
+.sd-article-body pre.sd-code-block {
+  position: relative;
+  background: #1e1e1e;
+  border: 1px solid #2e2e2e;
+  border-radius: 10px;
+  padding: 0;
+  overflow: hidden;
+  margin: 0 0 18px;
+}
+
+/* Language badge pinned to the top-left */
+.sd-article-body pre.sd-code-block::before {
+  content: attr(data-lang);
+  display: block;
+  padding: 5px 12px 5px 14px;
+  background: #2a2a2a;
+  color: #888;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #333;
+}
+
+.sd-article-body pre.sd-code-block code {
+  display: block;
+  padding: 14px 18px;
+  color: #d4d4d4;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  tab-size: 2;
+  overflow-x: auto;
+  background: transparent;
+}
+
 .sd-hero-block {
   background: linear-gradient(135deg, color-mix(in srgb, #0070D2 10%, transparent), var(--surface));
   border: 1px solid color-mix(in srgb, #0070D2 22%, transparent);
