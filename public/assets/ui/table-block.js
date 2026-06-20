@@ -180,10 +180,22 @@ export function createTableBlock(initialRows, onChange) {
       tr.appendChild(th);
     }
 
-    // Action-column header: add-column button.
+    // Action-column header: add-column + delete-table buttons.
     const actionTh = document.createElement('th');
     actionTh.className = 'sd-tbl-action-hdr';
     actionTh.appendChild(makeBtn('add', 'Add column', addColumn, 'sd-tbl-add-col'));
+
+    const delTableBtn = makeBtn('delete', 'Delete table', function () {
+      // Replace the entire table block with an empty paragraph so the
+      // composer surface always has at least one editable child.
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      if (element.parentNode) element.parentNode.replaceChild(p, element);
+      // Notify composer to re-emit blocks.
+      if (typeof onChange === 'function') onChange([]);
+    }, 'sd-tbl-del-table');
+    actionTh.appendChild(delTableBtn);
+
     tr.appendChild(actionTh);
 
     return tr;
