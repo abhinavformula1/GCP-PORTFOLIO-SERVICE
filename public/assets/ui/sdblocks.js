@@ -22,6 +22,7 @@ export const BLOCK_DEFS = [
   { type: 'matrix',     label: 'Matrix table',   icon: 'table_rows',     hint: 'Key/value rows, e.g. security properties.' },
   { type: 'risks',      label: 'Risk grid',      icon: 'warning',        hint: 'Risk cards with a severity level.' },
   { type: 'code',       label: 'Code block',     icon: 'terminal',       hint: 'A code snippet with syntax language label.' },
+  { type: 'image',      label: 'Image',          icon: 'image',          hint: 'Upload a JPEG, PNG, GIF, WebP or SVG with alt text and caption.' },
   { type: 'html',       label: 'Custom HTML',    icon: 'code',           hint: 'Advanced: raw HTML preserved as-is.' },
 ];
 
@@ -55,6 +56,7 @@ export function newBlock(type) {
     case 'matrix':     return Object.assign(base, { rows: [] });
     case 'risks':      return Object.assign(base, { items: [] });
     case 'code':       return Object.assign(base, { lang: 'javascript', code: '' });
+    case 'image':      return Object.assign(base, { url: '', alt: '', caption: '' });
     case 'html':       return Object.assign(base, { html: '' });
     default:           return Object.assign(base, { type: 'paragraph', text: '' });
   }
@@ -187,6 +189,20 @@ function risksToHtml(block) {
   return html;
 }
 
+function imageToHtml(block) {
+  if (!block.url) return '';
+  let html = '<figure class="sd-image-block">';
+  html += '<img src="' + escapeHtml(block.url) + '"'
+        + ' alt="' + escapeHtml(block.alt || '') + '"'
+        + ' loading="lazy"'
+        + (block.width  ? ' width="'  + Number(block.width)  + '"' : '')
+        + (block.height ? ' height="' + Number(block.height) + '"' : '')
+        + '>';
+  if (block.caption) html += '<figcaption>' + escapeHtml(block.caption) + '</figcaption>';
+  html += '</figure>';
+  return html;
+}
+
 function codeToHtml(block) {
   const lang = block.lang || 'plaintext';
   const code = block.code || '';
@@ -216,6 +232,7 @@ export function blockToHtml(block) {
     case 'matrix':     return matrixToHtml(block);
     case 'risks':      return risksToHtml(block);
     case 'code':       return codeToHtml(block);
+    case 'image':      return imageToHtml(block);
     case 'html':       return String(block.html || '');
     default:           return '';
   }
@@ -245,6 +262,7 @@ export function blockSummary(block) {
     }).filter(Boolean).join(' · ');
     case 'risks':     return (block.items || []).map(function (i) { return cleanText(i.title); }).filter(Boolean).join(' · ');
     case 'code':      return (block.code || '').split('\n')[0].slice(0, 60) || (block.lang || 'code') + ' snippet';
+    case 'image':     return block.alt || block.caption || 'Image';
     case 'html':      return 'Custom HTML block';
     default:          return '';
   }
@@ -448,6 +466,23 @@ function nodeToBlock(node) {
   if (node.classList.contains('sd-sequence')) return sequenceFromNode(node);
   if (node.classList.contains('sd-flow')) return flowFromNode(node);
   if (node.classList.contains('sd-risk-grid')) return risksFromNode(node);
+  // Dedicated image block component.
+  if (node.dataset && node.dataset.block === 'image') {
+    const block = newBlock('image');
+    block.url     = node.dataset.url     || '';
+    block.alt     = node.dataset.alt     || '';
+    block.caption = node.dataset.caption || '';
+    return block;
+  }
+  // Static image block from saved HTML.
+  if (tag === 'figure' && node.classList.contains('sd-image-block')) {
+    const block = newBlock('image');
+    const img = node.querySelector('img');
+    const cap = node.querySelector('figcaption');
+    if (img) { block.url = img.getAttribute('src') || ''; block.alt = img.getAttribute('alt') || ''; }
+    if (cap) block.caption = cap.textContent.trim();
+    return block;
+  }
   // Dedicated code block component — reads pre-computed data attributes.
   if (node.dataset && node.dataset.block === 'code') {
     const block = newBlock('code');

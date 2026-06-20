@@ -474,6 +474,7 @@ async function upsertSystemDesignArticle(article, { publishedBy } = {}) {
       stub:        !!article.stub,
       order:       Number(article.order || previous.order || 999),
       blocks:      sanitiseArticleBlocks(article.blocks),
+      thumbnail:   typeof article.thumbnail === 'string' ? article.thumbnail : '',
       en:          article.en && typeof article.en === 'object' ? article.en : {},
       fr:          article.fr && typeof article.fr === 'object' ? article.fr : {},
       version:     nextVersion,
@@ -759,4 +760,31 @@ module.exports = {
   deleteRecommendation,
   getContactPolicyConfig,
   upsertContactPolicyConfig,
+  getSponsorship,
+  upsertSponsorship,
+  deleteSponsorship,
 };
+
+// ── Sponsorship banner ────────────────────────────────────────────────────────
+
+const SPONSORSHIP_DOC = 'config/sponsorship';
+
+async function getSponsorship() {
+  const db = getDb();
+  const snap = await db.doc(SPONSORSHIP_DOC).get();
+  if (!snap.exists) return null;
+  const data = snap.data();
+  // Skip expired banners.
+  if (data.expiresAt && data.expiresAt.toDate && data.expiresAt.toDate() < new Date()) return null;
+  return data;
+}
+
+async function upsertSponsorship(data) {
+  const db = getDb();
+  await db.doc(SPONSORSHIP_DOC).set(data, { merge: true });
+}
+
+async function deleteSponsorship() {
+  const db = getDb();
+  await db.doc(SPONSORSHIP_DOC).delete();
+}

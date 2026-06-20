@@ -18,6 +18,7 @@
 import { blockToHtml, blocksToHtml, htmlToBlocks } from './sdblocks.js';
 import { createTableBlock } from './table-block.js';
 import { createCodeBlock } from './code-block.js';
+import { createImageBlock } from './image-block.js';
 import {
   createCardsBlock,
   createFlowBlock,
@@ -39,17 +40,41 @@ const RICH_SELECTOR = [
 const INSERT_ITEMS = [
   {
     type: 'matrix', label: 'Table', icon: 'table_rows',
+    hint: 'Rows & columns — compare specs, configs or properties.',
     seed: { type: 'matrix', rows: [['', ''], ['', '']] },
   },
-  { type: 'hero',       label: 'Selected design', icon: 'stars',                component: true },
-  { type: 'cards',      label: 'Info cards',      icon: 'grid_view',            component: true },
-  { type: 'flow',       label: 'Flow',            icon: 'linear_scale',         component: true },
-  { type: 'comparison', label: 'Comparison',      icon: 'compare_arrows',       component: true },
-  { type: 'sequence',   label: 'Sequence',        icon: 'format_list_numbered', component: true },
-  { type: 'risks',      label: 'Risk grid',       icon: 'warning',              component: true },
+  {
+    type: 'hero', label: 'Selected design', icon: 'stars', component: true,
+    hint: 'Highlight the chosen architecture with a kicker, heading and decision summary.',
+  },
+  {
+    type: 'cards', label: 'Info cards', icon: 'grid_view', component: true,
+    hint: 'Key facts as a tile grid — e.g. design goals, constraints, or system properties.',
+  },
+  {
+    type: 'flow', label: 'Flow', icon: 'linear_scale', component: true,
+    hint: 'Left-to-right pipeline steps — e.g. auth flow, data path, or trust boundary.',
+  },
+  {
+    type: 'comparison', label: 'Comparison', icon: 'compare_arrows', component: true,
+    hint: 'Options with Chosen / Rejected / Considered status and reasoning.',
+  },
+  {
+    type: 'sequence', label: 'Sequence', icon: 'format_list_numbered', component: true,
+    hint: 'Numbered steps for a technical flow — e.g. request lifecycle or boot sequence.',
+  },
+  {
+    type: 'risks', label: 'Risk grid', icon: 'warning', component: true,
+    hint: 'Risk cards with Low / Medium / High severity and mitigation notes.',
+  },
   {
     type: 'code', label: 'Code block', icon: 'terminal',
+    hint: 'Syntax-highlighted snippet — pick the language from the header bar.',
     seed: { type: 'code', lang: 'javascript', code: '' },
+  },
+  {
+    type: 'image', label: 'Image', icon: 'image', component: true,
+    hint: 'Upload a JPEG, PNG, GIF, WebP or SVG with alt text and caption.',
   },
 ];
 
@@ -326,6 +351,21 @@ export function createComposer(options) {
     });
   }
 
+  // Replace static figure.sd-image-block HTML with live image components.
+  function mountImageBlocks() {
+    surface.querySelectorAll('figure.sd-image-block:not([data-block])').forEach(function (fig) {
+      const img = fig.querySelector('img');
+      const cap = fig.querySelector('figcaption');
+      const b = createImageBlock({
+        url:     img ? (img.getAttribute('src') || '') : '',
+        alt:     img ? (img.getAttribute('alt') || '') : '',
+        caption: cap ? cap.textContent.trim() : '',
+      }, function () { emitChange(); });
+      b.setEditable(editable);
+      fig.replaceWith(b.element);
+    });
+  }
+
   // Replace any legacy sd-matrix-wrap HTML (from setBlocks/load) with live
   // table components. Called after innerHTML is set on the surface.
   function mountTableBlocks() {
@@ -550,10 +590,25 @@ export function createComposer(options) {
       row.type = 'button';
       row.className = 'composer-menu-item';
       row.setAttribute('role', 'menuitem');
-      row.append(icon(item.icon));
+
+      const iconWrap = document.createElement('span');
+      iconWrap.className = 'composer-menu-icon';
+      iconWrap.appendChild(icon(item.icon));
+      row.appendChild(iconWrap);
+
+      const text = document.createElement('span');
+      text.className = 'composer-menu-text';
       const label = document.createElement('span');
+      label.className = 'composer-menu-label';
       label.textContent = item.label;
-      row.appendChild(label);
+      text.appendChild(label);
+      if (item.hint) {
+        const hint = document.createElement('span');
+        hint.className = 'composer-menu-hint';
+        hint.textContent = item.hint;
+        text.appendChild(hint);
+      }
+      row.appendChild(text);
       row.addEventListener('click', function () {
         closeMenu();
         if (item.seed && item.seed.type === 'matrix') {
@@ -570,6 +625,7 @@ export function createComposer(options) {
             case 'sequence':   block = createSequenceBlock(null, function () { emitChange(); }); break;
             case 'risks':      block = createRisksBlock(null, function () { emitChange(); }); break;
             case 'hero':       block = createHeroBlock(null, function () { emitChange(); }); break;
+            case 'image':      block = createImageBlock(null, function () { emitChange(); }); break;
           }
           if (block) insertRichBlock(block);
         } else {
@@ -715,6 +771,7 @@ export function createComposer(options) {
     mountRichBlocks();
     mountTableBlocks();
     mountCodeBlocks();
+    mountImageBlocks();
     suppressChange = false;
     reflectEmpty();
     refreshActiveStates();

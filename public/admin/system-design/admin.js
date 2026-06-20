@@ -1,5 +1,3 @@
-/* global URL, atob, clearTimeout, customElements, document, fetch, google, localStorage, sessionStorage, setTimeout */
-
 import { GOOGLE_CLIENT_ID } from '../../assets/core/config.js';
 import {
   STORAGE_CREDENTIAL,
@@ -33,6 +31,7 @@ const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 let credential = readAdminHandoffCredential() || googleCredential || '';
 let articles = [];
 let selectedId = '';
+let currentThumbnailUrl = '';
 let contactPolicyState = null;
 let adminAvatarObjectUrl = '';
 let autosaveTimer = 0;
@@ -117,6 +116,12 @@ const els = {
   subtitle:        document.getElementById('articleSubtitle'),
   tags:            document.getElementById('articleTags'),
   body:            document.getElementById('articleBody'),
+  thumbInput:         document.getElementById('articleThumbInput'),
+  thumbDropzone:      document.getElementById('articleThumbDropzone'),
+  thumbPreviewWrap:   document.getElementById('articleThumbPreviewWrap'),
+  thumbPreview:       document.getElementById('articleThumbPreview'),
+  thumbRemoveBtn:     document.getElementById('articleThumbRemoveBtn'),
+  thumbStatus:        document.getElementById('articleThumbStatus'),
   sections:             document.getElementById('articleSections'),
   sectionBuilder:       document.querySelector('.sd-section-builder'),
   addSectionBtn:        document.getElementById('addSectionBtn'),
@@ -694,6 +699,7 @@ function articleFromForm() {
     order:       Number(els.order.value || 100),
     tags:        els.tags.value.split(',').map(function (tag) { return tag.trim(); }).filter(Boolean),
     stub:        els.statusField.value === 'Coming soon',
+    thumbnail:   currentThumbnailUrl || '',
     blocks:      cloneBlocks(blocks),
     en: {
       title:    els.title.value.trim(),
@@ -992,6 +998,8 @@ function fillForm(article) {
   els.title.value = en.title || '';
   els.subtitle.value = en.subtitle || '';
   els.tags.value = Array.isArray(item.tags) ? item.tags.join(', ') : '';
+  currentThumbnailUrl = item.thumbnail || '';
+  setThumbPreview(currentThumbnailUrl);
   els.detailsForm.hidden = true;
   els.sectionBuilder.hidden = false;
   renderArticleDetails();
@@ -1553,6 +1561,84 @@ function setDetailsStatus(msg, type) {
   el.hidden = !msg;
   el.className = 'sd-details-save-status' + (type ? ' sd-details-save-status--' + type : '');
 }
+
+// ── Thumbnail helpers ────────────────────────────────────────────────────────
+
+function setThumbPreview(url) {
+  if (url) {
+    els.thumbPreview.src = url;
+    els.thumbPreview.alt = 'Article thumbnail';
+    els.thumbPreviewWrap.hidden = false;
+    els.thumbDropzone.hidden = true;
+  } else {
+    els.thumbPreviewWrap.hidden = true;
+    els.thumbDropzone.hidden = false;
+  }
+}
+
+function setThumbStatus(msg, type) {
+  els.thumbStatus.textContent = msg;
+  els.thumbStatus.className = 'sd-thumb-status sd-thumb-status--' + (type || 'info');
+  els.thumbStatus.hidden = !msg;
+}
+
+async function uploadThumbnail(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    setThumbStatus('Only image files are allowed.', 'error');
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    setThumbStatus('File too large. Maximum is 8 MB.', 'error');
+    return;
+  }
+  setThumbStatus('Uploading…', 'info');
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/media/upload', { method: 'POST', headers: authHeaders(), body: form });
+    const json = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(json.message || json.error || 'Upload failed');
+    currentThumbnailUrl = json.url;
+    setThumbPreview(currentThumbnailUrl);
+    setThumbStatus('', '');
+  } catch (err) {
+    setThumbStatus(err.message || 'Upload failed.', 'error');
+  }
+}
+
+if (els.thumbInput) {
+  els.thumbInput.addEventListener('change', function () {
+    if (els.thumbInput.files && els.thumbInput.files[0]) uploadThumbnail(els.thumbInput.files[0]);
+  });
+}
+if (els.thumbDropzone) {
+  els.thumbDropzone.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    els.thumbDropzone.classList.add('sd-thumb-dropzone--active');
+  });
+  els.thumbDropzone.addEventListener('dragleave', function () {
+    els.thumbDropzone.classList.remove('sd-thumb-dropzone--active');
+  });
+  els.thumbDropzone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    els.thumbDropzone.classList.remove('sd-thumb-dropzone--active');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) uploadThumbnail(file);
+  });
+  els.thumbDropzone.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); els.thumbInput.click(); }
+  });
+}
+if (els.thumbRemoveBtn) {
+  els.thumbRemoveBtn.addEventListener('click', function () {
+    currentThumbnailUrl = '';
+    setThumbPreview('');
+    setThumbStatus('', '');
+    if (els.thumbInput) els.thumbInput.value = '';
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 els.saveDetailsBtn.addEventListener('click', async function () {
   const title = (els.title.value || '').trim();
