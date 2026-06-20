@@ -4091,15 +4091,18 @@ figure.sd-image-block figcaption {
   }
 
   /* ── Designed print header (injected by JS before window.print()) ─────── */
+  /* Note: position:running() is CSS Paged Media spec — Chrome does not support it.
+     Use normal document flow instead; the element is inserted before .sd-article. */
   body.sd-printing .sd-print-header {
-    position: running(header);
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: space-between;
     padding-bottom: 8px;
     border-bottom: 1.5px solid #0b5ed7;
-    margin-bottom: 10px;
+    margin-bottom: 18px;
     font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   body.sd-printing .sd-print-header-brand {
@@ -4116,9 +4119,7 @@ figure.sd-image-block figcaption {
 
   /* ── Article container ────────────────────────────────────────────────── */
   body.sd-printing .sd-article {
-    position: absolute;
-    top: 0;
-    left: 0;
+    position: static;   /* header sits above in normal flow — no overlap */
     width: 100%;
     background: #fff !important;
     border: 0 !important;

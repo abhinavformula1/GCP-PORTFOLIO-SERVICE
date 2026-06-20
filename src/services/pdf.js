@@ -83,6 +83,19 @@ async function generateArticlePdf(articleId, baseUrl) {
     //    rendered content rather than relying on network idle.
     await page.waitForSelector('.sd-article-body', { timeout: 20_000 });
 
+    // 3a. Wait for all images inside the article to finish loading so they
+    //     appear in the PDF (not just alt text placeholders).
+    await page.evaluate(`(function () {
+      var imgs = Array.from(document.querySelectorAll('.sd-article-body img'));
+      return Promise.all(imgs.map(function (img) {
+        if (img.complete) return Promise.resolve();
+        return new Promise(function (resolve) {
+          img.addEventListener('load', resolve);
+          img.addEventListener('error', resolve);  // don't block on broken imgs
+        });
+      }));
+    })()`).catch(function () {});  // never let image wait crash the whole job
+
     // 3. Activate the print-mode class (applies our @media print stylesheet).
     //    Passed as a string so ESLint (Node context) does not flag browser globals
     //    like `document` — this code executes inside headless Chrome, not Node.
