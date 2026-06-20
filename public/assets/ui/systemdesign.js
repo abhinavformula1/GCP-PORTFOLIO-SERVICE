@@ -372,11 +372,39 @@ function renderTopicDetail() {
 }
 
 function exportCurrentTopicPdf() {
+  // Inject a designed header that replaces the browser's URL bar
+  const existing = document.getElementById('sd-print-header');
+  if (existing) existing.remove();
+
+  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const header = document.createElement('div');
+  header.id = 'sd-print-header';
+  header.className = 'sd-print-header';
+  header.setAttribute('aria-hidden', 'true');
+  header.innerHTML =
+    '<span class="sd-print-header-brand">Abhinav Kumar &mdash; System Design</span>' +
+    '<span class="sd-print-header-date">' + dateStr + '</span>';
+
+  // Insert directly before the article so it appears at the top of the print page
+  const article = _sdDetail && _sdDetail.querySelector('.sd-article');
+  if (article) {
+    article.insertAdjacentElement('beforebegin', header);
+  } else {
+    document.body.prepend(header);
+  }
+
   document.body.classList.add('sd-printing');
-  window.print();
-  setTimeout(function () {
-    document.body.classList.remove('sd-printing');
-  }, 500);
+
+  // Let the DOM settle, then print
+  requestAnimationFrame(function () {
+    window.print();
+    setTimeout(function () {
+      document.body.classList.remove('sd-printing');
+      const h = document.getElementById('sd-print-header');
+      if (h) h.remove();
+    }, 800);
+  });
 }
 
 function highlightActiveTopic() {
