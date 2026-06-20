@@ -4046,35 +4046,268 @@ figure.sd-image-block figcaption {
   .ga-atlas-usage { margin-left: 36px; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Print / PDF stylesheet
+   Target: Chrome "Print…" → "Save as PDF"
+   Goal:   A clean, designed document — indistinguishable from a Stripe or
+           Google engineering design note.
+   ══════════════════════════════════════════════════════════════════════════ */
+
 @media print {
+
+  /* ── Page geometry ────────────────────────────────────────────────────── */
+  @page {
+    size: A4 portrait;
+    margin: 18mm 18mm 22mm 18mm;
+  }
+
+  /* First page: more top margin for the cover header */
+  @page :first {
+    margin-top: 22mm;
+  }
+
+  /* ── Suppress browser chrome ──────────────────────────────────────────── */
+  /* Chrome injects URL + date headers/footers only when @page has no margin
+     declaration — the @page above replaces them. Setting margin to a real
+     value AND using the custom header below removes the browser URL bar. */
+
+  /* ── Hide everything except the article ──────────────────────────────── */
   body.sd-printing * {
     visibility: hidden !important;
   }
 
   body.sd-printing .sd-article,
-  body.sd-printing .sd-article * {
+  body.sd-printing .sd-article *,
+  body.sd-printing .sd-print-header,
+  body.sd-printing .sd-print-header * {
     visibility: visible !important;
   }
 
+  /* ── Reset body layout ────────────────────────────────────────────────── */
+  body.sd-printing {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* ── Designed print header (injected by JS before window.print()) ─────── */
+  body.sd-printing .sd-print-header {
+    position: running(header);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid #0b5ed7;
+    margin-bottom: 10px;
+    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  body.sd-printing .sd-print-header-brand {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #0b5ed7;
+    letter-spacing: 0.02em;
+  }
+
+  body.sd-printing .sd-print-header-date {
+    font-size: 8pt;
+    color: #888;
+  }
+
+  /* ── Article container ────────────────────────────────────────────────── */
   body.sd-printing .sd-article {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
     background: #fff !important;
     border: 0 !important;
     box-shadow: none !important;
     color: #111 !important;
-    left: 0;
     padding: 0 !important;
-    position: absolute;
-    top: 0;
-    width: 100%;
+    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 10.5pt !important;
+    line-height: 1.65 !important;
   }
 
-  body.sd-printing .sd-export-btn {
-    display: none !important;
+  /* ── Typography ───────────────────────────────────────────────────────── */
+  body.sd-printing .sd-article h1,
+  body.sd-printing .sd-article h2 {
+    font-size: 16pt !important;
+    font-weight: 800 !important;
+    color: #0a0a0a !important;
+    margin: 0 0 4pt !important;
+    page-break-after: avoid;
   }
 
-  body.sd-printing .sd-article-body,
-  body.sd-printing .sd-article-sub {
+  body.sd-printing .sd-article h3 {
+    font-size: 11.5pt !important;
+    font-weight: 700 !important;
+    color: #0a0a0a !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 16pt 0 5pt !important;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 3pt;
+    page-break-after: avoid;
+  }
+
+  body.sd-printing .sd-article p {
+    font-size: 10.5pt !important;
     color: #222 !important;
+    margin: 0 0 7pt !important;
+  }
+
+  body.sd-printing .sd-article-title {
+    font-size: 18pt !important;
+    font-weight: 800 !important;
+    color: #0a0a0a !important;
+    line-height: 1.2 !important;
+    margin-bottom: 4pt !important;
+  }
+
+  body.sd-printing .sd-article-sub {
+    font-size: 10pt !important;
+    color: #555 !important;
+    margin-bottom: 12pt !important;
+  }
+
+  /* ── Meta row: tags + read time ───────────────────────────────────────── */
+  body.sd-printing .sd-article-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6pt;
+    margin-bottom: 14pt;
+    padding-bottom: 10pt;
+    border-bottom: 2px solid #0b5ed7;
+  }
+
+  body.sd-printing .sd-tag {
+    font-size: 7.5pt !important;
+    font-weight: 700 !important;
+    padding: 1pt 5pt !important;
+    border-radius: 4pt !important;
+    border: 1px solid #0b5ed7 !important;
+    color: #0b5ed7 !important;
+    background: transparent !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── Inline code ──────────────────────────────────────────────────────── */
+  body.sd-printing .sd-article code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace !important;
+    font-size: 9pt !important;
+    background: #f3f4f6 !important;
+    padding: 1pt 4pt !important;
+    border-radius: 3pt !important;
+    color: #c7254e !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── Code blocks ──────────────────────────────────────────────────────── */
+  body.sd-printing pre.sd-code-block,
+  body.sd-printing .sd-code-component {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    background: #1a1a2e !important;
+    border-radius: 6pt !important;
+    padding: 10pt 12pt !important;
+    margin: 8pt 0 10pt !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.sd-printing pre.sd-code-block code,
+  body.sd-printing .sd-code-component code,
+  body.sd-printing .sd-code-component textarea {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace !important;
+    font-size: 8.5pt !important;
+    color: #e8eaf6 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    white-space: pre-wrap;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.sd-printing pre.sd-code-block::before {
+    font-size: 7pt !important;
+    padding: 2pt 6pt !important;
+    margin-bottom: 6pt !important;
+  }
+
+  /* ── Tables ───────────────────────────────────────────────────────────── */
+  body.sd-printing .sd-matrix-wrap {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 8pt 0 10pt !important;
+  }
+
+  body.sd-printing .sd-matrix {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9pt !important;
+  }
+
+  body.sd-printing .sd-matrix th,
+  body.sd-printing .sd-matrix td {
+    padding: 5pt 8pt !important;
+    border: 1px solid #d1d5db !important;
+    color: #111 !important;
+    vertical-align: top;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.sd-printing .sd-matrix th {
+    background: #f3f4f6 !important;
+    font-weight: 700 !important;
+    font-size: 8.5pt !important;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #374151 !important;
+  }
+
+  body.sd-printing .sd-matrix tr:nth-child(even) td {
+    background: #fafafa !important;
+  }
+
+  /* ── Images ───────────────────────────────────────────────────────────── */
+  body.sd-printing figure.sd-image-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 10pt 0 12pt !important;
+    text-align: center;
+  }
+
+  body.sd-printing figure.sd-image-block img {
+    max-width: 100% !important;
+    max-height: 180pt !important;
+    object-fit: contain;
+    border-radius: 4pt !important;
+    border: 1px solid #e5e7eb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.sd-printing figure.sd-image-block figcaption {
+    font-size: 8pt !important;
+    color: #666 !important;
+    margin-top: 4pt !important;
+    font-style: italic;
+  }
+
+  /* ── Rich blocks ──────────────────────────────────────────────────────── */
+  body.sd-printing .sd-flow-block,
+  body.sd-printing .sd-card-grid,
+  body.sd-printing .sd-comparison-block,
+  body.sd-printing .sd-sequence-block,
+  body.sd-printing .sd-risk-block,
+  body.sd-printing .sd-hero-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   body.sd-printing .sd-tag,
@@ -4082,13 +4315,36 @@ figure.sd-image-block figcaption {
   body.sd-printing .sd-decision-grid div,
   body.sd-printing .sd-info-card,
   body.sd-printing .sd-risk,
-  body.sd-printing .sd-comparison-row,
-  body.sd-printing .sd-matrix th,
-  body.sd-printing .sd-matrix td {
-    border-color: #d9d9d9 !important;
+  body.sd-printing .sd-comparison-row {
+    border-color: #d1d5db !important;
   }
 
-  @page {
-    margin: 16mm;
+  /* ── Bullet lists ─────────────────────────────────────────────────────── */
+  body.sd-printing .sd-article ul {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    padding-left: 14pt !important;
+    margin: 0 0 8pt !important;
+  }
+
+  body.sd-printing .sd-article li {
+    font-size: 10.5pt !important;
+    color: #222 !important;
+    margin-bottom: 3pt !important;
+  }
+
+  /* ── UI chrome — hidden in print ──────────────────────────────────────── */
+  body.sd-printing .sd-export-btn,
+  body.sd-printing .sd-article-actions,
+  body.sd-printing .sd-topic-search,
+  body.sd-printing .sd-aside,
+  body.sd-printing .topbar,
+  body.sd-printing .sd-topic-list {
+    display: none !important;
+  }
+
+  /* ── Hyperlinks: show URL inline for technical references ─────────────── */
+  body.sd-printing .sd-article a[href]::after {
+    content: none;
   }
 }

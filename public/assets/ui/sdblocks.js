@@ -80,9 +80,13 @@ function escapeHtml(value) {
 
 function inlineMd(value) {
   let text = escapeHtml(value);
+  // Bold: **text**
   text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Inline code: `text` — must run before italic so backtick content is safe
   text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-  text = text.replace(/(^|[^_])_([^_]+)_(?!_)/g, '$1<em>$2</em>');
+  // Italic: _text_ — only when underscore is surrounded by whitespace/punctuation,
+  // NOT when it appears inside a word (snake_case identifiers like client_id, TOKEN_URL).
+  text = text.replace(/(^|[\s([{])_([^_]+)_(?=$|[\s)\]},.:!?])/g, '$1<em>$2</em>');
   return text;
 }
 
