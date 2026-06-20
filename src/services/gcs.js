@@ -37,7 +37,12 @@ const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 
 function getBucket() {
   const name = process.env.MEDIA_BUCKET;
-  if (!name) throw new Error('MEDIA_BUCKET environment variable is not set.');
+  if (!name) {
+    const err = new Error('Media storage is not configured on this server. Set the MEDIA_BUCKET environment variable.');
+    err.statusCode = 503;
+    err.isOperational = true;
+    throw err;
+  }
   return storage.bucket(name);
 }
 

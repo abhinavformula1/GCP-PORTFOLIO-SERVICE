@@ -17,10 +17,7 @@ function errorHandler(err, req, res, _next) {
     const statusCode = err.statusCode || 500;
     const code       = err.code       || 'ERROR';
 
-    // 503 specifically means a required service (e.g. Salesforce) is not configured
-    const message = statusCode === 503
-      ? 'Service temporarily unavailable. Please try again later.'
-      : err.message;
+    const message = err.message;
 
     return res.status(statusCode).json({
       success: false,
