@@ -4,17 +4,14 @@ steps:
     args:
       - build
       - '-t'
-      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/portfolio-service/app:$COMMIT_SHA'
-      - '-t'
       - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/portfolio-service/app:latest'
       - '.'
 
-  # Push both tags
+  # Push latest tag
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - push
-      - '--all-tags'
-      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/portfolio-service/app'
+      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/portfolio-service/app:latest'
 
   # Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -23,7 +20,7 @@ steps:
       - run
       - deploy
       - portfolio-service
-      - '--image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/portfolio-service/app:$COMMIT_SHA'
+      - '--image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/portfolio-service/app:latest'
       - '--region=asia-southeast1'
       - '--platform=managed'
       - '--quiet'

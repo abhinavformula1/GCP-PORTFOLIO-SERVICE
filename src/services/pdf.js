@@ -55,7 +55,7 @@ const LAUNCH_ARGS = [
  * @param {number} [settleMs]- Ms to wait after setContent (default 1500).
  * @returns {Promise<Buffer>}
  */
-async function generatePdfFromHtml(html, settleMs = 1500) {
+async function generatePdfFromHtml(html, settleMs = 2000) {
   const browser = await puppeteer.launch({
     executablePath: resolveChromePath(),
     headless: true,
@@ -67,9 +67,10 @@ async function generatePdfFromHtml(html, settleMs = 1500) {
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1.5 });
 
     // setContent writes HTML directly — no URL navigation, no frame detachment.
-    await page.setContent(html, { waitUntil: 'load' });
+    // networkidle0 waits until ALL external requests (GCS images, fonts) finish.
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
 
-    // Wait for images (GCS URLs embedded in the HTML) to load.
+    // Extra settle for any lazy-loaded or deferred resources.
     await new Promise(r => setTimeout(r, settleMs));
 
     // page.pdf() returns Uint8Array in Puppeteer v21+.
