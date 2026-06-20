@@ -142,6 +142,13 @@ function sequenceToHtml(block) {
   return html;
 }
 
+function matrixRowCells(row) {
+  // Normalise legacy {key,value} and new array-of-cells rows into a plain array.
+  if (Array.isArray(row)) return row.map(function (c) { return String(c == null ? '' : c); });
+  if (row && typeof row === 'object') return [String(row.key || ''), String(row.value || '')];
+  return [];
+}
+
 function matrixToHtml(block) {
   // Keep all rows (including empty ones) so the table renders in the editor.
   // Only skip null/undefined entries; guard against a completely rowless block.
@@ -149,7 +156,12 @@ function matrixToHtml(block) {
   if (!rows.length) return '';
   let html = '<div class="sd-matrix-wrap"><table class="sd-matrix"><tbody>';
   rows.forEach(function (row) {
-    html += '<tr><th>' + escapeHtml(row.key) + '</th><td>' + inlineMd(row.value) + '</td></tr>';
+    const cells = matrixRowCells(row);
+    if (!cells.length) return;
+    // First cell → <th>, remaining → <td>
+    html += '<tr><th>' + escapeHtml(cells[0]) + '</th>';
+    cells.slice(1).forEach(function (c) { html += '<td>' + inlineMd(c) + '</td>'; });
+    html += '</tr>';
   });
   html += '</tbody></table></div>';
   return html;
@@ -211,7 +223,10 @@ export function blockSummary(block) {
     case 'flow':      return (block.steps || []).map(cleanText).filter(Boolean).join(' → ');
     case 'comparison':return (block.rows || []).map(function (r) { return cleanText(r.title); }).filter(Boolean).join(' · ');
     case 'sequence':  return (block.steps || []).map(cleanText).filter(Boolean).join(' · ');
-    case 'matrix':    return (block.rows || []).map(function (r) { return cleanText(r.key); }).filter(Boolean).join(' · ');
+    case 'matrix':    return (block.rows || []).map(function (r) {
+      if (Array.isArray(r)) return cleanText(r[0]);
+      return cleanText(r && r.key);
+    }).filter(Boolean).join(' · ');
     case 'risks':     return (block.items || []).map(function (i) { return cleanText(i.title); }).filter(Boolean).join(' · ');
     case 'html':      return 'Custom HTML block';
     default:          return '';
@@ -298,11 +313,15 @@ function sequenceFromNode(node) {
 function matrixFromNode(node) {
   const block = newBlock('matrix');
   block.rows = Array.prototype.map.call(node.querySelectorAll('tr'), function (row) {
-    return {
-      key:   cleanText(row.querySelector('th') ? row.querySelector('th').textContent : ''),
-      value: inlineToMd(row.querySelector('td') || document.createElement('td')),
-    };
-  });
+    // Collect th (first cell) + all td cells → return as flat array.
+    const cells = [];
+    const th = row.querySelector('th');
+    if (th) cells.push(cleanText(th.textContent));
+    Array.prototype.forEach.call(row.querySelectorAll('td'), function (td) {
+      cells.push(inlineToMd(td));
+    });
+    return cells;
+  }).filter(function (cells) { return cells.length > 0; });
   return block;
 }
 
@@ -372,7 +391,17 @@ function nodeToBlock(node) {
   if (node.classList.contains('sd-sequence')) return sequenceFromNode(node);
   if (node.classList.contains('sd-flow')) return flowFromNode(node);
   if (node.classList.contains('sd-risk-grid')) return risksFromNode(node);
+  // Dedicated table component — reads pre-computed JSON attribute.
+  if (node.dataset && node.dataset.block === 'matrix') {
+    const block = newBlock('matrix');
+    try { block.rows = JSON.parse(node.dataset.rows || '[]'); } catch (_) { block.rows = []; }
+    return block;
+  }
   if (tag === 'table') return matrixFromNode(node);
+  if (node.classList.contains('sd-matrix-wrap')) {
+    const tbl = node.querySelector('table.sd-matrix');
+    if (tbl) return matrixFromNode(tbl);
+  }
   if (tag === 'section') {
     // Unwrap a generic section: convert its children individually.
     return Array.prototype.map.call(node.children, nodeToBlock).filter(Boolean);
