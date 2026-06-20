@@ -1474,9 +1474,11 @@
 }
 
 .sd-section-type-wrap {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* Both select and input share the same size/shape — only one shows at a time */
@@ -1484,7 +1486,8 @@
 .sd-section-type-custom-input {
   min-height: 36px;
   min-width: 148px;
-  max-width: 340px;
+  max-width: 100%;
+  width: 100%;
   border: 1.5px solid var(--md-sys-color-outline-variant, #cad3e0);
   border-radius: 10px;
   padding: 0 10px;
