@@ -127,4 +127,4 @@ async function generateArticlePdf(articleId, baseUrl) {
   }
 }
 
-module.exports = { generateArticlePdf };
+module.exports = { generateArticlePdf, resolveChromePath };
