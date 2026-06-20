@@ -1,37 +1,37 @@
-# ── Stage 1: node:20-slim (Debian) ────────────────────────────────────────────
-# We switched from node:20-alpine to node:20-slim to support headless Chrome
-# (Puppeteer) for server-side PDF generation.  Alpine's bundled Chromium is
-# several major versions behind and lacks the CSS print features we rely on;
-# the Debian package track is kept current by Google's own linux/chrome repo.
+# ── node:20-slim (Debian) ──────────────────────────────────────────────────────
+# Switched from node:20-alpine to node:20-slim to support headless Chrome
+# (Puppeteer) for server-side PDF generation.
 FROM node:20-slim
 
-# Install Google Chrome Stable.
-# We use the official Google signing key + apt repo so we always get the same
-# Chrome version that Google ships to end-users — the exact engine that renders
-# our @media print stylesheet correctly.
-RUN apt-get update && apt-get install -y wget gnupg --no-install-recommends \
-  && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-  && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
-       > /etc/apt/sources.list.d/google-chrome.list \
-  && apt-get update && apt-get install -y \
-       google-chrome-stable \
-       fonts-liberation \
-       fonts-noto-color-emoji \
-       libappindicator3-1 \
-       libasound2 \
-       libatk-bridge2.0-0 \
-       libatk1.0-0 \
-       libcups2 \
-       libdbus-1-3 \
-       libgdk-pixbuf2.0-0 \
-       libnspr4 \
-       libnss3 \
-       libx11-xcb1 \
-       libxcomposite1 \
-       libxdamage1 \
-       libxrandr2 \
-       xdg-utils \
-       --no-install-recommends \
+# Install Google Chrome Stable via the direct .deb download.
+# This avoids the GPG apt-repo setup (which is fragile in Cloud Build) while
+# still installing the identical binary Google ships to end-users.
+RUN apt-get update && apt-get install -y \
+      wget \
+      ca-certificates \
+      fonts-liberation \
+      libappindicator3-1 \
+      libasound2 \
+      libatk-bridge2.0-0 \
+      libatk1.0-0 \
+      libcups2 \
+      libdbus-1-3 \
+      libgdk-pixbuf2.0-0 \
+      libgtk-3-0 \
+      libnspr4 \
+      libnss3 \
+      libx11-xcb1 \
+      libxcomposite1 \
+      libxdamage1 \
+      libxrandr2 \
+      libxss1 \
+      libxtst6 \
+      xdg-utils \
+      --no-install-recommends \
+  && wget -q -O /tmp/chrome.deb \
+       https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+  && apt-get install -y /tmp/chrome.deb \
+  && rm /tmp/chrome.deb \
   && rm -rf /var/lib/apt/lists/*
 
 # Tell Puppeteer where Chrome lives (skips the Puppeteer-bundled download).
