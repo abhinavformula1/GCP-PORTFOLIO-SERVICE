@@ -143,9 +143,15 @@ function sequenceToHtml(block) {
 }
 
 function matrixRowCells(row) {
-  // Normalise legacy {key,value} and new array-of-cells rows into a plain array.
+  // Normalise all row formats into a plain string array:
+  //   [{cells:[...]}]  — Firestore-safe storage format (new)
+  //   [['c0','c1']]    — array-of-arrays in DOM data-rows (new, browser only)
+  //   [{key,value}]    — legacy two-column format
   if (Array.isArray(row)) return row.map(function (c) { return String(c == null ? '' : c); });
-  if (row && typeof row === 'object') return [String(row.key || ''), String(row.value || '')];
+  if (row && typeof row === 'object') {
+    if (Array.isArray(row.cells)) return row.cells.map(function (c) { return String(c == null ? '' : c); });
+    return [String(row.key || ''), String(row.value || '')];
+  }
   return [];
 }
 
@@ -224,8 +230,8 @@ export function blockSummary(block) {
     case 'comparison':return (block.rows || []).map(function (r) { return cleanText(r.title); }).filter(Boolean).join(' · ');
     case 'sequence':  return (block.steps || []).map(cleanText).filter(Boolean).join(' · ');
     case 'matrix':    return (block.rows || []).map(function (r) {
-      if (Array.isArray(r)) return cleanText(r[0]);
-      return cleanText(r && r.key);
+      const cells = matrixRowCells(r);
+      return cleanText(cells[0]);
     }).filter(Boolean).join(' · ');
     case 'risks':     return (block.items || []).map(function (i) { return cleanText(i.title); }).filter(Boolean).join(' · ');
     case 'html':      return 'Custom HTML block';
