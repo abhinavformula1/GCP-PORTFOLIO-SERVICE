@@ -317,8 +317,13 @@ function updateAdminChrome(profile) {
   els.userPhoto.alt = displayName + ' profile';
 }
 
+function syncAdminCredentialToWindow() {
+  window.__adminCredential = credential;
+}
+
 function resetAdminSession() {
   credential = '';
+  syncAdminCredentialToWindow();
   setGoogleCredential(null);
   setSiteProfile(null);
   sessionStorage.removeItem(STORAGE_CREDENTIAL);
@@ -339,6 +344,7 @@ function signOutAdmin(opts) {
 
 async function startAdminSession(token) {
   credential = token || '';
+  syncAdminCredentialToWindow();
   saveSharedSession(credential);
   updateAdminChrome(profileFromCredential(credential));
   try {
@@ -356,6 +362,7 @@ async function startLocalAdminPreview() {
   const data = await resp.json().catch(function () { return {}; });
   if (!resp.ok || !data.enabled) return false;
   credential = 'local-admin-preview';
+  syncAdminCredentialToWindow();
   const profile = {
     sub: 'local-admin-preview',
     name: 'Local Admin Preview',
