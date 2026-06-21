@@ -500,6 +500,43 @@ async function deleteSystemDesignArticle(id) {
   await getDb().collection(SYSTEM_DESIGN_COLLECTION).doc(articleId).delete();
 }
 
+// ── Tier configuration ────────────────────────────────────────────────────────
+const TIER_CONFIG_COLLECTION = 'config';
+const TIER_CONFIG_DOC        = 'tierSettings';
+
+const DEFAULT_TIER_CONFIG = {
+  free: {
+    items: [
+      { icon: 'article',  label: 'Popular Articles' },
+    ],
+  },
+  premium: {
+    items: [
+      { icon: 'library_books',  label: 'All Articles' },
+      { icon: 'support_agent',  label: 'Customer Support' },
+      { icon: 'build',          label: 'Implementation Help' },
+    ],
+  },
+};
+
+async function getTierConfig() {
+  const snap = await getDb().collection(TIER_CONFIG_COLLECTION).doc(TIER_CONFIG_DOC).get();
+  if (!snap.exists) return DEFAULT_TIER_CONFIG;
+  const d = snap.data() || {};
+  return {
+    free:    { items: Array.isArray(d.free?.items)    ? d.free.items    : DEFAULT_TIER_CONFIG.free.items },
+    premium: { items: Array.isArray(d.premium?.items) ? d.premium.items : DEFAULT_TIER_CONFIG.premium.items },
+  };
+}
+
+async function upsertTierConfig(config) {
+  await getDb().collection(TIER_CONFIG_COLLECTION).doc(TIER_CONFIG_DOC).set({
+    free:    { items: Array.isArray(config?.free?.items)    ? config.free.items    : [] },
+    premium: { items: Array.isArray(config?.premium?.items) ? config.premium.items : [] },
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
 /**
  * Moves the active chat into /users/{uid}/inquiries and clears it. Used after
  * a successful Recruiter_Inquiry__c create so we keep history but the next
@@ -756,6 +793,8 @@ module.exports = {
   getSystemDesignArticle,
   upsertSystemDesignArticle,
   deleteSystemDesignArticle,
+  getTierConfig,
+  upsertTierConfig,
   upsertRecommendation,
   listActiveRecommendations,
   writeRecommendationReply,

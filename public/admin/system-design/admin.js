@@ -78,6 +78,10 @@ const els = {
   articleSettingsStatus: document.getElementById('articleSettingsStatus'),
   autoFixArticleOrderBtn: document.getElementById('autoFixArticleOrderBtn'),
   saveArticleSettingsBtn: document.getElementById('saveArticleSettingsBtn'),
+  tierSettingsWorkspace: document.getElementById('tierSettingsWorkspace'),
+  tierSettingsPanel: document.getElementById('tierSettingsPanel'),
+  tierSettingsStatus: document.getElementById('tierSettingsStatus'),
+  saveTierSettingsBtn: document.getElementById('saveTierSettingsBtn'),
   togglePolicyInfoBtn: document.getElementById('toggleContactPolicyInfoBtn'),
   policyMeta:      document.getElementById('contactPolicyMeta'),
   allowedDomains:  document.getElementById('contactAllowedDomains'),
@@ -332,6 +336,7 @@ function resetAdminSession() {
   els.modules.hidden = true;
   els.policyWorkspace.hidden = true;
   els.articleSettingsWorkspace.hidden = true;
+  els.tierSettingsWorkspace.hidden = true;
   els.dropdown.hidden = true;
   updateAdminChrome(null);
 }
@@ -470,6 +475,7 @@ function handleAdminLoadError(err) {
   els.modules.hidden = true;
   els.policyWorkspace.hidden = true;
   els.articleSettingsWorkspace.hidden = true;
+  els.tierSettingsWorkspace.hidden = true;
   if (err?.status === 401) {
     resetAdminSession();
   }
@@ -543,12 +549,15 @@ function renderContactPolicy(policy) {
 }
 
 function setActiveModule(moduleName) {
-  const isPolicy = moduleName === 'contact-policy';
+  const isPolicy   = moduleName === 'contact-policy';
   const isSettings = moduleName === 'article-settings';
-  els.workspace.hidden = isPolicy || isSettings;
+  const isTier     = moduleName === 'tier-settings';
+  els.workspace.hidden = isPolicy || isSettings || isTier;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
+  els.tierSettingsWorkspace.hidden = !isTier;
   if (isSettings) renderArticleSettings();
+  if (isTier)     renderTierSettings();
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
@@ -1316,6 +1325,104 @@ async function saveArticleSettings() {
   setSectionStatus(els.articleSettingsStatus, 'Article settings saved.', 'success');
 }
 
+// ── Tier Settings ─────────────────────────────────────────────────────────────
+let tierConfig = null;
+
+async function loadTierConfig() {
+  try {
+    const data = await authedJson('/api/system-design/tier-config');
+    tierConfig = data.config || { free: { items: [] }, premium: { items: [] } };
+  } catch (_) {
+    tierConfig = { free: { items: [] }, premium: { items: [] } };
+  }
+}
+
+function buildTierList(tier) {
+  const items = (tierConfig && tierConfig[tier] && tierConfig[tier].items) || [];
+  const container = document.createElement('div');
+  container.className = 'sd-tier-items-editor';
+  container.dataset.tier = tier;
+
+  items.forEach(function (item, idx) {
+    container.appendChild(buildTierItemRow(item, idx));
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'sd-tier-add-btn';
+  addBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">add</span> Add item';
+  addBtn.addEventListener('click', function () {
+    const newIdx = container.querySelectorAll('.sd-tier-item-row').length;
+    container.insertBefore(buildTierItemRow({ icon: 'article', label: '' }, newIdx), addBtn);
+  });
+  container.appendChild(addBtn);
+  return container;
+}
+
+function buildTierItemRow(item, _idx) {
+  const row = document.createElement('div');
+  row.className = 'sd-tier-item-row';
+  row.innerHTML =
+    '<input class="sd-tier-icon-input" type="text" placeholder="Material icon name" value="' + (item.icon || '') + '" aria-label="Icon name">' +
+    '<input class="sd-tier-label-input" type="text" placeholder="Benefit label" value="' + (item.label || '') + '" aria-label="Benefit label">' +
+    '<button type="button" class="sd-tier-remove-btn" aria-label="Remove item">' +
+      '<span class="material-symbols-outlined" aria-hidden="true">delete</span>' +
+    '</button>';
+  row.querySelector('.sd-tier-remove-btn').addEventListener('click', function () {
+    row.remove();
+  });
+  return row;
+}
+
+function tierItemsFromEditor(container) {
+  return Array.from(container.querySelectorAll('.sd-tier-item-row')).map(function (row) {
+    return {
+      icon:  row.querySelector('.sd-tier-icon-input').value.trim() || 'article',
+      label: row.querySelector('.sd-tier-label-input').value.trim(),
+    };
+  }).filter(function (item) { return item.label; });
+}
+
+async function renderTierSettings() {
+  const panel = els.tierSettingsPanel;
+  panel.innerHTML = '<p class="sd-article-settings-loading">Loading tier config…</p>';
+  await loadTierConfig();
+  panel.innerHTML = '';
+
+  const grid = document.createElement('div');
+  grid.className = 'sd-tier-settings-grid';
+
+  ['free', 'premium'].forEach(function (tier) {
+    const card = document.createElement('div');
+    card.className = 'sd-tier-settings-card';
+    const head = document.createElement('div');
+    head.className = 'sd-tier-settings-card-head';
+    const icon = tier === 'free' ? 'lock_open' : 'workspace_premium';
+    const title = tier === 'free' ? 'Free Tier' : 'Premium Tier';
+    head.innerHTML =
+      '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>' +
+      '<h3>' + title + '</h3>' +
+      '<p>Benefit items shown in the tier gate card</p>';
+    card.appendChild(head);
+    card.appendChild(buildTierList(tier));
+    grid.appendChild(card);
+  });
+
+  panel.appendChild(grid);
+}
+
+async function saveTierSettings() {
+  setSectionStatus(els.tierSettingsStatus, 'Saving tier settings…', 'info');
+  const freeItems    = tierItemsFromEditor(els.tierSettingsPanel.querySelector('[data-tier="free"]'));
+  const premItems    = tierItemsFromEditor(els.tierSettingsPanel.querySelector('[data-tier="premium"]'));
+  await authedJson('/api/admin/system-design/tier-config', {
+    method: 'PUT',
+    body:   JSON.stringify({ free: { items: freeItems }, premium: { items: premItems } }),
+  });
+  tierConfig = { free: { items: freeItems }, premium: { items: premItems } };
+  setSectionStatus(els.tierSettingsStatus, 'Tier settings saved.', 'success');
+}
+
 function renderPreview() {
   const article = articleFromForm();
   updateWorkflowChrome(article.status);
@@ -1545,6 +1652,9 @@ els.testPolicyBtn.addEventListener('click', testContactPolicy);
 els.autoFixArticleOrderBtn.addEventListener('click', autoFixArticleSettingsOrder);
 els.saveArticleSettingsBtn.addEventListener('click', function () {
   saveArticleSettings().catch(function (err) { setSectionStatus(els.articleSettingsStatus, err.message, 'error'); });
+});
+els.saveTierSettingsBtn.addEventListener('click', function () {
+  saveTierSettings().catch(function (err) { setSectionStatus(els.tierSettingsStatus, err.message, 'error'); });
 });
 document.addEventListener('click', function () {
   closeSectionActionMenus();

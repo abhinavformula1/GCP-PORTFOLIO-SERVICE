@@ -654,6 +654,132 @@
   display: none;
 }
 
+/* ── Tier Settings editor ──────────────────────────────────────────────────── */
+.sd-tier-settings-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.sd-tier-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+@media (max-width: 720px) {
+  .sd-tier-settings-grid { grid-template-columns: 1fr; }
+}
+
+.sd-tier-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface);
+}
+
+.sd-tier-settings-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sd-tier-settings-card-head .material-symbols-outlined {
+  font-size: 24px;
+  color: var(--md-sys-color-primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sd-tier-settings-card-head h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sd-tier-settings-card-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.sd-tier-items-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sd-tier-item-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.sd-tier-item-row input {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 10px;
+  background: var(--md-sys-color-surface-container-lowest);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.sd-tier-item-row input:focus {
+  outline: none;
+  border-color: var(--md-sys-color-primary);
+}
+
+.sd-tier-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--md-sys-color-error, #b00020);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sd-tier-remove-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-error, #b00020) 10%, transparent);
+}
+
+.sd-tier-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px dashed var(--md-sys-color-outline);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.sd-tier-add-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.sd-article-settings-loading {
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 14px 0;
+}
+
 .sd-admin-policy-copy,
 .sd-admin-policy-card {
   padding: 18px;
