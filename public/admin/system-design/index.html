@@ -82,6 +82,10 @@
             <span class="material-symbols-outlined" aria-hidden="true">campaign</span>
             <span>Sponsorships</span>
           </button>
+          <button type="button" class="sd-admin-module" data-module="seo-config">
+            <span class="material-symbols-outlined" aria-hidden="true">travel_explore</span>
+            <span>SEO &amp; AEO</span>
+          </button>
         </div>
       </div>
       <div class="sd-admin-badge">
@@ -527,6 +531,109 @@
           <button type="button" id="deleteSponsorBtn" class="sd-sponsor-delete-btn" hidden>Delete</button>
           <button type="button" id="saveSponsorBtn" class="sd-admin-primary sd-sponsor-save-btn">Save sponsor</button>
         </div>
+      </div>
+    </section>
+
+    <!-- SEO & AEO configuration workspace -->
+    <section id="seoConfigWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Discoverability</div>
+          <h2>SEO &amp; AEO Settings</h2>
+          <p>Control how search engines and AI answer engines (Google SGE, Perplexity, Bing Copilot) discover and present your site. Changes are applied globally on the next page load.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <button type="button" id="saveSeoConfigBtn" class="sd-admin-primary">
+            <span class="material-symbols-outlined" aria-hidden="true">save</span> Save
+          </button>
+        </div>
+      </div>
+      <div id="seoConfigStatus" class="sd-admin-section-status"></div>
+
+      <div class="sd-seo-config-panel">
+
+        <!-- Site identity -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">Site Identity</h3>
+          <p class="sd-seo-group-desc">Used in canonical URLs, JSON-LD structured data, and the sitemap. Update if you move to a custom domain.</p>
+          <label class="sd-seo-field">
+            <span>Site canonical URL <span class="sd-required">*</span></span>
+            <input id="seoSiteUrl" type="url" placeholder="https://your-domain.com" />
+          </label>
+          <label class="sd-seo-field">
+            <span>Homepage meta description <span class="sd-required">*</span></span>
+            <textarea id="seoSiteDescription" rows="3" placeholder="Describe your portfolio in 150–160 characters for Google search snippets…"></textarea>
+            <span class="sd-seo-charcount" id="seoDescCharCount">0 / 160</span>
+          </label>
+          <label class="sd-seo-field">
+            <span>OG cover image URL <span class="sd-hint">(1200×630 px — shown when link is shared on LinkedIn / WhatsApp)</span></span>
+            <input id="seoOgImageUrl" type="url" placeholder="https://storage.googleapis.com/…/og-card.png" />
+          </label>
+        </div>
+
+        <!-- Feature toggles -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">Feature Toggles</h3>
+          <div class="sd-seo-toggles">
+
+            <div class="sd-seo-toggle-row">
+              <div class="sd-seo-toggle-info">
+                <strong>JSON-LD Structured Data</strong>
+                <span>Injects Person + ProfilePage + TechArticle schema. Enables AI engines (Google SGE, Perplexity, Bing Copilot) to cite you as the answer source.</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Enable JSON-LD">
+                <input type="checkbox" id="seoJsonLd" />
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="sd-seo-toggle-row">
+              <div class="sd-seo-toggle-info">
+                <strong>Sitemap</strong>
+                <span>Serves <code>/sitemap.xml</code> with all published articles. Allows Google to discover every article automatically without relying on crawl luck.</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Enable sitemap">
+                <input type="checkbox" id="seoSitemap" />
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="sd-seo-toggle-row">
+              <div class="sd-seo-toggle-info">
+                <strong>French hreflang (fr)</strong>
+                <span>Adds <code>hreflang="fr"</code> links so Google indexes French and English versions as separate search results. Only enable when French article content is ready.</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Enable French hreflang">
+                <input type="checkbox" id="seoHreflangFr" />
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="sd-seo-toggle-row sd-seo-toggle-danger">
+              <div class="sd-seo-toggle-info">
+                <strong>Block all indexing (noindex)</strong>
+                <span>Adds <code>noindex, nofollow</code> to every page. Use only during maintenance. Removes the site from Google within days — hard to recover from.</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Enable global noindex">
+                <input type="checkbox" id="seoRobotsNoindex" />
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Live preview -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">Google Search Preview</h3>
+          <p class="sd-seo-group-desc">Approximate appearance in search results based on current settings.</p>
+          <div class="sd-seo-serp-preview" id="seoSerpPreview">
+            <div class="sd-serp-url" id="seoSerpUrl">https://your-domain.com</div>
+            <div class="sd-serp-title" id="seoSerpTitle">Abhinav Kumar — Senior Salesforce Application Engineer</div>
+            <div class="sd-serp-desc" id="seoSerpDesc">Meta description will appear here…</div>
+          </div>
+        </div>
+
       </div>
     </section>
 

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /print/
+Disallow: /admin/
+
+Sitemap: https://portfolio-service-647206478056.asia-southeast1.run.app/sitemap.xml

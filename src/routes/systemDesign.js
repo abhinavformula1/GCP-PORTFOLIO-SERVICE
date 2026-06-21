@@ -191,6 +191,36 @@ router.get('/system-design/tier-config', async (_req, res) => {
   }
 });
 
+// ── SEO / AEO configuration (public read, admin write) ────────────────────────
+router.get('/system-design/seo-config', async (_req, res) => {
+  try {
+    const config = await firestore.getSeoConfig();
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+    return res.status(200).json({ success: true, config });
+  } catch (err) {
+    console.warn('[seo-config] Firestore read failed:', err.message);
+    return res.status(200).json({ success: true, config: {} });
+  }
+});
+
+router.put('/admin/system-design/seo-config', requireAdmin, [
+  body('siteUrl').isURL({ require_protocol: true }).withMessage('siteUrl must be a valid URL.'),
+  body('siteDescription').isString().notEmpty().withMessage('siteDescription is required.'),
+  body('jsonLdEnabled').isBoolean().withMessage('jsonLdEnabled must be a boolean.'),
+  body('sitemapEnabled').isBoolean().withMessage('sitemapEnabled must be a boolean.'),
+  body('robotsNoindex').isBoolean().withMessage('robotsNoindex must be a boolean.'),
+  body('hreflangFrEnabled').isBoolean().withMessage('hreflangFrEnabled must be a boolean.'),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
+  try {
+    await firestore.upsertSeoConfig(req.body);
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── Component registry (public read, admin write) ─────────────────────────────
 router.get('/system-design/component-registry', async (_req, res) => {
   try {

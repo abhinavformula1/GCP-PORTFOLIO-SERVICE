@@ -539,6 +539,47 @@ async function upsertTierConfig(config) {
   });
 }
 
+// ── SEO / AEO configuration ───────────────────────────────────────────────────
+const SEO_CONFIG_DOC = 'seoConfig';
+
+const DEFAULT_SEO_CONFIG = {
+  siteUrl:          'https://portfolio-service-647206478056.asia-southeast1.run.app',
+  siteDescription:  'Senior Salesforce Application Engineer with 12+ years across Salesforce, GCP, MuleSoft and API integrations. Deep-dive system design articles on authentication, security, and enterprise architecture.',
+  ogImageUrl:       '',
+  jsonLdEnabled:    true,
+  sitemapEnabled:   true,
+  robotsNoindex:    false,
+  hreflangFrEnabled: false,
+};
+
+async function getSeoConfig() {
+  const snap = await getDb().collection(TIER_CONFIG_COLLECTION).doc(SEO_CONFIG_DOC).get();
+  if (!snap.exists) return { ...DEFAULT_SEO_CONFIG };
+  const d = snap.data() || {};
+  return {
+    siteUrl:           String(d.siteUrl          || DEFAULT_SEO_CONFIG.siteUrl),
+    siteDescription:   String(d.siteDescription  || DEFAULT_SEO_CONFIG.siteDescription),
+    ogImageUrl:        String(d.ogImageUrl        || ''),
+    jsonLdEnabled:     d.jsonLdEnabled    !== false,
+    sitemapEnabled:    d.sitemapEnabled   !== false,
+    robotsNoindex:     !!d.robotsNoindex,
+    hreflangFrEnabled: !!d.hreflangFrEnabled,
+  };
+}
+
+async function upsertSeoConfig(cfg) {
+  await getDb().collection(TIER_CONFIG_COLLECTION).doc(SEO_CONFIG_DOC).set({
+    siteUrl:           String(cfg.siteUrl          || DEFAULT_SEO_CONFIG.siteUrl),
+    siteDescription:   String(cfg.siteDescription  || DEFAULT_SEO_CONFIG.siteDescription),
+    ogImageUrl:        String(cfg.ogImageUrl        || ''),
+    jsonLdEnabled:     cfg.jsonLdEnabled    !== false,
+    sitemapEnabled:    cfg.sitemapEnabled   !== false,
+    robotsNoindex:     !!cfg.robotsNoindex,
+    hreflangFrEnabled: !!cfg.hreflangFrEnabled,
+    updatedAt:         FieldValue.serverTimestamp(),
+  });
+}
+
 // ── Component registry ────────────────────────────────────────────────────────
 const COMPONENT_REGISTRY_DOC = 'componentRegistry';
 
@@ -813,6 +854,8 @@ module.exports = {
   deleteSystemDesignArticle,
   getTierConfig,
   upsertTierConfig,
+  getSeoConfig,
+  upsertSeoConfig,
   getComponentRegistry,
   upsertComponentRegistry,
   upsertRecommendation,

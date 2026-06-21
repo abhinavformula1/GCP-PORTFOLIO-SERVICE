@@ -536,8 +536,8 @@ import { mountSponsorSlot } from './ui/sponsorship.js';
   /* ── System Design view ──
      Master/detail topic browser that swaps the body grid (resume DOM is
      hidden, not removed, so the Download Resume scraper still works).
-     Wires its own hashchange listener for #/system-design/<id> deep
-     links. → ./ui/systemdesign.js  */
+     Uses History API (/system-design/<id>) for crawlable, shareable URLs.
+     → ./ui/systemdesign.js  */
   window.openSystemDesign  = openSystemDesign;
   window.closeSystemDesign = closeSystemDesign;
   initSystemDesign();

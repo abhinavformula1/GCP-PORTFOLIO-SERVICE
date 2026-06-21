@@ -97,6 +97,20 @@ const els = {
   closeSponsorDrawerBtn: document.getElementById('closeSponsorDrawerBtn'),
   saveSponsorBtn: document.getElementById('saveSponsorBtn'),
   deleteSponsorBtn: document.getElementById('deleteSponsorBtn'),
+  seoConfigWorkspace: document.getElementById('seoConfigWorkspace'),
+  seoConfigStatus: document.getElementById('seoConfigStatus'),
+  saveSeoConfigBtn: document.getElementById('saveSeoConfigBtn'),
+  seoSiteUrl: document.getElementById('seoSiteUrl'),
+  seoSiteDescription: document.getElementById('seoSiteDescription'),
+  seoOgImageUrl: document.getElementById('seoOgImageUrl'),
+  seoJsonLd: document.getElementById('seoJsonLd'),
+  seoSitemap: document.getElementById('seoSitemap'),
+  seoHreflangFr: document.getElementById('seoHreflangFr'),
+  seoRobotsNoindex: document.getElementById('seoRobotsNoindex'),
+  seoDescCharCount: document.getElementById('seoDescCharCount'),
+  seoSerpUrl: document.getElementById('seoSerpUrl'),
+  seoSerpTitle: document.getElementById('seoSerpTitle'),
+  seoSerpDesc: document.getElementById('seoSerpDesc'),
   togglePolicyInfoBtn: document.getElementById('toggleContactPolicyInfoBtn'),
   policyMeta:      document.getElementById('contactPolicyMeta'),
   allowedDomains:  document.getElementById('contactAllowedDomains'),
@@ -573,16 +587,19 @@ function setActiveModule(moduleName) {
   const isTier     = moduleName === 'tier-settings';
   const isMeta     = moduleName === 'metadata-config';
   const isSponsor  = moduleName === 'sponsorships';
-  els.workspace.hidden = isPolicy || isSettings || isTier || isMeta || isSponsor;
+  const isSeo      = moduleName === 'seo-config';
+  els.workspace.hidden = isPolicy || isSettings || isTier || isMeta || isSponsor || isSeo;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
   els.tierSettingsWorkspace.hidden = !isTier;
   els.metadataConfigWorkspace.hidden = !isMeta;
   els.sponsorshipsWorkspace.hidden = !isSponsor;
+  els.seoConfigWorkspace.hidden = !isSeo;
   if (isSettings) renderArticleSettings();
   if (isTier)     renderTierSettings();
   if (isMeta)     renderMetadataConfig();
   if (isSponsor)  renderSponsorships();
+  if (isSeo)      renderSeoConfig();
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
@@ -1641,6 +1658,65 @@ async function deleteSponsor() {
   renderSponsorships();
 }
 
+// ── SEO & AEO configuration ────────────────────────────────────────────────────
+
+let _seoConfig = null;
+
+function updateSerpPreview() {
+  const url   = (els.seoSiteUrl.value || '').replace(/\/$/, '');
+  const desc  = els.seoSiteDescription.value || '';
+  if (els.seoSerpUrl)   els.seoSerpUrl.textContent   = url || 'https://your-domain.com';
+  if (els.seoSerpTitle) els.seoSerpTitle.textContent = 'Abhinav Kumar — Senior Salesforce Application Engineer';
+  if (els.seoSerpDesc)  els.seoSerpDesc.textContent  = desc.slice(0, 160) || 'Meta description will appear here…';
+  const count = desc.length;
+  if (els.seoDescCharCount) {
+    els.seoDescCharCount.textContent = count + ' / 160';
+    els.seoDescCharCount.style.color = count > 160 ? 'var(--md-sys-color-error)' : '';
+  }
+}
+
+async function renderSeoConfig() {
+  setSectionStatus(els.seoConfigStatus, 'Loading…', 'info');
+  try {
+    const data = await authedJson('/api/system-design/seo-config');
+    _seoConfig = data.config || {};
+    els.seoSiteUrl.value         = _seoConfig.siteUrl          || '';
+    els.seoSiteDescription.value = _seoConfig.siteDescription  || '';
+    els.seoOgImageUrl.value      = _seoConfig.ogImageUrl        || '';
+    els.seoJsonLd.checked        = _seoConfig.jsonLdEnabled     !== false;
+    els.seoSitemap.checked       = _seoConfig.sitemapEnabled    !== false;
+    els.seoHreflangFr.checked    = !!_seoConfig.hreflangFrEnabled;
+    els.seoRobotsNoindex.checked = !!_seoConfig.robotsNoindex;
+    updateSerpPreview();
+    setSectionStatus(els.seoConfigStatus, '', '');
+  } catch (err) {
+    setSectionStatus(els.seoConfigStatus, 'Failed to load SEO config: ' + err.message, 'error');
+  }
+}
+
+async function saveSeoConfig() {
+  setSectionStatus(els.seoConfigStatus, 'Saving…', 'info');
+  els.saveSeoConfigBtn.disabled = true;
+  try {
+    const payload = {
+      siteUrl:           els.seoSiteUrl.value.trim(),
+      siteDescription:   els.seoSiteDescription.value.trim(),
+      ogImageUrl:        els.seoOgImageUrl.value.trim(),
+      jsonLdEnabled:     els.seoJsonLd.checked,
+      sitemapEnabled:    els.seoSitemap.checked,
+      hreflangFrEnabled: els.seoHreflangFr.checked,
+      robotsNoindex:     els.seoRobotsNoindex.checked,
+    };
+    await authedJson('/api/admin/system-design/seo-config', { method: 'PUT', body: JSON.stringify(payload) });
+    _seoConfig = payload;
+    setSectionStatus(els.seoConfigStatus, 'SEO settings saved.', 'success');
+  } catch (err) {
+    setSectionStatus(els.seoConfigStatus, 'Save failed: ' + err.message, 'error');
+  } finally {
+    els.saveSeoConfigBtn.disabled = false;
+  }
+}
+
 function renderPreview() {
   const article = articleFromForm();
   updateWorkflowChrome(article.status);
@@ -1890,6 +1966,11 @@ els.saveSponsorBtn.addEventListener('click', function () {
 els.deleteSponsorBtn.addEventListener('click', function () {
   deleteSponsor().catch(function (err) { setSectionStatus(els.sponsorDrawerStatus, err.message, 'error'); });
 });
+els.saveSeoConfigBtn.addEventListener('click', function () {
+  saveSeoConfig().catch(function (err) { setSectionStatus(els.seoConfigStatus, err.message, 'error'); });
+});
+els.seoSiteUrl.addEventListener('input', updateSerpPreview);
+els.seoSiteDescription.addEventListener('input', updateSerpPreview);
 document.addEventListener('click', function () {
   closeSectionActionMenus();
   closeArticleDetailsMenu();
