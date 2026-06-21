@@ -458,7 +458,7 @@ router.post('/admin/sponsorships', requireAdmin, [
   body('company').notEmpty().withMessage('Company name is required.'),
   body('headline').notEmpty().withMessage('Headline is required.'),
   body('ctaUrl').notEmpty().withMessage('CTA URL is required.'),
-  body('placement').isIn(['homepage', 'sidebar', 'article-footer']).withMessage('Invalid placement.'),
+  body('placement').isIn(['homepage', 'homepage-left', 'sidebar', 'article-footer']).withMessage('Invalid placement.'),
 ], async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
@@ -471,7 +471,7 @@ router.post('/admin/sponsorships', requireAdmin, [
 // Admin: update sponsor
 router.put('/admin/sponsorships/:id', requireAdmin, [
   body('company').notEmpty().withMessage('Company name is required.'),
-  body('placement').isIn(['homepage', 'sidebar', 'article-footer']).withMessage('Invalid placement.'),
+  body('placement').isIn(['homepage', 'homepage-left', 'sidebar', 'article-footer']).withMessage('Invalid placement.'),
 ], async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
