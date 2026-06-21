@@ -44,6 +44,7 @@ let _topicFilter = '';
 let _cmsTopics   = null;
 let _cmsLoadStarted = false;
 let _cmsLoaded   = false;
+let _tierConfig  = null;
 
 const HASH_PREFIX = '#/system-design';
 const CATEGORY_LABELS = {
@@ -150,16 +151,30 @@ function applyCmsTopics(topics) {
   if (_activeTopic && !topicById(_activeTopic)) _activeTopic = topics[0].id;
 }
 
-async function loadCmsTopics() {
-  if (_cmsLoadStarted) return;
-  _cmsLoadStarted = true;
+async function loadTierConfig() {
   try {
-    const resp = await fetch('/api/system-design/articles', {
+    const resp = await fetch('/api/system-design/tier-config', {
       headers: { Accept: 'application/json' },
       credentials: 'same-origin',
     });
     if (!resp.ok) return;
     const data = await resp.json();
+    _tierConfig = data.config || null;
+  } catch (_) {
+    // Non-fatal: tier gate will show article list fallback
+  }
+}
+
+async function loadCmsTopics() {
+  if (_cmsLoadStarted) return;
+  _cmsLoadStarted = true;
+  try {
+    const [articlesResp] = await Promise.all([
+      fetch('/api/system-design/articles', { headers: { Accept: 'application/json' }, credentials: 'same-origin' }),
+      loadTierConfig(),
+    ]);
+    if (!articlesResp.ok) return;
+    const data = await articlesResp.json();
     const articles = Array.isArray(data.articles) ? data.articles : [];
     const topics = articles.map(normaliseCmsTopic).filter(Boolean);
     applyCmsTopics(topics);
@@ -371,16 +386,18 @@ function renderTopicDetail() {
   html += '</div>';
   html += '</header>';
   if (topic.tier === 'premium') {
-    const allTopics  = getTopics().filter(function (t) { return !t.stub; });
-    const freeList   = allTopics.filter(function (t) { return t.tier !== 'premium'; });
-    const premList   = allTopics.filter(function (t) { return t.tier === 'premium'; });
-
-    const freeItems = freeList.map(function (t) {
-      return { icon: t.icon || 'article', label: localeOf(t).title, locked: false };
-    });
-    const premItems = premList.map(function (t) {
-      return { icon: t.icon || 'article', label: localeOf(t).title, locked: true };
-    });
+    // Use admin-configured benefit items if available, else fall back to article list
+    let freeItems, premItems;
+    if (_tierConfig && (_tierConfig.free?.items?.length || _tierConfig.premium?.items?.length)) {
+      freeItems = (_tierConfig.free?.items  || []).map(function (i) { return { icon: i.icon  || 'article', label: i.label, locked: false }; });
+      premItems = (_tierConfig.premium?.items || []).map(function (i) { return { icon: i.icon || 'article', label: i.label, locked: true }; });
+    } else {
+      const allTopics = getTopics().filter(function (t) { return !t.stub; });
+      freeItems = allTopics.filter(function (t) { return t.tier !== 'premium'; })
+        .map(function (t) { return { icon: t.icon || 'article', label: localeOf(t).title, locked: false }; });
+      premItems = allTopics.filter(function (t) { return t.tier === 'premium'; })
+        .map(function (t) { return { icon: t.icon || 'article', label: localeOf(t).title, locked: true }; });
+    }
 
     html += '<div class="sd-tier-gate">';
 

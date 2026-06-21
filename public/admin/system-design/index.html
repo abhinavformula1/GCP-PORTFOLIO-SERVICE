@@ -70,6 +70,10 @@
             <span class="material-symbols-outlined" aria-hidden="true">tune</span>
             <span>Article Settings</span>
           </button>
+          <button type="button" class="sd-admin-module" data-module="tier-settings">
+            <span class="material-symbols-outlined" aria-hidden="true">workspace_premium</span>
+            <span>Tier Settings</span>
+          </button>
         </div>
       </div>
       <div class="sd-admin-badge">
@@ -402,6 +406,22 @@
       </div>
       <div id="articleSettingsStatus" class="sd-admin-section-status"></div>
       <div id="articleSettingsList" class="sd-article-settings-list"></div>
+    </section>
+
+    <!-- Tier Settings workspace -->
+    <section id="tierSettingsWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Access control</div>
+          <h2>Tier Settings</h2>
+          <p>Configure the benefit items shown in the Free and Premium tier cards on locked articles.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <button type="button" id="saveTierSettingsBtn" class="sd-admin-primary">Save settings</button>
+        </div>
+      </div>
+      <div id="tierSettingsStatus" class="sd-admin-section-status"></div>
+      <div id="tierSettingsPanel" class="sd-tier-settings-panel"></div>
     </section>
 
     <md-dialog id="publishReviewDialog" class="sd-publish-dialog" aria-labelledby="publishReviewTitle">

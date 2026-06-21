@@ -62,7 +62,7 @@ const validateArticle = [
   body('icon').optional().trim().isLength({ max: 40 }),
   body('status').optional().trim().isIn(['Draft', 'Published', 'Retired', 'Coming soon']).withMessage('Status must be Draft, Published, Retired, or Coming soon.'),
   body('tags').optional().isArray({ max: 12 }).withMessage('Tags must be an array.'),
-  body('readMinutes').optional().isInt({ min: 1, max: 60 }).withMessage('Read time must be between 1 and 60 minutes.'),
+  body('readMinutes').optional({ nullable: true }).isInt({ min: 0, max: 60 }).withMessage('Read time must be between 0 and 60 minutes.'),
   body('order').optional().isInt({ min: 1, max: 9999 }).withMessage('Order must be a positive number.'),
   body('blocks').optional().isArray({ max: 200 }).withMessage('Blocks must be an array.'),
   body('en.title').trim().isLength({ min: 3, max: 140 }).withMessage('English title is required.'),
@@ -178,6 +178,32 @@ function validateEmails(emails) {
   }
   return Array.from(new Set(clean));
 }
+
+// ── Tier config (public read, admin write) ────────────────────────────────────
+router.get('/system-design/tier-config', async (_req, res) => {
+  try {
+    const config = await firestore.getTierConfig();
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+    return res.status(200).json({ success: true, config });
+  } catch (err) {
+    console.warn('[tier-config] Firestore read failed:', err.message);
+    return res.status(200).json({ success: true, config: { free: { items: [] }, premium: { items: [] } } });
+  }
+});
+
+router.put('/admin/system-design/tier-config', requireAdmin, [
+  body('free.items').isArray().withMessage('free.items must be an array.'),
+  body('premium.items').isArray().withMessage('premium.items must be an array.'),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
+  try {
+    await firestore.upsertTierConfig(req.body);
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/system-design/articles', async (_req, res) => {
   try {
