@@ -86,6 +86,18 @@ async function loadSeoConfig() {
     // Update canonical base URL
     const canon = document.querySelector('link[rel="canonical"]');
     if (canon) canon.href = SITE_BASE + '/';
+    // Inject AdSense library script if publisher ID is configured and not already loaded
+    if (cfg.adsensePublisherId && /^ca-pub-\d+$/.test(cfg.adsensePublisherId)) {
+      if (!document.querySelector('script[data-adsense]')) {
+        const s = document.createElement('script');
+        s.async = true;
+        s.crossOrigin = 'anonymous';
+        s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + cfg.adsensePublisherId;
+        s.setAttribute('data-adsense', '1');
+        document.head.appendChild(s);
+      }
+    }
+
     // hreflang for French
     if (cfg.hreflangFrEnabled) {
       if (!document.querySelector('link[hreflang="en"]')) {

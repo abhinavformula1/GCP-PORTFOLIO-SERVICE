@@ -206,6 +206,8 @@ router.get('/system-design/seo-config', async (_req, res) => {
 router.put('/admin/system-design/seo-config', requireAdmin, [
   body('siteUrl').isURL({ require_protocol: true }).withMessage('siteUrl must be a valid URL.'),
   body('siteDescription').isString().notEmpty().withMessage('siteDescription is required.'),
+  body('adsensePublisherId').optional({ checkFalsy: true })
+    .matches(/^ca-pub-\d+$/).withMessage('AdSense Publisher ID must match ca-pub-XXXXXXXXXX.'),
   body('jsonLdEnabled').isBoolean().withMessage('jsonLdEnabled must be a boolean.'),
   body('sitemapEnabled').isBoolean().withMessage('sitemapEnabled must be a boolean.'),
   body('robotsNoindex').isBoolean().withMessage('robotsNoindex must be a boolean.'),
