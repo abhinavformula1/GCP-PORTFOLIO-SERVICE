@@ -24,6 +24,7 @@
 
 import { currentLang } from '../core/i18n.js';
 import { blocksToHtml } from './sdblocks.js';
+import { iconCardsHtml } from './iconcards.js';
 
 // ── Topic catalogue ──────────────────────────────────────────────────────────
 //
@@ -374,13 +375,12 @@ function renderTopicDetail() {
     const freeList   = allTopics.filter(function (t) { return t.tier !== 'premium'; });
     const premList   = allTopics.filter(function (t) { return t.tier === 'premium'; });
 
-    function tierItem(t, locked) {
-      const loc = localeOf(t);
-      return '<li class="sd-tier-item' + (locked ? ' sd-tier-locked' : '') + '">' +
-        '<span class="material-symbols-outlined" aria-hidden="true">' + (locked ? 'lock' : (t.icon || 'article')) + '</span>' +
-        '<span>' + escapeHtml(loc.title) + '</span>' +
-        '</li>';
-    }
+    const freeItems = freeList.map(function (t) {
+      return { icon: t.icon || 'article', label: localeOf(t).title, locked: false };
+    });
+    const premItems = premList.map(function (t) {
+      return { icon: t.icon || 'article', label: localeOf(t).title, locked: true };
+    });
 
     html += '<div class="sd-tier-gate">';
 
@@ -390,9 +390,7 @@ function renderTopicDetail() {
     html += '<span class="material-symbols-outlined" aria-hidden="true">lock_open</span>';
     html += '<div><h3>Free Tier</h3><p>Available to everyone</p></div>';
     html += '</div>';
-    html += '<ul class="sd-tier-list">';
-    freeList.forEach(function (t) { html += tierItem(t, false); });
-    html += '</ul>';
+    html += iconCardsHtml(freeItems, { size: 'sm' });
     html += '</div>';
 
     // Premium tier card
@@ -401,9 +399,7 @@ function renderTopicDetail() {
     html += '<span class="material-symbols-outlined" aria-hidden="true">workspace_premium</span>';
     html += '<div><h3>Premium Tier</h3><p>Get in touch to unlock</p></div>';
     html += '</div>';
-    html += '<ul class="sd-tier-list">';
-    premList.forEach(function (t) { html += tierItem(t, true); });
-    html += '</ul>';
+    html += iconCardsHtml(premItems, { size: 'sm' });
     html += '<a href="mailto:abhinavformula1@gmail.com?subject=Premium%20Access%20Request" class="sd-locked-cta">Get in touch</a>';
     html += '</div>';
 
