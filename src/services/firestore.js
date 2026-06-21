@@ -471,7 +471,9 @@ async function upsertSystemDesignArticle(article, { publishedBy } = {}) {
       icon:        String(article.icon || previous.icon || 'article'),
       status:      String(article.status || previous.status || 'Published'),
       tags:        Array.isArray(article.tags) ? article.tags.map(String).slice(0, 12) : [],
-      readMinutes: article.readMinutes ? Number(article.readMinutes) : (previous.readMinutes ? Number(previous.readMinutes) : null),
+      readMinutes: article.readMinutes !== undefined
+        ? (article.readMinutes ? Number(article.readMinutes) : null)
+        : (previous.readMinutes ? Number(previous.readMinutes) : null),
       tier:        String(article.tier || previous.tier || 'free'),
       stub:        !!article.stub,
       order:       Number(article.order || previous.order || 999),
