@@ -1547,10 +1547,11 @@ let _sponsors = [];
 let _editingSponsorId = null;
 
 const PLACEMENT_LABELS = {
-  'article-footer': 'Article Footer',
-  'homepage':       'Homepage — Right Column',
-  'homepage-left':  'Homepage — Left Column',
-  'sidebar':        'System Design Sidebar',
+  'article-footer':  'Article Footer',
+  'homepage':        'Homepage — Right Column',
+  'homepage-left':   'Homepage — Left Column',
+  'sticky-corner':   'Sticky Corner (above chat agent)',
+  'sidebar':         'System Design Sidebar',
 };
 
 async function renderSponsorships() {

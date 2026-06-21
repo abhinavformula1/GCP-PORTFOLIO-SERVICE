@@ -2464,6 +2464,45 @@ figure.sd-image-block figcaption {
 }
 
 /* ══════════════════════════════════════════════════════════
+   STICKY CORNER SPONSOR SLOT — floats above the chat FAB
+══════════════════════════════════════════════════════════ */
+
+.sticky-corner-sponsor-slot {
+  position: fixed;
+  bottom: 104px;   /* sits above the 56px FAB + 28px gap + 8px breathing room */
+  right: 28px;
+  z-index: 9997;
+  width: 260px;
+  pointer-events: auto;
+}
+
+.sticky-corner-sponsor-slot:empty { display: none; }
+
+/* Compact card variant inside the corner slot */
+.sticky-corner-sponsor-slot .sd-sponsor-slot {
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+}
+
+.sticky-corner-sponsor-slot .sd-sponsor-content {
+  gap: 8px;
+}
+
+.sticky-corner-sponsor-slot .sd-sponsor-pub-logo {
+  height: 22px;
+}
+
+.sticky-corner-sponsor-slot .sd-sponsor-text p {
+  font-size: 0.8rem;
+}
+
+.sticky-corner-sponsor-slot .sd-sponsor-cta {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+}
+
+/* ══════════════════════════════════════════════════════════
    CHAT LAUNCHER — floating bottom-right
 ══════════════════════════════════════════════════════════ */
 
