@@ -434,8 +434,6 @@ function renderTopicList() {
       group += '<button type="button" class="sd-topic-btn" data-topic-id="' + t.id + '"' + (t.id === _activeTopic ? ' aria-current="page"' : '') + '>';
       if (t.thumbnail) {
         group += '<img class="sd-topic-thumb" src="' + escapeHtml(t.thumbnail) + '" alt="" loading="lazy" aria-hidden="true">';
-      } else {
-        group += '<span class="material-symbols-outlined sd-topic-icon" aria-hidden="true">' + (t.icon || 'article') + '</span>';
       }
       group += '<span class="sd-topic-text">';
       group += '<span class="sd-topic-title" data-i18n="' + topicKey(t.id, 'title') + '">' + escapeHtml(loc.title) + '</span>';
@@ -495,12 +493,6 @@ function renderLanding() {
   const soon = topics.filter(function (t) { return t.stub; });
   let html = '';
   html += '<section class="sd-landing">';
-  html += '<div class="sd-landing-hero">';
-  html += '<div class="sd-article-eyebrow">System Design</div>';
-  html += '<h2>Architecture Notes</h2>';
-  html += '<p>Deep-dive notes on Salesforce, GCP, MuleSoft, scale, security, and integration trade-offs. Built for recruiters, architects, and security reviewers who want more than resume bullets.</p>';
-  html += '</div>';
-  html += '<h3>Published notes</h3>';
   if (published.length) {
     html += '<div class="sd-landing-grid">';
     published.forEach(function (t) {
@@ -552,7 +544,6 @@ function renderTopicDetail() {
   const loc = localeOf(topic);
   let html = '<article class="sd-article">';
   html += '<header class="sd-article-head">';
-  html += '<div class="sd-article-eyebrow">' + escapeHtml(uiText('articleLabel')) + '</div>';
   html += '<h2 class="sd-article-title">' + escapeHtml(loc.title) + '</h2>';
   if (loc.subtitle) {
     html += '<p class="sd-article-sub">' + escapeHtml(loc.subtitle) + '</p>';
