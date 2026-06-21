@@ -6,7 +6,25 @@
 
 let _cache = null;
 let _fetchedAt = 0;
+let _registryEnabled = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function isFeatureEnabled() {
+  if (_registryEnabled !== null) return _registryEnabled;
+  try {
+    const resp = await fetch('/api/system-design/component-registry', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+    if (!resp.ok) { _registryEnabled = true; return true; }
+    const data = await resp.json();
+    const map = data.enabled || {};
+    _registryEnabled = map['monetisation_sponsorship'] !== false;
+  } catch (_) {
+    _registryEnabled = true;
+  }
+  return _registryEnabled;
+}
 
 async function fetchActiveSponsor(placement) {
   const now = Date.now();
@@ -31,9 +49,13 @@ async function fetchActiveSponsor(placement) {
   }
 }
 
+function isImageUrl(url) {
+  return Boolean(url && /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i.test(url));
+}
+
 function sponsorCardHtml(sponsor) {
-  const logo = sponsor.logoUrl
-    ? '<img src="' + sponsor.logoUrl + '" alt="' + _esc(sponsor.company) + '" class="sd-sponsor-pub-logo" loading="lazy">'
+  const logo = isImageUrl(sponsor.logoUrl)
+    ? '<img src="' + _esc(sponsor.logoUrl) + '" alt="' + _esc(sponsor.company) + '" class="sd-sponsor-pub-logo" loading="lazy">'
     : '<span class="sd-sponsor-pub-name">' + _esc(sponsor.company) + '</span>';
   return (
     '<div class="sd-sponsor-slot" role="complementary" aria-label="Sponsored">' +
@@ -76,6 +98,8 @@ function _esc(str) {
  */
 export async function mountSponsorSlot(container, placement) {
   if (!container) return;
+  const enabled = await isFeatureEnabled();
+  if (!enabled) return;
   const sponsor = await fetchActiveSponsor(placement);
   if (sponsor) {
     container.innerHTML = sponsorCardHtml(sponsor);

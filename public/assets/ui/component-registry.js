@@ -131,6 +131,24 @@ export const COMPONENT_REGISTRY = [
     hint:     'First-visit welcome modal shown to new readers.',
     defaultEnabled: true,
   },
+
+  // ── Monetisation ─────────────────────────────────────────────────────────
+  {
+    id:       'monetisation_sponsorship',
+    group:    'Monetisation',
+    label:    'Sponsorship Slot',
+    icon:     'campaign',
+    hint:     'B2B sponsor card shown on homepage and article footer. Falls back to AdSense.',
+    defaultEnabled: true,
+  },
+  {
+    id:       'monetisation_adsense',
+    group:    'Monetisation',
+    label:    'Google AdSense',
+    icon:     'ads_click',
+    hint:     'AdSense fallback slot — shown when no paid sponsor is active.',
+    defaultEnabled: false,
+  },
 ];
 
 /** Map from registry id → INSERT_ITEMS type key in composer.js */
