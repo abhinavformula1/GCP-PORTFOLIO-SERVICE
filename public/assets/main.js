@@ -530,9 +530,8 @@ import { mountSponsorSlot } from './ui/sponsorship.js';
   /* ── Homepage sponsor slots ──
      Right column (top of Work Experience) and Left column (bottom of aside).
      Each placement is configured independently in Admin → Sponsorships.     */
-  mountSponsorSlot(document.getElementById('homepageSponsorSlot'),       'homepage');
-  mountSponsorSlot(document.getElementById('homepageSponsorSlotLeft'),   'homepage-left');
-  mountSponsorSlot(document.getElementById('stickyCornerSponsorSlot'),   'sticky-corner');
+  mountSponsorSlot(document.getElementById('homepageSponsorSlot'),     'homepage');
+  mountSponsorSlot(document.getElementById('homepageSponsorSlotLeft'), 'homepage-left');
 
   /* ── System Design view ──
      Master/detail topic browser that swaps the body grid (resume DOM is
