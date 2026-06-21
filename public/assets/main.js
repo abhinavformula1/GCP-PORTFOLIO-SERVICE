@@ -67,6 +67,7 @@ import {
   initSystemDesign, openSystemDesign, closeSystemDesign,
 } from './ui/systemdesign.js';
 import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-layout.js';
+import { mountSponsorSlot } from './ui/sponsorship.js';
 
 (function () {
   'use strict';
@@ -526,31 +527,10 @@ import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-la
   window.closeLeaveRecommendation = closeLeaveRecommendation;
   initRecommendations();
 
-  /* ── Sponsorship banner ──
-     Loads the active sponsorship from Firestore (via the server) and
-     renders it in #sponsorBanner. Silently hidden if no banner is set
-     or if the banner has expired.                                        */
-  (async function loadSponsorBanner() {
-    try {
-      const res  = await fetch('/api/media/sponsorship');
-      if (!res.ok) return;
-      const json = await res.json();
-      const s    = json.sponsorship;
-      if (!s || !s.url) return;
-
-      const section = document.getElementById('sponsorBanner');
-      const link    = document.getElementById('sponsorLink');
-      const img     = document.getElementById('sponsorImg');
-      const cta     = document.getElementById('sponsorCta');
-
-      img.src = s.url;
-      img.alt = s.alt || 'Sponsored';
-      if (s.link) { link.href = s.link; } else { link.removeAttribute('href'); link.style.cursor = 'default'; }
-      if (s.cta) { cta.textContent = s.cta; cta.hidden = false; } else { cta.hidden = true; }
-
-      section.hidden = false;
-    } catch (_) { /* silent — banner is purely additive */ }
-  })();
+  /* ── Homepage sponsor slot ──
+     Mounts the active B2B sponsor card (or AdSense fallback) on the
+     portfolio homepage. Silently hidden if no sponsor is configured.   */
+  mountSponsorSlot(document.getElementById('homepageSponsorSlot'), 'homepage');
 
   /* ── System Design view ──
      Master/detail topic browser that swaps the body grid (resume DOM is
