@@ -6,7 +6,25 @@
 
 let _cache = null;
 let _fetchedAt = 0;
+let _registryEnabled = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function isFeatureEnabled() {
+  if (_registryEnabled !== null) return _registryEnabled;
+  try {
+    const resp = await fetch('/api/system-design/component-registry', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+    if (!resp.ok) { _registryEnabled = true; return true; }
+    const data = await resp.json();
+    const map = data.enabled || {};
+    _registryEnabled = map['monetisation_sponsorship'] !== false;
+  } catch (_) {
+    _registryEnabled = true;
+  }
+  return _registryEnabled;
+}
 
 async function fetchActiveSponsor(placement) {
   const now = Date.now();
@@ -76,6 +94,8 @@ function _esc(str) {
  */
 export async function mountSponsorSlot(container, placement) {
   if (!container) return;
+  const enabled = await isFeatureEnabled();
+  if (!enabled) return;
   const sponsor = await fetchActiveSponsor(placement);
   if (sponsor) {
     container.innerHTML = sponsorCardHtml(sponsor);
