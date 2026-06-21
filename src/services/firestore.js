@@ -539,6 +539,22 @@ async function upsertTierConfig(config) {
   });
 }
 
+// ── Component registry ────────────────────────────────────────────────────────
+const COMPONENT_REGISTRY_DOC = 'componentRegistry';
+
+async function getComponentRegistry() {
+  const snap = await getDb().collection(TIER_CONFIG_COLLECTION).doc(COMPONENT_REGISTRY_DOC).get();
+  if (!snap.exists) return {};
+  return snap.data()?.enabled || {};
+}
+
+async function upsertComponentRegistry(enabled) {
+  await getDb().collection(TIER_CONFIG_COLLECTION).doc(COMPONENT_REGISTRY_DOC).set({
+    enabled:   enabled || {},
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
 /**
  * Moves the active chat into /users/{uid}/inquiries and clears it. Used after
  * a successful Recruiter_Inquiry__c create so we keep history but the next
@@ -797,6 +813,8 @@ module.exports = {
   deleteSystemDesignArticle,
   getTierConfig,
   upsertTierConfig,
+  getComponentRegistry,
+  upsertComponentRegistry,
   upsertRecommendation,
   listActiveRecommendations,
   writeRecommendationReply,
