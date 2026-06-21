@@ -137,7 +137,7 @@ function codeToHtml(b) {
 function imageToHtml(b) {
   if (!b.url) return '';
   let h = '<figure class="sd-image-block">';
-  h += '<img src="' + esc(b.url) + '" alt="' + esc(b.alt || '') + '" loading="lazy"';
+  h += '<img src="' + esc(b.url) + '" alt="' + esc(b.alt || '') + '" loading="eager"';
   if (b.width)  h += ' width="'  + Number(b.width)  + '"';
   if (b.height) h += ' height="' + Number(b.height) + '"';
   h += '>';
