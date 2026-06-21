@@ -1606,24 +1606,30 @@ function closeSponsorDrawer() {
 }
 
 async function saveSponsor() {
+  if (els.saveSponsorBtn.disabled) return;
+  els.saveSponsorBtn.disabled = true;
   setSectionStatus(els.sponsorDrawerStatus, 'Saving…', 'info');
-  const payload = {
-    company:     document.getElementById('sponsorCompany').value.trim(),
-    headline:    document.getElementById('sponsorHeadline').value.trim(),
-    cta:         document.getElementById('sponsorCta').value.trim() || 'Learn More',
-    ctaUrl:      document.getElementById('sponsorCtaUrl').value.trim(),
-    logoUrl:     document.getElementById('sponsorLogoUrl').value.trim(),
-    placement:   document.getElementById('sponsorPlacement').value,
-    adsenseSlot: document.getElementById('sponsorAdsenseSlot').value.trim(),
-    active:      document.getElementById('sponsorActive').checked,
-    startsAt:    document.getElementById('sponsorStartsAt').value  || null,
-    expiresAt:   document.getElementById('sponsorExpiresAt').value || null,
-  };
-  const url    = _editingSponsorId ? '/api/admin/sponsorships/' + _editingSponsorId : '/api/admin/sponsorships';
-  const method = _editingSponsorId ? 'PUT' : 'POST';
-  await authedJson(url, { method, body: JSON.stringify(payload) });
-  setSectionStatus(els.sponsorDrawerStatus, 'Saved!', 'success');
-  setTimeout(function () { closeSponsorDrawer(); renderSponsorships(); }, 800);
+  try {
+    const payload = {
+      company:     document.getElementById('sponsorCompany').value.trim(),
+      headline:    document.getElementById('sponsorHeadline').value.trim(),
+      cta:         document.getElementById('sponsorCta').value.trim() || 'Learn More',
+      ctaUrl:      document.getElementById('sponsorCtaUrl').value.trim(),
+      logoUrl:     document.getElementById('sponsorLogoUrl').value.trim(),
+      placement:   document.getElementById('sponsorPlacement').value,
+      adsenseSlot: document.getElementById('sponsorAdsenseSlot').value.trim(),
+      active:      document.getElementById('sponsorActive').checked,
+      startsAt:    document.getElementById('sponsorStartsAt').value  || null,
+      expiresAt:   document.getElementById('sponsorExpiresAt').value || null,
+    };
+    const url    = _editingSponsorId ? '/api/admin/sponsorships/' + _editingSponsorId : '/api/admin/sponsorships';
+    const method = _editingSponsorId ? 'PUT' : 'POST';
+    await authedJson(url, { method, body: JSON.stringify(payload) });
+    setSectionStatus(els.sponsorDrawerStatus, 'Saved!', 'success');
+    setTimeout(function () { closeSponsorDrawer(); renderSponsorships(); }, 800);
+  } finally {
+    els.saveSponsorBtn.disabled = false;
+  }
 }
 
 async function deleteSponsor() {

@@ -1142,6 +1142,18 @@
   cursor: pointer;
 }
 
+.sd-sponsor-save-btn {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.sd-sponsor-save-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
 .sd-admin-policy-copy,
 .sd-admin-policy-card {
   padding: 18px;

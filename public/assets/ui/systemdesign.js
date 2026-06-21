@@ -376,6 +376,8 @@ function renderLanding() {
     });
     html += '</div>';
   }
+  // Homepage sponsor slot placeholder
+  html += '<div class="sd-sponsor-slot-placeholder" data-placement="homepage"></div>';
   html += '</section>';
   _sdDetail.innerHTML = html;
   _sdDetail.querySelectorAll('.sd-landing-card').forEach(function (card) {
@@ -383,6 +385,8 @@ function renderLanding() {
       location.hash = HASH_PREFIX + '/' + card.getAttribute('data-topic-id');
     });
   });
+  const homeSlot = _sdDetail.querySelector('.sd-sponsor-slot-placeholder[data-placement="homepage"]');
+  if (homeSlot) mountSponsorSlot(homeSlot, 'homepage');
 }
 
 function renderTopicDetail() {
