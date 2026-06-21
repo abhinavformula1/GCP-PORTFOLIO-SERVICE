@@ -1090,6 +1090,16 @@ function createArticleSettingsField(labelText, field, value, type) {
       input.appendChild(option);
     });
     input.value = value || 'integration';
+  } else if (field === 'tier') {
+    input = document.createElement('select');
+    input.className = 'sd-tier-select';
+    [['free', 'Free'], ['premium', 'Premium']].forEach(function (pair) {
+      const option = document.createElement('option');
+      option.value = pair[0];
+      option.textContent = pair[1];
+      input.appendChild(option);
+    });
+    input.value = value || 'free';
   } else if (field === 'status') {
     input = document.createElement('select');
     input.className = 'sd-status-select';
@@ -1221,6 +1231,7 @@ function renderArticleSettings() {
       createArticleSettingsField('Icon', 'icon', article.icon || 'article'),
       createArticleSettingsField('Read time', 'readMinutes', String(article.readMinutes || 5), 'number'),
       createArticleSettingsField('Order', 'order', String(article.order || 100), 'number'),
+      createArticleSettingsField('Tier', 'tier', article.tier || 'free'),
       createArticleSettingsField('Status', 'status', article.status || 'Draft')
     );
 
@@ -1267,6 +1278,7 @@ function articleSettingsPayloadFromCard(card) {
       icon: input('icon').value.trim() || 'article',
       readMinutes: Number(input('readMinutes').value || 5),
       order: Number(input('order').value || 100),
+      tier: input('tier').value || 'free',
       status: input('status').value || original.status || 'Draft',
       stub: input('status').value === 'Coming soon',
     }),

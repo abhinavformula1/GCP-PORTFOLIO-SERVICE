@@ -119,6 +119,7 @@ function normaliseCmsTopic(article) {
     status:      article.status || 'Published',
     tags:        Array.isArray(article.tags) ? article.tags : [],
     readMinutes: Number(article.readMinutes || 5),
+    tier:        article.tier || 'free',
     stub:        !!article.stub,
     blocks,
     en: {
@@ -228,9 +229,10 @@ function renderTopicList() {
       if (query && haystack.indexOf(query) === -1) continue;
       groupCount += 1;
       visibleCount += 1;
-      const active = t.id === _activeTopic ? ' sd-active' : '';
+      const active   = t.id === _activeTopic ? ' sd-active' : '';
       const disabled = t.stub ? ' sd-disabled' : '';
-      group += '<li class="sd-topic-item' + active + disabled + '" data-topic-id="' + t.id + '">';
+      const premium  = t.tier === 'premium' ? ' sd-premium' : '';
+      group += '<li class="sd-topic-item' + active + disabled + premium + '" data-topic-id="' + t.id + '">';
       group += '<button type="button" class="sd-topic-btn" data-topic-id="' + t.id + '"' + (t.id === _activeTopic ? ' aria-current="page"' : '') + '>';
       if (t.thumbnail) {
         group += '<img class="sd-topic-thumb" src="' + escapeHtml(t.thumbnail) + '" alt="" loading="lazy" aria-hidden="true">';
@@ -241,6 +243,9 @@ function renderTopicList() {
       group += '<span class="sd-topic-title" data-i18n="' + topicKey(t.id, 'title') + '">' + escapeHtml(loc.title) + '</span>';
       group += '<span class="sd-topic-sub" data-i18n="' + topicKey(t.id, 'subtitle') + '">' + escapeHtml(loc.subtitle) + '</span>';
       group += '</span>';
+      if (t.tier === 'premium') {
+        group += '<span class="material-symbols-outlined sd-lock-icon" aria-label="Premium">lock</span>';
+      }
       group += '</button>';
       group += '</li>';
     }
@@ -300,10 +305,14 @@ function renderLanding() {
     html += '<div class="sd-landing-grid">';
     published.forEach(function (t) {
       const loc = localeOf(t);
-      html += '<button type="button" class="sd-landing-card" data-topic-id="' + t.id + '">';
+      const premiumClass = t.tier === 'premium' ? ' sd-premium' : '';
+      html += '<button type="button" class="sd-landing-card' + premiumClass + '" data-topic-id="' + t.id + '">';
       html += '<span class="material-symbols-outlined" aria-hidden="true">' + (t.icon || 'article') + '</span>';
       html += '<strong>' + escapeHtml(loc.title) + '</strong>';
       html += '<small>' + escapeHtml(loc.subtitle) + '</small>';
+      if (t.tier === 'premium') {
+        html += '<span class="material-symbols-outlined sd-landing-lock" aria-label="Premium">lock</span>';
+      }
       html += '</button>';
     });
     html += '</div>';
@@ -360,8 +369,19 @@ function renderTopicDetail() {
   html += '</button>';
   html += '</div>';
   html += '</header>';
-  const bodyHtml = (topic.blocks && topic.blocks.length) ? blocksToHtml(topic.blocks) : (loc.body || '');
-  html += '<div class="sd-article-body">' + bodyHtml + '</div>';
+  if (topic.tier === 'premium') {
+    html += '<div class="sd-locked-body">';
+    html += '<div class="sd-locked-gate">';
+    html += '<span class="material-symbols-outlined sd-locked-icon" aria-hidden="true">lock</span>';
+    html += '<h3>Premium Article</h3>';
+    html += '<p>This article is part of the premium tier. Get in touch to get access.</p>';
+    html += '<a href="mailto:abhinavformula1@gmail.com?subject=Premium%20Access%20Request" class="sd-locked-cta">Get in touch</a>';
+    html += '</div>';
+    html += '</div>';
+  } else {
+    const bodyHtml = (topic.blocks && topic.blocks.length) ? blocksToHtml(topic.blocks) : (loc.body || '');
+    html += '<div class="sd-article-body">' + bodyHtml + '</div>';
+  }
   html += '</article>';
   _sdDetail.innerHTML = html;
   const exportBtn = _sdDetail.querySelector('.sd-export-btn');
