@@ -873,7 +873,7 @@ function buildSectionCard(section, index) {
     placeholder: '',
     aiAssist: composerAiAssist,
     onSave: saveArticleFromComposer,
-    enabledTypes: enabledBlockTypes(_metaEnabledMap),
+    enabledTypes: function () { return enabledBlockTypes(_metaEnabledMap); },
     value: section.blocks,
     onChange: function (blocks) {
       section.blocks = blocks;
