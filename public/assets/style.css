@@ -1574,39 +1574,85 @@ a:hover { text-decoration: underline; }
   color: var(--md-sys-color-primary);
 }
 
-/* Locked article gate */
-.sd-locked-body {
-  display: flex;
-  justify-content: center;
-  padding: 60px 24px;
+/* Tier gate — two cards side by side */
+.sd-tier-gate {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 28px 0;
 }
-.sd-locked-gate {
+@media (max-width: 640px) {
+  .sd-tier-gate { grid-template-columns: 1fr; }
+}
+.sd-tier-card {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1.5px solid var(--md-sys-color-outline-variant);
+}
+.sd-tier-free {
+  background: var(--md-sys-color-surface-container-low);
+}
+.sd-tier-premium {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 6%, var(--md-sys-color-surface));
+  border-color: var(--md-sys-color-primary);
+}
+.sd-tier-card-head {
+  display: flex;
   align-items: center;
-  text-align: center;
-  max-width: 360px;
   gap: 12px;
 }
-.sd-locked-icon {
-  font-size: 48px;
+.sd-tier-card-head > .material-symbols-outlined {
+  font-size: 28px;
+  color: var(--md-sys-color-primary);
+  flex-shrink: 0;
+}
+.sd-tier-free .sd-tier-card-head > .material-symbols-outlined {
   color: var(--md-sys-color-outline);
 }
-.sd-locked-gate h3 {
-  font-size: 1.25rem;
+.sd-tier-card-head h3 {
+  font-size: 1rem;
   font-weight: 700;
   margin: 0;
   color: var(--md-sys-color-on-surface);
 }
-.sd-locked-gate p {
-  font-size: 0.9rem;
+.sd-tier-card-head p {
+  font-size: 0.78rem;
   color: var(--md-sys-color-on-surface-variant);
   margin: 0;
-  line-height: 1.6;
+}
+.sd-tier-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.sd-tier-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface);
+}
+.sd-tier-item .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--md-sys-color-primary);
+  flex-shrink: 0;
+}
+.sd-tier-item.sd-tier-locked {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.sd-tier-item.sd-tier-locked .material-symbols-outlined {
+  color: var(--md-sys-color-outline);
 }
 .sd-locked-cta {
   display: inline-block;
-  margin-top: 8px;
+  margin-top: 4px;
   padding: 10px 24px;
   background: var(--md-sys-color-primary);
   color: var(--md-sys-color-on-primary);
@@ -1614,6 +1660,7 @@ a:hover { text-decoration: underline; }
   font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
+  text-align: center;
   transition: opacity 0.15s;
 }
 .sd-locked-cta:hover { opacity: 0.88; }
