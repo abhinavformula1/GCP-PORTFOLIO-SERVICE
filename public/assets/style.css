@@ -1644,10 +1644,12 @@ a:hover { text-decoration: underline; }
 
 .homepage-sponsor-slot:empty { display: none; }
 
-/* Left column slot sits at the bottom of aside after all content */
+/* Left column sponsor — sticky so it floats in the empty space
+   when aside content ends before the right column does.          */
 #homepageSponsorSlotLeft {
+  position: sticky;
+  bottom: 24px;
   margin-top: 24px;
-  margin-bottom: 0;
 }
 
 .sd-sponsor-slot {
