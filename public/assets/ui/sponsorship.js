@@ -49,9 +49,13 @@ async function fetchActiveSponsor(placement) {
   }
 }
 
+function isImageUrl(url) {
+  return Boolean(url && /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i.test(url));
+}
+
 function sponsorCardHtml(sponsor) {
-  const logo = sponsor.logoUrl
-    ? '<img src="' + sponsor.logoUrl + '" alt="' + _esc(sponsor.company) + '" class="sd-sponsor-pub-logo" loading="lazy">'
+  const logo = isImageUrl(sponsor.logoUrl)
+    ? '<img src="' + _esc(sponsor.logoUrl) + '" alt="' + _esc(sponsor.company) + '" class="sd-sponsor-pub-logo" loading="lazy">'
     : '<span class="sd-sponsor-pub-name">' + _esc(sponsor.company) + '</span>';
   return (
     '<div class="sd-sponsor-slot" role="complementary" aria-label="Sponsored">' +
