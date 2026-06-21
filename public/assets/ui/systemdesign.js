@@ -402,9 +402,6 @@ function renderTopicList() {
   const query = normaliseText(_topicFilter);
   let html = '';
   html += '<div class="sd-topics-header">';
-  html += '<div class="sd-eyebrow" data-i18n="systemDesignEyebrow">System Design</div>';
-  html += '<h2 class="sd-topics-title">' + escapeHtml(uiText('title')) + '</h2>';
-  html += '<p class="sd-topics-intro">' + escapeHtml(uiText('intro')) + '</p>';
   html += '<label class="sd-topic-search">';
   html += '<span class="material-symbols-outlined" aria-hidden="true">search</span>';
   html += '<input type="search" value="' + escapeHtml(_topicFilter) + '" placeholder="' + escapeHtml(uiText('search')) + '" aria-label="' + escapeHtml(uiText('search')) + '">';
