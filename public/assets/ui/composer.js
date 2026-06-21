@@ -585,7 +585,10 @@ export function createComposer(options) {
     menu.className = 'composer-menu';
     menu.setAttribute('role', 'menu');
     menu.hidden = true;
-    INSERT_ITEMS.forEach(function (item) {
+    const visibleItems = opts.enabledTypes
+      ? INSERT_ITEMS.filter(function (item) { return opts.enabledTypes.has(item.type); })
+      : INSERT_ITEMS;
+    visibleItems.forEach(function (item) {
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'composer-menu-item';

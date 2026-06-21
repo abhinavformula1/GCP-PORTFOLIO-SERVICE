@@ -25,6 +25,7 @@ import {
   htmlToBlocks,
 } from '../../assets/ui/sdblocks.js';
 import { createComposer } from '../../assets/ui/composer.js';
+import { COMPONENT_REGISTRY, enabledBlockTypes } from '../../assets/ui/component-registry.js';
 
 const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 
@@ -82,6 +83,10 @@ const els = {
   tierSettingsPanel: document.getElementById('tierSettingsPanel'),
   tierSettingsStatus: document.getElementById('tierSettingsStatus'),
   saveTierSettingsBtn: document.getElementById('saveTierSettingsBtn'),
+  metadataConfigWorkspace: document.getElementById('metadataConfigWorkspace'),
+  metadataConfigPanel: document.getElementById('metadataConfigPanel'),
+  metadataConfigStatus: document.getElementById('metadataConfigStatus'),
+  saveMetadataConfigBtn: document.getElementById('saveMetadataConfigBtn'),
   togglePolicyInfoBtn: document.getElementById('toggleContactPolicyInfoBtn'),
   policyMeta:      document.getElementById('contactPolicyMeta'),
   allowedDomains:  document.getElementById('contactAllowedDomains'),
@@ -337,6 +342,7 @@ function resetAdminSession() {
   els.policyWorkspace.hidden = true;
   els.articleSettingsWorkspace.hidden = true;
   els.tierSettingsWorkspace.hidden = true;
+  els.metadataConfigWorkspace.hidden = true;
   els.dropdown.hidden = true;
   updateAdminChrome(null);
 }
@@ -476,6 +482,7 @@ function handleAdminLoadError(err) {
   els.policyWorkspace.hidden = true;
   els.articleSettingsWorkspace.hidden = true;
   els.tierSettingsWorkspace.hidden = true;
+  els.metadataConfigWorkspace.hidden = true;
   if (err?.status === 401) {
     resetAdminSession();
   }
@@ -552,12 +559,15 @@ function setActiveModule(moduleName) {
   const isPolicy   = moduleName === 'contact-policy';
   const isSettings = moduleName === 'article-settings';
   const isTier     = moduleName === 'tier-settings';
-  els.workspace.hidden = isPolicy || isSettings || isTier;
+  const isMeta     = moduleName === 'metadata-config';
+  els.workspace.hidden = isPolicy || isSettings || isTier || isMeta;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
   els.tierSettingsWorkspace.hidden = !isTier;
+  els.metadataConfigWorkspace.hidden = !isMeta;
   if (isSettings) renderArticleSettings();
   if (isTier)     renderTierSettings();
+  if (isMeta)     renderMetadataConfig();
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
@@ -863,6 +873,7 @@ function buildSectionCard(section, index) {
     placeholder: '',
     aiAssist: composerAiAssist,
     onSave: saveArticleFromComposer,
+    enabledTypes: enabledBlockTypes(_metaEnabledMap),
     value: section.blocks,
     onChange: function (blocks) {
       section.blocks = blocks;
@@ -1423,6 +1434,81 @@ async function saveTierSettings() {
   setSectionStatus(els.tierSettingsStatus, 'Tier settings saved.', 'success');
 }
 
+// ── Metadata Configuration ────────────────────────────────────────────────────
+var _metaEnabledMap = null;
+
+async function renderMetadataConfig() {
+  const panel = els.metadataConfigPanel;
+  panel.innerHTML = '<p class="sd-article-settings-loading">Loading configuration…</p>';
+  try {
+    const data = await authedJson('/api/system-design/component-registry');
+    _metaEnabledMap = data.enabled || {};
+  } catch (_) {
+    _metaEnabledMap = {};
+  }
+  panel.innerHTML = '';
+
+  // Group components by their group label
+  const groups = {};
+  COMPONENT_REGISTRY.forEach(function (comp) {
+    if (!groups[comp.group]) groups[comp.group] = [];
+    groups[comp.group].push(comp);
+  });
+
+  Object.entries(groups).forEach(function ([groupName, components]) {
+    const section = document.createElement('div');
+    section.className = 'sd-meta-config-group';
+
+    const heading = document.createElement('h3');
+    heading.className = 'sd-meta-config-group-title';
+    heading.textContent = groupName;
+    section.appendChild(heading);
+
+    const grid = document.createElement('div');
+    grid.className = 'sd-meta-config-grid';
+
+    components.forEach(function (comp) {
+      const isEnabled = _metaEnabledMap[comp.id] !== false; // default ON
+      const card = document.createElement('label');
+      card.className = 'sd-meta-config-card' + (isEnabled ? ' sd-meta-config-card--on' : '');
+      card.htmlFor = 'meta-toggle-' + comp.id;
+
+      card.innerHTML =
+        '<div class="sd-meta-config-card-left">' +
+          '<div class="sd-meta-config-icon"><span class="material-symbols-outlined" aria-hidden="true">' + comp.icon + '</span></div>' +
+          '<div class="sd-meta-config-info"><strong>' + comp.label + '</strong><span>' + comp.hint + '</span></div>' +
+        '</div>' +
+        '<div class="sd-meta-config-toggle">' +
+          '<input type="checkbox" id="meta-toggle-' + comp.id + '" data-comp-id="' + comp.id + '"' + (isEnabled ? ' checked' : '') + '>' +
+          '<span class="sd-meta-toggle-track"><span class="sd-meta-toggle-thumb"></span></span>' +
+        '</div>';
+
+      card.querySelector('input').addEventListener('change', function (e) {
+        card.classList.toggle('sd-meta-config-card--on', e.target.checked);
+      });
+
+      grid.appendChild(card);
+    });
+
+    section.appendChild(grid);
+    panel.appendChild(section);
+  });
+}
+
+async function saveMetadataConfig() {
+  setSectionStatus(els.metadataConfigStatus, 'Saving configuration…', 'info');
+  const enabled = {};
+  els.metadataConfigPanel.querySelectorAll('input[data-comp-id]').forEach(function (input) {
+    enabled[input.dataset.compId] = input.checked;
+  });
+  await authedJson('/api/admin/system-design/component-registry', {
+    method: 'PUT',
+    body:   JSON.stringify({ enabled }),
+  });
+  _metaEnabledMap = enabled;
+  setSectionStatus(els.metadataConfigStatus, 'Configuration saved.', 'success');
+}
+
 function renderPreview() {
   const article = articleFromForm();
   updateWorkflowChrome(article.status);
@@ -1499,7 +1585,12 @@ function setPublishReviewStep(step) {
 
 async function loadArticles() {
   setStatus('Loading articles...', 'info');
-  const data = await authedJson('/api/admin/system-design/articles');
+  const [data] = await Promise.all([
+    authedJson('/api/admin/system-design/articles'),
+    authedJson('/api/system-design/component-registry').then(function (r) {
+      _metaEnabledMap = r.enabled || {};
+    }).catch(function () {}),
+  ]);
   articles = Array.isArray(data.articles) ? data.articles : [];
   els.modules.hidden = false;
   els.workspace.hidden = false;
@@ -1655,6 +1746,9 @@ els.saveArticleSettingsBtn.addEventListener('click', function () {
 });
 els.saveTierSettingsBtn.addEventListener('click', function () {
   saveTierSettings().catch(function (err) { setSectionStatus(els.tierSettingsStatus, err.message, 'error'); });
+});
+els.saveMetadataConfigBtn.addEventListener('click', function () {
+  saveMetadataConfig().catch(function (err) { setSectionStatus(els.metadataConfigStatus, err.message, 'error'); });
 });
 document.addEventListener('click', function () {
   closeSectionActionMenus();

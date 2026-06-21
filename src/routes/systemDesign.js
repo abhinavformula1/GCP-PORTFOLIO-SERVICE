@@ -191,6 +191,31 @@ router.get('/system-design/tier-config', async (_req, res) => {
   }
 });
 
+// ── Component registry (public read, admin write) ─────────────────────────────
+router.get('/system-design/component-registry', async (_req, res) => {
+  try {
+    const enabled = await firestore.getComponentRegistry();
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+    return res.status(200).json({ success: true, enabled });
+  } catch (err) {
+    console.warn('[component-registry] Firestore read failed:', err.message);
+    return res.status(200).json({ success: true, enabled: {} });
+  }
+});
+
+router.put('/admin/system-design/component-registry', requireAdmin, [
+  body('enabled').isObject().withMessage('enabled must be an object.'),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
+  try {
+    await firestore.upsertComponentRegistry(req.body.enabled);
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.put('/admin/system-design/tier-config', requireAdmin, [
   body('free.items').isArray().withMessage('free.items must be an array.'),
   body('premium.items').isArray().withMessage('premium.items must be an array.'),
