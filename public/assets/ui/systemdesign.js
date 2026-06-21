@@ -25,6 +25,7 @@
 import { currentLang } from '../core/i18n.js';
 import { blocksToHtml } from './sdblocks.js';
 import { iconCardsHtml } from './iconcards.js';
+import { mountSponsorSlot } from './sponsorship.js';
 
 // ── Topic catalogue ──────────────────────────────────────────────────────────
 //
@@ -457,12 +458,17 @@ function renderTopicDetail() {
     html += '<div class="sd-article-body">' + bodyHtml + '</div>';
   }
   html += '</article>';
+  // Sponsor slot placeholder — mounted asynchronously below
+  html += '<div class="sd-sponsor-slot-placeholder" data-placement="article-footer"></div>';
   _sdDetail.innerHTML = html;
   const exportBtn = _sdDetail.querySelector('.sd-export-btn');
   if (exportBtn) exportBtn.addEventListener('click', exportCurrentTopicPdf);
   if (typeof _sdDetail.scrollIntoView === 'function') {
     _sdDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  // Mount sponsor slot asynchronously so it never blocks rendering
+  const slotEl = _sdDetail.querySelector('.sd-sponsor-slot-placeholder');
+  if (slotEl) mountSponsorSlot(slotEl, 'article-footer');
 }
 
 function exportCurrentTopicPdf() {

@@ -1633,6 +1633,84 @@ a:hover { text-decoration: underline; }
   color: var(--md-sys-color-primary);
 }
 
+/* ── Public sponsorship slot ─────────────────────────────────────────────────
+   Waterfall: paid sponsor → AdSense → empty
+───────────────────────────────────────────────────────────────────────────── */
+.sd-sponsor-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  margin-top: 36px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--md-sys-color-surface-container-lowest, var(--surface));
+}
+
+.sd-sponsor-slot--adsense {
+  min-height: 100px;
+}
+
+.sd-sponsor-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sd-sponsor-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sd-sponsor-pub-logo {
+  height: 28px;
+  max-width: 110px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.sd-sponsor-pub-name {
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.sd-sponsor-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sd-sponsor-text p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.sd-sponsor-cta {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--md-sys-color-primary);
+  border-radius: 999px;
+  color: var(--md-sys-color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+
+.sd-sponsor-cta:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
 /* ── IconCards component ─────────────────────────────────────────────────────
    Reusable circular-icon + label grid (Marriott-style benefit cards).
    Used in: tier gate, article blocks, anywhere benefits/features are listed.

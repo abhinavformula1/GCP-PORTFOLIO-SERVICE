@@ -821,31 +821,80 @@ module.exports = {
   deleteRecommendation,
   getContactPolicyConfig,
   upsertContactPolicyConfig,
+  listSponsorships,
+  listActiveSponsorships,
   getSponsorship,
   upsertSponsorship,
   deleteSponsorship,
 };
 
-// ── Sponsorship banner ────────────────────────────────────────────────────────
+// ── Sponsorship banners ───────────────────────────────────────────────────────
+const SPONSORSHIPS_COLLECTION = 'sponsorships';
 
-const SPONSORSHIP_DOC = 'config/sponsorship';
+function normaliseSponsor(id, data) {
+  return {
+    id:          id,
+    company:     String(data.company     || ''),
+    headline:    String(data.headline    || ''),
+    cta:         String(data.cta         || 'Learn More'),
+    ctaUrl:      String(data.ctaUrl      || ''),
+    logoUrl:     String(data.logoUrl     || ''),
+    placement:   String(data.placement   || 'article-footer'),
+    active:      data.active !== false,
+    adsenseSlot: String(data.adsenseSlot || ''),
+    startsAt:    data.startsAt  && data.startsAt.toMillis  ? data.startsAt.toMillis()  : null,
+    expiresAt:   data.expiresAt && data.expiresAt.toMillis ? data.expiresAt.toMillis() : null,
+    updatedAt:   data.updatedAt && data.updatedAt.toMillis ? data.updatedAt.toMillis() : null,
+  };
+}
 
-async function getSponsorship() {
-  const db = getDb();
-  const snap = await db.doc(SPONSORSHIP_DOC).get();
+async function listSponsorships() {
+  const snap = await getDb().collection(SPONSORSHIPS_COLLECTION).orderBy('updatedAt', 'desc').get();
+  return snap.docs.map(function (d) { return normaliseSponsor(d.id, d.data()); });
+}
+
+async function listActiveSponsorships(placement) {
+  const now = new Date();
+  let query = getDb().collection(SPONSORSHIPS_COLLECTION).where('active', '==', true);
+  if (placement) query = query.where('placement', '==', placement);
+  const snap = await query.get();
+  return snap.docs
+    .map(function (d) { return normaliseSponsor(d.id, d.data()); })
+    .filter(function (s) {
+      if (s.startsAt  && s.startsAt  > now.getTime()) return false;
+      if (s.expiresAt && s.expiresAt < now.getTime()) return false;
+      return true;
+    });
+}
+
+async function getSponsorship(id) {
+  const snap = await getDb().collection(SPONSORSHIPS_COLLECTION).doc(id).get();
   if (!snap.exists) return null;
-  const data = snap.data();
-  // Skip expired banners.
-  if (data.expiresAt && data.expiresAt.toDate && data.expiresAt.toDate() < new Date()) return null;
-  return data;
+  return normaliseSponsor(snap.id, snap.data());
 }
 
-async function upsertSponsorship(data) {
-  const db = getDb();
-  await db.doc(SPONSORSHIP_DOC).set(data, { merge: true });
+async function upsertSponsorship(id, data) {
+  const ref = id
+    ? getDb().collection(SPONSORSHIPS_COLLECTION).doc(id)
+    : getDb().collection(SPONSORSHIPS_COLLECTION).doc();
+  const payload = {
+    company:     String(data.company     || ''),
+    headline:    String(data.headline    || ''),
+    cta:         String(data.cta         || 'Learn More'),
+    ctaUrl:      String(data.ctaUrl      || ''),
+    logoUrl:     String(data.logoUrl     || ''),
+    placement:   String(data.placement   || 'article-footer'),
+    active:      data.active !== false,
+    adsenseSlot: String(data.adsenseSlot || ''),
+    startsAt:    data.startsAt  ? new Date(data.startsAt)  : null,
+    expiresAt:   data.expiresAt ? new Date(data.expiresAt) : null,
+    updatedAt:   FieldValue.serverTimestamp(),
+  };
+  await ref.set(payload, { merge: true });
+  const saved = await ref.get();
+  return normaliseSponsor(saved.id, saved.data());
 }
 
-async function deleteSponsorship() {
-  const db = getDb();
-  await db.doc(SPONSORSHIP_DOC).delete();
+async function deleteSponsorship(id) {
+  await getDb().collection(SPONSORSHIPS_COLLECTION).doc(id).delete();
 }

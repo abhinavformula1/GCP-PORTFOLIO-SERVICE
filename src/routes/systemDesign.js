@@ -430,4 +430,63 @@ router.post('/admin/system-design/seed', requireAdmin, async (req, res, next) =>
   }
 });
 
+// ── Sponsorship routes ────────────────────────────────────────────────────────
+
+// Public: get active sponsors for a placement (used by public page)
+router.get('/sponsorships/active', async (req, res) => {
+  try {
+    const placement = req.query.placement || null;
+    const sponsors = await firestore.listActiveSponsorships(placement);
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=120');
+    return res.status(200).json({ success: true, sponsors });
+  } catch (err) {
+    console.warn('[sponsorships] list active failed:', err.message);
+    return res.status(200).json({ success: true, sponsors: [] });
+  }
+});
+
+// Admin: list all sponsors
+router.get('/admin/sponsorships', requireAdmin, async (_req, res, next) => {
+  try {
+    const sponsors = await firestore.listSponsorships();
+    return res.status(200).json({ success: true, sponsors });
+  } catch (err) { next(err); }
+});
+
+// Admin: create sponsor
+router.post('/admin/sponsorships', requireAdmin, [
+  body('company').notEmpty().withMessage('Company name is required.'),
+  body('headline').notEmpty().withMessage('Headline is required.'),
+  body('ctaUrl').notEmpty().withMessage('CTA URL is required.'),
+  body('placement').isIn(['homepage', 'sidebar', 'article-footer']).withMessage('Invalid placement.'),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
+  try {
+    const sponsor = await firestore.upsertSponsorship(null, req.body);
+    return res.status(201).json({ success: true, sponsor });
+  } catch (err) { next(err); }
+});
+
+// Admin: update sponsor
+router.put('/admin/sponsorships/:id', requireAdmin, [
+  body('company').notEmpty().withMessage('Company name is required.'),
+  body('placement').isIn(['homepage', 'sidebar', 'article-footer']).withMessage('Invalid placement.'),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
+  try {
+    const sponsor = await firestore.upsertSponsorship(req.params.id, req.body);
+    return res.status(200).json({ success: true, sponsor });
+  } catch (err) { next(err); }
+});
+
+// Admin: delete sponsor
+router.delete('/admin/sponsorships/:id', requireAdmin, async (req, res, next) => {
+  try {
+    await firestore.deleteSponsorship(req.params.id);
+    return res.status(200).json({ success: true });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
