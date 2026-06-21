@@ -1574,6 +1574,72 @@ a:hover { text-decoration: underline; }
   color: var(--md-sys-color-primary);
 }
 
+/* ── IconCards component ─────────────────────────────────────────────────────
+   Reusable circular-icon + label grid (Marriott-style benefit cards).
+   Used in: tier gate, article blocks, anywhere benefits/features are listed.
+──────────────────────────────────────────────────────────────────────────── */
+.sd-icon-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 16px;
+}
+.sd-icon-cards--cols-2 { --sd-icon-cols: 2; }
+.sd-icon-cards--cols-3 { --sd-icon-cols: 3; }
+.sd-icon-cards--cols-4 { --sd-icon-cols: 4; }
+.sd-icon-cards[class*="--cols-"] .sd-icon-card {
+  flex: 0 0 calc((100% - (var(--sd-icon-cols) - 1) * 16px) / var(--sd-icon-cols));
+}
+
+.sd-icon-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  min-width: 80px;
+}
+
+/* Circle */
+.sd-icon-card__circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--md-sys-color-surface-container);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.sd-icon-cards--sm .sd-icon-card__circle { width: 52px; height: 52px; }
+.sd-icon-cards--lg .sd-icon-card__circle { width: 88px; height: 88px; }
+
+.sd-icon-card__circle .material-symbols-outlined {
+  font-size: 28px;
+  color: var(--md-sys-color-primary);
+}
+.sd-icon-cards--sm .sd-icon-card__circle .material-symbols-outlined { font-size: 22px; }
+.sd-icon-cards--lg .sd-icon-card__circle .material-symbols-outlined { font-size: 36px; }
+
+/* Locked state — grey everything */
+.sd-icon-card--locked .sd-icon-card__circle {
+  background: var(--md-sys-color-surface-container-high);
+}
+.sd-icon-card--locked .sd-icon-card__circle .material-symbols-outlined {
+  color: var(--md-sys-color-outline);
+}
+.sd-icon-card--locked .sd-icon-card__label {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Label */
+.sd-icon-card__label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  line-height: 1.35;
+  max-width: 100px;
+}
+
 /* Tier gate — two cards side by side */
 .sd-tier-gate {
   display: grid;
@@ -1622,33 +1688,6 @@ a:hover { text-decoration: underline; }
   font-size: 0.78rem;
   color: var(--md-sys-color-on-surface-variant);
   margin: 0;
-}
-.sd-tier-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-}
-.sd-tier-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.875rem;
-  color: var(--md-sys-color-on-surface);
-}
-.sd-tier-item .material-symbols-outlined {
-  font-size: 18px;
-  color: var(--md-sys-color-primary);
-  flex-shrink: 0;
-}
-.sd-tier-item.sd-tier-locked {
-  color: var(--md-sys-color-on-surface-variant);
-}
-.sd-tier-item.sd-tier-locked .material-symbols-outlined {
-  color: var(--md-sys-color-outline);
 }
 .sd-locked-cta {
   display: inline-block;
