@@ -274,7 +274,7 @@ export function blockSummary(block) {
 
 // ── HTML → blocks (migration of legacy rich articles) ──────────────────────────
 
-function inlineToMd(node) {
+function inlineToMd(node, _noTrim) {
   if (!node) return '';
   let out = '';
   Array.prototype.forEach.call(node.childNodes, function (child) {
@@ -284,14 +284,30 @@ function inlineToMd(node) {
     }
     if (child.nodeType !== 1) return;
     const tag = child.tagName.toLowerCase();
-    const inner = inlineToMd(child);
-    if (tag === 'strong' || tag === 'b') out += '**' + inner + '**';
-    else if (tag === 'code') out += '`' + inner + '`';
-    else if (tag === 'em' || tag === 'i') out += '_' + inner + '_';
-    else if (tag === 'br') out += ' ';
-    else out += inner;
+    // Never trim recursive calls — browsers sometimes absorb a trailing space
+    // *inside* <strong>/<em> in contenteditable, e.g. <strong>foo </strong>bar.
+    // If we trim that inner text the space is lost permanently in the stored
+    // markdown, causing the "reverts on refresh" defect.
+    const inner = inlineToMd(child, true);
+    if (tag === 'strong' || tag === 'b') {
+      // Move any space the browser put inside the element back outside the markers.
+      const lead = inner.match(/^\s+/) ? inner.match(/^\s+/)[0] : '';
+      const trail = inner.match(/\s+$/) ? inner.match(/\s+$/)[0] : '';
+      out += lead + '**' + inner.trim() + '**' + trail;
+    } else if (tag === 'code') {
+      out += '`' + inner.trim() + '`';
+    } else if (tag === 'em' || tag === 'i') {
+      const lead = inner.match(/^\s+/) ? inner.match(/^\s+/)[0] : '';
+      const trail = inner.match(/\s+$/) ? inner.match(/\s+$/)[0] : '';
+      out += lead + '_' + inner.trim() + '_' + trail;
+    } else if (tag === 'br') {
+      out += ' ';
+    } else {
+      out += inner;
+    }
   });
-  return out.replace(/\s+/g, ' ').trim();
+  const normalised = out.replace(/\s+/g, ' ');
+  return _noTrim ? normalised : normalised.trim();
 }
 
 function heroFromNode(node) {

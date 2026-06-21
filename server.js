@@ -63,6 +63,60 @@ app.use('/api', mediaRoute);
 app.use('/api/pdf', pdfRoute);
 app.use('/print',   printRoute);
 
+// ── Sitemap ───────────────────────────────────────────────────────────────────
+// Dynamic sitemap that includes static pages + all published System Design
+// articles so Google can discover every /system-design/<id> page.
+app.get('/sitemap.xml', async (_req, res, next) => {
+  try {
+    const firestore = require('./src/services/firestore');
+    // Respect admin SEO toggle — return 404 if sitemap is disabled
+    let seoConfig = {};
+    try { seoConfig = await firestore.getSeoConfig(); } catch (_) {}
+    if (seoConfig.sitemapEnabled === false) {
+      return res.status(404).send('Not found');
+    }
+    const base = seoConfig.siteUrl
+      || process.env.SITE_URL
+      || 'https://portfolio-service-647206478056.asia-southeast1.run.app';
+    let articles = [];
+    try {
+      articles = await firestore.listPublishedSystemDesignArticles();
+    } catch (_) { /* non-fatal — sitemap still serves static pages */ }
+
+    const now = new Date().toISOString().slice(0, 10);
+    const articleUrls = articles
+      .filter((a) => !a.stub)
+      .map((a) => `  <url>
+    <loc>${base}/system-design/${a.id}</loc>
+    <lastmod>${a.updatedAt ? new Date(a.updatedAt).toISOString().slice(0, 10) : now}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>`).join('\n');
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${base}/</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${base}/system-design</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+${articleUrls}
+</urlset>`;
+    res.set('Content-Type', 'application/xml');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(xml);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

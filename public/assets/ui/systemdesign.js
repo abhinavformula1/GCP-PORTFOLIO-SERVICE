@@ -10,16 +10,14 @@
  *     querySelector ([hidden] doesn't affect that), and
  *   - flipping back to the resume view is instantaneous (no re-render).
  *
- * URL hash routing -- #/system-design/<topic-id> -- is the source of
- * truth for which topic is rendered. That means back/forward, deep
- * links pasted to a colleague, and reload all converge on the same
- * state.
+ * URL routing: uses the History API (/system-design/<id>) so every
+ * article gets a real, crawlable URL that Google can index. The server
+ * catch-all serves index.html for any /system-design/* path so direct
+ * loads and reloads work correctly.
  *
  * Locale flip -- listens for the <html lang> attribute mutation that
  * applyPageLang performs at the end of every language switch -- and
- * re-renders the active topic body in the new locale. Topic short
- * labels (title/subtitle) are also exposed via PAGE_LANG so the page-
- * level translator picks them up for free.
+ * re-renders the active topic body in the new locale.
  */
 
 import { currentLang } from '../core/i18n.js';
@@ -48,7 +46,57 @@ let _cmsLoaded   = false;
 let _tierConfig  = null;
 let _userToggledSidebar = false;
 
-const HASH_PREFIX = '#/system-design';
+const PATH_PREFIX = '/system-design';
+// SITE_BASE is overridden at runtime by loadSeoConfig() from the admin-managed
+// SEO config in Firestore. Falls back to the Cloud Run URL if the API is unreachable.
+let SITE_BASE = 'https://portfolio-service-647206478056.asia-southeast1.run.app';
+let _seoJsonLdEnabled = true;
+
+async function loadSeoConfig() {
+  try {
+    const resp = await fetch('/api/system-design/seo-config', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const cfg  = data.config || {};
+    if (cfg.siteUrl)         SITE_BASE          = cfg.siteUrl.replace(/\/$/, '');
+    if (cfg.jsonLdEnabled === false) _seoJsonLdEnabled = false;
+    // Apply noindex if admin turned it on
+    if (cfg.robotsNoindex) {
+      let el = document.querySelector('meta[name="robots"]');
+      if (!el) { el = document.createElement('meta'); el.name = 'robots'; document.head.appendChild(el); }
+      el.setAttribute('content', 'noindex, nofollow');
+    }
+    // Update homepage meta description if configured
+    if (cfg.siteDescription) {
+      const el = document.querySelector('meta[name="description"]');
+      if (el) el.setAttribute('content', cfg.siteDescription);
+    }
+    // Update OG image if configured
+    if (cfg.ogImageUrl) {
+      ['og:image', 'og:image:width', 'og:image:height'].forEach(function (p) {
+        const el = document.querySelector('meta[property="' + p + '"]');
+        if (el && p === 'og:image') el.setAttribute('content', cfg.ogImageUrl);
+      });
+      const tw = document.querySelector('meta[name="twitter:image"]');
+      if (tw) tw.setAttribute('content', cfg.ogImageUrl);
+    }
+    // Update canonical base URL
+    const canon = document.querySelector('link[rel="canonical"]');
+    if (canon) canon.href = SITE_BASE + '/';
+    // hreflang for French
+    if (cfg.hreflangFrEnabled) {
+      if (!document.querySelector('link[hreflang="en"]')) {
+        const enLink = document.createElement('link'); enLink.rel = 'alternate'; enLink.hreflang = 'en'; enLink.href = SITE_BASE + '/';
+        const frLink = document.createElement('link'); frLink.rel = 'alternate'; frLink.hreflang = 'fr'; frLink.href = SITE_BASE + '/?lang=fr';
+        document.head.appendChild(enLink);
+        document.head.appendChild(frLink);
+      }
+    }
+  } catch (_) { /* non-fatal — defaults remain */ }
+}
 const CATEGORY_LABELS = {
   integration: 'Integration',
   architecture: 'Architecture',
@@ -63,6 +111,96 @@ function topicById(id) {
     if (topic.id === id) return topic;
   }
   return null;
+}
+
+// ── Dynamic meta helpers (SEO / AEO) ─────────────────────────────────────────
+
+const _defaultTitle = document.title;
+const _defaultDesc  = (document.querySelector('meta[name="description"]') || {}).content || '';
+
+function setMeta(name, value) {
+  let el = document.querySelector('meta[name="' + name + '"]');
+  if (!el) { el = document.createElement('meta'); el.name = name; document.head.appendChild(el); }
+  el.setAttribute('content', value);
+}
+function setOg(prop, value) {
+  let el = document.querySelector('meta[property="' + prop + '"]');
+  if (!el) { el = document.createElement('meta'); el.setAttribute('property', prop); document.head.appendChild(el); }
+  el.setAttribute('content', value);
+}
+function setCanonical(url) {
+  let el = document.querySelector('link[rel="canonical"]');
+  if (!el) { el = document.createElement('link'); el.rel = 'canonical'; document.head.appendChild(el); }
+  el.href = url;
+}
+function setJsonLd(id, data) {
+  if (!_seoJsonLdEnabled) { removeJsonLd(id); return; }
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('script');
+    el.type = 'application/ld+json';
+    el.id = id;
+    document.head.appendChild(el);
+  }
+  el.textContent = JSON.stringify(data, null, 2);
+}
+function removeJsonLd(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function applyArticleMeta(topic) {
+  if (!topic) { resetMeta(); return; }
+  const loc   = topic.en || {};
+  const title = (loc.title || topic.id) + ' — System Design | Abhinav Kumar';
+  const desc  = loc.subtitle
+    || 'System design article: ' + (loc.title || topic.id) + '. Architecture and security deep-dive by Abhinav Kumar.';
+  const url   = SITE_BASE + PATH_PREFIX + '/' + topic.id;
+  const tags  = Array.isArray(topic.tags) ? topic.tags : [];
+
+  document.title = title;
+  setMeta('description', desc);
+  setOg('og:title', title);
+  setOg('og:description', desc);
+  setOg('og:url', url);
+  setOg('og:type', 'article');
+  setMeta('twitter:title', title);
+  setMeta('twitter:description', desc);
+  setCanonical(url);
+
+  setJsonLd('sd-article-jsonld', {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    'headline': loc.title || topic.id,
+    'description': desc,
+    'url': url,
+    'author': {
+      '@type': 'Person',
+      '@id': SITE_BASE + '/#person',
+      'name': 'Abhinav Kumar',
+    },
+    'publisher': {
+      '@type': 'Person',
+      'name': 'Abhinav Kumar',
+      'url': SITE_BASE,
+    },
+    'keywords': tags.join(', '),
+    'dateModified': topic.updatedAt ? new Date(topic.updatedAt).toISOString() : undefined,
+    'inLanguage': 'en',
+  });
+}
+
+function resetMeta() {
+  document.title = _defaultTitle;
+  setMeta('description', _defaultDesc);
+  setOg('og:title', _defaultTitle);
+  setOg('og:description', _defaultDesc);
+  setOg('og:url', SITE_BASE + '/');
+  setOg('og:type', 'profile');
+  setMeta('twitter:title', _defaultTitle);
+  setMeta('twitter:description', _defaultDesc);
+  setCanonical(SITE_BASE + '/');
+  removeJsonLd('sd-article-jsonld');
 }
 
 function getTopics() {
@@ -325,13 +463,15 @@ function renderTopicList() {
   _sdAside.querySelectorAll('.sd-topic-btn').forEach(function (b) {
     b.addEventListener('click', function () {
       const id = b.getAttribute('data-topic-id');
-      location.hash = HASH_PREFIX + '/' + id;
+      navigate(PATH_PREFIX + '/' + id);
+      handleRoute();
     });
   });
   const overview = _sdAside.querySelector('.sd-overview-link');
   if (overview) {
     overview.addEventListener('click', function () {
-      location.hash = HASH_PREFIX;
+      navigate(PATH_PREFIX);
+      handleRoute();
     });
   }
 }
@@ -382,7 +522,8 @@ function renderLanding() {
   _sdDetail.innerHTML = html;
   _sdDetail.querySelectorAll('.sd-landing-card').forEach(function (card) {
     card.addEventListener('click', function () {
-      location.hash = HASH_PREFIX + '/' + card.getAttribute('data-topic-id');
+      navigate(PATH_PREFIX + '/' + card.getAttribute('data-topic-id'));
+      handleRoute();
     });
   });
   const homeSlot = _sdDetail.querySelector('.sd-sponsor-slot-placeholder[data-placement="homepage"]');
@@ -561,23 +702,41 @@ function updateButton() {
   _btn.setAttribute('aria-pressed', sysOn ? 'true' : 'false');
 }
 
-// ── Hash routing ─────────────────────────────────────────────────────────────
-function readHash() {
-  const h = location.hash || '';
-  if (h.indexOf(HASH_PREFIX) !== 0) return null;
-  const rest = h.slice(HASH_PREFIX.length).replace(/^\//, '');
+// ── History API routing ──────────────────────────────────────────────────────
+// URLs: /system-design           → topic list landing
+//       /system-design/<id>      → specific article
+// The server catch-all serves index.html for every /system-design/* path so
+// direct loads, reloads, and social shares all work correctly.
+// Legacy hash URLs (#/system-design/…) are redirected on init.
+
+function readPath() {
+  const p = location.pathname || '/';
+  if (!p.startsWith(PATH_PREFIX)) return null;
+  const rest = p.slice(PATH_PREFIX.length).replace(/^\//, '');
   return { id: rest || null };
 }
 
+function navigate(path, replace) {
+  if (replace) {
+    history.replaceState(null, '', path);
+  } else {
+    history.pushState(null, '', path);
+  }
+}
+
 function handleRoute() {
-  const route = readHash();
+  const route = readPath();
   if (!route) {
-    if (_activeView === 'sysdesign') setView('resume');
+    if (_activeView === 'sysdesign') {
+      resetMeta();
+      setView('resume');
+    }
     return;
   }
   let id = route.id;
   if (!id) {
     _activeTopic = null;
+    resetMeta();
     setView('sysdesign');
     renderTopicList();
     renderLanding();
@@ -586,7 +745,8 @@ function handleRoute() {
   const topics = getTopics();
   if (!topicById(id) && topics.length) id = topics[0].id;
   _activeTopic = id;
-  _userToggledSidebar = false; // resume auto-collapse behaviour for new article
+  _userToggledSidebar = false;
+  applyArticleMeta(topicById(id));
   setView('sysdesign');
   renderTopicList();
   highlightActiveTopic();
@@ -597,27 +757,25 @@ function handleRoute() {
 export function openSystemDesign(id) {
   ensureDom();
   if (id && topicById(id)) {
-    location.hash = HASH_PREFIX + '/' + id;
+    navigate(PATH_PREFIX + '/' + id);
     return;
   }
-  if (_activeView === 'sysdesign') {
-    return;
-  }
-  location.hash = HASH_PREFIX;
+  if (_activeView === 'sysdesign') return;
+  navigate(PATH_PREFIX);
 }
 
 export function closeSystemDesign() {
-  if (location.hash && location.hash.indexOf(HASH_PREFIX) === 0) {
-    history.replaceState(null, '', location.pathname + location.search);
-  }
+  navigate('/', true);
+  resetMeta();
   setView('resume');
 }
 
 export function initSystemDesign() {
   _btn = document.querySelector('.systemdesign-btn');
   ensureDom();
+  loadSeoConfig(); // non-blocking — updates meta tags and SITE_BASE from Firestore
   loadCmsTopics();
-  window.addEventListener('hashchange', handleRoute);
+  window.addEventListener('popstate', handleRoute);
   const observer = new MutationObserver(function () {
     renderTopicList();
     highlightActiveTopic();
@@ -625,7 +783,16 @@ export function initSystemDesign() {
     updateButton();
   });
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
-  if (location.hash && location.hash.indexOf(HASH_PREFIX) === 0) {
+
+  // Redirect legacy hash URLs (#/system-design/…) to clean paths
+  if (location.hash && location.hash.startsWith('#/system-design')) {
+    const legacyId = location.hash.slice('#/system-design'.length).replace(/^\//, '');
+    const newPath  = PATH_PREFIX + (legacyId ? '/' + legacyId : '');
+    navigate(newPath, true);
+  }
+
+  // Handle direct navigation to /system-design or /system-design/<id>
+  if (location.pathname.startsWith(PATH_PREFIX)) {
     handleRoute();
   }
 }
