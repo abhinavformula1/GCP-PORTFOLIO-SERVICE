@@ -78,6 +78,10 @@
             <span class="material-symbols-outlined" aria-hidden="true">toggle_on</span>
             <span>Metadata Config</span>
           </button>
+          <button type="button" class="sd-admin-module" data-module="sponsorships">
+            <span class="material-symbols-outlined" aria-hidden="true">campaign</span>
+            <span>Sponsorships</span>
+          </button>
         </div>
       </div>
       <div class="sd-admin-badge">
@@ -442,6 +446,87 @@
       </div>
       <div id="metadataConfigStatus" class="sd-admin-section-status"></div>
       <div id="metadataConfigPanel" class="sd-metadata-config-panel"></div>
+    </section>
+
+    <!-- Sponsorships workspace -->
+    <section id="sponsorshipsWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Monetisation</div>
+          <h2>Sponsorships</h2>
+          <p>Manage B2B sponsor cards shown on the public site. Each slot supports a logo, headline, CTA, and placement. Falls back to Google AdSense when no active sponsor exists.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <button type="button" id="addSponsorBtn" class="sd-admin-primary">
+            <span class="material-symbols-outlined" aria-hidden="true">add</span> New sponsor
+          </button>
+        </div>
+      </div>
+      <div id="sponsorshipsStatus" class="sd-admin-section-status"></div>
+      <div id="sponsorshipsPanel" class="sd-sponsorships-panel"></div>
+
+      <!-- Sponsor edit drawer -->
+      <div id="sponsorDrawer" class="sd-sponsor-drawer" hidden>
+        <div class="sd-sponsor-drawer-head">
+          <h3 id="sponsorDrawerTitle">New Sponsor</h3>
+          <button type="button" id="closeSponsorDrawerBtn" aria-label="Close">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        </div>
+        <div id="sponsorDrawerStatus" class="sd-admin-section-status"></div>
+        <div class="sd-sponsor-form">
+          <label class="sd-sponsor-field">
+            <span>Company name <span class="sd-required">*</span></span>
+            <input id="sponsorCompany" type="text" placeholder="e.g. Copado">
+          </label>
+          <label class="sd-sponsor-field">
+            <span>Headline <span class="sd-required">*</span></span>
+            <input id="sponsorHeadline" type="text" placeholder="e.g. #1 DevOps platform for Salesforce">
+          </label>
+          <label class="sd-sponsor-field">
+            <span>CTA label</span>
+            <input id="sponsorCta" type="text" placeholder="Learn More">
+          </label>
+          <label class="sd-sponsor-field">
+            <span>CTA URL <span class="sd-required">*</span></span>
+            <input id="sponsorCtaUrl" type="url" placeholder="https://copado.com">
+          </label>
+          <label class="sd-sponsor-field">
+            <span>Logo URL <span class="sd-hint">(GCS or external)</span></span>
+            <input id="sponsorLogoUrl" type="url" placeholder="https://storage.googleapis.com/...">
+          </label>
+          <label class="sd-sponsor-field">
+            <span>Placement <span class="sd-required">*</span></span>
+            <select id="sponsorPlacement">
+              <option value="article-footer">Article Footer</option>
+              <option value="homepage">Homepage Banner</option>
+              <option value="sidebar">Sidebar</option>
+            </select>
+          </label>
+          <div class="sd-sponsor-row">
+            <label class="sd-sponsor-field">
+              <span>Start date</span>
+              <input id="sponsorStartsAt" type="date">
+            </label>
+            <label class="sd-sponsor-field">
+              <span>End date</span>
+              <input id="sponsorExpiresAt" type="date">
+            </label>
+          </div>
+          <label class="sd-sponsor-field">
+            <span>Google AdSense slot ID <span class="sd-hint">(fallback when inactive)</span></span>
+            <input id="sponsorAdsenseSlot" type="text" placeholder="ca-pub-XXXXXXXX / slot-XXXXXXXX">
+          </label>
+          <label class="sd-sponsor-field sd-sponsor-toggle-field">
+            <span>Active</span>
+            <input id="sponsorActive" type="checkbox" checked>
+          </label>
+        </div>
+        <div class="sd-sponsor-drawer-actions">
+          <button type="button" id="deleteSponsorBtn" class="sd-sponsor-delete-btn" hidden>Delete</button>
+          <button type="button" id="saveSponsorBtn" class="sd-admin-primary">Save sponsor</button>
+        </div>
+      </div>
     </section>
 
     <md-dialog id="publishReviewDialog" class="sd-publish-dialog" aria-labelledby="publishReviewTitle">

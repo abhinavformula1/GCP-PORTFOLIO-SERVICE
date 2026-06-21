@@ -87,6 +87,16 @@ const els = {
   metadataConfigPanel: document.getElementById('metadataConfigPanel'),
   metadataConfigStatus: document.getElementById('metadataConfigStatus'),
   saveMetadataConfigBtn: document.getElementById('saveMetadataConfigBtn'),
+  sponsorshipsWorkspace: document.getElementById('sponsorshipsWorkspace'),
+  sponsorshipsPanel: document.getElementById('sponsorshipsPanel'),
+  sponsorshipsStatus: document.getElementById('sponsorshipsStatus'),
+  addSponsorBtn: document.getElementById('addSponsorBtn'),
+  sponsorDrawer: document.getElementById('sponsorDrawer'),
+  sponsorDrawerTitle: document.getElementById('sponsorDrawerTitle'),
+  sponsorDrawerStatus: document.getElementById('sponsorDrawerStatus'),
+  closeSponsorDrawerBtn: document.getElementById('closeSponsorDrawerBtn'),
+  saveSponsorBtn: document.getElementById('saveSponsorBtn'),
+  deleteSponsorBtn: document.getElementById('deleteSponsorBtn'),
   togglePolicyInfoBtn: document.getElementById('toggleContactPolicyInfoBtn'),
   policyMeta:      document.getElementById('contactPolicyMeta'),
   allowedDomains:  document.getElementById('contactAllowedDomains'),
@@ -343,6 +353,7 @@ function resetAdminSession() {
   els.articleSettingsWorkspace.hidden = true;
   els.tierSettingsWorkspace.hidden = true;
   els.metadataConfigWorkspace.hidden = true;
+  els.sponsorshipsWorkspace.hidden = true;
   els.dropdown.hidden = true;
   updateAdminChrome(null);
 }
@@ -483,6 +494,7 @@ function handleAdminLoadError(err) {
   els.articleSettingsWorkspace.hidden = true;
   els.tierSettingsWorkspace.hidden = true;
   els.metadataConfigWorkspace.hidden = true;
+  els.sponsorshipsWorkspace.hidden = true;
   if (err?.status === 401) {
     resetAdminSession();
   }
@@ -560,14 +572,17 @@ function setActiveModule(moduleName) {
   const isSettings = moduleName === 'article-settings';
   const isTier     = moduleName === 'tier-settings';
   const isMeta     = moduleName === 'metadata-config';
-  els.workspace.hidden = isPolicy || isSettings || isTier || isMeta;
+  const isSponsor  = moduleName === 'sponsorships';
+  els.workspace.hidden = isPolicy || isSettings || isTier || isMeta || isSponsor;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
   els.tierSettingsWorkspace.hidden = !isTier;
   els.metadataConfigWorkspace.hidden = !isMeta;
+  els.sponsorshipsWorkspace.hidden = !isSponsor;
   if (isSettings) renderArticleSettings();
   if (isTier)     renderTierSettings();
   if (isMeta)     renderMetadataConfig();
+  if (isSponsor)  renderSponsorships();
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
@@ -1509,6 +1524,116 @@ async function saveMetadataConfig() {
   setSectionStatus(els.metadataConfigStatus, 'Configuration saved.', 'success');
 }
 
+// ── Sponsorships ──────────────────────────────────────────────────────────────
+let _sponsors = [];
+let _editingSponsorId = null;
+
+const PLACEMENT_LABELS = {
+  'article-footer': 'Article Footer',
+  'homepage':       'Homepage Banner',
+  'sidebar':        'Sidebar',
+};
+
+async function renderSponsorships() {
+  const panel = els.sponsorshipsPanel;
+  panel.innerHTML = '<p class="sd-article-settings-loading">Loading sponsors…</p>';
+  closeSponsorDrawer();
+  try {
+    const data = await authedJson('/api/admin/sponsorships');
+    _sponsors = Array.isArray(data.sponsors) ? data.sponsors : [];
+  } catch (_) {
+    _sponsors = [];
+  }
+  panel.innerHTML = '';
+  if (!_sponsors.length) {
+    panel.innerHTML = '<p class="sd-article-settings-loading">No sponsors yet. Click "New sponsor" to add one.</p>';
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'sd-sponsor-grid';
+  _sponsors.forEach(function (s) {
+    const card = document.createElement('div');
+    card.className = 'sd-sponsor-card' + (s.active ? ' sd-sponsor-card--active' : '');
+    card.innerHTML =
+      '<div class="sd-sponsor-card-top">' +
+        (s.logoUrl ? '<img src="' + s.logoUrl + '" alt="' + s.company + '" class="sd-sponsor-logo">' : '<div class="sd-sponsor-logo-placeholder"><span class="material-symbols-outlined">business</span></div>') +
+        '<div class="sd-sponsor-badge ' + (s.active ? 'sd-sponsor-badge--active' : 'sd-sponsor-badge--inactive') + '">' + (s.active ? 'Active' : 'Inactive') + '</div>' +
+      '</div>' +
+      '<div class="sd-sponsor-card-body">' +
+        '<strong>' + escHtml(s.company) + '</strong>' +
+        '<span>' + escHtml(s.headline) + '</span>' +
+        '<div class="sd-sponsor-meta">' +
+          '<span class="material-symbols-outlined">location_on</span>' +
+          (PLACEMENT_LABELS[s.placement] || s.placement) +
+          (s.expiresAt ? ' · Expires ' + new Date(s.expiresAt).toLocaleDateString() : '') +
+        '</div>' +
+      '</div>' +
+      '<button type="button" class="sd-sponsor-edit-btn" aria-label="Edit sponsor">Edit</button>';
+    card.querySelector('.sd-sponsor-edit-btn').addEventListener('click', function () {
+      openSponsorDrawer(s);
+    });
+    grid.appendChild(card);
+  });
+  panel.appendChild(grid);
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function openSponsorDrawer(sponsor) {
+  _editingSponsorId = sponsor ? sponsor.id : null;
+  els.sponsorDrawerTitle.textContent = sponsor ? 'Edit Sponsor' : 'New Sponsor';
+  els.sponsorDrawer.hidden = false;
+  els.deleteSponsorBtn.hidden = !sponsor;
+  setSectionStatus(els.sponsorDrawerStatus, '', 'info');
+
+  document.getElementById('sponsorCompany').value    = sponsor ? sponsor.company    : '';
+  document.getElementById('sponsorHeadline').value   = sponsor ? sponsor.headline   : '';
+  document.getElementById('sponsorCta').value        = sponsor ? sponsor.cta        : 'Learn More';
+  document.getElementById('sponsorCtaUrl').value     = sponsor ? sponsor.ctaUrl     : '';
+  document.getElementById('sponsorLogoUrl').value    = sponsor ? sponsor.logoUrl    : '';
+  document.getElementById('sponsorPlacement').value  = sponsor ? sponsor.placement  : 'article-footer';
+  document.getElementById('sponsorAdsenseSlot').value = sponsor ? sponsor.adsenseSlot : '';
+  document.getElementById('sponsorActive').checked   = sponsor ? sponsor.active     : true;
+  document.getElementById('sponsorStartsAt').value   = sponsor && sponsor.startsAt  ? new Date(sponsor.startsAt).toISOString().split('T')[0]  : '';
+  document.getElementById('sponsorExpiresAt').value  = sponsor && sponsor.expiresAt ? new Date(sponsor.expiresAt).toISOString().split('T')[0] : '';
+}
+
+function closeSponsorDrawer() {
+  els.sponsorDrawer.hidden = true;
+  _editingSponsorId = null;
+}
+
+async function saveSponsor() {
+  setSectionStatus(els.sponsorDrawerStatus, 'Saving…', 'info');
+  const payload = {
+    company:     document.getElementById('sponsorCompany').value.trim(),
+    headline:    document.getElementById('sponsorHeadline').value.trim(),
+    cta:         document.getElementById('sponsorCta').value.trim() || 'Learn More',
+    ctaUrl:      document.getElementById('sponsorCtaUrl').value.trim(),
+    logoUrl:     document.getElementById('sponsorLogoUrl').value.trim(),
+    placement:   document.getElementById('sponsorPlacement').value,
+    adsenseSlot: document.getElementById('sponsorAdsenseSlot').value.trim(),
+    active:      document.getElementById('sponsorActive').checked,
+    startsAt:    document.getElementById('sponsorStartsAt').value  || null,
+    expiresAt:   document.getElementById('sponsorExpiresAt').value || null,
+  };
+  const url    = _editingSponsorId ? '/api/admin/sponsorships/' + _editingSponsorId : '/api/admin/sponsorships';
+  const method = _editingSponsorId ? 'PUT' : 'POST';
+  await authedJson(url, { method, body: JSON.stringify(payload) });
+  setSectionStatus(els.sponsorDrawerStatus, 'Saved!', 'success');
+  setTimeout(function () { closeSponsorDrawer(); renderSponsorships(); }, 800);
+}
+
+async function deleteSponsor() {
+  if (!_editingSponsorId) return;
+  if (!confirm('Delete this sponsor? This cannot be undone.')) return;
+  await authedJson('/api/admin/sponsorships/' + _editingSponsorId, { method: 'DELETE' });
+  closeSponsorDrawer();
+  renderSponsorships();
+}
+
 function renderPreview() {
   const article = articleFromForm();
   updateWorkflowChrome(article.status);
@@ -1749,6 +1874,14 @@ els.saveTierSettingsBtn.addEventListener('click', function () {
 });
 els.saveMetadataConfigBtn.addEventListener('click', function () {
   saveMetadataConfig().catch(function (err) { setSectionStatus(els.metadataConfigStatus, err.message, 'error'); });
+});
+els.addSponsorBtn.addEventListener('click', function () { openSponsorDrawer(null); });
+els.closeSponsorDrawerBtn.addEventListener('click', closeSponsorDrawer);
+els.saveSponsorBtn.addEventListener('click', function () {
+  saveSponsor().catch(function (err) { setSectionStatus(els.sponsorDrawerStatus, err.message, 'error'); });
+});
+els.deleteSponsorBtn.addEventListener('click', function () {
+  deleteSponsor().catch(function (err) { setSectionStatus(els.sponsorDrawerStatus, err.message, 'error'); });
 });
 document.addEventListener('click', function () {
   closeSectionActionMenus();
