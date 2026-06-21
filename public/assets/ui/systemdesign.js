@@ -45,6 +45,7 @@ let _cmsTopics   = null;
 let _cmsLoadStarted = false;
 let _cmsLoaded   = false;
 let _tierConfig  = null;
+let _userToggledSidebar = false;
 
 const HASH_PREFIX = '#/system-design';
 const CATEGORY_LABELS = {
@@ -204,9 +205,39 @@ function ensureDom() {
   _sdAside.className = 'sd-topics';
   _sdAside.setAttribute('hidden', '');
 
+  // Collapse tab — always visible even when sidebar is collapsed
+  const collapseTab = document.createElement('button');
+  collapseTab.type = 'button';
+  collapseTab.className = 'sd-topics-collapse-tab';
+  collapseTab.setAttribute('aria-label', 'Expand article list');
+  collapseTab.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>';
+  collapseTab.addEventListener('click', function () {
+    const collapsed = body.classList.toggle('sd-topics-collapsed');
+    collapseTab.setAttribute('aria-label', collapsed ? 'Expand article list' : 'Collapse article list');
+    collapseTab.querySelector('.material-symbols-outlined').textContent = collapsed ? 'chevron_right' : 'chevron_left';
+    _userToggledSidebar = true;
+  });
+  _sdAside.appendChild(collapseTab);
+
   _sdDetail = document.createElement('main');
   _sdDetail.className = 'sd-detail';
   _sdDetail.setAttribute('hidden', '');
+
+  // Auto-collapse sidebar when user scrolls 300px into article detail
+  let _scrollTimer = null;
+  _sdDetail.addEventListener('scroll', function () {
+    if (_userToggledSidebar) return;
+    clearTimeout(_scrollTimer);
+    _scrollTimer = setTimeout(function () {
+      const shouldCollapse = _sdDetail.scrollTop > 300 && !!_activeTopic;
+      const isCollapsed = body.classList.contains('sd-topics-collapsed');
+      if (shouldCollapse !== isCollapsed) {
+        body.classList.toggle('sd-topics-collapsed', shouldCollapse);
+        collapseTab.setAttribute('aria-label', shouldCollapse ? 'Expand article list' : 'Collapse article list');
+        collapseTab.querySelector('.material-symbols-outlined').textContent = shouldCollapse ? 'chevron_right' : 'chevron_left';
+      }
+    }, 80);
+  });
 
   body.appendChild(_sdAside);
   body.appendChild(_sdDetail);
@@ -545,6 +576,7 @@ function handleRoute() {
   const topics = getTopics();
   if (!topicById(id) && topics.length) id = topics[0].id;
   _activeTopic = id;
+  _userToggledSidebar = false; // resume auto-collapse behaviour for new article
   setView('sysdesign');
   renderTopicList();
   highlightActiveTopic();

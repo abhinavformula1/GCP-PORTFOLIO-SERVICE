@@ -1358,6 +1358,65 @@ a:hover { text-decoration: underline; }
   position: sticky;
   top: 88px;
   align-self: start;
+  transition: width .3s cubic-bezier(.4,0,.2,1), opacity .3s;
+}
+
+/* ── Sidebar auto-collapse ── */
+.body.sd-topics-collapsed.sd-mode {
+  grid-template-columns: 0px minmax(0, 1fr);
+  gap: 0;
+}
+
+.body.sd-topics-collapsed .sd-topics {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.body.sd-topics-collapsed .sd-topics-collapse-tab {
+  opacity: 1;
+  pointer-events: auto;
+  left: -4px;
+}
+
+/* Collapse tab — the small chevron button on the edge of the sidebar */
+.sd-topics-collapse-tab {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  left: calc(var(--page-inset, 48px) + 252px);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 0 10px 10px 0;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, left .3s cubic-bezier(.4,0,.2,1), background .15s;
+  box-shadow: 2px 0 8px rgba(0,0,0,.06);
+}
+
+/* Show tab on hover of the sidebar or when collapsed */
+.sd-topics:hover .sd-topics-collapse-tab,
+.body.sd-topics-collapsed .sd-topics-collapse-tab {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sd-topics-collapse-tab:hover {
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-primary);
+}
+
+.sd-topics-collapse-tab .material-symbols-outlined {
+  font-size: 18px;
 }
 
 .sd-topics-header {
