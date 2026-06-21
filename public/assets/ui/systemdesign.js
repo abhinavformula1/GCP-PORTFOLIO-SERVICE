@@ -370,13 +370,43 @@ function renderTopicDetail() {
   html += '</div>';
   html += '</header>';
   if (topic.tier === 'premium') {
-    html += '<div class="sd-locked-body">';
-    html += '<div class="sd-locked-gate">';
-    html += '<span class="material-symbols-outlined sd-locked-icon" aria-hidden="true">lock</span>';
-    html += '<h3>Premium Article</h3>';
-    html += '<p>This article is part of the premium tier. Get in touch to get access.</p>';
+    const allTopics  = getTopics().filter(function (t) { return !t.stub; });
+    const freeList   = allTopics.filter(function (t) { return t.tier !== 'premium'; });
+    const premList   = allTopics.filter(function (t) { return t.tier === 'premium'; });
+
+    function tierItem(t, locked) {
+      const loc = localeOf(t);
+      return '<li class="sd-tier-item' + (locked ? ' sd-tier-locked' : '') + '">' +
+        '<span class="material-symbols-outlined" aria-hidden="true">' + (locked ? 'lock' : (t.icon || 'article')) + '</span>' +
+        '<span>' + escapeHtml(loc.title) + '</span>' +
+        '</li>';
+    }
+
+    html += '<div class="sd-tier-gate">';
+
+    // Free tier card
+    html += '<div class="sd-tier-card sd-tier-free">';
+    html += '<div class="sd-tier-card-head">';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">lock_open</span>';
+    html += '<div><h3>Free Tier</h3><p>Available to everyone</p></div>';
+    html += '</div>';
+    html += '<ul class="sd-tier-list">';
+    freeList.forEach(function (t) { html += tierItem(t, false); });
+    html += '</ul>';
+    html += '</div>';
+
+    // Premium tier card
+    html += '<div class="sd-tier-card sd-tier-premium">';
+    html += '<div class="sd-tier-card-head">';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">workspace_premium</span>';
+    html += '<div><h3>Premium Tier</h3><p>Get in touch to unlock</p></div>';
+    html += '</div>';
+    html += '<ul class="sd-tier-list">';
+    premList.forEach(function (t) { html += tierItem(t, true); });
+    html += '</ul>';
     html += '<a href="mailto:abhinavformula1@gmail.com?subject=Premium%20Access%20Request" class="sd-locked-cta">Get in touch</a>';
     html += '</div>';
+
     html += '</div>';
   } else {
     const bodyHtml = (topic.blocks && topic.blocks.length) ? blocksToHtml(topic.blocks) : (loc.body || '');
