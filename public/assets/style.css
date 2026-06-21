@@ -1636,12 +1636,18 @@ a:hover { text-decoration: underline; }
 /* ── Public sponsorship slot ─────────────────────────────────────────────────
    Waterfall: paid sponsor → AdSense → empty
 ───────────────────────────────────────────────────────────────────────────── */
-/* Homepage sponsor slot — sits at top of right (main) column */
+/* Homepage sponsor slots — right column (top) and left column (bottom) */
 .homepage-sponsor-slot {
   margin-bottom: 28px;
 }
 
 .homepage-sponsor-slot:empty { display: none; }
+
+/* Left column slot sits at the bottom of aside after all content */
+#homepageSponsorSlotLeft {
+  margin-top: 24px;
+  margin-bottom: 0;
+}
 
 .sd-sponsor-slot {
   display: flex;

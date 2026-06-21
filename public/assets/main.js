@@ -527,10 +527,11 @@ import { mountSponsorSlot } from './ui/sponsorship.js';
   window.closeLeaveRecommendation = closeLeaveRecommendation;
   initRecommendations();
 
-  /* ── Homepage sponsor slot ──
-     Mounts the active B2B sponsor card (or AdSense fallback) on the
-     portfolio homepage. Silently hidden if no sponsor is configured.   */
-  mountSponsorSlot(document.getElementById('homepageSponsorSlot'), 'homepage');
+  /* ── Homepage sponsor slots ──
+     Right column (top of Work Experience) and Left column (bottom of aside).
+     Each placement is configured independently in Admin → Sponsorships.     */
+  mountSponsorSlot(document.getElementById('homepageSponsorSlot'),     'homepage');
+  mountSponsorSlot(document.getElementById('homepageSponsorSlotLeft'), 'homepage-left');
 
   /* ── System Design view ──
      Master/detail topic browser that swaps the body grid (resume DOM is

@@ -1530,8 +1530,9 @@ let _editingSponsorId = null;
 
 const PLACEMENT_LABELS = {
   'article-footer': 'Article Footer',
-  'homepage':       'Homepage Banner',
-  'sidebar':        'Sidebar',
+  'homepage':       'Homepage — Right Column',
+  'homepage-left':  'Homepage — Left Column',
+  'sidebar':        'System Design Sidebar',
 };
 
 async function renderSponsorships() {
