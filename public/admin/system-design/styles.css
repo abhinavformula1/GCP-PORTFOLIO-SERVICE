@@ -1222,6 +1222,20 @@
 
 .sd-seo-hint { color: var(--text-secondary); font-weight: 400; }
 
+.sd-seo-field-hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.sd-seo-field-hint code {
+  font-family: monospace;
+  font-size: 0.78rem;
+  background: var(--surface-variant, rgba(0,0,0,.06));
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
 /* ── SEO feature toggles ── */
 .sd-seo-toggles { display: grid; gap: 0; }
 

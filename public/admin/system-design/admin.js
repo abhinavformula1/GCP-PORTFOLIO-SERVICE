@@ -108,6 +108,7 @@ const els = {
   seoHreflangFr: document.getElementById('seoHreflangFr'),
   seoRobotsNoindex: document.getElementById('seoRobotsNoindex'),
   seoDescCharCount: document.getElementById('seoDescCharCount'),
+  seoAdsensePublisherId: document.getElementById('seoAdsensePublisherId'),
   seoSerpUrl: document.getElementById('seoSerpUrl'),
   seoSerpTitle: document.getElementById('seoSerpTitle'),
   seoSerpDesc: document.getElementById('seoSerpDesc'),
@@ -1680,13 +1681,14 @@ async function renderSeoConfig() {
   try {
     const data = await authedJson('/api/system-design/seo-config');
     _seoConfig = data.config || {};
-    els.seoSiteUrl.value         = _seoConfig.siteUrl          || '';
-    els.seoSiteDescription.value = _seoConfig.siteDescription  || '';
-    els.seoOgImageUrl.value      = _seoConfig.ogImageUrl        || '';
-    els.seoJsonLd.checked        = _seoConfig.jsonLdEnabled     !== false;
-    els.seoSitemap.checked       = _seoConfig.sitemapEnabled    !== false;
-    els.seoHreflangFr.checked    = !!_seoConfig.hreflangFrEnabled;
-    els.seoRobotsNoindex.checked = !!_seoConfig.robotsNoindex;
+    els.seoSiteUrl.value              = _seoConfig.siteUrl           || '';
+    els.seoSiteDescription.value      = _seoConfig.siteDescription   || '';
+    els.seoOgImageUrl.value           = _seoConfig.ogImageUrl         || '';
+    els.seoAdsensePublisherId.value   = _seoConfig.adsensePublisherId || '';
+    els.seoJsonLd.checked             = _seoConfig.jsonLdEnabled      !== false;
+    els.seoSitemap.checked            = _seoConfig.sitemapEnabled     !== false;
+    els.seoHreflangFr.checked         = !!_seoConfig.hreflangFrEnabled;
+    els.seoRobotsNoindex.checked      = !!_seoConfig.robotsNoindex;
     updateSerpPreview();
     setSectionStatus(els.seoConfigStatus, '', '');
   } catch (err) {
@@ -1699,13 +1701,14 @@ async function saveSeoConfig() {
   els.saveSeoConfigBtn.disabled = true;
   try {
     const payload = {
-      siteUrl:           els.seoSiteUrl.value.trim(),
-      siteDescription:   els.seoSiteDescription.value.trim(),
-      ogImageUrl:        els.seoOgImageUrl.value.trim(),
-      jsonLdEnabled:     els.seoJsonLd.checked,
-      sitemapEnabled:    els.seoSitemap.checked,
-      hreflangFrEnabled: els.seoHreflangFr.checked,
-      robotsNoindex:     els.seoRobotsNoindex.checked,
+      siteUrl:            els.seoSiteUrl.value.trim(),
+      siteDescription:    els.seoSiteDescription.value.trim(),
+      ogImageUrl:         els.seoOgImageUrl.value.trim(),
+      adsensePublisherId: els.seoAdsensePublisherId.value.trim(),
+      jsonLdEnabled:      els.seoJsonLd.checked,
+      sitemapEnabled:     els.seoSitemap.checked,
+      hreflangFrEnabled:  els.seoHreflangFr.checked,
+      robotsNoindex:      els.seoRobotsNoindex.checked,
     };
     await authedJson('/api/admin/system-design/seo-config', { method: 'PUT', body: JSON.stringify(payload) });
     _seoConfig = payload;
