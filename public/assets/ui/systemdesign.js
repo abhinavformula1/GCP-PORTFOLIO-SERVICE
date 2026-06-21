@@ -118,7 +118,7 @@ function normaliseCmsTopic(article) {
     icon:        article.icon || 'article',
     status:      article.status || 'Published',
     tags:        Array.isArray(article.tags) ? article.tags : [],
-    readMinutes: Number(article.readMinutes || 5),
+    readMinutes: article.readMinutes ? Number(article.readMinutes) : null,
     tier:        article.tier || 'free',
     stub:        !!article.stub,
     blocks,

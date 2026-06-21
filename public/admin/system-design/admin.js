@@ -702,7 +702,7 @@ function articleFromForm() {
     status:      els.statusField.value,
     category:    els.category.value,
     icon:        els.icon.value.trim() || 'article',
-    readMinutes: Number(els.readMinutes.value || 5),
+    readMinutes: els.readMinutes.value ? Number(els.readMinutes.value) : null,
     order:       Number(els.order.value || 100),
     tags:        els.tags.value.split(',').map(function (tag) { return tag.trim(); }).filter(Boolean),
     stub:        els.statusField.value === 'Coming soon',
@@ -989,7 +989,7 @@ function fillForm(article) {
     status: 'Draft',
     category: 'integration',
     icon: 'article',
-    readMinutes: 5,
+    readMinutes: null,
     order: nextAvailableOrder(),
     tags: [],
     en: { title: '', subtitle: '', body: '' },
@@ -1000,7 +1000,7 @@ function fillForm(article) {
   els.statusField.value = item.status || 'Draft';
   els.category.value = item.category || 'integration';
   els.icon.value = item.icon || 'article';
-  els.readMinutes.value = item.readMinutes || 5;
+  els.readMinutes.value = item.readMinutes || '';
   els.order.value = item.order || 100;
   els.title.value = en.title || '';
   els.subtitle.value = en.subtitle || '';
@@ -1065,7 +1065,7 @@ function renderList() {
     subtitle.textContent = en.subtitle || article.id;
     const meta = document.createElement('span');
     meta.className = 'sd-admin-article-meta';
-    meta.textContent = (article.readMinutes || 5) + ' min read · Order ' + (article.order || 100);
+    meta.textContent = (article.readMinutes ? article.readMinutes + ' min read · ' : '') + 'Order ' + (article.order || 100);
     btn.append(top, title, subtitle, meta);
     btn.addEventListener('click', function () {
       const article = articles.find(function (item) { return item.id === btn.dataset.id; });
@@ -1124,8 +1124,9 @@ function createArticleSettingsField(labelText, field, value, type) {
     input.type = type || 'text';
     input.value = value || '';
     if (field === 'readMinutes') {
-      input.min = '1';
+      input.min = '0';
       input.max = '60';
+      input.placeholder = 'Optional';
     }
     if (field === 'order') {
       input.min = '1';
@@ -1229,7 +1230,7 @@ function renderArticleSettings() {
       createArticleSettingsField('Slug', 'id', article.id),
       createArticleSettingsField('Category', 'category', article.category || 'integration'),
       createArticleSettingsField('Icon', 'icon', article.icon || 'article'),
-      createArticleSettingsField('Read time', 'readMinutes', String(article.readMinutes || 5), 'number'),
+      createArticleSettingsField('Read time', 'readMinutes', article.readMinutes ? String(article.readMinutes) : '', 'number'),
       createArticleSettingsField('Order', 'order', String(article.order || 100), 'number'),
       createArticleSettingsField('Tier', 'tier', article.tier || 'free'),
       createArticleSettingsField('Status', 'status', article.status || 'Draft')
@@ -1276,7 +1277,7 @@ function articleSettingsPayloadFromCard(card) {
       id: slugify(input('id').value || original.id),
       category: input('category').value || 'integration',
       icon: input('icon').value.trim() || 'article',
-      readMinutes: Number(input('readMinutes').value || 5),
+      readMinutes: input('readMinutes').value ? Number(input('readMinutes').value) : null,
       order: Number(input('order').value || 100),
       tier: input('tier').value || 'free',
       status: input('status').value || original.status || 'Draft',
@@ -1369,7 +1370,7 @@ function syncPublishSeoToForm() {
   els.publishSeoSlug.value = els.id.value;
   els.category.value = els.publishSeoCategory.value || 'integration';
   els.icon.value = els.publishSeoIcon.value.trim() || 'article';
-  els.readMinutes.value = els.publishSeoReadMinutes.value || '5';
+  els.readMinutes.value = els.publishSeoReadMinutes.value || '';
   els.order.value = els.publishSeoOrder.value || '100';
   renderArticleDetails();
   renderPreview();

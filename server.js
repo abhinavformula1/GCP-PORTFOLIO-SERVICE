@@ -3,6 +3,17 @@
 // Load .env in development (no-op in production — Cloud Run injects env vars directly)
 require('dotenv').config();
 
+// Prevent Firestore's background gRPC auth probe from crashing the process
+// in local dev where GCP credentials are not configured.
+// On Cloud Run the service account provides credentials automatically.
+process.on('unhandledRejection', (reason) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('[dev] Unhandled rejection (non-fatal locally):', reason?.message || reason);
+  } else {
+    throw reason;
+  }
+});
+
 const express      = require('express');
 const path         = require('path');
 const config       = require('./src/config');
