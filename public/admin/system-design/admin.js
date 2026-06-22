@@ -73,6 +73,7 @@ const els = {
   welcomeClose:    document.getElementById('welcomeCloseBtn'),
   welcomeGuest:    document.getElementById('welcomeGuestBtn'),
   workspace:       document.getElementById('adminWorkspace'),
+  authWall:        document.getElementById('adminAuthWall'),
   modules:         document.getElementById('adminModules'),
   policyWorkspace: document.getElementById('contactPolicyWorkspace'),
   articleSettingsWorkspace: document.getElementById('articleSettingsWorkspace'),
@@ -165,7 +166,9 @@ const els = {
   systemStatus:    document.getElementById('systemDesignStatus'),
   previewBtn:      document.getElementById('previewBtn'),
   publishBtn:      document.getElementById('publishBtn'),
-  publishDialog:   document.getElementById('publishReviewDialog'),
+  publishDialog:        document.getElementById('publishReviewDialog'),
+  publishSuccessPanel:  document.getElementById('publishSuccessPanel'),
+  publishSuccessTitle:  document.getElementById('publishSuccessTitle'),
   publishReviewHeading: document.getElementById('publishReviewTitle'),
   publishReviewDescription: document.getElementById('publishReviewDescription'),
   publishReviewTitle: document.getElementById('publishReviewArticleTitle'),
@@ -520,8 +523,11 @@ function handleAdminLoadError(err) {
   els.tierSettingsWorkspace.hidden = true;
   els.metadataConfigWorkspace.hidden = true;
   els.sponsorshipsWorkspace.hidden = true;
-  if (err?.status === 401) {
+  if (err?.status === 401 || err?.status === 403) {
     resetAdminSession();
+    setStatus(null);
+    if (els.authWall) els.authWall.hidden = false;
+    return;
   }
   setStatus(err.message, 'error');
 }
@@ -1796,7 +1802,7 @@ function setPublishReviewStep(step) {
   els.publishDialog.dataset.publishStep = isSeoStep ? 'seo' : 'preview';
   els.publishPreviewPanel.hidden = isSeoStep;
   els.publishSeoPanel.hidden = !isSeoStep;
-  els.publishReviewHeading.textContent = isSeoStep ? 'SEO & order' : '';
+  els.publishReviewHeading.textContent = '';
   if (els.publishReviewDescription) {
     els.publishReviewDescription.textContent = isSeoStep
       ? 'Confirm SEO and ordering before this article goes live.'
@@ -1818,6 +1824,7 @@ async function loadArticles() {
   els.modules.hidden = false;
   els.workspace.hidden = false;
   els.signOut.hidden = false;
+  if (els.authWall) els.authWall.hidden = true;
   setStatus('', 'info');
   renderList();
   fillForm(articles[0] || null);
@@ -1881,6 +1888,32 @@ function openPublishReview() {
 
 function closePublishReview() {
   els.publishDialog.close();
+  // Reset for next open
+  if (els.publishSuccessPanel) els.publishSuccessPanel.hidden = true;
+  if (els.confirmPublishBtn) {
+    els.confirmPublishBtn.disabled = false;
+    els.confirmPublishBtn.hidden = false;
+  }
+  if (els.continueEditingBtn) els.continueEditingBtn.hidden = false;
+}
+
+function showPublishSuccess(title) {
+  // Hide all other panels
+  els.publishPreviewPanel.hidden = true;
+  els.publishSeoPanel.hidden = true;
+  els.publishSuccessPanel.hidden = false;
+  els.publishSuccessPanel.classList.remove('sd-publish-success-in');
+  // Trigger animation
+  requestAnimationFrame(function () {
+    els.publishSuccessPanel.classList.add('sd-publish-success-in');
+  });
+  els.publishSuccessTitle.textContent = '\u201c' + title + '\u201d is live';
+  // Hide action buttons — nothing more to do
+  els.continueEditingBtn.hidden = true;
+  els.confirmPublishBtn.hidden = true;
+  els.publishReviewHeading.textContent = '';
+  // Auto-close after 2.4 s
+  setTimeout(closePublishReview, 2400);
 }
 
 function handlePublishDialogBack() {
@@ -2230,9 +2263,16 @@ els.confirmPublishBtn.addEventListener('click', function () {
     return;
   }
   syncPublishSeoToForm();
+  els.confirmPublishBtn.disabled = true;
   publishArticle()
-    .then(closePublishReview)
-    .catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
+    .then(function () {
+      const title = els.publishReviewTitle.textContent || 'Your article';
+      showPublishSuccess(title);
+    })
+    .catch(function (err) {
+      els.confirmPublishBtn.disabled = false;
+      setSectionStatus(els.systemStatus, err.message, 'error');
+    });
 });
 els.seedBtn.addEventListener('click', function () {
   seedArticles().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
