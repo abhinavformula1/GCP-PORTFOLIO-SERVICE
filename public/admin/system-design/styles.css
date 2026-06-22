@@ -131,8 +131,7 @@
 .sd-admin-workspace,
 .sd-admin-editor,
 .sd-admin-editor-shell,
-.sd-admin-list-panel,
-.sd-admin-status {
+.sd-admin-list-panel {
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--surface);
@@ -140,7 +139,9 @@
 }
 
 .sd-admin-topbar .topbar-inner {
+  max-width: 1360px;
   justify-content: space-between;
+  align-items: center;
 }
 
 .sd-admin-topbar .lang-select {
@@ -187,7 +188,7 @@
 .sd-admin-header {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: start;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   padding-bottom: 28px;
@@ -195,15 +196,13 @@
 }
 
 .sd-admin-header h1 {
-  margin: 8px 0 8px;
+  margin: 0;
   font-size: 32px;
   line-height: 1.1;
   letter-spacing: -0.02em;
   color: var(--text);
 }
 
-.sd-admin-header p,
-.sd-admin-status,
 .sd-admin-empty,
 .sd-admin-article span {
   color: var(--text-secondary);
@@ -212,10 +211,12 @@
 .sd-admin-back {
   display: inline-flex;
   align-items: center;
+  align-self: center;
   gap: 6px;
   color: var(--accent);
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .sd-admin-back .material-symbols-outlined {
@@ -238,24 +239,25 @@
 .sd-admin-modules {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .sd-admin-module {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 0 24px;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 16px;
   border: 1px solid var(--md-sys-color-outline);
   border-radius: 999px;
   background: transparent;
   color: var(--md-sys-color-primary);
-  font-size: 0.95rem;
-  font-weight: 800;
+  font-size: 0.875rem;
+  font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
   transition:
     background-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
     border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
@@ -263,7 +265,7 @@
 }
 
 .sd-admin-module .material-symbols-outlined {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .sd-admin-module-active {
@@ -292,18 +294,49 @@
 }
 
 .sd-admin-status {
-  margin: 18px 0;
-  padding: 10px 14px;
-  display: inline-block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 80px 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* The inner pill — only visible on success/error; loader uses sd-loader */
+.sd-admin-status[data-kind="success"],
+.sd-admin-status[data-kind="error"] {
+  padding: 16px 24px;
+  justify-content: flex-start;
+  width: auto;
+  display: inline-flex;
+  gap: 8px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   font-size: 13px;
-  box-shadow: none;
+  color: var(--text-secondary);
 }
 
-.sd-admin-status[data-kind="success"] { border-color: rgba(25, 128, 56, 0.28); }
-.sd-admin-status[data-kind="error"] { border-color: rgba(186, 26, 26, 0.32); color: #ba1a1a; }
+.sd-admin-status[data-kind="success"] {
+  border-color: rgba(25, 128, 56, 0.28);
+  color: #1a7a38;
+}
+.sd-admin-status[data-kind="success"]::before {
+  content: 'check_circle';
+  font-family: 'Material Symbols Outlined';
+  font-size: 15px;
+  color: #1a7a38;
+}
+.sd-admin-status[data-kind="error"] {
+  border-color: rgba(186, 26, 26, 0.32);
+  color: #ba1a1a;
+}
+.sd-admin-status[data-kind="error"]::before {
+  content: 'error';
+  font-family: 'Material Symbols Outlined';
+  font-size: 15px;
+  color: #ba1a1a;
+}
 
 .sd-admin-workspace {
   display: grid;
@@ -318,7 +351,6 @@
   padding: 18px;
 }
 
-.sd-admin-list-head,
 .sd-admin-list-actions,
 .sd-admin-actions {
   display: flex;
@@ -327,8 +359,14 @@
   gap: 12px;
 }
 
+.sd-admin-list-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .sd-admin-list-head h2 {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--text);
 }
 
@@ -1602,7 +1640,7 @@
 }
 
 .sd-admin-list-head {
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .sd-admin-workspace-library-collapsed .sd-admin-list-panel {
@@ -3989,7 +4027,7 @@ col.sd-tbl-action-col { width: 56px; }
 
 .sd-publish-dialog {
   --md-dialog-container-color: var(--md-sys-color-surface-container-high);
-  --md-dialog-container-shape: 28px;
+  --md-dialog-container-shape: 20px;
   --md-dialog-supporting-text-color: var(--md-sys-color-on-surface-variant);
   width: min(1180px, calc(100vw - 48px));
   max-width: calc(100vw - 48px);
@@ -4000,18 +4038,33 @@ col.sd-tbl-action-col { width: 56px; }
   max-height: calc(100vh - 48px);
 }
 
-.sd-publish-dialog-head h2 {
-  margin: 0 0 6px;
-  font-size: clamp(1.28rem, 1.7vw, 1.7rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+/* Reclaim horizontal padding — we own it, not M3 */
+.sd-publish-dialog::part(headline) {
+  padding: 20px 24px 8px;
+}
+
+.sd-publish-dialog::part(content) {
+  padding: 0 24px;
+}
+
+.sd-publish-dialog::part(actions) {
+  padding: 0 24px 28px;
 }
 
 .sd-publish-dialog-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: start;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.sd-publish-dialog-eyebrow {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
 }
 
 .sd-publish-close-btn {
@@ -4038,12 +4091,7 @@ col.sd-tbl-action-col { width: 56px; }
   font-size: 22px;
 }
 
-.sd-publish-dialog-head p {
-  margin: 0;
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: 0.92rem;
-  line-height: 1.4;
-}
+.sd-public-preview-label { display: none; }
 
 .sd-publish-dialog-content {
   display: grid;
@@ -4058,8 +4106,7 @@ col.sd-tbl-action-col { width: 56px; }
 .sd-publish-dialog-preview {
   display: grid;
   gap: 12px;
-  width: min(1040px, 100%);
-  margin: 0 auto;
+  width: 100%;
 }
 
 .sd-publish-dialog-preview[hidden] {
@@ -4236,7 +4283,7 @@ col.sd-tbl-action-col { width: 56px; }
   justify-content: flex-end;
   gap: 14px;
   width: 100%;
-  padding-top: 10px;
+  padding: 16px 0 4px;
   border-top: 1px solid var(--sd-outline-soft);
 }
 

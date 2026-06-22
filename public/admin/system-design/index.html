@@ -54,9 +54,7 @@
   <main class="sd-admin-shell">
     <header class="sd-admin-header">
       <div class="sd-admin-hero-copy">
-        <div class="sd-admin-eyebrow">Internal publishing console</div>
         <h1>System Design CMS</h1>
-        <p>Plan, edit, preview, and publish architecture notes with the same Google Cloud + Salesforce stack that powers the public portfolio.</p>
         <div id="adminModules" class="sd-admin-modules" hidden aria-label="Admin modules">
           <button type="button" class="sd-admin-module sd-admin-module-active" data-module="system-design">
             <span class="material-symbols-outlined" aria-hidden="true">article</span>
@@ -100,9 +98,7 @@
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
       <div class="sd-admin-command">
         <div>
-          <div class="sd-admin-section-kicker">Publishing cockpit</div>
           <h2>System Design Library</h2>
-          <p>Keep public architecture notes sharp, reviewable, and ready to publish.</p>
         </div>
         <div class="sd-admin-metrics" aria-label="Article summary">
           <div class="sd-admin-metric">
@@ -122,11 +118,6 @@
 
       <aside class="sd-admin-list-panel">
         <div class="sd-admin-list-head">
-          <div>
-            <div class="sd-admin-section-kicker">Step 1</div>
-            <h2>Articles</h2>
-            <p>Select an article or start a fresh draft.</p>
-          </div>
           <div class="sd-admin-list-actions">
             <button type="button" id="toggleArticleLibraryBtn" title="Collapse article library" aria-expanded="true" aria-label="Collapse article library">
               <span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>
@@ -137,6 +128,7 @@
               <span>New</span>
             </button>
           </div>
+          <h2>Articles</h2>
         </div>
         <div class="sd-admin-rail-label" aria-hidden="true">Articles</div>
         <div id="articleList" class="sd-admin-list"></div>
@@ -151,9 +143,7 @@
         <section class="sd-admin-editor">
           <div class="sd-admin-editor-head">
             <div>
-              <div class="sd-admin-section-kicker">Step 2</div>
               <h2>Write the story</h2>
-              <p>Focus on the reader-facing title, promise, and article body first.</p>
             </div>
             <div class="sd-admin-editor-controls">
               <input id="articleStatus" type="hidden" value="Draft">
@@ -645,20 +635,15 @@
 
     <md-dialog id="publishReviewDialog" class="sd-publish-dialog" aria-labelledby="publishReviewTitle">
       <div slot="headline" class="sd-publish-dialog-head">
-        <div>
-          <h2 id="publishReviewTitle">Ready to publish?</h2>
-          <p id="publishReviewDescription">Review the public version before it goes live.</p>
-        </div>
-        <button type="button" id="closePublishReviewBtn" class="sd-publish-close-btn" aria-label="Close publish review">
+        <span id="publishReviewTitle" class="sd-publish-dialog-eyebrow"></span>
+        <button type="button" id="closePublishReviewBtn" class="sd-publish-close-btn" aria-label="Close">
           <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>
       </div>
       <div slot="content" class="sd-publish-dialog-content">
         <div id="publishPreviewPanel" class="sd-publish-dialog-preview">
-          <div class="sd-public-preview-label">Previewing as public page</div>
           <article class="sd-article sd-public-preview-article">
             <header class="sd-article-head">
-              <div class="sd-article-eyebrow" id="publishReviewMeta">Design note</div>
               <h2 class="sd-article-title" id="publishReviewArticleTitle">Untitled article</h2>
               <p class="sd-article-sub" id="publishReviewSubtitle"></p>
               <div class="sd-article-meta">

@@ -1553,6 +1553,28 @@ a:hover { text-decoration: underline; }
   padding: 14px 12px;
 }
 
+.sd-topic-loading,
+.sd-detail-loading {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.sd-topic-loading sd-loader,
+.sd-detail-loading sd-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 .sd-topic-btn {
   display: flex;
   align-items: center;

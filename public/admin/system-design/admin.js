@@ -26,6 +26,7 @@ import {
 } from '../../assets/ui/sdblocks.js';
 import { createComposer } from '../../assets/ui/composer.js';
 import { COMPONENT_REGISTRY, enabledBlockTypes } from '../../assets/ui/component-registry.js';
+import '../../assets/ui/loader.js';
 
 const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 
@@ -167,7 +168,6 @@ const els = {
   publishDialog:   document.getElementById('publishReviewDialog'),
   publishReviewHeading: document.getElementById('publishReviewTitle'),
   publishReviewDescription: document.getElementById('publishReviewDescription'),
-  publishReviewMeta: document.getElementById('publishReviewMeta'),
   publishReviewTitle: document.getElementById('publishReviewArticleTitle'),
   publishReviewSubtitle: document.getElementById('publishReviewSubtitle'),
   publishReviewTags: document.getElementById('publishReviewTags'),
@@ -201,8 +201,18 @@ function setStatus(message, kind) {
     status.className = 'sd-admin-status';
     els.workspace.before(status);
   }
-  status.textContent = message;
-  status.dataset.kind = kind || 'info';
+  const resolvedKind = kind || 'info';
+  status.dataset.kind = resolvedKind;
+
+  if (resolvedKind === 'info') {
+    status.innerHTML = '';
+    const loader = document.createElement('sd-loader');
+    loader.setAttribute('size', 'sm');
+    loader.setAttribute('label', message);
+    status.appendChild(loader);
+  } else {
+    status.textContent = message;
+  }
 }
 
 function setSectionStatus(el, message, kind) {
@@ -1468,7 +1478,7 @@ async function saveTierSettings() {
 }
 
 // ── Metadata Configuration ────────────────────────────────────────────────────
-var _metaEnabledMap = null;
+let _metaEnabledMap = null;
 
 async function renderMetadataConfig() {
   const panel = els.metadataConfigPanel;
@@ -1728,7 +1738,6 @@ function renderPreview() {
 
 function renderPublishReview() {
   const article = articleFromForm();
-  els.publishReviewMeta.textContent = 'Design note';
   els.publishReviewTitle.textContent = article.en.title || 'Untitled article';
   els.publishReviewSubtitle.textContent = article.en.subtitle || '';
   els.publishReviewSubtitle.hidden = !article.en.subtitle;
@@ -1787,12 +1796,14 @@ function setPublishReviewStep(step) {
   els.publishDialog.dataset.publishStep = isSeoStep ? 'seo' : 'preview';
   els.publishPreviewPanel.hidden = isSeoStep;
   els.publishSeoPanel.hidden = !isSeoStep;
-  els.publishReviewHeading.textContent = isSeoStep ? 'Final check' : 'Ready to publish?';
-  els.publishReviewDescription.textContent = isSeoStep
-    ? 'Confirm SEO and ordering before this article goes live.'
-    : 'Review the public version before it goes live.';
+  els.publishReviewHeading.textContent = isSeoStep ? 'SEO & order' : '';
+  if (els.publishReviewDescription) {
+    els.publishReviewDescription.textContent = isSeoStep
+      ? 'Confirm SEO and ordering before this article goes live.'
+      : '';
+  }
   els.continueEditingBtn.textContent = isSeoStep ? 'Back to preview' : 'Continue editing';
-  els.publishActionLabel.textContent = isSeoStep ? 'Publish now' : 'Publish';
+  if (els.publishActionLabel) els.publishActionLabel.textContent = isSeoStep ? 'Publish now' : 'Publish';
 }
 
 async function loadArticles() {
