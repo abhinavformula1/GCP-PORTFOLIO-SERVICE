@@ -95,6 +95,13 @@
       </div>
     </header>
 
+    <div id="adminAuthWall" class="sd-admin-auth-wall">
+      <span class="material-symbols-outlined sd-admin-auth-wall-icon" aria-hidden="true">lock</span>
+      <p class="sd-admin-auth-wall-title">Sign in to manage content</p>
+      <p class="sd-admin-auth-wall-sub">Use your Google account associated with this portfolio.</p>
+      <div id="topbarSignInBtnWall"></div>
+    </div>
+
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
       <div class="sd-admin-command">
         <div>
@@ -102,16 +109,16 @@
         </div>
         <div class="sd-admin-metrics" aria-label="Article summary">
           <div class="sd-admin-metric">
-            <span id="articleTotalCount">0</span>
-            <small>Total</small>
+            <span id="articleDraftCount">0</span>
+            <small>Drafts</small>
           </div>
           <div class="sd-admin-metric">
             <span id="articlePublishedCount">0</span>
             <small>Published</small>
           </div>
           <div class="sd-admin-metric">
-            <span id="articleDraftCount">0</span>
-            <small>Drafts</small>
+            <span id="articleTotalCount">0</span>
+            <small>Total</small>
           </div>
         </div>
       </div>
@@ -128,7 +135,6 @@
               <span>New</span>
             </button>
           </div>
-          <h2>Articles</h2>
         </div>
         <div class="sd-admin-rail-label" aria-hidden="true">Articles</div>
         <div id="articleList" class="sd-admin-list"></div>
@@ -164,7 +170,6 @@
             <section class="sd-authoring-card sd-article-details-card">
               <div class="sd-authoring-card-head sd-article-details-head">
                 <div>
-                  <div class="sd-admin-section-kicker">Article details</div>
                   <h3 id="articleDetailsTitle">Untitled article</h3>
                   <p id="articleDetailsSubtitle">No subtitle yet.</p>
                   <div id="articleDetailsTags" class="sd-article-details-tags"></div>
@@ -662,11 +667,6 @@
           </article>
         </div>
         <section id="publishSeoPanel" class="sd-publish-seo-panel" hidden>
-          <div>
-            <span class="sd-publish-step-label">Final check</span>
-            <h3>SEO & ordering</h3>
-            <p>Confirm how this article appears in the public System Design library.</p>
-          </div>
           <dl class="sd-publish-seo-list">
             <div>
               <dt><label for="publishSeoSlug">Slug</label></dt>
@@ -703,6 +703,14 @@
             <button id="useNextOrderBtn" type="button">Use next available order</button>
           </div>
         </section>
+
+        <div id="publishSuccessPanel" class="sd-publish-success" hidden>
+          <div class="sd-publish-success-icon">
+            <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+          </div>
+          <p id="publishSuccessTitle" class="sd-publish-success-title"></p>
+          <p class="sd-publish-success-sub">Your article is now live on the public portfolio.</p>
+        </div>
       </div>
       <div slot="actions" class="sd-publish-dialog-actions">
         <md-outlined-button id="continueEditingBtn" type="button">Continue editing</md-outlined-button>
