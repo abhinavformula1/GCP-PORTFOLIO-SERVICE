@@ -69,7 +69,11 @@
   <link rel="icon" type="image/png"     href="/assets/favicon.png" sizes="32x32" />
   <meta name="theme-color" content="#1565C0" />
 
-  <!-- ── Material Design 3: Google Fonts (Roboto Flex + Material Symbols) ── -->
+  <!-- ── Google Fonts: Roboto Flex + Material Symbols ────────────────────────
+       display=block on Material Symbols: browser hides icon ligatures (instead
+       of flashing raw text) until the font file arrives from gstatic.com.
+       The visibility:hidden + fonts-loaded JS below is a belt-and-suspenders
+       layer for slow connections where the block period (~3s) may expire. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet"
