@@ -450,7 +450,9 @@ function renderTopicList() {
     }
   });
   if (!visibleCount) {
-    html += '<div class="sd-topic-empty">' + escapeHtml(_cmsLoaded ? uiText('noResults') : uiText('loading')) + '</div>';
+    html += _cmsLoaded
+      ? '<div class="sd-topic-empty">' + escapeHtml(uiText('noResults')) + '</div>'
+      : '<div class="sd-topic-empty sd-topic-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
   }
   html += '</div>';
   _sdAside.innerHTML = html;
@@ -506,7 +508,9 @@ function renderLanding() {
     });
     html += '</div>';
   } else {
-    html += '<p class="sd-detail-empty">' + escapeHtml(_cmsLoaded ? uiText('unavailable') : uiText('loading')) + '</p>';
+    html += _cmsLoaded
+      ? '<p class="sd-detail-empty">' + escapeHtml(uiText('unavailable')) + '</p>'
+      : '<div class="sd-detail-empty sd-detail-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
   }
   if (soon.length) {
     html += '<h3>Coming next</h3>';
@@ -535,7 +539,9 @@ function renderTopicDetail() {
   if (!_sdDetail) return;
   const topic = topicById(_activeTopic);
   if (!topic) {
-    _sdDetail.innerHTML = '<div class="sd-detail-empty">' + escapeHtml(_cmsLoaded ? uiText('unavailable') : uiText('loading')) + '</div>';
+    _sdDetail.innerHTML = _cmsLoaded
+      ? '<div class="sd-detail-empty">' + escapeHtml(uiText('unavailable')) + '</div>'
+      : '<div class="sd-detail-empty sd-detail-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
     return;
   }
   const loc = localeOf(topic);
@@ -758,10 +764,12 @@ export function openSystemDesign(id) {
   ensureDom();
   if (id && topicById(id)) {
     navigate(PATH_PREFIX + '/' + id);
+    handleRoute();
     return;
   }
   if (_activeView === 'sysdesign') return;
   navigate(PATH_PREFIX);
+  handleRoute();
 }
 
 export function closeSystemDesign() {

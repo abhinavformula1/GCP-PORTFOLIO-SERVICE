@@ -94,7 +94,6 @@ function renderLanguageSelect(id) {
   return createEl('md-outlined-select', {
     id,
     className: 'lang-select',
-    label: 'Language',
     value: 'en',
     'aria-label': 'Language',
   }, [

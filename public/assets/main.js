@@ -68,6 +68,7 @@ import {
 } from './ui/systemdesign.js';
 import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-layout.js';
 import { mountSponsorSlot } from './ui/sponsorship.js';
+import '/assets/ui/loader.js';
 
 (function () {
   'use strict';

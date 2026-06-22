@@ -263,8 +263,10 @@ export function createImageBlock(initialData, onChange) {
     altInput.disabled = !editable;
     altInput.setAttribute('aria-label', 'Alt text (required for accessibility)');
     function updateAltBadge() {
-      altRequired.textContent = altInput.value.trim() ? 'added' : 'required';
-      altRequired.className   = altInput.value.trim() ? 'sd-img-ok' : 'sd-img-required';
+      const hasAlt = altInput.value.trim();
+      altRequired.textContent = hasAlt ? '' : 'required';
+      altRequired.className   = hasAlt ? '' : 'sd-img-required';
+      altRequired.hidden      = !!hasAlt;
     }
     updateAltBadge();
     altInput.addEventListener('input', function () {
