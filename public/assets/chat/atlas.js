@@ -76,6 +76,8 @@ const VARIANT_STORAGE_KEY = 'atlas_chip_variant_v1';
 const MODEL_STORAGE_KEY = 'atlas_model_choice_v1';
 const ATLAS_STREAM_TIMEOUT_MS = 20000;
 const GOOGLE_TOKEN_EXPIRY_SKEW_SECONDS = 60;
+
+// All possible model options (superset). The admin may enable a subset.
 const MODEL_OPTIONS = {
   'flash-lite': {
     label: 'Fast & economical',
@@ -86,6 +88,27 @@ const MODEL_OPTIONS = {
     detail: 'Higher cost',
   },
 };
+
+// Resolved at runtime from /api/atlas/config — falls back to defaults.
+let _atlasRemoteConfig = null;
+
+async function fetchAtlasConfig() {
+  if (_atlasRemoteConfig) return _atlasRemoteConfig;
+  try {
+    const res = await fetch('/api/atlas/config');
+    if (res.ok) {
+      _atlasRemoteConfig = await res.json();
+    }
+  } catch (_) {}
+  if (!_atlasRemoteConfig) {
+    _atlasRemoteConfig = {
+      enabledModels:        Object.keys(MODEL_OPTIONS),
+      defaultModel:         'flash-lite',
+      modelSelectorVisible: true,
+    };
+  }
+  return _atlasRemoteConfig;
+}
 
 /**
  * Cryptographically-strong uniform integer in [0, max).
@@ -118,10 +141,11 @@ function chooseVariant() {
   return QUESTION_VARIANTS[idx];
 }
 
-function readStoredModel() {
+function readStoredModel(enabledModels) {
+  const allowed = enabledModels || Object.keys(MODEL_OPTIONS);
   let stored;
   try { stored = sessionStorage.getItem(MODEL_STORAGE_KEY); } catch (_) {}
-  return MODEL_OPTIONS[stored] ? stored : 'flash-lite';
+  return (stored && allowed.includes(stored)) ? stored : (allowed[0] || 'flash-lite');
 }
 
 /* ── State ────────────────────────────────────────────────────────────── */
@@ -129,8 +153,8 @@ function readStoredModel() {
 const atlasState = {
   history:   /** @type {Array<{role:'user'|'model', text:string}>} */ ([]),
   inFlight:  false,
-  variant:   null, // { id, label, chips }  resolved on first render
-  model:     readStoredModel(),
+  variant:   null,  // { id, label, chips }  resolved on first render
+  model:     readStoredModel(), // may be overridden after remote config loads
   usage:     null,
 };
 
@@ -166,9 +190,17 @@ export async function renderFreeFormMode() {
   msgs.innerHTML = '';
   area.innerHTML = '';
 
+  // Fetch remote config (which models are enabled, whether picker is shown).
+  // This is fast (cached) and runs in parallel with the conversation restore.
+  const remoteCfg = await fetchAtlasConfig();
+  const enabledModels = (remoteCfg.enabledModels || []).filter(function (k) { return !!MODEL_OPTIONS[k]; });
+  if (enabledModels.length === 0) enabledModels.push('flash-lite');
+  // Reconcile stored model against enabled set.
+  atlasState.model = readStoredModel(enabledModels);
+
   // Render the input bar early so it's there even while we wait for the
   // server to load any saved conversation.
-  renderFreeFormInput(area);
+  renderFreeFormInput(area, remoteCfg, enabledModels);
   refreshUsageSummary();
 
   // Try to restore a saved conversation. If found, replay it; otherwise
@@ -217,9 +249,10 @@ function renderSuggestedChips(msgs) {
   scrollToBottom();
 }
 
-function renderFreeFormInput(area) {
+function renderFreeFormInput(area, remoteCfg, enabledModels) {
   renderBudgetStatus(area);
-  renderModelSelector(area);
+  const showPicker = !remoteCfg || remoteCfg.modelSelectorVisible !== false;
+  if (showPicker) renderModelSelector(area, enabledModels);
   const { row, input, button } = createInputRow({
     rowClass:    'ga-input-row ga-atlas-input-row',
     inputClass:  'ga-text-input ga-atlas-input',
@@ -247,13 +280,18 @@ function renderBudgetStatus(area) {
   area.appendChild(wrap);
 }
 
-function renderModelSelector(area) {
+function renderModelSelector(area, enabledModels) {
+  const allowed = enabledModels || Object.keys(MODEL_OPTIONS);
+  // Only render when there are 2+ models — no point showing a picker for one.
+  if (allowed.length < 2) return;
+
   const wrap = document.createElement('div');
   wrap.className = 'ga-atlas-model-picker';
   wrap.setAttribute('aria-label', 'Atlas response mode');
 
-  Object.keys(MODEL_OPTIONS).forEach(function (key) {
+  allowed.forEach(function (key) {
     const opt = MODEL_OPTIONS[key];
+    if (!opt) return;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'ga-atlas-model-btn';

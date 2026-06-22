@@ -84,6 +84,10 @@
             <span class="material-symbols-outlined" aria-hidden="true">travel_explore</span>
             <span>SEO &amp; AEO</span>
           </button>
+          <button type="button" class="sd-admin-module" data-module="atlas-settings">
+            <span class="material-symbols-outlined" aria-hidden="true">smart_toy</span>
+            <span>Atlas AI</span>
+          </button>
         </div>
       </div>
       <div class="sd-admin-badge">
@@ -720,6 +724,62 @@
         </md-filled-button>
       </div>
     </md-dialog>
+
+    <!-- Atlas AI settings workspace -->
+    <section id="atlasSettingsWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Chat assistant</div>
+          <h2>Atlas AI Settings</h2>
+          <p>Control which Gemini models power Atlas, set the default, and cap monthly spend. Changes take effect on the next chat session.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <button type="button" id="saveAtlasConfigBtn" class="sd-admin-primary">
+            <span class="material-symbols-outlined" aria-hidden="true">save</span> Save
+          </button>
+        </div>
+      </div>
+      <div id="atlasConfigStatus" class="sd-admin-section-status"></div>
+
+      <div class="sd-atlas-config-panel">
+
+        <!-- Model toggles -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">Available Models</h3>
+          <p class="sd-seo-group-desc">Enable the models visitors can choose from. At least one model must stay enabled. The default model is used when the visitor has not picked one.</p>
+          <div id="atlasModelRows" class="sd-atlas-model-rows"></div>
+        </div>
+
+        <!-- Model selector visibility -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">Model Picker</h3>
+          <div class="sd-seo-toggles">
+            <div class="sd-seo-toggle-row">
+              <div class="sd-seo-toggle-info">
+                <strong>Show model picker in chat</strong>
+                <span>Let visitors switch between Fast &amp; More detailed. Hide to keep the UI minimal.</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Show model picker">
+                <input type="checkbox" id="atlasModelSelectorVisible">
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Budget cap -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">Monthly Budget Cap</h3>
+          <p class="sd-seo-group-desc">Aggregate spend limit across all visitors. Atlas stops accepting new questions once the cap is hit. Set to 0 for unlimited.</p>
+          <label class="sd-seo-field sd-atlas-budget-field">
+            <span>Cap (₹ / month)</span>
+            <input id="atlasBudgetCapInr" type="number" min="0" step="10" placeholder="100" />
+          </label>
+          <p class="sd-seo-field-hint" style="margin-top:4px">Current month usage is shown in the Atlas chat widget for signed-in visitors.</p>
+        </div>
+
+      </div>
+    </section>
 
     <div id="sharedFooter"></div>
   </main>

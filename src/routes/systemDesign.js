@@ -521,4 +521,32 @@ router.delete('/admin/sponsorships/:id', requireAdmin, async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
+// ── Atlas config (admin read/write) ──────────────────────────────────────────
+router.get('/admin/atlas/config', requireAdmin, async (_req, res, next) => {
+  try {
+    const cfg = await firestore.getAtlasConfig();
+    return res.status(200).json({ success: true, config: cfg });
+  } catch (err) { return next(err); }
+});
+
+router.put('/admin/atlas/config', requireAdmin, [
+  body('enabledModels').isArray({ min: 1 }).withMessage('enabledModels must be a non-empty array.'),
+  body('enabledModels.*').isString().notEmpty(),
+  body('defaultModel').isString().notEmpty().withMessage('defaultModel is required.'),
+  body('budgetCapInr').isFloat({ min: 0 }).withMessage('budgetCapInr must be a non-negative number.'),
+  body('modelSelectorVisible').isBoolean().withMessage('modelSelectorVisible must be a boolean.'),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
+  try {
+    await firestore.upsertAtlasConfig({
+      enabledModels:        req.body.enabledModels,
+      defaultModel:         req.body.defaultModel,
+      budgetCapInr:         Number(req.body.budgetCapInr),
+      modelSelectorVisible: req.body.modelSelectorVisible,
+    });
+    return res.status(200).json({ success: true });
+  } catch (err) { return next(err); }
+});
+
 module.exports = router;

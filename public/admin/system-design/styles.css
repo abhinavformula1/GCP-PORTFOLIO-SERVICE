@@ -4527,3 +4527,126 @@ col.sd-tbl-action-col { width: 56px; }
     display: none;
   }
 }
+
+/* ── Shared toggle switch (SEO toggles + Atlas AI toggles) ──────────────── */
+.sd-toggle-switch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.sd-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.sd-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--md-sys-color-surface-variant, #e0e0e0);
+  border-radius: 24px;
+  transition: background 0.2s;
+}
+
+.sd-toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--md-sys-color-on-surface-variant, #fff);
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+
+.sd-toggle-switch input:checked + .sd-toggle-slider {
+  background: var(--md-sys-color-primary, #6750a4);
+}
+
+.sd-toggle-switch input:checked + .sd-toggle-slider::after {
+  transform: translateX(20px);
+  background: #fff;
+}
+
+.sd-toggle-switch input:focus-visible + .sd-toggle-slider {
+  outline: 2px solid var(--md-sys-color-primary, #6750a4);
+  outline-offset: 2px;
+}
+
+/* ── Atlas AI config panel ──────────────────────────────────────────────── */
+.sd-atlas-config-panel {
+  display: grid;
+  gap: 24px;
+  padding: 24px 0;
+}
+
+.sd-atlas-model-rows {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sd-atlas-model-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.sd-atlas-model-row:last-child {
+  border-bottom: none;
+}
+
+.sd-atlas-model-info {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.sd-atlas-model-info strong {
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.sd-atlas-model-info span {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.sd-atlas-model-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sd-atlas-default-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sd-atlas-default-label input[type="radio"] {
+  accent-color: var(--md-sys-color-primary, #6750a4);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.sd-atlas-budget-field {
+  max-width: 220px;
+}

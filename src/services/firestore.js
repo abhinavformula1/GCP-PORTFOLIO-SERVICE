@@ -583,6 +583,38 @@ async function upsertSeoConfig(cfg) {
   });
 }
 
+// ── Atlas configuration ───────────────────────────────────────────────────────
+const ATLAS_CONFIG_DOC = 'atlasConfig';
+
+const DEFAULT_ATLAS_CONFIG = {
+  enabledModels:        ['flash-lite', 'flash'],
+  defaultModel:         'flash-lite',
+  budgetCapInr:         100,
+  modelSelectorVisible: true,
+};
+
+async function getAtlasConfig() {
+  const snap = await getDb().collection(TIER_CONFIG_COLLECTION).doc(ATLAS_CONFIG_DOC).get();
+  if (!snap.exists) return { ...DEFAULT_ATLAS_CONFIG };
+  const d = snap.data() || {};
+  return {
+    enabledModels:        Array.isArray(d.enabledModels) ? d.enabledModels : DEFAULT_ATLAS_CONFIG.enabledModels,
+    defaultModel:         String(d.defaultModel         || DEFAULT_ATLAS_CONFIG.defaultModel),
+    budgetCapInr:         typeof d.budgetCapInr === 'number' ? d.budgetCapInr : DEFAULT_ATLAS_CONFIG.budgetCapInr,
+    modelSelectorVisible: d.modelSelectorVisible !== false,
+  };
+}
+
+async function upsertAtlasConfig(cfg) {
+  await getDb().collection(TIER_CONFIG_COLLECTION).doc(ATLAS_CONFIG_DOC).set({
+    enabledModels:        Array.isArray(cfg.enabledModels) ? cfg.enabledModels : DEFAULT_ATLAS_CONFIG.enabledModels,
+    defaultModel:         String(cfg.defaultModel         || DEFAULT_ATLAS_CONFIG.defaultModel),
+    budgetCapInr:         typeof cfg.budgetCapInr === 'number' ? cfg.budgetCapInr : DEFAULT_ATLAS_CONFIG.budgetCapInr,
+    modelSelectorVisible: cfg.modelSelectorVisible !== false,
+    updatedAt:            FieldValue.serverTimestamp(),
+  });
+}
+
 // ── Component registry ────────────────────────────────────────────────────────
 const COMPONENT_REGISTRY_DOC = 'componentRegistry';
 
@@ -859,6 +891,8 @@ module.exports = {
   upsertTierConfig,
   getSeoConfig,
   upsertSeoConfig,
+  getAtlasConfig,
+  upsertAtlasConfig,
   getComponentRegistry,
   upsertComponentRegistry,
   upsertRecommendation,

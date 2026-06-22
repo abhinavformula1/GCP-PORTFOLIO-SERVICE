@@ -102,6 +102,12 @@ const els = {
   seoConfigWorkspace: document.getElementById('seoConfigWorkspace'),
   seoConfigStatus: document.getElementById('seoConfigStatus'),
   saveSeoConfigBtn: document.getElementById('saveSeoConfigBtn'),
+  atlasSettingsWorkspace: document.getElementById('atlasSettingsWorkspace'),
+  atlasConfigStatus: document.getElementById('atlasConfigStatus'),
+  saveAtlasConfigBtn: document.getElementById('saveAtlasConfigBtn'),
+  atlasModelRows: document.getElementById('atlasModelRows'),
+  atlasModelSelectorVisible: document.getElementById('atlasModelSelectorVisible'),
+  atlasBudgetCapInr: document.getElementById('atlasBudgetCapInr'),
   seoSiteUrl: document.getElementById('seoSiteUrl'),
   seoSiteDescription: document.getElementById('seoSiteDescription'),
   seoOgImageUrl: document.getElementById('seoOgImageUrl'),
@@ -605,18 +611,21 @@ function setActiveModule(moduleName) {
   const isMeta     = moduleName === 'metadata-config';
   const isSponsor  = moduleName === 'sponsorships';
   const isSeo      = moduleName === 'seo-config';
-  els.workspace.hidden = isPolicy || isSettings || isTier || isMeta || isSponsor || isSeo;
+  const isAtlas    = moduleName === 'atlas-settings';
+  els.workspace.hidden = isPolicy || isSettings || isTier || isMeta || isSponsor || isSeo || isAtlas;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
   els.tierSettingsWorkspace.hidden = !isTier;
   els.metadataConfigWorkspace.hidden = !isMeta;
   els.sponsorshipsWorkspace.hidden = !isSponsor;
   els.seoConfigWorkspace.hidden = !isSeo;
+  els.atlasSettingsWorkspace.hidden = !isAtlas;
   if (isSettings) renderArticleSettings();
   if (isTier)     renderTierSettings();
   if (isMeta)     renderMetadataConfig();
   if (isSponsor)  renderSponsorships();
   if (isSeo)      renderSeoConfig();
+  if (isAtlas)    renderAtlasConfig();
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
@@ -1737,6 +1746,87 @@ async function saveSeoConfig() {
   }
 }
 
+// ── Atlas AI config ───────────────────────────────────────────────────────────
+// All model keys and their display labels — single source of truth for the UI.
+const ATLAS_ALL_MODELS = {
+  'flash-lite': { label: 'Gemini 2.5 Flash-Lite', detail: 'Fast & economical · Default' },
+  'flash':      { label: 'Gemini 2.5 Flash',      detail: 'More detailed · Higher cost'  },
+};
+let _atlasConfig = null;
+
+async function renderAtlasConfig() {
+  setSectionStatus(els.atlasConfigStatus, 'Loading…', 'info');
+  try {
+    const data = await authedJson('/api/admin/atlas/config');
+    _atlasConfig = data.config || {};
+    const enabled = Array.isArray(_atlasConfig.enabledModels) ? _atlasConfig.enabledModels : ['flash-lite', 'flash'];
+    const defaultModel = _atlasConfig.defaultModel || 'flash-lite';
+
+    // Build model toggle rows
+    els.atlasModelRows.innerHTML = '';
+    Object.keys(ATLAS_ALL_MODELS).forEach(function (key) {
+      const meta   = ATLAS_ALL_MODELS[key];
+      const isOn   = enabled.includes(key);
+      const isDef  = defaultModel === key;
+      const row = document.createElement('div');
+      row.className = 'sd-atlas-model-row';
+      row.innerHTML = [
+        '<div class="sd-atlas-model-info">',
+        '  <strong>' + meta.label + '</strong>',
+        '  <span>' + meta.detail + '</span>',
+        '</div>',
+        '<div class="sd-atlas-model-controls">',
+        '  <label class="sd-atlas-default-label" title="Set as default">',
+        '    <input type="radio" name="atlasDefaultModel" value="' + key + '"' + (isDef ? ' checked' : '') + '>',
+        '    <span>Default</span>',
+        '  </label>',
+        '  <label class="sd-toggle-switch" aria-label="Enable ' + meta.label + '">',
+        '    <input type="checkbox" class="sd-atlas-model-toggle" data-key="' + key + '"' + (isOn ? ' checked' : '') + '>',
+        '    <span class="sd-toggle-slider"></span>',
+        '  </label>',
+        '</div>',
+      ].join('');
+      els.atlasModelRows.appendChild(row);
+    });
+
+    els.atlasModelSelectorVisible.checked = _atlasConfig.modelSelectorVisible !== false;
+    els.atlasBudgetCapInr.value = typeof _atlasConfig.budgetCapInr === 'number' ? _atlasConfig.budgetCapInr : 100;
+    setSectionStatus(els.atlasConfigStatus, '', '');
+  } catch (err) {
+    setSectionStatus(els.atlasConfigStatus, 'Failed to load Atlas config: ' + err.message, 'error');
+  }
+}
+
+async function saveAtlasConfig() {
+  setSectionStatus(els.atlasConfigStatus, 'Saving…', 'info');
+  els.saveAtlasConfigBtn.disabled = true;
+  try {
+    const toggles = els.atlasModelRows.querySelectorAll('.sd-atlas-model-toggle');
+    const enabledModels = Array.from(toggles)
+      .filter(function (cb) { return cb.checked; })
+      .map(function (cb) { return cb.dataset.key; });
+    if (enabledModels.length === 0) {
+      setSectionStatus(els.atlasConfigStatus, 'At least one model must be enabled.', 'error');
+      return;
+    }
+    const defaultRadio = els.atlasModelRows.querySelector('input[name="atlasDefaultModel"]:checked');
+    const defaultModel = defaultRadio ? defaultRadio.value : enabledModels[0];
+    const payload = {
+      enabledModels,
+      defaultModel,
+      budgetCapInr:         Number(els.atlasBudgetCapInr.value) || 0,
+      modelSelectorVisible: els.atlasModelSelectorVisible.checked,
+    };
+    await authedJson('/api/admin/atlas/config', { method: 'PUT', body: JSON.stringify(payload) });
+    _atlasConfig = payload;
+    setSectionStatus(els.atlasConfigStatus, 'Atlas settings saved.', 'success');
+  } catch (err) {
+    setSectionStatus(els.atlasConfigStatus, 'Save failed: ' + err.message, 'error');
+  } finally {
+    els.saveAtlasConfigBtn.disabled = false;
+  }
+}
+
 function renderPreview() {
   const article = articleFromForm();
   updateWorkflowChrome(article.status);
@@ -2016,6 +2106,9 @@ els.deleteSponsorBtn.addEventListener('click', function () {
 });
 els.saveSeoConfigBtn.addEventListener('click', function () {
   saveSeoConfig().catch(function (err) { setSectionStatus(els.seoConfigStatus, err.message, 'error'); });
+});
+els.saveAtlasConfigBtn.addEventListener('click', function () {
+  saveAtlasConfig().catch(function (err) { setSectionStatus(els.atlasConfigStatus, err.message, 'error'); });
 });
 els.seoSiteUrl.addEventListener('input', updateSerpPreview);
 els.seoSiteDescription.addEventListener('input', updateSerpPreview);
