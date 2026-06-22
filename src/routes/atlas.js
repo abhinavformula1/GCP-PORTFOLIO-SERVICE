@@ -384,4 +384,26 @@ router.delete('/atlas/conversations/active',
   }
 );
 
+// ── GET /api/atlas/config  (public — returns only fields the chat UI needs) ──
+router.get('/atlas/config',
+  async (req, res, next) => {
+    try {
+      const cfg = await firestore.getAtlasConfig();
+      // Filter enabledModels to only those that exist in GEMINI_MODELS
+      const enabledModels = cfg.enabledModels.filter(function (k) { return !!GEMINI_MODELS[k]; });
+      // Ensure defaultModel is in the enabled set; fall back to first enabled.
+      const defaultModel = enabledModels.includes(cfg.defaultModel)
+        ? cfg.defaultModel
+        : (enabledModels[0] || DEFAULT_GEMINI_MODEL_KEY);
+      return res.json({
+        enabledModels,
+        defaultModel,
+        modelSelectorVisible: cfg.modelSelectorVisible,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  }
+);
+
 module.exports = router;
