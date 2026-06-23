@@ -163,6 +163,8 @@ export function createComposer(options) {
   // ── helpers ────────────────────────────────────────────────────────────────
 
   function isEmpty() {
+    // Dedicated block components (table/code/image/rich blocks) count as content.
+    if (surface.querySelector('[data-block]')) return false;
     if (surface.querySelector(RICH_SELECTOR)) return false;
     return surface.textContent.replace(/\u200b/g, '').trim() === '';
   }
@@ -241,10 +243,23 @@ export function createComposer(options) {
 
   function focus() {
     surface.focus();
-    if (!surface.querySelector('p, h1, h2, h3, h4, h5, h6, ul, ol')) {
+    const hasTextBlock = !!surface.querySelector('p, h1, h2, h3, h4, h5, h6, ul, ol');
+    const hasRichBlock = !!surface.querySelector('[data-block]') || !!surface.querySelector(RICH_SELECTOR);
+    if (!hasTextBlock && !hasRichBlock) {
       surface.innerHTML = '<p><br></p>';
     }
-    placeCaretAtEnd(surface.lastElementChild || surface);
+
+    // If the last element is a dedicated block component (e.g. table), add a
+    // paragraph after it so the caret lands in a normal editable text node.
+    const last = surface.lastElementChild;
+    if (last && last.matches && last.matches('[data-block]')) {
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      surface.appendChild(p);
+      placeCaretAtEnd(p);
+      return;
+    }
+    placeCaretAtEnd(last || surface);
   }
 
   function placeCaretAtEnd(node) {
