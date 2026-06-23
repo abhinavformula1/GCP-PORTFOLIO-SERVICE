@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>System Design Admin</title>
+  <title>Software Architecture Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap">
@@ -64,11 +64,10 @@
   <main class="sd-admin-shell">
     <header class="sd-admin-header">
       <div class="sd-admin-hero-copy">
-        <h1>System Design CMS</h1>
         <div id="adminModules" class="sd-admin-modules" hidden aria-label="Admin modules">
           <button type="button" class="sd-admin-module sd-admin-module-active" data-module="system-design">
             <span class="material-symbols-outlined" aria-hidden="true">article</span>
-            <span>System Design</span>
+            <span>Software Architecture</span>
           </button>
           <button type="button" class="sd-admin-module" data-module="contact-policy">
             <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
@@ -119,7 +118,7 @@
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
       <div class="sd-admin-command">
         <div>
-          <h2>System Design Library</h2>
+          <h2>Software Architecture Library</h2>
         </div>
         <div class="sd-admin-metrics" aria-label="Article summary">
           <div class="sd-admin-metric">
@@ -207,8 +206,17 @@
                 <label>Subtitle
                   <input id="articleSubtitle" type="text" placeholder="Short article subtitle">
                 </label>
-                <label>Tags
-                  <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth">
+                <label>Content type
+                  <select id="articleContentType">
+                    <option value="system-design">System Design</option>
+                    <option value="architecture">Architecture Notes</option>
+                    <option value="case-study">Case Studies</option>
+                  </select>
+                  <span class="sd-field-hint">Controls where the article appears in the public library.</span>
+                </label>
+                <label>Domains (tags)
+                  <input id="articleTags" type="text" placeholder="Salesforce, MuleSoft, OAuth 2.0, Security">
+                  <span class="sd-field-hint">Drives the left DOMAINS sidebar + the chips shown on cards.</span>
                 </label>
 
                 <!-- Thumbnail -->
@@ -216,7 +224,7 @@
                   <div class="sd-thumb-label">
                     <span class="material-symbols-outlined" aria-hidden="true">image</span>
                     <span>Thumbnail</span>
-                    <span class="sd-thumb-hint">Shown on the home page article card (JPEG, PNG, WebP, max 8 MB)</span>
+                    <span class="sd-thumb-hint">Shown on article cards (JPEG, PNG, WebP, max 8 MB)</span>
                   </div>
                   <div class="sd-thumb-picker" id="articleThumbPicker">
                     <div class="sd-thumb-preview-wrap" id="articleThumbPreviewWrap" hidden>
@@ -268,13 +276,6 @@
 
           <div class="sd-admin-metadata-fields" hidden>
             <input id="articleId" type="text" placeholder="salesforce-mulesoft-authentication">
-            <select id="articleCategory">
-              <option value="integration">Integration</option>
-              <option value="architecture">Architecture</option>
-              <option value="scale">Scale</option>
-              <option value="security">Security</option>
-              <option value="delivery">Delivery</option>
-            </select>
             <input id="articleIcon" type="text" value="article">
             <input id="articleReadMinutes" type="number" min="0" max="60" placeholder="Optional">
             <input id="articleOrder" type="number" min="1" max="9999" value="100">
@@ -302,6 +303,31 @@
         <div class="sd-admin-rail-label" aria-hidden="true">Policy</div>
       </div>
       <div class="sd-admin-policy-card">
+        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="privatePhone">
+          <div class="sd-authoring-card-head sd-policy-rule-head">
+            <div>
+              <div class="sd-admin-section-kicker">Private</div>
+              <h3>Private phone number</h3>
+              <p>Stored in Firestore and only revealed on the public site when the viewer passes your policy rules.</p>
+            </div>
+            <div class="reco-actions sd-policy-rule-actions">
+              <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Private phone actions" aria-haspopup="menu" aria-expanded="false">
+                <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+              </button>
+              <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
+                <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                  <span>Edit</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="contactPrivatePhoneView" class="sd-policy-rule-values"></div>
+          <label class="sd-policy-rule-edit" hidden>Private phone
+            <input id="contactPrivatePhone" type="tel" placeholder="+91 98765 43210">
+            <button type="button" class="sd-policy-done-btn">Done</button>
+          </label>
+        </section>
         <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="personalDomains">
           <div class="sd-authoring-card-head sd-policy-rule-head">
             <div>
@@ -418,7 +444,7 @@
         <div>
           <div class="sd-admin-section-kicker">Library controls</div>
           <h2>Article Settings</h2>
-          <p>Manage SEO, order, category, icon, and read time for every System Design article from one place.</p>
+          <p>Manage SEO, order, icon, and read time for every Software Architecture article from one place.</p>
         </div>
         <div class="sd-article-settings-actions">
           <button type="button" id="autoFixArticleOrderBtn">Auto-fix order</button>
@@ -687,14 +713,12 @@
               <dd><input id="publishSeoSlug" type="text" placeholder="salesforce-mulesoft-authentication"></dd>
             </div>
             <div>
-              <dt><label for="publishSeoCategory">Category</label></dt>
+              <dt><label for="publishSeoContentType">Content type</label></dt>
               <dd>
-                <select id="publishSeoCategory">
-                  <option value="integration">Integration</option>
-                  <option value="architecture">Architecture</option>
-                  <option value="scale">Scale</option>
-                  <option value="security">Security</option>
-                  <option value="delivery">Delivery</option>
+                <select id="publishSeoContentType">
+                  <option value="system-design">System Design</option>
+                  <option value="architecture">Architecture Notes</option>
+                  <option value="case-study">Case Studies</option>
                 </select>
               </dd>
             </div>

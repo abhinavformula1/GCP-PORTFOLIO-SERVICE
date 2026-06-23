@@ -48,8 +48,19 @@ function matchesDomain(domain, allowedDomain) {
   return domain === allowedDomain || domain.endsWith('.' + allowedDomain);
 }
 
+function looksConfiguredPhone(phone) {
+  const value = String(phone || '').trim();
+  if (!value) return false;
+  // If the server is still using the sentinel placeholder, treat it as not configured.
+  if (/[xX]/.test(value)) return false;
+  // Must contain at least a few digits to be useful
+  const digits = value.replace(/[^\d]/g, '');
+  return digits.length >= 8;
+}
+
 function defaultPolicy() {
   return {
+    privatePhone: String(config.contactPolicy.privatePhone || '').trim(),
     allowedDomains:  normaliseDomains(config.contactPolicy.allowedDomains),
     personalDomains: normaliseDomains(config.contactPolicy.personalDomains),
     allowedEmails:   Array.from(new Set(normaliseEmails([
@@ -68,15 +79,19 @@ function resolveWithPolicy(viewer, policy) {
   const blockedDomains = normaliseDomains(effective.blockedDomains);
   const personalDomains = normaliseDomains(effective.personalDomains);
   const allowedDomains = normaliseDomains(effective.allowedDomains);
+  const privatePhone = String(effective.privatePhone || '').trim();
 
   if (!email || !domain) {
     return { canSeePhone: false, phone: null, matchedDomain: null, reason: 'invalid-email' };
   }
 
   if (allowedEmails.includes(email)) {
+    if (!looksConfiguredPhone(privatePhone)) {
+      return { canSeePhone: false, phone: null, matchedDomain: domain, reason: 'phone-not-configured' };
+    }
     return {
       canSeePhone: true,
-      phone: config.contactPolicy.privatePhone,
+      phone: privatePhone,
       matchedDomain: domain,
       reason: 'allowed-email',
     };
@@ -93,9 +108,12 @@ function resolveWithPolicy(viewer, policy) {
   }
 
   const allowed = allowedDomains.find((d) => matchesDomain(domain, d));
+  if (!looksConfiguredPhone(privatePhone)) {
+    return { canSeePhone: false, phone: null, matchedDomain: allowed || domain, reason: 'phone-not-configured' };
+  }
   return {
     canSeePhone: true,
-    phone: config.contactPolicy.privatePhone,
+    phone: privatePhone,
     matchedDomain: allowed || domain,
     reason: allowed ? 'allowed-domain' : 'company-domain',
   };
@@ -122,7 +140,7 @@ async function getContactPolicyConfig() {
         ...defaultPolicy(),
       updatedBy: null,
       updatedAt: null,
-      privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+      privatePhoneConfigured: looksConfiguredPhone(defaultPolicy().privatePhone),
     };
   }
   try {
@@ -131,6 +149,9 @@ async function getContactPolicyConfig() {
       const defaults = defaultPolicy();
       return {
         source: 'firestore',
+        privatePhone: Object.prototype.hasOwnProperty.call(stored, 'privatePhone')
+          ? String(stored.privatePhone || '').trim()
+          : defaults.privatePhone,
         allowedDomains: normaliseDomains(stored.allowedDomains),
         personalDomains: Object.prototype.hasOwnProperty.call(stored, 'personalDomains')
           ? normaliseDomains(stored.personalDomains)
@@ -143,7 +164,9 @@ async function getContactPolicyConfig() {
           : defaults.blockedDomains,
         updatedBy: stored.updatedBy || null,
         updatedAt: stored.updatedAt || null,
-        privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+        privatePhoneConfigured: looksConfiguredPhone(
+          (Object.prototype.hasOwnProperty.call(stored, 'privatePhone') ? String(stored.privatePhone || '').trim() : defaults.privatePhone)
+        ),
       };
     }
   } catch (err) {
@@ -154,7 +177,7 @@ async function getContactPolicyConfig() {
     ...defaultPolicy(),
     updatedBy: null,
     updatedAt: null,
-    privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+    privatePhoneConfigured: looksConfiguredPhone(defaultPolicy().privatePhone),
   };
 }
 

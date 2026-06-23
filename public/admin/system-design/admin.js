@@ -42,7 +42,15 @@ let autosaveTimer = 0;
 let articleSections = [];
 let sectionSeq = 0;
 
-const ARTICLE_CATEGORIES = ['integration', 'architecture', 'scale', 'security', 'delivery'];
+// Public filtering uses contentType (content type pills) + tags (domains). Categories are
+// intentionally removed to avoid a third, redundant taxonomy.
+
+function contentTypeLabel(value) {
+  const v = String(value || '').trim();
+  if (v === 'architecture') return 'Architecture Notes';
+  if (v === 'case-study') return 'Case Studies';
+  return 'System Design';
+}
 
 renderTopbar('#sharedTopbar', {
   className: 'topbar sd-admin-topbar',
@@ -124,10 +132,12 @@ const els = {
   seoSerpDesc: document.getElementById('seoSerpDesc'),
   togglePolicyInfoBtn: document.getElementById('toggleContactPolicyInfoBtn'),
   policyMeta:      document.getElementById('contactPolicyMeta'),
+  privatePhone:   document.getElementById('contactPrivatePhone'),
   allowedDomains:  document.getElementById('contactAllowedDomains'),
   personalDomains: document.getElementById('contactPersonalDomains'),
   allowedEmails:   document.getElementById('contactAllowedEmails'),
   blockedDomains:  document.getElementById('contactBlockedDomains'),
+  privatePhoneView: document.getElementById('contactPrivatePhoneView'),
   allowedDomainsView: document.getElementById('contactAllowedDomainsView'),
   personalDomainsView: document.getElementById('contactPersonalDomainsView'),
   allowedEmailsView: document.getElementById('contactAllowedEmailsView'),
@@ -145,7 +155,7 @@ const els = {
   newBtn:          document.getElementById('newArticleBtn'),
   id:              document.getElementById('articleId'),
   statusField:     document.getElementById('articleStatus'),
-  category:        document.getElementById('articleCategory'),
+  contentType:     document.getElementById('articleContentType'),
   icon:            document.getElementById('articleIcon'),
   readMinutes:     document.getElementById('articleReadMinutes'),
   order:           document.getElementById('articleOrder'),
@@ -187,7 +197,7 @@ const els = {
   publishPreviewPanel: document.getElementById('publishPreviewPanel'),
   publishSeoPanel: document.getElementById('publishSeoPanel'),
   publishSeoSlug: document.getElementById('publishSeoSlug'),
-  publishSeoCategory: document.getElementById('publishSeoCategory'),
+  publishSeoContentType: document.getElementById('publishSeoContentType'),
   publishSeoIcon: document.getElementById('publishSeoIcon'),
   publishSeoReadMinutes: document.getElementById('publishSeoReadMinutes'),
   publishSeoOrder: document.getElementById('publishSeoOrder'),
@@ -572,10 +582,19 @@ function renderPolicyValues(target, values, emptyText) {
 }
 
 function renderPolicyRuleCards() {
+  renderPolicyValues(els.privatePhoneView, [formatPrivatePhonePreview(els.privatePhone?.value)], 'No private phone configured.');
   renderPolicyValues(els.personalDomainsView, parseListInput(els.personalDomains), 'No personal domains configured.');
   renderPolicyValues(els.allowedEmailsView, parseListInput(els.allowedEmails), 'No email exceptions configured.');
   renderPolicyValues(els.blockedDomainsView, parseListInput(els.blockedDomains), 'No blocked company domains.');
   renderPolicyValues(els.allowedDomainsView, parseListInput(els.allowedDomains), 'No strategic domains configured.');
+}
+
+function formatPrivatePhonePreview(phone) {
+  const raw = String(phone || '').trim();
+  if (!raw) return '';
+  const digits = raw.replace(/[^\d]/g, '');
+  if (digits.length < 4) return raw;
+  return '•••• ••• ' + digits.slice(-4);
 }
 
 function closePolicyRuleMenus() {
@@ -589,6 +608,7 @@ function closePolicyRuleMenus() {
 
 function renderContactPolicy(policy) {
   contactPolicyState = policy || {};
+  els.privatePhone.value = String(contactPolicyState.privatePhone || '').trim();
   const allowedDomains = Array.isArray(contactPolicyState.allowedDomains) ? contactPolicyState.allowedDomains : [];
   const personalDomains = Array.isArray(contactPolicyState.personalDomains) ? contactPolicyState.personalDomains : [];
   const allowedEmails = Array.isArray(contactPolicyState.allowedEmails) ? contactPolicyState.allowedEmails : [];
@@ -602,7 +622,8 @@ function renderContactPolicy(policy) {
   const updated = contactPolicyState.updatedAt
     ? new Date(contactPolicyState.updatedAt).toLocaleString()
     : 'Not edited yet';
-  els.policyMeta.textContent = source + ' · ' + personalDomains.length + ' personal domains blocked · ' + allowedEmails.length + ' email exceptions · Updated: ' + updated;
+  const phoneConfigured = contactPolicyState.privatePhoneConfigured ? 'private phone set' : 'private phone missing';
+  els.policyMeta.textContent = source + ' · ' + phoneConfigured + ' · ' + personalDomains.length + ' personal domains blocked · ' + allowedEmails.length + ' email exceptions · Updated: ' + updated;
   setSectionStatus(els.policyTest, '', 'info');
 }
 
@@ -659,6 +680,7 @@ async function loadContactPolicy() {
 }
 
 async function saveContactPolicy() {
+  const privatePhone = String(els.privatePhone.value || '').trim();
   const allowedDomains = parseListInput(els.allowedDomains);
   const personalDomains = parseListInput(els.personalDomains);
   const allowedEmails = parseListInput(els.allowedEmails);
@@ -666,7 +688,7 @@ async function saveContactPolicy() {
   setSectionStatus(els.policyTest, 'Saving contact policy...', 'info');
   const data = await authedJson('/api/admin/contact-policy', {
     method: 'PUT',
-    body:   JSON.stringify({ allowedDomains, personalDomains, allowedEmails, blockedDomains }),
+    body:   JSON.stringify({ privatePhone, allowedDomains, personalDomains, allowedEmails, blockedDomains }),
   });
   renderContactPolicy(data.policy || {});
   setSectionStatus(els.policyTest, 'Contact policy saved.', 'success');
@@ -779,7 +801,7 @@ function articleFromForm() {
   return {
     id,
     status:      els.statusField.value,
-    category:    els.category.value,
+    contentType: (els.contentType && els.contentType.value) ? els.contentType.value : '',
     icon:        els.icon.value.trim() || 'article',
     readMinutes: els.readMinutes.value ? Number(els.readMinutes.value) : null,
     order:       Number(els.order.value || 100),
@@ -1067,7 +1089,7 @@ function fillForm(article) {
   const item = article || {
     id: '',
     status: 'Draft',
-    category: 'integration',
+    contentType: 'system-design',
     icon: 'article',
     readMinutes: null,
     order: nextAvailableOrder(),
@@ -1078,7 +1100,9 @@ function fillForm(article) {
   selectedId = item.id || '';
   els.id.value = item.id || '';
   els.statusField.value = item.status || 'Draft';
-  els.category.value = item.category || 'integration';
+  if (els.contentType) {
+    els.contentType.value = item.contentType || 'system-design';
+  }
   els.icon.value = item.icon || 'article';
   els.readMinutes.value = item.readMinutes || '';
   els.order.value = item.order || 100;
@@ -1135,10 +1159,10 @@ function renderList() {
     status.className = 'sd-admin-chip';
     status.dataset.status = article.status || 'Draft';
     status.textContent = article.status || 'Draft';
-    const category = document.createElement('span');
-    category.className = 'sd-admin-chip sd-admin-chip-muted';
-    category.textContent = article.category || 'uncategorized';
-    top.append(status, category);
+    const typeChip = document.createElement('span');
+    typeChip.className = 'sd-admin-chip sd-admin-chip-muted';
+    typeChip.textContent = contentTypeLabel(article.contentType || 'system-design');
+    top.append(status, typeChip);
     const title = document.createElement('strong');
     title.textContent = en.title || article.id;
     const subtitle = document.createElement('small');
@@ -1161,16 +1185,7 @@ function createArticleSettingsField(labelText, field, value, type) {
   const labelSpan = document.createElement('span');
   labelSpan.textContent = labelText;
   let input;
-  if (field === 'category') {
-    input = document.createElement('select');
-    ARTICLE_CATEGORIES.forEach(function (category) {
-      const option = document.createElement('option');
-      option.value = category;
-      option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
-      input.appendChild(option);
-    });
-    input.value = value || 'integration';
-  } else if (field === 'tier') {
+  if (field === 'tier') {
     input = document.createElement('select');
     input.className = 'sd-tier-select';
     [['free', 'Free'], ['premium', 'Premium']].forEach(function (pair) {
@@ -1180,6 +1195,15 @@ function createArticleSettingsField(labelText, field, value, type) {
       input.appendChild(option);
     });
     input.value = value || 'free';
+  } else if (field === 'contentType') {
+    input = document.createElement('select');
+    [['system-design', 'System Design'], ['architecture', 'Architecture Notes'], ['case-study', 'Case Studies']].forEach(function (pair) {
+      const option = document.createElement('option');
+      option.value = pair[0];
+      option.textContent = pair[1];
+      input.appendChild(option);
+    });
+    input.value = value || 'system-design';
   } else if (field === 'status') {
     input = document.createElement('select');
     input.className = 'sd-status-select';
@@ -1308,7 +1332,6 @@ function renderArticleSettings() {
     grid.className = 'sd-article-settings-grid';
     grid.append(
       createArticleSettingsField('Slug', 'id', article.id),
-      createArticleSettingsField('Category', 'category', article.category || 'integration'),
       createArticleSettingsField('Icon', 'icon', article.icon || 'article'),
       createArticleSettingsField('Read time', 'readMinutes', article.readMinutes ? String(article.readMinutes) : '', 'number'),
       createArticleSettingsField('Order', 'order', String(article.order || 100), 'number'),
@@ -1355,7 +1378,6 @@ function articleSettingsPayloadFromCard(card) {
     previousId: original.id,
     article: Object.assign({}, original, {
       id: slugify(input('id').value || original.id),
-      category: input('category').value || 'integration',
       icon: input('icon').value.trim() || 'article',
       readMinutes: input('readMinutes').value ? Number(input('readMinutes').value) : null,
       order: Number(input('order').value || 100),
@@ -1848,7 +1870,7 @@ function renderPublishReview() {
   });
   els.publishReviewReadTime.lastElementChild.textContent = article.readMinutes + ' min';
   els.publishSeoSlug.value = article.id || '';
-  els.publishSeoCategory.value = article.category || 'integration';
+  if (els.publishSeoContentType) els.publishSeoContentType.value = article.contentType || 'system-design';
   els.publishSeoIcon.value = article.icon || 'article';
   els.publishSeoReadMinutes.value = String(article.readMinutes || 5);
   els.publishSeoOrder.value = String(article.order || 100);
@@ -1880,7 +1902,9 @@ function renderPublishOrderWarning() {
 function syncPublishSeoToForm() {
   els.id.value = slugify(els.publishSeoSlug.value || els.title.value);
   els.publishSeoSlug.value = els.id.value;
-  els.category.value = els.publishSeoCategory.value || 'integration';
+  if (els.contentType && els.publishSeoContentType) {
+    els.contentType.value = els.publishSeoContentType.value || els.contentType.value || 'system-design';
+  }
   els.icon.value = els.publishSeoIcon.value.trim() || 'article';
   els.readMinutes.value = els.publishSeoReadMinutes.value || '';
   els.order.value = els.publishSeoOrder.value || '100';
@@ -2310,7 +2334,7 @@ els.title.addEventListener('input', function () {
   markDirty();
 });
 [
-  els.id, els.statusField, els.category, els.icon, els.readMinutes, els.order,
+  els.id, els.statusField, els.contentType, els.icon, els.readMinutes, els.order,
   els.subtitle, els.tags,
 ].forEach(function (el) {
   el.addEventListener('input', function () {
@@ -2334,7 +2358,7 @@ els.closePublishReviewBtn.addEventListener('click', closePublishReview);
 els.continueEditingBtn.addEventListener('click', handlePublishDialogBack);
 [
   els.publishSeoSlug,
-  els.publishSeoCategory,
+  els.publishSeoContentType,
   els.publishSeoIcon,
   els.publishSeoReadMinutes,
   els.publishSeoOrder,

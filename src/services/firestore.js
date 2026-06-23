@@ -832,6 +832,9 @@ async function getContactPolicyConfig() {
   if (!snap.exists) return null;
   const data = snap.data() || {};
   return {
+    privatePhone: Object.prototype.hasOwnProperty.call(data, 'privatePhone')
+      ? String(data.privatePhone || '').trim()
+      : undefined,
     allowedDomains: Object.prototype.hasOwnProperty.call(data, 'allowedDomains') && Array.isArray(data.allowedDomains)
       ? data.allowedDomains.map(String)
       : undefined,
@@ -855,8 +858,14 @@ function cleanStringList(values) {
     : [];
 }
 
-async function upsertContactPolicyConfig({ allowedDomains, personalDomains, allowedEmails, blockedDomains, updatedBy }) {
+function cleanPhone(value) {
+  const raw = String(value || '').trim();
+  return raw;
+}
+
+async function upsertContactPolicyConfig({ privatePhone, allowedDomains, personalDomains, allowedEmails, blockedDomains, updatedBy }) {
   await getDb().collection(APP_CONFIG_COLLECTION).doc(CONTACT_POLICY_DOC).set({
+    privatePhone:   cleanPhone(privatePhone),
     allowedDomains:  cleanStringList(allowedDomains),
     personalDomains: cleanStringList(personalDomains),
     allowedEmails:   cleanStringList(allowedEmails),

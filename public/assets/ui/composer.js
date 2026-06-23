@@ -194,6 +194,13 @@ export function createComposer(options) {
       editBtn.setAttribute('aria-pressed', editable ? 'true' : 'false');
       editBtn.title = editable ? 'Lock section (read-only)' : 'Edit section';
     }
+    // Disable all write-affecting tools while locked. Keep the "Edit" toggle
+    // enabled so authors have an explicit entry into edit mode.
+    toolbar.querySelectorAll('button').forEach(function (btn) {
+      if (btn === editBtn) return;
+      // Save is also a write action; it should be usable only while editable.
+      btn.disabled = !editable;
+    });
     if (saveBtn) saveBtn.disabled = !editable;
     // Lock/unlock all embedded dedicated block components.
     surface.querySelectorAll('[data-block]').forEach(function (el) {

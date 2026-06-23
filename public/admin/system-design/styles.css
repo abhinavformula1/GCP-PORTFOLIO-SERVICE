@@ -264,7 +264,7 @@
 }
 
 .sd-admin-hero-copy {
-  max-width: 760px;
+  max-width: none;
 }
 
 .sd-admin-modules {
@@ -1972,7 +1972,26 @@
   font-weight: 800;
 }
 
+.sd-field-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 650;
+  margin-top: -2px;
+}
+
 .sd-article-details-form input {
+  min-height: 48px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 4px;
+  padding: 0 14px;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-weight: 800;
+}
+
+.sd-article-details-form select {
   min-height: 48px;
   border: 1px solid var(--md-sys-color-outline);
   border-radius: 4px;
@@ -1985,6 +2004,13 @@
 
 .sd-article-details-form input:focus,
 .sd-article-details-form input:focus-visible {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 3px var(--sd-state-focus);
+  outline: none;
+}
+
+.sd-article-details-form select:focus,
+.sd-article-details-form select:focus-visible {
   border-color: var(--md-sys-color-primary);
   box-shadow: 0 0 0 3px var(--sd-state-focus);
   outline: none;
