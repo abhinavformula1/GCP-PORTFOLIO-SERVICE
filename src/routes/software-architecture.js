@@ -39,7 +39,8 @@ async function loadSeedArticles({ publishedOnly } = {}) {
     })
     .map((article) => ({
       ...article,
-      contentType: article.contentType || 'system-design',
+      contentType: article.contentType
+        || (String(article.category || '').trim().toLowerCase() === 'architecture' ? 'architecture' : 'system-design'),
     }))
     .sort((a, b) => Number(a.order || 999) - Number(b.order || 999)
       || String(a.en?.title || a.id || '').localeCompare(String(b.en?.title || b.id || '')));
