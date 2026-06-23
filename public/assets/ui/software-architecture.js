@@ -141,12 +141,10 @@ async function loadSeoConfig() {
     }
   } catch (_) { /* non-fatal — defaults remain */ }
 }
-const CATEGORY_LABELS = {
-  integration: 'Integration',
-  architecture: 'Architecture',
-  scale: 'Scale',
-  security: 'Security',
-  delivery: 'Delivery',
+const CONTENT_TYPE_LABELS = {
+  'system-design': 'System Design',
+  architecture:    'Architecture Notes',
+  'case-study':    'Case Studies',
 };
 
 function topicById(id) {
@@ -307,7 +305,7 @@ function normaliseCmsTopic(article) {
   const blocks = Array.isArray(article.blocks) ? article.blocks : [];
   return {
     id,
-    category:    article.category || 'architecture',
+    contentType: article.contentType || '',
     icon:        article.icon || 'article',
     status:      article.status || 'Published',
     tags:        Array.isArray(article.tags) ? article.tags : [],
@@ -452,12 +450,12 @@ function renderTopicList() {
   html += '</button>';
   html += '<div class="sd-topic-list" role="list">';
   let visibleCount = 0;
-  Object.keys(CATEGORY_LABELS).forEach(function (category) {
+  Object.keys(CONTENT_TYPE_LABELS).forEach(function (type) {
     let group = '';
     let groupCount = 0;
     const topics = getTopics();
     for (const t of topics) {
-      if ((t.category || 'architecture') !== category) continue;
+      if (getContentType(t) !== type) continue;
       const loc = localeOf(t);
       const haystack = normaliseText(loc.title + ' ' + loc.subtitle + ' ' + (t.tags || []).join(' '));
       if (query && haystack.indexOf(query) === -1) continue;
@@ -483,7 +481,7 @@ function renderTopicList() {
     }
     if (groupCount) {
       html += '<section class="sd-topic-group">';
-      html += '<div class="sd-topic-group-title">' + escapeHtml(CATEGORY_LABELS[category]) + '</div>';
+      html += '<div class="sd-topic-group-title">' + escapeHtml(CONTENT_TYPE_LABELS[type]) + '</div>';
       html += '<ul role="list">' + group + '</ul>';
       html += '</section>';
     }
@@ -539,9 +537,8 @@ function getArticleDomains(topics) {
 }
 
 function getContentType(topic) {
-  const cat = (topic.category || '').toLowerCase();
-  if (cat === 'case-study' || cat === 'casestudy') return 'case-study';
-  if (cat === 'architecture' || cat === 'architecture-note') return 'architecture';
+  const explicit = String(topic.contentType || '').trim();
+  if (explicit === 'system-design' || explicit === 'architecture' || explicit === 'case-study') return explicit;
   return 'system-design';
 }
 
@@ -860,7 +857,11 @@ function setView(view) {
   _activeView = view;
   const sysOn = view === 'sysdesign';
   const body = document.querySelector('.body');
-  if (body) body.classList.toggle('sd-mode', sysOn);
+  if (body) {
+    body.classList.toggle('sd-mode', sysOn);
+    // Remove list-mode class when leaving system design view
+    if (!sysOn) body.classList.remove('sd-list-mode');
+  }
   if (_resumeAside) _resumeAside.toggleAttribute('hidden', sysOn);
   if (_resumeMain)  _resumeMain.toggleAttribute('hidden', sysOn);
   _sdAside.toggleAttribute('hidden', !sysOn);
@@ -882,7 +883,7 @@ function updateButton() {
   if (label) {
     label.textContent = currentLang === 'fr' ? 'Architecture logicielle' : 'Software Architecture';
   }
-  if (icon) icon.textContent = 'schema';
+  if (icon) icon.textContent = 'account_tree';
   _btn.setAttribute('aria-pressed', sysOn ? 'true' : 'false');
 }
 

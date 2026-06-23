@@ -37,6 +37,10 @@ async function loadSeedArticles({ publishedOnly } = {}) {
       const status = String(article.status || 'Published').toLowerCase();
       return status === 'published' || article.stub;
     })
+    .map((article) => ({
+      ...article,
+      contentType: article.contentType || 'system-design',
+    }))
     .sort((a, b) => Number(a.order || 999) - Number(b.order || 999)
       || String(a.en?.title || a.id || '').localeCompare(String(b.en?.title || b.id || '')));
 }
@@ -58,7 +62,7 @@ async function localSeedFallback(res, { publishedOnly, articleId } = {}) {
 
 const validateArticle = [
   body('id').trim().matches(/^[a-z0-9-]{3,80}$/).withMessage('Slug must use lowercase letters, numbers, and hyphens.'),
-  body('category').trim().isLength({ min: 2, max: 40 }).withMessage('Category is required.'),
+  body('contentType').optional().trim().isIn(['system-design', 'architecture', 'case-study']).withMessage('contentType must be system-design, architecture, or case-study.'),
   body('icon').optional().trim().isLength({ max: 40 }),
   body('status').optional().trim().isIn(['Draft', 'Published', 'Retired', 'Coming soon']).withMessage('Status must be Draft, Published, Retired, or Coming soon.'),
   body('tags').optional().isArray({ max: 12 }).withMessage('Tags must be an array.'),
@@ -177,6 +181,24 @@ function validateEmails(emails) {
     }
   }
   return Array.from(new Set(clean));
+}
+
+function validatePrivatePhone(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.length > 40) throw new ValidationError('Private phone is too long.');
+  // Allow common formatting chars: + digits spaces hyphens parentheses
+  if (!/^[+\d\s().-]+$/.test(raw)) throw new ValidationError('Private phone contains invalid characters.');
+  const digits = raw.replace(/[^\d]/g, '');
+  if (digits.length < 8) throw new ValidationError('Private phone must contain at least 8 digits.');
+  return raw;
+}
+
+function looksConfiguredPhone(value) {
+  const v = String(value || '').trim();
+  if (!v) return false;
+  if (/[xX]/.test(v)) return false;
+  return v.replace(/[^\d]/g, '').length >= 8;
 }
 
 // ── Tier config (public read, admin write) ────────────────────────────────────
@@ -323,6 +345,7 @@ router.get('/admin/contact-policy', requireAdmin, async (_req, res, next) => {
 
 router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
   try {
+    const privatePhone = validatePrivatePhone(req.body?.privatePhone || '');
     const allowedDomains = validateDomains(req.body?.allowedDomains || []);
     const personalDomains = validateDomains(req.body?.personalDomains || []);
     const allowedEmails = validateEmails(req.body?.allowedEmails || []);
@@ -332,17 +355,19 @@ router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
         success: true,
         policy: {
           source: 'local-dev',
+          privatePhone,
           allowedDomains,
           personalDomains,
           allowedEmails,
           blockedDomains,
           updatedBy: req.user.email,
           updatedAt: Date.now(),
-          privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+          privatePhoneConfigured: looksConfiguredPhone(privatePhone || config.contactPolicy.privatePhone),
         },
       });
     }
     const saved = await firestore.upsertContactPolicyConfig({
+      privatePhone,
       allowedDomains,
       personalDomains,
       allowedEmails,
@@ -353,13 +378,14 @@ router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
       success: true,
       policy: {
         source: 'firestore',
+        privatePhone: saved.privatePhone || '',
         allowedDomains: saved.allowedDomains,
         personalDomains: saved.personalDomains,
         allowedEmails: saved.allowedEmails,
         blockedDomains: saved.blockedDomains,
         updatedBy: saved.updatedBy,
         updatedAt: saved.updatedAt,
-        privatePhoneConfigured: !!config.contactPolicy.privatePhone,
+        privatePhoneConfigured: looksConfiguredPhone(saved.privatePhone || config.contactPolicy.privatePhone),
       },
     });
   } catch (err) {
@@ -409,6 +435,7 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
 
     const previousId = String(req.params.id || '').trim();
     const article = Object.assign({}, req.body, { id: String(req.body.id || previousId).trim() });
+    if (!article.contentType) article.contentType = 'system-design';
     if (config.admin.localPreview) {
       return res.status(200).json({
         success: true,
@@ -451,6 +478,7 @@ router.post('/admin/system-design/seed', requireAdmin, async (req, res, next) =>
 
     const results = [];
     for (const article of articles) {
+      if (!article.contentType) article.contentType = 'system-design';
       results.push(await firestore.upsertSystemDesignArticle(article, {
         publishedBy: req.user.email,
       }));
