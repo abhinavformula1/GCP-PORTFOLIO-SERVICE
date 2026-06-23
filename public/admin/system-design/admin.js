@@ -10,7 +10,9 @@ import {
 } from '../../assets/core/state.js';
 import { initTheme } from '../../assets/core/theme.js';
 import { hideWelcomeOverlay, showWelcomeOverlay } from '../../assets/ui/welcome.js';
-import { renderAtlasShell, renderTechFooter, renderTopbar } from '../../assets/ui/shared-layout.js';
+import { renderTopbar }     from '../../assets/ui/topbar.js';
+import { renderTechFooter } from '../../assets/ui/footer.js';
+import { renderAtlasShell } from '../../assets/ui/atlas-shell.js';
 import {
   closeAssistant,
   initChat,

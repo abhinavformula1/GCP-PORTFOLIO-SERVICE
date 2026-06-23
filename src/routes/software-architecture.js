@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * System Design content routes.
+ * Software Architecture content routes.
  *
  * Firestore is used as a lightweight CMS so article edits can be published
  * without rebuilding the Cloud Run image. The frontend keeps checked-in
