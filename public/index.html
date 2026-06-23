@@ -246,18 +246,18 @@
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">forward_to_inbox</span>
             <span data-i18n="referMe">Refer Me</span>
           </md-outlined-button>
-          <!-- "System Design" — tertiary CTA that swaps the body into a
+          <!-- "Software Architecture" — tertiary CTA that swaps the body into a
                master/detail topic browser (architecture write-ups + worked
                examples). Pure client-side: the resume DOM is hidden, not
                removed, so the Download Resume button still works while in
                this view. URL hash #/system-design/<id> is the source of
                truth for which topic is rendered, so deep links are
                shareable and back/forward both work. -->
-          <md-outlined-button class="systemdesign-btn" aria-label="System Design" aria-pressed="false"
+          <md-outlined-button class="systemdesign-btn" aria-label="Software Architecture" aria-pressed="false"
             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
             onclick="window.openSystemDesign && window.openSystemDesign()">
             <span class="material-symbols-outlined" slot="icon" aria-hidden="true">schema</span>
-            <span data-i18n="systemDesign">System Design</span>
+            <span data-i18n="systemDesign">Software Architecture</span>
           </md-outlined-button>
           <md-outlined-button class="admin-btn" id="systemDesignAdminBtn" aria-label="Admin" hidden
             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"

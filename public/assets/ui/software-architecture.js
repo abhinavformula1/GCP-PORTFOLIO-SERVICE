@@ -1,14 +1,19 @@
 /**
- * System Design view -- master/detail topic browser.
+ * Software Architecture view -- master/detail topic browser.
  *
  * A second persona for the same body grid: instead of "About + Skills" on
  * the left and "Work Experience + Projects" on the right, we surface a
- * curated catalogue of architecture / design write-ups (left) with the
- * selected topic's full body (right). The resume DOM is hidden, not
- * removed, so:
+ * curated catalogue of architecture / design write-ups. The resume DOM is
+ * hidden, not removed, so:
  *   - the Download Resume button keeps scraping the resume nodes via
  *     querySelector ([hidden] doesn't affect that), and
  *   - flipping back to the resume view is instantaneous (no re-render).
+ *
+ * Two views:
+ *   - List view (landing): shows all articles with filtering by content type
+ *     and domain tags. The old sidebar is hidden; a new integrated sidebar
+ *     with domain filters is rendered inside the content area.
+ *   - Article detail view: shows a single article with the topic sidebar.
  *
  * URL routing: uses the History API (/system-design/<id>) so every
  * article gets a real, crawlable URL that Google can index. The server
@@ -45,6 +50,33 @@ let _cmsLoadStarted = false;
 let _cmsLoaded   = false;
 let _tierConfig  = null;
 let _userToggledSidebar = false;
+
+// ── List view filters ────────────────────────────────────────────────────────
+let _activeContentTab = 'all';   // 'all' | 'system-design' | 'architecture' | 'case-study'
+let _activeDomain = 'all';       // 'all' | tag name
+
+// Content type tabs for horizontal filter
+const CONTENT_TABS = [
+  { id: 'all',           label: 'All',                icon: 'apps' },
+  { id: 'system-design', label: 'System Design',      icon: 'schema' },
+  { id: 'architecture',  label: 'Architecture Notes', icon: 'architecture' },
+  { id: 'case-study',    label: 'Case Studies',       icon: 'menu_book' },
+];
+
+// Domain/tag categories for sidebar (dynamically populated from article tags)
+const DOMAIN_ICONS = {
+  'Integration':   'sync_alt',
+  'Security':      'shield',
+  'Scalability':   'speed',
+  'Event-Driven':  'bolt',
+  'AI':            'psychology',
+  'Cloud':         'cloud',
+  'CPQ':           'request_quote',
+  'DevOps':        'deployed_code',
+  'Performance':   'analytics',
+  'Salesforce':    'cloud_circle',
+  'MuleSoft':      'hub',
+};
 
 const PATH_PREFIX = '/system-design';
 // SITE_BASE is overridden at runtime by loadSeoConfig() from the admin-managed
@@ -164,9 +196,9 @@ function removeJsonLd(id) {
 function applyArticleMeta(topic) {
   if (!topic) { resetMeta(); return; }
   const loc   = topic.en || {};
-  const title = (loc.title || topic.id) + ' — System Design | Abhinav Kumar';
+  const title = (loc.title || topic.id) + ' — Software Architecture | Abhinav Kumar';
   const desc  = loc.subtitle
-    || 'System design article: ' + (loc.title || topic.id) + '. Architecture and security deep-dive by Abhinav Kumar.';
+    || 'Software architecture article: ' + (loc.title || topic.id) + '. Architecture and engineering deep-dive by Abhinav Kumar.';
   const url   = SITE_BASE + PATH_PREFIX + '/' + topic.id;
   const tags  = Array.isArray(topic.tags) ? topic.tags : [];
 
@@ -255,6 +287,13 @@ function uiText(key) {
     unavailable: fr ? 'Aucune note publiee pour le moment.' : 'No published notes are available yet.',
     articleLabel: fr ? 'Note de conception' : 'Design note',
     exportPdf:   fr ? 'Exporter PDF' : 'Export PDF',
+    // List view strings
+    pageTitle:   fr ? 'Architecture logicielle' : 'Software Architecture',
+    pageSubtitle: fr ? 'Decisions d\'architecture, conception systeme, patterns d\'integration et insights d\'ingenierie issus de systemes reels.' : 'Architecture decisions, system design, integration patterns, and engineering insights from real-world systems.',
+    domains:     fr ? 'Domaines' : 'DOMAINS',
+    all:         fr ? 'Tous' : 'All',
+    comingSoon:  fr ? 'Plus d\'articles bientot...' : 'More articles coming soon...',
+    minRead:     fr ? 'min de lecture' : 'min read',
   };
   return dict[key] || '';
 }
@@ -485,52 +524,191 @@ function renderTopicList() {
   }
 }
 
+// ── List view helpers ─────────────────────────────────────────────────────────
+
+function getArticleDomains(topics) {
+  const domainCounts = {};
+  topics.forEach(function (t) {
+    (t.tags || []).forEach(function (tag) {
+      domainCounts[tag] = (domainCounts[tag] || 0) + 1;
+    });
+  });
+  return Object.keys(domainCounts)
+    .map(function (name) { return { name: name, count: domainCounts[name] }; })
+    .sort(function (a, b) { return b.count - a.count; });
+}
+
+function getContentType(topic) {
+  const cat = (topic.category || '').toLowerCase();
+  if (cat === 'case-study' || cat === 'casestudy') return 'case-study';
+  if (cat === 'architecture' || cat === 'architecture-note') return 'architecture';
+  return 'system-design';
+}
+
+function getCategoryEyebrow(topic) {
+  const type = getContentType(topic);
+  if (type === 'case-study') return 'CASE STUDY';
+  if (type === 'architecture') return 'ARCHITECTURE NOTE';
+  return 'SYSTEM DESIGN';
+}
+
+function filterArticles(topics, contentTab, domain) {
+  return topics.filter(function (t) {
+    if (t.stub) return false;
+    if (contentTab !== 'all' && getContentType(t) !== contentTab) return false;
+    if (domain !== 'all' && !(t.tags || []).includes(domain)) return false;
+    return true;
+  });
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function renderLanding() {
   if (!_sdDetail) return;
   const topics = getTopics();
   const published = topics.filter(function (t) { return !t.stub; });
-  const soon = topics.filter(function (t) { return t.stub; });
-  let html = '';
-  html += '<section class="sd-landing">';
-  if (published.length) {
-    html += '<div class="sd-landing-grid">';
-    published.forEach(function (t) {
+  const domains = getArticleDomains(published);
+  const filtered = filterArticles(topics, _activeContentTab, _activeDomain);
+
+  let html = '<section class="sd-list-view">';
+
+  // ── Header ──
+  html += '<header class="sd-list-header">';
+  html += '<h1 class="sd-list-title">' + escapeHtml(uiText('pageTitle')) + '</h1>';
+  html += '<p class="sd-list-subtitle">' + escapeHtml(uiText('pageSubtitle')) + '</p>';
+
+  // ── Content type tabs ──
+  html += '<nav class="sd-content-tabs" role="tablist">';
+  CONTENT_TABS.forEach(function (tab) {
+    const active = _activeContentTab === tab.id ? ' sd-tab-active' : '';
+    html += '<button type="button" class="sd-content-tab' + active + '" data-tab="' + tab.id + '" role="tab" aria-selected="' + (_activeContentTab === tab.id) + '">';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">' + tab.icon + '</span>';
+    html += '<span>' + escapeHtml(tab.label) + '</span>';
+    html += '</button>';
+  });
+  html += '</nav>';
+  html += '</header>';
+
+  // ── Main content area with sidebar ──
+  html += '<div class="sd-list-body">';
+
+  // ── Domains sidebar ──
+  html += '<aside class="sd-domains-sidebar">';
+  html += '<div class="sd-domains-title">' + escapeHtml(uiText('domains')) + '</div>';
+  html += '<nav class="sd-domains-nav" role="list">';
+  // "All" item
+  const allActive = _activeDomain === 'all' ? ' sd-domain-active' : '';
+  html += '<button type="button" class="sd-domain-item' + allActive + '" data-domain="all">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">apps</span>';
+  html += '<span class="sd-domain-label">' + escapeHtml(uiText('all')) + '</span>';
+  html += '<span class="sd-domain-count">' + published.length + '</span>';
+  html += '</button>';
+  // Domain items (hide 0-count)
+  domains.forEach(function (d) {
+    if (d.count === 0) return;
+    const active = _activeDomain === d.name ? ' sd-domain-active' : '';
+    const icon = DOMAIN_ICONS[d.name] || 'label';
+    html += '<button type="button" class="sd-domain-item' + active + '" data-domain="' + escapeHtml(d.name) + '">';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
+    html += '<span class="sd-domain-label">' + escapeHtml(d.name) + '</span>';
+    html += '<span class="sd-domain-count">' + d.count + '</span>';
+    html += '</button>';
+  });
+  html += '</nav>';
+  html += '</aside>';
+
+  // ── Article list ──
+  html += '<div class="sd-article-list">';
+  if (filtered.length) {
+    filtered.forEach(function (t) {
       const loc = localeOf(t);
-      const premiumClass = t.tier === 'premium' ? ' sd-premium' : '';
-      html += '<button type="button" class="sd-landing-card' + premiumClass + '" data-topic-id="' + t.id + '">';
-      html += '<span class="material-symbols-outlined" aria-hidden="true">' + (t.icon || 'article') + '</span>';
-      html += '<strong>' + escapeHtml(loc.title) + '</strong>';
-      html += '<small>' + escapeHtml(loc.subtitle) + '</small>';
-      if (t.tier === 'premium') {
-        html += '<span class="material-symbols-outlined sd-landing-lock" aria-label="Premium">lock</span>';
+      const eyebrow = getCategoryEyebrow(t);
+      const premiumClass = t.tier === 'premium' ? ' sd-card-premium' : '';
+      html += '<article class="sd-article-card' + premiumClass + '" data-topic-id="' + t.id + '">';
+
+      // Thumbnail (icon-based for now)
+      html += '<div class="sd-card-thumb">';
+      html += '<span class="material-symbols-outlined">' + (t.icon || 'article') + '</span>';
+      html += '</div>';
+
+      // Content
+      html += '<div class="sd-card-content">';
+      html += '<div class="sd-card-eyebrow">' + escapeHtml(eyebrow) + '</div>';
+      html += '<h2 class="sd-card-title">' + escapeHtml(loc.title) + '</h2>';
+      html += '<p class="sd-card-subtitle">' + escapeHtml(loc.subtitle) + '</p>';
+
+      // Tags
+      if (t.tags && t.tags.length) {
+        html += '<div class="sd-card-tags">';
+        t.tags.slice(0, 4).forEach(function (tag) {
+          html += '<span class="sd-card-tag">' + escapeHtml(tag) + '</span>';
+        });
+        html += '</div>';
       }
-      html += '</button>';
+      html += '</div>';
+
+      // Meta (date + read time)
+      html += '<div class="sd-card-meta">';
+      if (t.publishedAt) {
+        html += '<span class="sd-card-date"><span class="material-symbols-outlined">calendar_today</span>' + formatDate(t.publishedAt) + '</span>';
+      }
+      if (t.readMinutes) {
+        html += '<span class="sd-card-read"><span class="material-symbols-outlined">schedule</span>' + t.readMinutes + ' ' + uiText('minRead') + '</span>';
+      }
+      html += '</div>';
+
+      // Arrow
+      html += '<div class="sd-card-arrow"><span class="material-symbols-outlined">arrow_forward</span></div>';
+
+      if (t.tier === 'premium') {
+        html += '<span class="material-symbols-outlined sd-card-lock" aria-label="Premium">lock</span>';
+      }
+      html += '</article>';
     });
-    html += '</div>';
   } else {
     html += _cmsLoaded
-      ? '<p class="sd-detail-empty">' + escapeHtml(uiText('unavailable')) + '</p>'
-      : '<div class="sd-detail-empty sd-detail-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
+      ? '<p class="sd-list-empty">' + escapeHtml(uiText('noResults')) + '</p>'
+      : '<div class="sd-list-empty sd-list-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
   }
-  if (soon.length) {
-    html += '<h3>Coming next</h3>';
-    html += '<div class="sd-coming-grid">';
-    soon.forEach(function (t) {
-      const loc = localeOf(t);
-      html += '<div class="sd-coming-card"><strong>' + escapeHtml(loc.title) + '</strong><span>Draft</span></div>';
-    });
-    html += '</div>';
-  }
-  // Homepage sponsor slot placeholder
+
+  // Coming soon footer
+  html += '<div class="sd-list-footer">' + escapeHtml(uiText('comingSoon')) + '</div>';
+  html += '</div>'; // .sd-article-list
+
+  html += '</div>'; // .sd-list-body
   html += '<div class="sd-sponsor-slot-placeholder" data-placement="homepage"></div>';
   html += '</section>';
+
   _sdDetail.innerHTML = html;
-  _sdDetail.querySelectorAll('.sd-landing-card').forEach(function (card) {
+
+  // ── Event listeners ──
+  // Content tabs
+  _sdDetail.querySelectorAll('.sd-content-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      _activeContentTab = tab.getAttribute('data-tab');
+      renderLanding();
+    });
+  });
+  // Domain filters
+  _sdDetail.querySelectorAll('.sd-domain-item').forEach(function (item) {
+    item.addEventListener('click', function () {
+      _activeDomain = item.getAttribute('data-domain');
+      renderLanding();
+    });
+  });
+  // Article cards
+  _sdDetail.querySelectorAll('.sd-article-card').forEach(function (card) {
     card.addEventListener('click', function () {
       navigate(PATH_PREFIX + '/' + card.getAttribute('data-topic-id'));
       handleRoute();
     });
   });
+
   const homeSlot = _sdDetail.querySelector('.sd-sponsor-slot-placeholder[data-placement="homepage"]');
   if (homeSlot) mountSponsorSlot(homeSlot, 'homepage');
 }
@@ -702,7 +880,7 @@ function updateButton() {
   const label = _btn.querySelector('[data-i18n="systemDesign"]');
   const icon  = _btn.querySelector('.material-symbols-outlined');
   if (label) {
-    label.textContent = currentLang === 'fr' ? 'Conception systeme' : 'System Design';
+    label.textContent = currentLang === 'fr' ? 'Architecture logicielle' : 'Software Architecture';
   }
   if (icon) icon.textContent = 'schema';
   _btn.setAttribute('aria-pressed', sysOn ? 'true' : 'false');
@@ -744,7 +922,10 @@ function handleRoute() {
     _activeTopic = null;
     resetMeta();
     setView('sysdesign');
-    renderTopicList();
+    // Hide old sidebar on landing view — the new list view has its own sidebar
+    if (_sdAside) _sdAside.setAttribute('hidden', '');
+    const body = document.querySelector('.body');
+    if (body) body.classList.add('sd-list-mode');
     renderLanding();
     return;
   }
@@ -754,6 +935,10 @@ function handleRoute() {
   _userToggledSidebar = false;
   applyArticleMeta(topicById(id));
   setView('sysdesign');
+  // Show old sidebar for article detail view
+  if (_sdAside) _sdAside.removeAttribute('hidden');
+  const body = document.querySelector('.body');
+  if (body) body.classList.remove('sd-list-mode');
   renderTopicList();
   highlightActiveTopic();
   renderTopicDetail();

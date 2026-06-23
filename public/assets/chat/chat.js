@@ -441,7 +441,8 @@ function renderModeChooser() {
       // (→ applyGoogleProfileToChat) can route to free-form instead of
       // the guided hire flow.
       state.mode = 'freeform';
-      if (!googleCredential || !siteProfile || siteProfile.type === 'guest') {
+      const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      if (!isLocal && (!googleCredential || !siteProfile || siteProfile.type === 'guest')) {
         renderAtlasSignInPrompt();
         return;
       }

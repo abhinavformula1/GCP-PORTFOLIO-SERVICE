@@ -65,8 +65,10 @@ import {
 } from './recommendations/recommendations.js';
 import {
   initSystemDesign, openSystemDesign, closeSystemDesign,
-} from './ui/systemdesign.js';
-import { renderAtlasShell, renderTechFooter, renderTopbar } from './ui/shared-layout.js';
+} from './ui/software-architecture.js';
+import { renderTopbar }     from './ui/topbar.js';
+import { renderTechFooter } from './ui/footer.js';
+import { renderAtlasShell } from './ui/atlas-shell.js';
 import { mountSponsorSlot } from './ui/sponsorship.js';
 import '/assets/ui/loader.js';
 
