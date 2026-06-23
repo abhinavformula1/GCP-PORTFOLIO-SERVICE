@@ -375,6 +375,16 @@ async function saveAtlasCacheEntry(cacheKey, entry) {
 // require rebuilding the Cloud Run container. The checked-in JS topics remain
 // a frontend fallback for local/dev outages while the CMS collection is empty.
 
+const ALLOWED_CONTENT_TYPES = new Set(['system-design', 'architecture', 'case-study']);
+function normaliseContentType(raw, categoryFallback) {
+  const explicit = String(raw || '').trim();
+  if (ALLOWED_CONTENT_TYPES.has(explicit)) return explicit;
+  const category = String(categoryFallback || '').trim().toLowerCase();
+  if (category === 'case-study' || category === 'case_study' || category === 'casestudy') return 'case-study';
+  if (category === 'architecture') return 'architecture';
+  return 'system-design';
+}
+
 function sanitiseArticleBlocks(blocks) {
   if (!Array.isArray(blocks)) return [];
   return blocks
@@ -409,7 +419,9 @@ function normaliseSystemDesignArticle(id, data) {
   const blocks = sanitiseArticleBlocks(v.blocks);
   return {
     id,
-    category:    String(v.category || 'architecture'),
+    // category is legacy; contentType is the primary filter axis.
+    category:    v.category != null ? String(v.category) : '',
+    contentType: normaliseContentType(v.contentType, v.category),
     icon:        String(v.icon || 'article'),
     status:      String(v.status || 'Published'),
     tags:        Array.isArray(v.tags) ? v.tags.map(String).slice(0, 12) : [],
@@ -466,25 +478,49 @@ async function upsertSystemDesignArticle(article, { publishedBy } = {}) {
     const previous = snap.exists ? (snap.data() || {}) : {};
     const nextVersion = Number(previous.version || 0) + 1;
     const now = FieldValue.serverTimestamp();
+
+    const contentType = normaliseContentType(
+      article.contentType !== undefined ? article.contentType : previous.contentType,
+      article.category !== undefined ? article.category : previous.category
+    );
+    const tags = article.tags !== undefined
+      ? (Array.isArray(article.tags) ? article.tags.map(String).slice(0, 12) : [])
+      : (Array.isArray(previous.tags) ? previous.tags.map(String).slice(0, 12) : []);
+    const blocks = article.blocks !== undefined
+      ? sanitiseArticleBlocks(article.blocks)
+      : sanitiseArticleBlocks(previous.blocks);
+    const thumbnail = article.thumbnail !== undefined
+      ? (typeof article.thumbnail === 'string' ? article.thumbnail : '')
+      : (typeof previous.thumbnail === 'string' ? previous.thumbnail : '');
+    const enDoc = (article.en && typeof article.en === 'object')
+      ? article.en
+      : (previous.en && typeof previous.en === 'object' ? previous.en : {});
+    const frDoc = (article.fr && typeof article.fr === 'object')
+      ? article.fr
+      : (previous.fr && typeof previous.fr === 'object' ? previous.fr : {});
+
     const payload = {
-      category:    String(article.category || previous.category || 'architecture'),
+      contentType,
       icon:        String(article.icon || previous.icon || 'article'),
       status:      String(article.status || previous.status || 'Published'),
-      tags:        Array.isArray(article.tags) ? article.tags.map(String).slice(0, 12) : [],
+      tags,
       readMinutes: article.readMinutes !== undefined
         ? (article.readMinutes ? Number(article.readMinutes) : null)
         : (previous.readMinutes ? Number(previous.readMinutes) : null),
       tier:        String(article.tier || previous.tier || 'free'),
-      stub:        !!article.stub,
+      stub:        article.stub !== undefined ? !!article.stub : !!previous.stub,
       order:       Number(article.order || previous.order || 999),
-      blocks:      sanitiseArticleBlocks(article.blocks),
-      thumbnail:   typeof article.thumbnail === 'string' ? article.thumbnail : '',
-      en:          article.en && typeof article.en === 'object' ? article.en : {},
-      fr:          article.fr && typeof article.fr === 'object' ? article.fr : {},
+      blocks,
+      thumbnail,
+      en:          enDoc,
+      fr:          frDoc,
       version:     nextVersion,
       updatedAt:   now,
       updatedBy:   String(publishedBy || 'local-script'),
     };
+    // Persist legacy category only when explicitly supplied or already present.
+    if (article.category !== undefined) payload.category = String(article.category || '');
+    else if (previous.category !== undefined) payload.category = String(previous.category || '');
     if (!snap.exists) payload.createdAt = now;
 
     tx.set(ref, payload, { merge: true });

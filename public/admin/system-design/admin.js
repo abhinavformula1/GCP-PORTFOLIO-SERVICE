@@ -151,7 +151,6 @@ const els = {
   totalCount:      document.getElementById('articleTotalCount'),
   publishedCount:  document.getElementById('articlePublishedCount'),
   draftCount:      document.getElementById('articleDraftCount'),
-  seedBtn:         document.getElementById('seedArticlesBtn'),
   newBtn:          document.getElementById('newArticleBtn'),
   id:              document.getElementById('articleId'),
   statusField:     document.getElementById('articleStatus'),
@@ -789,9 +788,16 @@ async function saveArticleFromComposer() {
     throw new Error('Add some content before saving.');
   }
   clearDraftAutosave();
-  const status = els.statusField.value === 'Published' ? 'Published' : 'Draft';
+  // Never silently republish from inside the section composer. If the current
+  // article is Published, we switch to Draft on first edit and save a draft.
+  const status = els.statusField.value === 'Published' ? 'Draft' : 'Draft';
+  if (els.statusField.value === 'Published') {
+    els.statusField.value = 'Draft';
+    updateWorkflowChrome('Draft');
+    renderPreview();
+  }
   await saveArticleWithStatus(status, { silent: true });
-  return status === 'Published' ? 'Published to Firestore.' : 'Draft saved to Firestore.';
+  return 'Draft saved to Firestore.';
 }
 
 function articleFromForm() {
@@ -965,13 +971,34 @@ function buildSectionCard(section, index) {
   });
   section.composer = composer;
 
+  // If someone explicitly clicks "Edit" on a Published article, switch the
+  // workflow to Draft first (so changes don't silently republish).
+  const editBtn = composer.element.querySelector('.composer-tool-edit');
+  if (editBtn) {
+    editBtn.addEventListener('click', function () {
+      // Let the composer toggle run first, then reconcile workflow state.
+      setTimeout(function () {
+        if (!composer.isEditable()) return;
+        if (!els.statusField || els.statusField.value !== 'Published') return;
+        els.statusField.value = 'Draft';
+        updateWorkflowChrome('Draft');
+        renderPreview();
+        setSectionStatus(els.systemStatus, 'Switched to Draft (Published articles require explicit republish).', 'info');
+      }, 0);
+    });
+  }
+
+  card.append(ribbon, composer.element);
+
+  // IMPORTANT: apply the lock AFTER the composer is inside the section card so
+  // setEditable() can find and disable the ribbon picklist / controls.
+  composer.setEditable(composer.isEditable());
+
   // Published articles should open in a clearly read-only mode. Editing must be
   // explicit via the "Edit" toggle.
   if (els.statusField && els.statusField.value === 'Published') {
     composer.setEditable(false);
   }
-
-  card.append(ribbon, composer.element);
 
   // Pull the status ribbon out of the composer's flex container and place it
   // above the card so messages appear above the section, not inside it.
@@ -1082,6 +1109,9 @@ function canAutosaveArticle(article) {
 function scheduleDraftAutosave() {
   clearDraftAutosave();
   const article = articleFromForm();
+  // Avoid silently publishing. Published articles must go through the explicit
+  // publish flow; drafts can autosave freely.
+  if ((article.status || '').toLowerCase() === 'published') return;
   if (!canAutosaveArticle(article)) return;
   autosaveTimer = setTimeout(function () {
     autosaveTimer = 0;
@@ -2048,12 +2078,6 @@ function handlePublishDialogBack() {
   closePublishReview();
 }
 
-async function seedArticles() {
-  setSectionStatus(els.systemStatus, 'Importing seed articles...', 'info');
-  const data = await authedJson('/api/admin/system-design/seed', { method: 'POST' });
-  setSectionStatus(els.systemStatus, 'Imported ' + data.imported + ' seed articles.', 'success');
-  await loadArticles();
-}
 
 function initGoogle() {
   if (!GOOGLE_CLIENT_ID) {
@@ -2398,9 +2422,6 @@ els.confirmPublishBtn.addEventListener('click', function () {
       els.confirmPublishBtn.disabled = false;
       setSectionStatus(els.systemStatus, err.message, 'error');
     });
-});
-els.seedBtn.addEventListener('click', function () {
-  seedArticles().catch(function (err) { setSectionStatus(els.systemStatus, err.message, 'error'); });
 });
 els.newBtn.addEventListener('click', function () {
   selectedId = '';

@@ -542,7 +542,7 @@ function getContentType(topic) {
   return 'system-design';
 }
 
-function getCategoryEyebrow(topic) {
+function getContentTypeEyebrow(topic) {
   const type = getContentType(topic);
   if (type === 'case-study') return 'CASE STUDY';
   if (type === 'architecture') return 'ARCHITECTURE NOTE';
@@ -624,7 +624,7 @@ function renderLanding() {
   if (filtered.length) {
     filtered.forEach(function (t) {
       const loc = localeOf(t);
-      const eyebrow = getCategoryEyebrow(t);
+      const eyebrow = getContentTypeEyebrow(t);
       const premiumClass = t.tier === 'premium' ? ' sd-card-premium' : '';
       html += '<article class="sd-article-card' + premiumClass + '" data-topic-id="' + t.id + '">';
 
@@ -973,7 +973,12 @@ export function initSystemDesign() {
   const observer = new MutationObserver(function () {
     renderTopicList();
     highlightActiveTopic();
-    if (_activeView === 'sysdesign') renderTopicDetail();
+    if (_activeView === 'sysdesign') {
+      // When on the landing (list) route, _activeTopic is null and the list view
+      // owns _sdDetail. Don't let renderTopicDetail() wipe it on locale flips.
+      if (_activeTopic) renderTopicDetail();
+      else renderLanding();
+    }
     updateButton();
   });
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });

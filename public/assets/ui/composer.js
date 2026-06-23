@@ -222,7 +222,14 @@ export function createComposer(options) {
     // enabled so authors have an explicit entry into edit mode.
     toolbar.querySelectorAll('button').forEach(function (btn) {
       if (btn === editBtn) return;
-      // Save is also a write action; it should be usable only while editable.
+      if (!editable && !btn.dataset.composerPrevDisabled) {
+        btn.dataset.composerPrevDisabled = btn.disabled ? '1' : '0';
+      }
+      if (editable && btn.dataset.composerPrevDisabled) {
+        btn.disabled = btn.dataset.composerPrevDisabled === '1';
+        delete btn.dataset.composerPrevDisabled;
+        return;
+      }
       btn.disabled = !editable;
     });
     if (saveBtn) saveBtn.disabled = !editable;

@@ -19,6 +19,10 @@ async function main() {
   const articles = Array.isArray(payload) ? payload : [payload];
 
   for (const article of articles) {
+    if (!article.contentType) {
+      const category = String(article.category || '').trim().toLowerCase();
+      article.contentType = category === 'architecture' ? 'architecture' : 'system-design';
+    }
     const result = await firestore.upsertSystemDesignArticle(article, {
       publishedBy: process.env.USER || 'local-script',
     });
