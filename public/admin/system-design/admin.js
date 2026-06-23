@@ -965,6 +965,12 @@ function buildSectionCard(section, index) {
   });
   section.composer = composer;
 
+  // Published articles should open in a clearly read-only mode. Editing must be
+  // explicit via the "Edit" toggle.
+  if (els.statusField && els.statusField.value === 'Published') {
+    composer.setEditable(false);
+  }
+
   card.append(ribbon, composer.element);
 
   // Pull the status ribbon out of the composer's flex container and place it

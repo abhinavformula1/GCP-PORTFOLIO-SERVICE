@@ -186,8 +186,32 @@ export function createComposer(options) {
     // Also lock/unlock the section-type dropdown in the parent ribbon if present
     const ribbon = element.closest('.sd-section-editor');
     if (ribbon) {
-      ribbon.querySelectorAll('.sd-section-type-select, .sd-section-type-custom-input')
-        .forEach(function (el) { el.disabled = !editable; });
+      ribbon
+        .querySelectorAll('.sd-section-type-select, .sd-section-type-custom-input')
+        .forEach(function (el) {
+          if (!editable && !el.dataset.composerPrevDisabled) {
+            el.dataset.composerPrevDisabled = el.disabled ? '1' : '0';
+          }
+          if (editable && el.dataset.composerPrevDisabled) {
+            el.disabled = el.dataset.composerPrevDisabled === '1';
+            delete el.dataset.composerPrevDisabled;
+            return;
+          }
+          el.disabled = !editable;
+        });
+
+      // When locked, the whole section should feel read-only (no reordering / delete).
+      ribbon.querySelectorAll('.sd-section-ribbon-controls button').forEach(function (btn) {
+        if (!editable && !btn.dataset.composerPrevDisabled) {
+          btn.dataset.composerPrevDisabled = btn.disabled ? '1' : '0';
+        }
+        if (editable && btn.dataset.composerPrevDisabled) {
+          btn.disabled = btn.dataset.composerPrevDisabled === '1';
+          delete btn.dataset.composerPrevDisabled;
+          return;
+        }
+        btn.disabled = !editable;
+      });
     }
     if (editBtn) {
       editBtn.classList.toggle('composer-tool-active', editable);
