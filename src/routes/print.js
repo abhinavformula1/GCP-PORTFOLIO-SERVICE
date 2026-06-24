@@ -29,7 +29,8 @@ router.get('/system-design/:id', async (req, res, next) => {
       return res.status(404).send('Article not found.');
     }
 
-    const html = buildPrintDocument(article);
+    const mode = String(req.query.mode || '').toLowerCase();
+    const html = buildPrintDocument(article, { mode: mode === 'lite' ? 'lite' : 'full' });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'noindex');
     res.send(html);

@@ -409,6 +409,11 @@
   display: grid;
   gap: 10px;
   margin-top: 16px;
+  /* Let the library list scroll independently of the editor column. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .sd-admin-article {
@@ -1667,6 +1672,12 @@
   position: sticky;
   top: 18px;
   padding: 18px;
+  /* Keep the library usable while the editor is long:
+     the panel stays sticky, and the list scrolls within it. */
+  max-height: calc(100vh - 36px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-radius: 24px;
   transition: padding 0.15s;
 }
@@ -4475,6 +4486,8 @@ col.sd-tbl-action-col { width: 56px; }
 
   .sd-admin-list-panel {
     position: static;
+    max-height: none;
+    overflow: visible;
   }
 
   .sd-admin-module {
