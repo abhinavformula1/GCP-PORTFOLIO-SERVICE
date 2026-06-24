@@ -15,9 +15,9 @@
  *     with domain filters is rendered inside the content area.
  *   - Article detail view: shows a single article with the topic sidebar.
  *
- * URL routing: uses the History API (/system-design/<id>) so every
+ * URL routing: uses the History API (/software-architecture/<id>) so every
  * article gets a real, crawlable URL that Google can index. The server
- * catch-all serves index.html for any /system-design/* path so direct
+ * catch-all serves index.html for any /software-architecture/* path so direct
  * loads and reloads work correctly.
  *
  * Locale flip -- listens for the <html lang> attribute mutation that
@@ -51,6 +51,32 @@ let _cmsLoaded   = false;
 let _tierConfig  = null;
 let _userToggledSidebar = false;
 
+const SIDEBAR_COLLAPSE_KEY = 'sd_topics_collapsed';
+const LIST_FILTERS_KEY = 'sd_list_filters_v1';
+
+function persistListFilters() {
+  try {
+    sessionStorage.setItem(LIST_FILTERS_KEY, JSON.stringify({
+      contentTab: _activeContentTab,
+      domain: _activeDomain,
+    }));
+  } catch (_) {}
+}
+
+function restoreListFilters() {
+  try {
+    const raw = sessionStorage.getItem(LIST_FILTERS_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    const tab = String(data && data.contentTab || '');
+    const dom = String(data && data.domain || '');
+    if (tab && (tab === 'all' || tab === 'system-design' || tab === 'architecture' || tab === 'case-study')) {
+      _activeContentTab = tab;
+    }
+    if (dom) _activeDomain = dom;
+  } catch (_) {}
+}
+
 // ── List view filters ────────────────────────────────────────────────────────
 let _activeContentTab = 'all';   // 'all' | 'system-design' | 'architecture' | 'case-study'
 let _activeDomain = 'all';       // 'all' | tag name
@@ -78,7 +104,10 @@ const DOMAIN_ICONS = {
   'MuleSoft':      'hub',
 };
 
-const PATH_PREFIX = '/system-design';
+// Public route prefix for the Software Architecture library.
+// Keep LEGACY_PREFIX working via redirects for old links/SEO.
+const PATH_PREFIX = '/software-architecture';
+const LEGACY_PREFIX = '/system-design';
 // SITE_BASE is overridden at runtime by loadSeoConfig() from the admin-managed
 // SEO config in Firestore. Falls back to the Cloud Run URL if the API is unreachable.
 let SITE_BASE = 'https://portfolio-service-647206478056.asia-southeast1.run.app';
@@ -326,11 +355,210 @@ function normaliseCmsTopic(article) {
   };
 }
 
+function renderSidebar(mode) {
+  if (!_sdAside) return;
+  const topics = getTopics();
+  const published = topics.filter(function (t) { return t && !t.stub; });
+  const domains = getArticleDomains(published);
+  const isDetail = mode === 'detail';
+
+  let html = '<div class="sd-sa-sidebar' + (isDetail ? ' sd-sa-sidebar--detail' : '') + '">';
+
+  // Search
+  html += '<label class="sd-topic-search sd-sa-search">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">search</span>';
+  html += '<input type="search" value="' + escapeHtml(isDetail ? _topicFilter : '') + '" placeholder="' + escapeHtml(currentLang === 'fr' ? 'Rechercher…' : 'Search articles…') + '" aria-label="' + escapeHtml(currentLang === 'fr' ? 'Rechercher des articles' : 'Search articles') + '">';
+  html += '</label>';
+
+  // Topics
+  html += '<div class="sd-sa-section">';
+  html += '<nav class="sd-sa-nav" role="list">';
+  const allTopicsActive = _activeDomain === 'all' ? ' sd-domain-active' : '';
+  html += '<button type="button" class="sd-domain-item' + allTopicsActive + '" data-filter-kind="domain" data-filter-id="all" title="' + escapeHtml(currentLang === 'fr' ? 'Tous' : 'All') + '">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">apps</span>';
+  html += '<span class="sd-domain-label">' + escapeHtml(currentLang === 'fr' ? 'Tous' : 'All') + '</span>';
+  html += '<span class="sd-domain-count">' + published.length + '</span>';
+  html += '</button>';
+  domains.forEach(function (d) {
+    if (!d || d.count === 0) return;
+    const active = _activeDomain === d.name ? ' sd-domain-active' : '';
+    const icon = DOMAIN_ICONS[d.name] || 'label';
+    html += '<button type="button" class="sd-domain-item' + active + '" data-filter-kind="domain" data-filter-id="' + escapeHtml(d.name) + '" title="' + escapeHtml(d.name) + '">';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
+    html += '<span class="sd-domain-label">' + escapeHtml(d.name) + '</span>';
+    html += '<span class="sd-domain-count">' + d.count + '</span>';
+    html += '</button>';
+  });
+  html += '</nav>';
+  html += '</div>';
+
+  // Footer collapse control
+  html += '<div class="sd-sa-footer">';
+  html += '<button type="button" class="sd-sa-collapse" aria-label="Collapse sidebar" title="Collapse sidebar">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>';
+  html += '<span class="sd-sa-collapse-label">' + escapeHtml(currentLang === 'fr' ? 'Réduire' : 'Collapse') + '</span>';
+  html += '</button>';
+  html += '</div>';
+
+  html += '</div>';
+  _sdAside.innerHTML = html;
+
+  // Wire up search
+  const search = _sdAside.querySelector('.sd-topic-search input');
+  if (search) {
+    search.addEventListener('input', function () {
+      _topicFilter = search.value || '';
+      if (isDetail) renderSidebar('detail');
+    });
+  }
+
+  // Wire up topic filters
+  _sdAside.querySelectorAll('[data-filter-kind="domain"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      _activeDomain = btn.getAttribute('data-filter-id') || 'all';
+      persistListFilters();
+      if (_activeDomain === 'all') {
+        // Apps / 9-dot = "show me everything": reset and return to library list.
+        _activeContentTab = 'all';
+        _topicFilter = '';
+        if (isDetail) {
+          navigate(PATH_PREFIX);
+          handleRoute();
+          return;
+        }
+      }
+      if (isDetail) renderSidebar('detail');
+      else renderLandingRoute();
+    });
+  });
+
+  // Collapse control
+  const collapseBtn = _sdAside.querySelector('.sd-sa-collapse');
+  if (collapseBtn) {
+    function syncCollapseIcon() {
+      const body = document.querySelector('.body');
+      const icon = collapseBtn.querySelector('.material-symbols-outlined');
+      if (!icon || !body) return;
+      icon.textContent = body.classList.contains('sd-topics-collapsed') ? 'left_panel_open' : 'left_panel_close';
+    }
+    syncCollapseIcon();
+    collapseBtn.addEventListener('click', function () {
+      const body = document.querySelector('.body');
+      if (!body) return;
+      const collapsed = body.classList.toggle('sd-topics-collapsed');
+      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
+      syncCollapseIcon();
+    });
+  }
+}
+
+function renderLandingMain() {
+  if (!_sdDetail) return;
+  restoreListFilters();
+  const topics = getTopics();
+  const filtered = filterArticles(topics, _activeContentTab, _activeDomain);
+
+  let html = '<section class="sd-list-view sd-sa-list">';
+
+  // Header
+  html += '<header class="sd-list-header">';
+  html += '<h1 class="sd-list-title">' + escapeHtml(uiText('pageTitle')) + '</h1>';
+  html += '<p class="sd-list-subtitle">' + escapeHtml(uiText('pageSubtitle')) + '</p>';
+  // Content type tabs (primary navigation, like previous UX)
+  html += '<div class="sd-content-tabs-row">';
+  html += '<nav class="sd-content-tabs" role="tablist">';
+  // Apple-grade: no explicit "All" chip. Only show real types; clicking the
+  // active chip again toggles back to "all types".
+  CONTENT_TABS.filter(function (t) { return t.id !== 'all'; }).forEach(function (tab) {
+    const active = _activeContentTab === tab.id ? ' sd-tab-active' : '';
+    const label = tab.label;
+    html += '<button type="button" class="sd-content-tab' + active + '" data-tab="' + tab.id + '" role="tab" aria-selected="' + (_activeContentTab === tab.id) + '">';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">' + tab.icon + '</span>';
+    html += '<span>' + escapeHtml(label) + '</span>';
+    html += '</button>';
+  });
+  html += '</nav>';
+  const canClear = !(_activeContentTab === 'all' && _activeDomain === 'all');
+  html += '<button type="button" class="sd-clear-filters' + (canClear ? '' : ' sd-clear-filters-hidden') + '" aria-label="Clear filters">Clear</button>';
+  html += '</div>';
+  html += '</header>';
+
+  // Articles
+  html += '<div class="sd-article-list">';
+  if (filtered.length) {
+    filtered.forEach(function (t) {
+      const loc = localeOf(t);
+      const eyebrow = getContentTypeEyebrow(t);
+      const premiumClass = t.tier === 'premium' ? ' sd-card-premium' : '';
+      html += '<article class="sd-article-card' + premiumClass + '" data-topic-id="' + t.id + '">';
+      html += '<div class="sd-card-thumb"><span class="material-symbols-outlined">' + (t.icon || 'article') + '</span></div>';
+      html += '<div class="sd-card-content">';
+      html += '<div class="sd-card-eyebrow">' + escapeHtml(eyebrow) + '</div>';
+      html += '<h2 class="sd-card-title">' + escapeHtml(loc.title) + '</h2>';
+      html += '<p class="sd-card-subtitle">' + escapeHtml(loc.subtitle) + '</p>';
+      if (t.tags && t.tags.length) {
+        html += '<div class="sd-card-tags">';
+        t.tags.slice(0, 4).forEach(function (tag) { html += '<span class="sd-card-tag">' + escapeHtml(tag) + '</span>'; });
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '<div class="sd-card-meta">';
+      if (t.readMinutes) html += '<span class="sd-card-read"><span class="material-symbols-outlined">schedule</span>' + t.readMinutes + ' ' + uiText('minRead') + '</span>';
+      html += '</div>';
+      html += '<div class="sd-card-arrow"><span class="material-symbols-outlined">arrow_forward</span></div>';
+      if (t.tier === 'premium') html += '<span class="material-symbols-outlined sd-card-lock" aria-label="Premium">lock</span>';
+      html += '</article>';
+    });
+  } else {
+    html += _cmsLoaded
+      ? '<p class="sd-list-empty">' + escapeHtml(uiText('noResults')) + '</p>'
+      : '<div class="sd-list-empty sd-list-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
+  }
+  html += '</div>';
+  html += '</section>';
+
+  _sdDetail.innerHTML = html;
+
+  // Tabs
+  _sdDetail.querySelectorAll('.sd-content-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      const next = tab.getAttribute('data-tab') || 'all';
+      // Toggle-off pattern: clicking an already-selected type clears back to "all"
+      _activeContentTab = (_activeContentTab === next) ? 'all' : next;
+      persistListFilters();
+      renderLandingRoute();
+    });
+  });
+  // Clear resets both dimensions (type + topic)
+  const clearBtn = _sdDetail.querySelector('.sd-clear-filters');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      _activeContentTab = 'all';
+      _activeDomain = 'all';
+      persistListFilters();
+      renderLandingRoute();
+    });
+  }
+
+  _sdDetail.querySelectorAll('.sd-article-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      navigate(PATH_PREFIX + '/' + card.getAttribute('data-topic-id'));
+      handleRoute();
+    });
+  });
+}
+
+function renderLandingRoute() {
+  renderSidebar('list');
+  renderLandingMain();
+}
+
 function rerenderSystemDesignView() {
-  renderTopicList();
+  // Keep existing detail sidebar behavior; landing sidebar is rendered from route handler.
+  if (_activeView === 'sysdesign' && _activeTopic) renderSidebar('detail');
   if (_activeView !== 'sysdesign') return;
   if (_activeTopic) renderTopicDetail();
-  else renderLanding();
+  else renderLandingRoute();
 }
 
 function applyCmsTopics(topics) {
@@ -393,39 +621,23 @@ function ensureDom() {
   _sdAside.className = 'sd-topics';
   _sdAside.setAttribute('hidden', '');
 
-  // Collapse tab — always visible even when sidebar is collapsed
-  const collapseTab = document.createElement('button');
-  collapseTab.type = 'button';
-  collapseTab.className = 'sd-topics-collapse-tab';
-  collapseTab.setAttribute('aria-label', 'Expand article list');
-  collapseTab.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>';
-  collapseTab.addEventListener('click', function () {
-    const collapsed = body.classList.toggle('sd-topics-collapsed');
-    collapseTab.setAttribute('aria-label', collapsed ? 'Expand article list' : 'Collapse article list');
-    collapseTab.querySelector('.material-symbols-outlined').textContent = collapsed ? 'chevron_right' : 'chevron_left';
+  function setSidebarCollapsed(collapsed) {
+    body.classList.toggle('sd-topics-collapsed', !!collapsed);
     _userToggledSidebar = true;
-  });
-  _sdAside.appendChild(collapseTab);
+    try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
+  }
+
+  // Restore persisted collapse state (desktop-only UI affordance).
+  try {
+    const persisted = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
+    if (persisted === '1') setSidebarCollapsed(true);
+  } catch (_) {}
 
   _sdDetail = document.createElement('main');
   _sdDetail.className = 'sd-detail';
   _sdDetail.setAttribute('hidden', '');
 
-  // Auto-collapse sidebar when user scrolls 300px into article detail
-  let _scrollTimer = null;
-  _sdDetail.addEventListener('scroll', function () {
-    if (_userToggledSidebar) return;
-    clearTimeout(_scrollTimer);
-    _scrollTimer = setTimeout(function () {
-      const shouldCollapse = _sdDetail.scrollTop > 300 && !!_activeTopic;
-      const isCollapsed = body.classList.contains('sd-topics-collapsed');
-      if (shouldCollapse !== isCollapsed) {
-        body.classList.toggle('sd-topics-collapsed', shouldCollapse);
-        collapseTab.setAttribute('aria-label', shouldCollapse ? 'Expand article list' : 'Collapse article list');
-        collapseTab.querySelector('.material-symbols-outlined').textContent = shouldCollapse ? 'chevron_right' : 'chevron_left';
-      }
-    }, 80);
-  });
+  // Apple-grade principle: no UI that collapses itself. Sidebar collapse is user-driven.
 
   body.appendChild(_sdAside);
   body.appendChild(_sdDetail);
@@ -439,10 +651,15 @@ function renderTopicList() {
   const query = normaliseText(_topicFilter);
   let html = '';
   html += '<div class="sd-topics-header">';
+  html += '<div class="sd-topics-header-row">';
   html += '<label class="sd-topic-search">';
   html += '<span class="material-symbols-outlined" aria-hidden="true">search</span>';
   html += '<input type="search" value="' + escapeHtml(_topicFilter) + '" placeholder="' + escapeHtml(uiText('search')) + '" aria-label="' + escapeHtml(uiText('search')) + '">';
   html += '</label>';
+  html += '<button type="button" class="sd-topics-collapse-btn" aria-label="Collapse article list" title="Collapse article list">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>';
+  html += '</button>';
+  html += '</div>';
   html += '</div>';
   html += '<button type="button" class="sd-overview-link' + (!_activeTopic ? ' sd-active' : '') + '" data-topic-id="">';
   html += '<span class="material-symbols-outlined" aria-hidden="true">dashboard</span>';
@@ -493,6 +710,27 @@ function renderTopicList() {
   }
   html += '</div>';
   _sdAside.innerHTML = html;
+  const collapseBtn = _sdAside.querySelector('.sd-topics-collapse-btn');
+  if (collapseBtn) {
+    collapseBtn.addEventListener('click', function () {
+      const body = document.querySelector('.body');
+      if (!body) return;
+      const collapsed = body.classList.toggle('sd-topics-collapsed');
+      _userToggledSidebar = true;
+      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
+    });
+    // Icon should reflect state.
+    const body = document.querySelector('.body');
+    const icon = collapseBtn.querySelector('.material-symbols-outlined');
+    if (icon && body) {
+      icon.textContent = body.classList.contains('sd-topics-collapsed') ? 'left_panel_open' : 'left_panel_close';
+    }
+    collapseBtn.addEventListener('click', function () {
+      const body = document.querySelector('.body');
+      const icon = collapseBtn.querySelector('.material-symbols-outlined');
+      if (icon && body) icon.textContent = body.classList.contains('sd-topics-collapsed') ? 'left_panel_open' : 'left_panel_close';
+    });
+  }
   const search = _sdAside.querySelector('.sd-topic-search input');
   if (search) {
     search.addEventListener('input', function () {
@@ -516,6 +754,11 @@ function renderTopicList() {
   const overview = _sdAside.querySelector('.sd-overview-link');
   if (overview) {
     overview.addEventListener('click', function () {
+      // Overview should land you in a "clean" library state.
+      _activeContentTab = 'all';
+      _activeDomain = 'all';
+      _topicFilter = '';
+      persistListFilters();
       navigate(PATH_PREFIX);
       handleRoute();
     });
@@ -567,6 +810,8 @@ function formatDate(dateStr) {
 
 function renderLanding() {
   if (!_sdDetail) return;
+  // Bring back last-used filters for a smoother "continue reading" experience.
+  restoreListFilters();
   const topics = getTopics();
   const published = topics.filter(function (t) { return !t.stub; });
   const domains = getArticleDomains(published);
@@ -580,6 +825,7 @@ function renderLanding() {
   html += '<p class="sd-list-subtitle">' + escapeHtml(uiText('pageSubtitle')) + '</p>';
 
   // ── Content type tabs ──
+  html += '<div class="sd-content-tabs-row">';
   html += '<nav class="sd-content-tabs" role="tablist">';
   CONTENT_TABS.forEach(function (tab) {
     const active = _activeContentTab === tab.id ? ' sd-tab-active' : '';
@@ -589,6 +835,9 @@ function renderLanding() {
     html += '</button>';
   });
   html += '</nav>';
+  const canClear = !(_activeContentTab === 'all' && _activeDomain === 'all');
+  html += '<button type="button" class="sd-clear-filters' + (canClear ? '' : ' sd-clear-filters-hidden') + '" aria-label="Clear filters">Clear</button>';
+  html += '</div>';
   html += '</header>';
 
   // ── Main content area with sidebar ──
@@ -687,6 +936,7 @@ function renderLanding() {
   _sdDetail.querySelectorAll('.sd-content-tab').forEach(function (tab) {
     tab.addEventListener('click', function () {
       _activeContentTab = tab.getAttribute('data-tab');
+      persistListFilters();
       renderLanding();
     });
   });
@@ -694,9 +944,19 @@ function renderLanding() {
   _sdDetail.querySelectorAll('.sd-domain-item').forEach(function (item) {
     item.addEventListener('click', function () {
       _activeDomain = item.getAttribute('data-domain');
+      persistListFilters();
       renderLanding();
     });
   });
+  const clearBtn = _sdDetail.querySelector('.sd-clear-filters');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      _activeContentTab = 'all';
+      _activeDomain = 'all';
+      persistListFilters();
+      renderLanding();
+    });
+  }
   // Article cards
   _sdDetail.querySelectorAll('.sd-article-card').forEach(function (card) {
     card.addEventListener('click', function () {
@@ -789,6 +1049,7 @@ function renderTopicDetail() {
   // Sponsor slot placeholder — mounted asynchronously below
   html += '<div class="sd-sponsor-slot-placeholder" data-placement="article-footer"></div>';
   _sdDetail.innerHTML = html;
+
   const exportBtn = _sdDetail.querySelector('.sd-export-btn');
   if (exportBtn) exportBtn.addEventListener('click', exportCurrentTopicPdf);
   if (typeof _sdDetail.scrollIntoView === 'function') {
@@ -824,7 +1085,7 @@ function exportCurrentTopicPdf() {
       const url  = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href     = url;
-      link.download = _activeTopic + '-system-design.pdf';
+      link.download = _activeTopic + '-software-architecture.pdf';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -890,17 +1151,23 @@ function updateButton() {
 }
 
 // ── History API routing ──────────────────────────────────────────────────────
-// URLs: /system-design           → topic list landing
-//       /system-design/<id>      → specific article
-// The server catch-all serves index.html for every /system-design/* path so
+// URLs: /software-architecture           → topic list landing
+//       /software-architecture/<id>      → specific article
+// The server catch-all serves index.html for every /software-architecture/* path so
 // direct loads, reloads, and social shares all work correctly.
 // Legacy hash URLs (#/system-design/…) are redirected on init.
 
 function readPath() {
   const p = location.pathname || '/';
-  if (!p.startsWith(PATH_PREFIX)) return null;
-  const rest = p.slice(PATH_PREFIX.length).replace(/^\//, '');
-  return { id: rest || null };
+  if (p.startsWith(PATH_PREFIX)) {
+    const rest = p.slice(PATH_PREFIX.length).replace(/^\//, '');
+    return { id: rest || null, legacy: false };
+  }
+  if (p.startsWith(LEGACY_PREFIX)) {
+    const rest = p.slice(LEGACY_PREFIX.length).replace(/^\//, '');
+    return { id: rest || null, legacy: true };
+  }
+  return null;
 }
 
 function navigate(path, replace) {
@@ -920,16 +1187,29 @@ function handleRoute() {
     }
     return;
   }
+  // If we landed on the legacy URL, replace it with the new one immediately.
+  if (route.legacy) {
+    const target = PATH_PREFIX + (route.id ? '/' + route.id : '');
+    navigate(target, true);
+  }
   let id = route.id;
   if (!id) {
     _activeTopic = null;
     resetMeta();
     setView('sysdesign');
-    // Hide old sidebar on landing view — the new list view has its own sidebar
-    if (_sdAside) _sdAside.setAttribute('hidden', '');
+    // Landing view uses the left sidebar for filters (matches reference design)
+    if (_sdAside) _sdAside.removeAttribute('hidden');
     const body = document.querySelector('.body');
-    if (body) body.classList.add('sd-list-mode');
-    renderLanding();
+    if (body) {
+      body.classList.add('sd-sa-list');
+      body.classList.remove('sd-list-mode');
+      // Restore persisted collapse for list view
+      try {
+        const persisted = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
+        body.classList.toggle('sd-topics-collapsed', persisted === '1');
+      } catch (_) {}
+    }
+    renderLandingRoute();
     return;
   }
   const topics = getTopics();
@@ -941,8 +1221,16 @@ function handleRoute() {
   // Show old sidebar for article detail view
   if (_sdAside) _sdAside.removeAttribute('hidden');
   const body = document.querySelector('.body');
-  if (body) body.classList.remove('sd-list-mode');
-  renderTopicList();
+  if (body) {
+    body.classList.remove('sd-list-mode');
+    body.classList.remove('sd-sa-list');
+    // Allow collapse in detail view too (same rail model as reference)
+    try {
+      const persisted = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
+      body.classList.toggle('sd-topics-collapsed', persisted === '1');
+    } catch (_) {}
+  }
+  renderSidebar('detail');
   highlightActiveTopic();
   renderTopicDetail();
 }
@@ -992,8 +1280,8 @@ export function initSystemDesign() {
     navigate(newPath, true);
   }
 
-  // Handle direct navigation to /system-design or /system-design/<id>
-  if (location.pathname.startsWith(PATH_PREFIX)) {
+  // Handle direct navigation to /software-architecture (new) or /system-design (legacy)
+  if (location.pathname.startsWith(PATH_PREFIX) || location.pathname.startsWith(LEGACY_PREFIX)) {
     handleRoute();
   }
 }

@@ -167,7 +167,7 @@ import '/assets/ui/loader.js';
         }));
       }
     } catch (_) {}
-    window.open('/admin/system-design/', '_blank', 'noopener');
+    window.open('/admin/software-architecture/', '_blank', 'noopener');
   }
   window.openSystemDesignAdmin = openSystemDesignAdmin;
 
@@ -539,7 +539,7 @@ import '/assets/ui/loader.js';
   /* ── System Design view ──
      Master/detail topic browser that swaps the body grid (resume DOM is
      hidden, not removed, so the Download Resume scraper still works).
-     Uses History API (/system-design/<id>) for crawlable, shareable URLs.
+     Uses History API (/software-architecture/<id>) for crawlable, shareable URLs.
      → ./ui/systemdesign.js  */
   window.openSystemDesign  = openSystemDesign;
   window.closeSystemDesign = closeSystemDesign;
