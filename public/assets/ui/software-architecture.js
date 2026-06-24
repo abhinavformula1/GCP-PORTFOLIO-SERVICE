@@ -53,6 +53,7 @@ let _userToggledSidebar = false;
 
 const SIDEBAR_COLLAPSE_KEY = 'sd_topics_collapsed';
 const LIST_FILTERS_KEY = 'sd_list_filters_v1';
+const PREMIUM_COUPON_KEY = 'sd_premium_coupon_v1';
 
 function persistListFilters() {
   try {
@@ -1034,10 +1035,18 @@ function renderTopicDetail() {
     html += '<div class="sd-tier-card sd-tier-premium">';
     html += '<div class="sd-tier-card-head">';
     html += '<span class="material-symbols-outlined" aria-hidden="true">workspace_premium</span>';
-    html += '<div><h3>Premium Tier</h3><p>Get in touch to unlock</p></div>';
+    html += '<div><h3>Premium Tier</h3><p>Unlock premium articles. Coupon optional.</p></div>';
     html += '</div>';
     html += iconCardsHtml(premItems, { size: 'sm' });
-    html += '<a href="mailto:abhinavformula1@gmail.com?subject=Premium%20Access%20Request" class="sd-locked-cta">Get in touch</a>';
+    html += '<a id="sdBuyNowBtn" href="mailto:abhinavformula1@gmail.com?subject=Buy%20Premium%20Access" class="sd-locked-cta">Buy now</a>';
+    html += '<div class="sd-coupon">';
+    html += '<button type="button" class="sd-coupon-toggle" aria-expanded="false">Apply coupon</button>';
+    html += '<div class="sd-coupon-form" hidden>';
+    html += '<input class="sd-coupon-input" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Enter coupon">';
+    html += '<button type="button" class="sd-coupon-apply">Apply</button>';
+    html += '<div class="sd-coupon-msg" aria-live="polite"></div>';
+    html += '</div>';
+    html += '</div>';
     html += '</div>';
 
     html += '</div>';
@@ -1052,6 +1061,87 @@ function renderTopicDetail() {
 
   const exportBtn = _sdDetail.querySelector('.sd-export-btn');
   if (exportBtn) exportBtn.addEventListener('click', exportCurrentTopicPdf);
+
+  // Premium gate UX: "Buy now" + progressive-disclosure coupon apply.
+  const buyNowBtn    = _sdDetail.querySelector('#sdBuyNowBtn');
+  const couponToggle = _sdDetail.querySelector('.sd-coupon-toggle');
+  const couponForm   = _sdDetail.querySelector('.sd-coupon-form');
+  const couponInput  = _sdDetail.querySelector('.sd-coupon-input');
+  const couponApply  = _sdDetail.querySelector('.sd-coupon-apply');
+  const couponMsg    = _sdDetail.querySelector('.sd-coupon-msg');
+
+  function buildPremiumMailtoHref(code) {
+    const email = 'abhinavformula1@gmail.com';
+    const subject = 'Buy Premium Access';
+    const lines = [
+      'Hi Abhinav,',
+      '',
+      'I want to unlock Premium Tier access for Software Architecture articles.',
+      '',
+      'Article: ' + (loc && loc.title ? loc.title : (_activeTopic || '')),
+      'Coupon: ' + (code ? code : '(none)'),
+      '',
+      'Please share the next steps.',
+    ];
+    return 'mailto:' + encodeURIComponent(email)
+      + '?subject=' + encodeURIComponent(subject)
+      + '&body=' + encodeURIComponent(lines.join('\\n'));
+  }
+
+  function getStoredCoupon() {
+    try { return String(sessionStorage.getItem(PREMIUM_COUPON_KEY) || '').trim(); } catch (_) { return ''; }
+  }
+
+  function setStoredCoupon(code) {
+    try { sessionStorage.setItem(PREMIUM_COUPON_KEY, code); } catch (_) {}
+  }
+
+  function syncBuyNowHref(code) {
+    if (buyNowBtn) buyNowBtn.href = buildPremiumMailtoHref(code);
+  }
+
+  // Hydrate from session storage.
+  if (buyNowBtn) {
+    const stored = getStoredCoupon();
+    syncBuyNowHref(stored);
+    if (stored && couponInput && couponMsg && couponToggle && couponForm) {
+      couponInput.value = stored;
+      couponMsg.textContent = 'Applied: ' + stored;
+      couponForm.hidden = false;
+      couponToggle.setAttribute('aria-expanded', 'true');
+    }
+  }
+
+  if (couponToggle && couponForm) {
+    couponToggle.addEventListener('click', function () {
+      const isOpen = !couponForm.hidden;
+      couponForm.hidden = isOpen;
+      couponToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+      if (!isOpen && couponInput) couponInput.focus();
+    });
+  }
+
+  function applyCoupon() {
+    if (!couponInput || !couponMsg) return;
+    const code = String(couponInput.value || '').trim();
+    if (!code) {
+      couponMsg.textContent = 'Enter a coupon code.';
+      return;
+    }
+    setStoredCoupon(code);
+    couponMsg.textContent = 'Applied: ' + code;
+    syncBuyNowHref(code);
+  }
+
+  if (couponApply) couponApply.addEventListener('click', applyCoupon);
+  if (couponInput) {
+    couponInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyCoupon();
+      }
+    });
+  }
   if (typeof _sdDetail.scrollIntoView === 'function') {
     _sdDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

@@ -1202,15 +1202,23 @@ function renderList() {
     els.list.appendChild(empty);
     return;
   }
+  const list = document.createElement('md-list');
+  list.className = 'sd-admin-md-list';
   articles.forEach(function (article) {
     const en = article.en || {};
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'sd-admin-article';
-    if (article.id === selectedId) btn.classList.add('sd-admin-article-active');
-    btn.dataset.id = article.id;
-    const top = document.createElement('span');
-    top.className = 'sd-admin-article-top';
+
+    const item = document.createElement('md-list-item');
+    item.setAttribute('type', 'button');
+    item.className = 'sd-admin-li';
+    item.dataset.id = article.id;
+    if (article.id === selectedId) {
+      item.setAttribute('checked', '');
+      item.classList.add('sd-admin-li-active');
+    }
+
+    const overline = document.createElement('div');
+    overline.slot = 'overline';
+    overline.className = 'sd-admin-li-overline';
     const status = document.createElement('span');
     status.className = 'sd-admin-chip';
     status.dataset.status = article.status || 'Draft';
@@ -1218,21 +1226,32 @@ function renderList() {
     const typeChip = document.createElement('span');
     typeChip.className = 'sd-admin-chip sd-admin-chip-muted';
     typeChip.textContent = contentTypeLabel(article.contentType || 'system-design');
-    top.append(status, typeChip);
-    const title = document.createElement('strong');
-    title.textContent = en.title || article.id;
-    const subtitle = document.createElement('small');
-    subtitle.textContent = en.subtitle || article.id;
-    const meta = document.createElement('span');
-    meta.className = 'sd-admin-article-meta';
+    overline.append(status, typeChip);
+
+    const headline = document.createElement('div');
+    headline.slot = 'headline';
+    headline.className = 'sd-admin-li-title';
+    headline.textContent = en.title || article.id;
+
+    const supporting = document.createElement('div');
+    supporting.slot = 'supporting-text';
+    supporting.className = 'sd-admin-li-support';
+    const subtitle = document.createElement('div');
+    subtitle.className = 'sd-admin-li-subtitle';
+    subtitle.textContent = en.subtitle || '';
+    const meta = document.createElement('div');
+    meta.className = 'sd-admin-li-meta';
     meta.textContent = (article.readMinutes ? article.readMinutes + ' min read · ' : '') + 'Order ' + (article.order || 100);
-    btn.append(top, title, subtitle, meta);
-    btn.addEventListener('click', function () {
-      const article = articles.find(function (item) { return item.id === btn.dataset.id; });
-      fillForm(article);
+    supporting.append(subtitle, meta);
+
+    item.append(overline, headline, supporting);
+    item.addEventListener('click', function () {
+      const picked = articles.find(function (it) { return it.id === item.dataset.id; });
+      fillForm(picked);
     });
-    els.list.appendChild(btn);
+    list.appendChild(item);
   });
+  els.list.appendChild(list);
 }
 
 function createArticleSettingsField(labelText, field, value, type) {
@@ -1263,7 +1282,7 @@ function createArticleSettingsField(labelText, field, value, type) {
   } else if (field === 'status') {
     input = document.createElement('select');
     input.className = 'sd-status-select';
-    ['Draft', 'Published', 'Retired'].forEach(function (s) {
+    ['Draft', 'Published', 'Coming soon', 'Retired'].forEach(function (s) {
       const option = document.createElement('option');
       option.value = s;
       option.textContent = s;
