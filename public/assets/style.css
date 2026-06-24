@@ -453,27 +453,28 @@ a:hover { text-decoration: underline; }
 .contact-reveal-badge[hidden] { display: none; }
 
 .exp-badge {
+  /* Restore original accent-soft badge background */
   background: var(--accent-soft);
   border: 1px solid var(--accent);
-  border-radius: 12px;
-  padding: 10px 20px;
+  border-radius: 14px;
+  padding: 8px 14px;
   text-align: center;
   white-space: nowrap;
 }
 
 .exp-badge .years {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--accent);
+  font-size: 20px;
+  font-weight: 750;
+  color: var(--text);
   line-height: 1;
 }
 
 .exp-badge .label {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: 10px;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 /* ── Filled buttons — branded colors ──
@@ -1943,6 +1944,86 @@ a:hover { text-decoration: underline; }
 }
 .sd-locked-cta:hover { opacity: 0.88; }
 
+/* Coupon (progressive disclosure) — keep secondary to the primary CTA. */
+.sd-coupon {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sd-coupon-toggle {
+  align-self: flex-start;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sd-coupon-toggle:hover { opacity: 0.9; }
+.sd-coupon-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+  border-radius: 8px;
+}
+
+.sd-coupon-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sd-coupon-input {
+  flex: 1 1 220px;
+  min-height: 40px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  padding: 0 12px;
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+.sd-coupon-input:focus-visible {
+  outline: none;
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+}
+
+.sd-coupon-apply {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--md-sys-color-primary);
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.sd-coupon-apply:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+.sd-coupon-apply:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+}
+
+.sd-coupon-msg {
+  flex: 1 1 100%;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
 /* Detail pane (right column) */
 .sd-detail {
   min-width: 0;
@@ -2105,9 +2186,9 @@ a:hover { text-decoration: underline; }
 
 .sd-content-tabs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .sd-clear-filters {
@@ -2142,19 +2223,20 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  min-height: 32px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: 999px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 650;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .sd-content-tab .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .sd-content-tab:hover {
@@ -2940,6 +3022,14 @@ figure.sd-image-block figcaption {
   .body.sd-mode { grid-template-columns: 1fr; }
   .sd-article { padding: 20px 18px 22px; }
   .sd-article-title { font-size: 19px; }
+  .sd-content-tabs { margin-top: 4px; }
+  .sd-content-tab { min-height: 34px; padding: 7px 12px; }
+  .sd-clear-filters { height: 34px; padding: 0 12px; font-size: 12px; }
+
+  .sponsors-footer { padding: 14px 16px; margin-top: 36px; }
+  .sponsors-inner { gap: 12px; }
+  .sponsors-logos { gap: 12px; }
+  .sponsor-divider { height: 20px; }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -3666,7 +3756,7 @@ figure.sd-image-block figcaption {
 .sponsors-footer {
   background: var(--surface);
   border-top: 1px solid var(--border);
-  padding: 20px 32px;
+  padding: 16px 24px;
   margin-top: 48px;
 }
 /* Single centered row: [BUILT WITH] [GCloud logo] [Salesforce logo].
@@ -3678,7 +3768,7 @@ figure.sd-image-block figcaption {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 .sponsors-label {
@@ -3692,7 +3782,7 @@ figure.sd-image-block figcaption {
 .sponsors-logos {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 .sponsor-link {
@@ -3701,9 +3791,15 @@ figure.sd-image-block figcaption {
   gap: 8px;
   text-decoration: none;
   opacity: 0.78;
-  transition: opacity 0.2s;
+  border-radius: 12px;
+  transition: opacity 0.2s, box-shadow 0.2s;
 }
 .sponsor-link:hover { opacity: 1; }
+.sponsor-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #0070D2 14%, transparent);
+  opacity: 1;
+}
 /* Default sizing for any sponsor mark — overridden per-brand below
    because each official lockup has its own intrinsic aspect ratio. */
 .sponsor-logo {
@@ -3734,7 +3830,7 @@ figure.sd-image-block figcaption {
 .sponsor-divider {
   width: 1px;
   height: 24px;
-  background: var(--border);
+  background: color-mix(in srgb, var(--border) 70%, transparent);
 }
 /* Trademark / nominative-fair-use note. Quiet by design — it's there for
    legal hygiene, not to be read every time. Kept centered + narrow so it
