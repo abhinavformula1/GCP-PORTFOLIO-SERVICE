@@ -189,7 +189,7 @@ export function createComposer(options) {
     const ribbon = element.closest('.sd-section-editor');
     if (ribbon) {
       ribbon
-        .querySelectorAll('.sd-section-type-select, .sd-section-type-custom-input')
+        .querySelectorAll('.sd-section-type-custom-input')
         .forEach(function (el) {
           if (!editable && !el.dataset.composerPrevDisabled) {
             el.dataset.composerPrevDisabled = el.disabled ? '1' : '0';
@@ -314,6 +314,17 @@ export function createComposer(options) {
       changeTimer = 0;
       onChange(serialize());
     }, 250);
+  }
+
+  // Force-sync the latest DOM → blocks immediately (used before Save).
+  function flushChange() {
+    reflectEmpty();
+    if (suppressChange) return;
+    if (changeTimer) {
+      clearTimeout(changeTimer);
+      changeTimer = 0;
+    }
+    onChange(serialize());
   }
 
   function exec(command, value) {
@@ -768,6 +779,7 @@ export function createComposer(options) {
       saveBtn.disabled = true;
       setStatus('Saving\u2026', 'info');
       Promise.resolve()
+        .then(function () { flushChange(); })
         .then(function () { return opts.onSave(); })
         .then(function (message) {
           setStatus(message || 'Saved.', 'success');
@@ -884,5 +896,6 @@ export function createComposer(options) {
     setEditable,
     isEditable: function () { return editable; },
     setOnChange: function (fn) { onChange = typeof fn === 'function' ? fn : function () {}; },
+    flushChange,
   };
 }

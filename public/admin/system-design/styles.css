@@ -1931,6 +1931,13 @@
   gap: 16px;
 }
 
+/* Article details errors: render as a banner like section cards. */
+.sd-article-details-card .composer-status {
+  /* Stretch the banner to the card edges (card has 18px padding). */
+  margin: -18px -18px 0;
+  border-radius: 16px 16px 0 0;
+}
+
 .sd-article-details-head {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
@@ -2233,8 +2240,7 @@
   overflow: hidden;
 }
 
-/* Both select and input share the same size/shape — only one shows at a time */
-.sd-section-type-select,
+/* Section title input */
 .sd-section-type-custom-input {
   min-height: 36px;
   min-width: 148px;
@@ -2250,12 +2256,6 @@
   font-weight: 700;
 }
 
-.sd-section-type-select {
-  cursor: pointer;
-  appearance: auto;
-}
-
-.sd-section-type-select:focus,
 .sd-section-type-custom-input:focus {
   border-color: var(--md-sys-color-primary);
   outline: 2px solid var(--md-sys-color-primary);
@@ -2269,7 +2269,6 @@
   background: var(--md-sys-color-surface-container-lowest, #fff);
 }
 
-.sd-section-type-select[hidden],
 .sd-section-type-custom-input[hidden] { display: none; }
 
 .sd-section-ribbon-controls {
@@ -2511,7 +2510,6 @@
   cursor: default;
 }
 
-.sd-section-type-select:disabled,
 .sd-section-type-custom-input:disabled {
   opacity: 0.5;
   cursor: default;
@@ -3660,8 +3658,11 @@ col.sd-tbl-action-col { width: 56px; }
 }
 
 .composer-status[data-kind="error"] {
-  background: var(--md-sys-color-error-container);
-  color: var(--md-sys-color-on-error-container);
+  /* Match the inline "Add a title before saving." error style (red text),
+     but keep the banner layout above the section card. */
+  background: color-mix(in srgb, var(--md-sys-color-error) 10%, var(--md-sys-color-surface-container-high));
+  color: var(--md-sys-color-error, #b3261e);
+  border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-error) 28%, transparent);
 }
 
 .composer-status[data-kind="success"] {
