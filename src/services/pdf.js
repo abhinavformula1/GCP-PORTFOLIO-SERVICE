@@ -79,55 +79,72 @@ async function waitForPageAssets(page, timeoutMs = 15_000) {
  * @returns {Promise<Buffer>}
  */
 async function generatePdf(url, settleMs = 1000) {
-  const browser = await puppeteer.launch({
-    executablePath: resolveChromePath(),
-    headless: true,
-    args: LAUNCH_ARGS,
-  });
+  function isRetriablePdfError(message) {
+    const msg = String(message || '');
+    return /frame was detached|Target closed|Protocol error \(Page\.printToPDF\)|Navigation failed because browser has disconnected|Execution context is not available|context is not available in detached frame|Execution context was destroyed|Cannot find context with specified id/i.test(msg);
+  }
 
-  try {
-    // Some pages can crash headless Chrome during navigation/print (e.g. image-heavy
-    // articles). When that happens Puppeteer commonly throws:
-    // - "Navigating frame was detached"
-    // - "Protocol error (Page.printToPDF): Target closed"
-    //
-    // Retry once with a lighter render strategy (lower DPR + less strict goto wait).
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      const page = await browser.newPage();
-      try {
-        const deviceScaleFactor = attempt === 1 ? 1.5 : 1;
-        await page.setViewport({ width: 794, height: 1123, deviceScaleFactor });
-        // Make sure print CSS applies consistently.
-        try { await page.emulateMediaType('print'); } catch (_) {}
+  function withLiteMode(u) {
+    const s = String(u || '');
+    return s.includes('?') ? (s + '&mode=lite') : (s + '?mode=lite');
+  }
 
-        const waitUntil = attempt === 1 ? 'networkidle0' : 'domcontentloaded';
-        await page.goto(url, { waitUntil, timeout: 60_000 });
+  // Some pages can crash headless Chrome during navigation/print (e.g. image-heavy
+  // articles). We use:
+  //  - Attempt 1: full render (networkidle0, higher DPR)
+  //  - Attempt 2: lighter render (domcontentloaded, lower DPR)
+  //  - Attempt 3: "lite print" (server strips images; deterministic success path)
+  //
+  // Each attempt uses a fresh Chrome process to avoid a poisoned browser
+  // instance after a crash/disconnect.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const browser = await puppeteer.launch({
+      executablePath: resolveChromePath(),
+      headless: true,
+      args: LAUNCH_ARGS,
+    });
 
-        if (attempt === 1) {
-          await new Promise((r) => setTimeout(r, settleMs));
-        } else {
-          await waitForPageAssets(page, 15_000);
-        }
+    const page = await browser.newPage();
+    try {
+      const deviceScaleFactor = attempt === 1 ? 1.5 : 1;
+      await page.setViewport({ width: 794, height: 1123, deviceScaleFactor });
+      // Make sure print CSS applies consistently.
+      try { await page.emulateMediaType('print'); } catch (_) {}
 
-        const pdf = await page.pdf({
-          format:              'A4',
-          printBackground:     true,
-          displayHeaderFooter: false,
-          headerTemplate:      '',
-          footerTemplate:      '',
-          margin: { top: '18mm', right: '18mm', bottom: '22mm', left: '18mm' },
-        });
-        return Buffer.from(pdf);
-      } catch (err) {
-        const msg = String(err && err.message ? err.message : err);
-        const retriable = /frame was detached|Target closed|Protocol error \(Page\.printToPDF\)|Navigation failed because browser has disconnected/i.test(msg);
-        if (!retriable || attempt === 2) throw err;
-      } finally {
-        try { await page.close(); } catch (_) {}
+      const waitUntil = attempt === 1 ? 'networkidle0' : 'domcontentloaded';
+      const navUrl = attempt === 3 ? withLiteMode(url) : url;
+      // Lite mode is intentionally static; disabling JS reduces memory + crash risk.
+      if (attempt === 3) {
+        try { await page.setJavaScriptEnabled(false); } catch (_) {}
       }
+      await page.goto(navUrl, { waitUntil, timeout: 60_000 });
+
+      if (attempt === 1) {
+        await new Promise((r) => setTimeout(r, settleMs));
+      } else if (attempt === 2) {
+        await waitForPageAssets(page, 15_000);
+      } else {
+        // Lite print: images are stripped server-side, so a short settle is enough.
+        await new Promise((r) => setTimeout(r, 250));
+      }
+
+      const pdf = await page.pdf({
+        format:              'A4',
+        printBackground:     true,
+        displayHeaderFooter: false,
+        headerTemplate:      '',
+        footerTemplate:      '',
+        margin: { top: '18mm', right: '18mm', bottom: '22mm', left: '18mm' },
+      });
+      return Buffer.from(pdf);
+    } catch (err) {
+      const msg = String(err && err.message ? err.message : err);
+      const retriable = isRetriablePdfError(msg);
+      if (!retriable || attempt === 3) throw err;
+    } finally {
+      try { await page.close(); } catch (_) {}
+      try { await browser.close(); } catch (_) {}
     }
-  } finally {
-    await browser.close();
   }
 }
 

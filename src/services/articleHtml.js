@@ -146,8 +146,18 @@ function imageToHtml(b) {
   return h;
 }
 
-function blockToHtml(block) {
+function imageToLiteHtml(b) {
+  if (!b || !b.url) return '';
+  const label = b.caption || b.alt || 'Image';
+  return '<div class="sd-print-image-lite">' +
+         '<strong>' + esc(label) + '</strong>' +
+         '<span>' + esc(b.url) + '</span>' +
+         '</div>';
+}
+
+function blockToHtml(block, opts) {
   if (!block || !block.type) return '';
+  const options = opts || {};
   switch (block.type) {
     case 'heading':   return block.text ? '<h3>' + inlineMd(block.text) + '</h3>' : '';
     case 'paragraph': return block.text ? '<p>'  + inlineMd(block.text) + '</p>'  : '';
@@ -168,15 +178,15 @@ function blockToHtml(block) {
     case 'matrix':     return matrixToHtml(block);
     case 'risks':      return risksToHtml(block);
     case 'code':       return codeToHtml(block);
-    case 'image':      return imageToHtml(block);
+    case 'image':      return options.mode === 'lite' ? imageToLiteHtml(block) : imageToHtml(block);
     case 'html':       return String(block.html || '');
     default:           return '';
   }
 }
 
-function blocksToHtml(blocks) {
+function blocksToHtml(blocks, opts) {
   if (!Array.isArray(blocks)) return '';
-  return blocks.map(blockToHtml).filter(Boolean).join('');
+  return blocks.map(b => blockToHtml(b, opts)).filter(Boolean).join('');
 }
 
 // ── Document builder ──────────────────────────────────────────────────────────
@@ -186,14 +196,15 @@ function blocksToHtml(blocks) {
  * Embeds full site CSS so Puppeteer page.setContent() renders correctly
  * with the exact same visual output as the live site.
  */
-function buildPrintDocument(article) {
+function buildPrintDocument(article, opts) {
+  const options = opts || {};
   const title  = article.title   || article.id || 'Design Note';
   const sub    = article.subtitle || article.description || '';
   const tags   = Array.isArray(article.tags) ? article.tags : [];
   const mins   = article.readMinutes ? String(article.readMinutes) + ' min read' : '';
   const date   = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const bodyHtml = blocksToHtml(article.blocks || []);
+  const bodyHtml = blocksToHtml(article.blocks || [], options);
 
   const tagsHtml = tags.map(t =>
     '<span class="sd-tag">' + esc(t) + '</span>'
@@ -220,6 +231,17 @@ body {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
+
+.sd-print-image-lite {
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0 14px;
+  background: #fafafa;
+  page-break-inside: avoid;
+}
+.sd-print-image-lite strong { display: block; font-size: 9.5pt; margin-bottom: 4px; }
+.sd-print-image-lite span { display: block; font-size: 8.5pt; color: #333; word-break: break-all; }
 </style>
 </head>
 <body>

@@ -596,7 +596,6 @@ function renderLanding() {
 
   // ── Domains sidebar ──
   html += '<aside class="sd-domains-sidebar">';
-  html += '<div class="sd-domains-title">' + escapeHtml(uiText('domains')) + '</div>';
   html += '<nav class="sd-domains-nav" role="list">';
   // "All" item
   const allActive = _activeDomain === 'all' ? ' sd-domain-active' : '';
