@@ -2396,6 +2396,15 @@ a:hover { text-decoration: underline; }
   gap: 12px;
 }
 
+.sd-article-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .sd-tags {
   display: flex;
   flex-wrap: wrap;
@@ -2421,7 +2430,7 @@ a:hover { text-decoration: underline; }
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
-  margin-left: auto;
+  margin-left: 0;
 }
 .sd-readtime .material-symbols-outlined { font-size: 16px; }
 

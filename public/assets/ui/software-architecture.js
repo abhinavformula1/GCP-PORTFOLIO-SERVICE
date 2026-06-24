@@ -734,6 +734,8 @@ function renderTopicDetail() {
     }
     html += '</div>';
   }
+  // Right-aligned actions cluster (so Export PDF stays right even when read time is missing).
+  html += '<div class="sd-article-actions">';
   if (topic.readMinutes) {
     html += '<span class="sd-readtime"><span class="material-symbols-outlined" aria-hidden="true">schedule</span>' + topic.readMinutes + ' min</span>';
   }
@@ -741,6 +743,7 @@ function renderTopicDetail() {
   html += '<span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>';
   html += '<span>' + escapeHtml(uiText('exportPdf')) + '</span>';
   html += '</button>';
+  html += '</div>';
   html += '</div>';
   html += '</header>';
   if (topic.tier === 'premium') {

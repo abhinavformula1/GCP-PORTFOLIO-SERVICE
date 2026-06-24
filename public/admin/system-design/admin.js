@@ -162,6 +162,7 @@ const els = {
   detailsSubtitle: document.getElementById('articleDetailsSubtitle'),
   detailsTags:     document.getElementById('articleDetailsTags'),
   detailsForm:     document.getElementById('articleDetailsForm'),
+  detailsBanner:   document.getElementById('articleDetailsBanner'),
   detailsActionsBtn: document.getElementById('articleDetailsActionsBtn'),
   detailsActionsMenu: document.getElementById('articleDetailsActionsMenu'),
   editDetailsBtn:  document.getElementById('editArticleDetailsBtn'),
@@ -732,7 +733,8 @@ function testContactPolicy() {
   setSectionStatus(els.policyTest, 'Allowed. ' + domain + ' looks like a company domain.', 'success');
 }
 
-const SECTION_TYPES = ['Overview', 'Problem Statement', 'Solution'];
+// Section titles are free-text for stability. (Preset options caused edge cases
+// around blur/commit and increased complexity for little benefit.)
 
 function nextSectionId() {
   sectionSeq += 1;
@@ -752,30 +754,54 @@ function sectionsToBlocks() {
   articleSections.forEach(function (section) {
     const body = section.composer ? section.composer.getBlocks() : (section.blocks || []);
     const type = (section.type || '').trim();
-    if (type) blocks.push({ type: 'heading', text: type });
+    // Mark section-title headings explicitly so we never confuse them with
+    // in-body headings (e.g. "1. Stable Product Identity") on reload.
+    if (type) blocks.push({ type: 'heading', text: type, scope: 'section' });
     body.forEach(function (block) { blocks.push(block); });
   });
   return blocks;
 }
 
-// Flat blocks → sections: a heading starts a new section; its text is the type.
+function isExplicitSectionHeading(block) {
+  return !!(block && block.type === 'heading' && (
+    block.scope === 'section' ||
+    block.role === 'section' ||
+    block.section === true ||
+    block.isSection === true
+  ));
+}
+
+function looksLikeNumberedHeading(text) {
+  // e.g. "1. Foo", "2) Bar", "3.1 Baz"
+  return /^\s*\d+(?:\.\d+)*[.)]?\s+/.test(String(text || ''));
+}
+
+// Flat blocks → sections: section-title headings start new sections.
 function blocksToSections(blocks) {
   const list = Array.isArray(blocks) ? blocks : [];
   const sections = [];
   let current = null;
+  const hasExplicitSectionHeadings = list.some(isExplicitSectionHeading);
   list.forEach(function (block) {
     if (block && block.type === 'heading') {
-      current = { id: nextSectionId(), type: String(block.text || 'Overview'), blocks: [], composer: null };
-      sections.push(current);
-      return;
+      const text = String(block.text || '').trim();
+      const isDelimiter = hasExplicitSectionHeadings
+        ? isExplicitSectionHeading(block)
+        : (isExplicitSectionHeading(block) || (!!text && !looksLikeNumberedHeading(text)));
+
+      if (isDelimiter) {
+        current = { id: nextSectionId(), type: text, blocks: [], composer: null };
+        sections.push(current);
+        return;
+      }
     }
     if (!current) {
-      current = { id: nextSectionId(), type: 'Overview', blocks: [], composer: null };
+      current = { id: nextSectionId(), type: '', blocks: [], composer: null };
       sections.push(current);
     }
     current.blocks.push(block);
   });
-  if (!sections.length) sections.push({ id: nextSectionId(), type: 'Overview', blocks: [], composer: null });
+  if (!sections.length) sections.push({ id: nextSectionId(), type: '', blocks: [], composer: null });
   return sections;
 }
 
@@ -828,81 +854,38 @@ function articleFromForm() {
   };
 }
 
-function buildSectionTypeSelect(section) {
-  const isPreset = SECTION_TYPES.includes(section.type);
+function buildSectionTitleInput(section) {
   const wrap = document.createElement('span');
   wrap.className = 'sd-section-type-wrap';
 
-  // --- Select (shown when a preset is active) ---
-  const select = document.createElement('select');
-  select.className = 'sd-section-type-select';
-  SECTION_TYPES.forEach(function (type) {
-    const opt = document.createElement('option');
-    opt.value = type;
-    opt.textContent = type;
-    select.appendChild(opt);
-  });
-  const customOpt = document.createElement('option');
-  customOpt.value = '__custom__';
-  customOpt.textContent = 'Custom…';
-  select.appendChild(customOpt);
-  select.value = isPreset ? section.type : '__custom__';
-  select.hidden = !isPreset;
+  const input = document.createElement('input');
+  input.type = 'text';
+  // Reuse the existing class so CSS + composer lock behavior keep working.
+  input.className = 'sd-section-type-custom-input';
+  input.placeholder = 'Section title (optional)…';
+  input.spellcheck = false;
+  input.autocomplete = 'off';
+  input.value = (section.type || '');
 
-  // --- Custom input (shown INSTEAD of select when custom is active) ---
-  const customInput = document.createElement('input');
-  customInput.type = 'text';
-  customInput.className = 'sd-section-type-custom-input';
-  customInput.placeholder = 'Section name…';
-  customInput.spellcheck = false;
-  customInput.autocomplete = 'off';
-  customInput.value = isPreset ? '' : (section.type || '');
-  customInput.hidden = isPreset;
-
-  function showSelect() {
-    customInput.hidden = true;
-    select.hidden = false;
-    select.focus();
-  }
-
-  function showCustom() {
-    select.hidden = true;
-    customInput.hidden = false;
-    customInput.focus();
-    customInput.select();
-  }
-
-  function commitCustom() {
-    const val = customInput.value.trim();
-    if (!val) {
-      // Nothing typed — revert to select
-      showSelect();
-      select.value = '__custom__';
-      return;
-    }
-    section.type = val;
+  function sync() {
+    // If empty, we intentionally store '' so sectionsToBlocks() omits the heading.
+    section.type = String(input.value || '').trim();
     renderPreview();
-    markDirty();
   }
 
-  select.addEventListener('change', function () {
-    if (select.value === '__custom__') {
-      customInput.value = '';
-      showCustom();
-    } else {
-      section.type = select.value;
-      renderPreview();
-      markDirty();
-    }
+  input.addEventListener('input', function () {
+    sync();
+    // Don't mark dirty on every keystroke; keep it lightweight.
+  });
+  input.addEventListener('blur', function () {
+    sync();
+    markDirty();
+  });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
   });
 
-  customInput.addEventListener('blur', commitCustom);
-  customInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); commitCustom(); customInput.blur(); }
-    if (e.key === 'Escape') { e.preventDefault(); showSelect(); }
-  });
-
-  wrap.append(select, customInput);
+  wrap.appendChild(input);
   return wrap;
 }
 
@@ -918,7 +901,7 @@ function buildSectionCard(section, index) {
   number.className = 'sd-section-ribbon-number';
   number.textContent = String(index + 1).padStart(2, '0');
 
-  const select = buildSectionTypeSelect(section);
+  const select = buildSectionTitleInput(section);
 
   const controls = document.createElement('div');
   controls.className = 'sd-section-ribbon-controls';
@@ -941,15 +924,52 @@ function buildSectionCard(section, index) {
   down.disabled = index === articleSections.length - 1;
   down.addEventListener('click', function () { moveSection(section, 1); });
 
-  const remove = document.createElement('button');
-  remove.type = 'button';
-  remove.className = 'sd-section-ribbon-btn sd-section-ribbon-remove';
-  remove.title = 'Delete section';
-  remove.setAttribute('aria-label', 'Delete section');
-  remove.appendChild(makeIcon('delete'));
-  remove.addEventListener('click', function () { deleteSection(section); });
+  // Section actions (kebab menu) — avoids one-click delete accidents.
+  const actionsWrap = document.createElement('div');
+  // Reuse the recommendation kebab menu styling for consistency.
+  actionsWrap.className = 'reco-actions sd-section-actions';
 
-  controls.append(up, down, remove);
+  const actionsBtn = document.createElement('button');
+  actionsBtn.type = 'button';
+  actionsBtn.className = 'reco-actions-trigger sd-section-actions-trigger';
+  actionsBtn.title = 'Section actions';
+  actionsBtn.setAttribute('aria-label', 'Section actions');
+  actionsBtn.setAttribute('aria-haspopup', 'menu');
+  actionsBtn.setAttribute('aria-expanded', 'false');
+  actionsBtn.appendChild(makeIcon('more_vert'));
+
+  const menu = document.createElement('div');
+  menu.className = 'reco-actions-menu sd-section-actions-menu';
+  menu.hidden = true;
+  menu.setAttribute('role', 'menu');
+
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'reco-action-item reco-action-item-destructive';
+  del.setAttribute('role', 'menuitem');
+  del.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span><span>Delete</span>';
+  del.addEventListener('click', function () {
+    closeSectionActionMenus();
+    if (!confirm('Delete this section? This cannot be undone.')) return;
+    deleteSection(section);
+  });
+
+  menu.appendChild(del);
+
+  actionsBtn.addEventListener('click', function (event) {
+    event.stopPropagation();
+    const willOpen = menu.hidden;
+    closeSectionActionMenus();
+    closeArticleDetailsMenu();
+    closePolicyRuleMenus();
+    menu.hidden = !willOpen;
+    actionsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  });
+  menu.addEventListener('click', function (event) { event.stopPropagation(); });
+
+  actionsWrap.append(actionsBtn, menu);
+
+  controls.append(up, down, actionsWrap);
   ribbon.append(number, select, controls);
 
   const composer = createComposer({
@@ -1021,7 +1041,7 @@ function renderSectionEditors() {
 
 function addSection(type) {
   syncSectionBlocks();
-  const section = { id: nextSectionId(), type: type || 'Problem Statement', blocks: [], composer: null, startEditing: true };
+  const section = { id: nextSectionId(), type: String(type || '').trim(), blocks: [], composer: null, startEditing: true };
   articleSections.push(section);
   renderSectionEditors();
   const card = els.sections.lastElementChild;
@@ -2197,11 +2217,25 @@ els.editDetailsBtn.addEventListener('click', function () {
 });
 
 function setDetailsStatus(msg, type) {
+  const banner = els.detailsBanner;
   const el = els.detailsSaveStatus;
-  if (!el) return;
-  el.textContent = msg || '';
-  el.hidden = !msg;
-  el.className = 'sd-details-save-status' + (type ? ' sd-details-save-status--' + type : '');
+  const message = msg || '';
+
+  // Always show details status in the same banner slot (like section cards),
+  // so success appears where errors appear.
+  if (banner) {
+    banner.textContent = message;
+    banner.hidden = !message;
+    if (message && type) banner.dataset.kind = type;
+    else delete banner.dataset.kind;
+  }
+
+  // Retire the inline status to avoid mixed placements/colors.
+  if (el) {
+    el.textContent = '';
+    el.hidden = true;
+    el.className = 'sd-details-save-status';
+  }
 }
 
 // ── Thumbnail helpers ────────────────────────────────────────────────────────
@@ -2308,7 +2342,7 @@ els.saveDetailsBtn.addEventListener('click', async function () {
       .sort(function (a, b) { return Number(a.order || 999) - Number(b.order || 999); });
     renderList();
     renderArticleDetails();
-    setDetailsStatus('Saved.', 'success');
+    setDetailsStatus((saved.status || 'Draft') + ' saved to Firestore.', 'success');
     setTimeout(function () {
       els.detailsForm.hidden = true;
       setDetailsStatus('', '');
@@ -2355,7 +2389,7 @@ els.togglePolicyInfoBtn.addEventListener('click', function () {
 });
 els.addSectionBtn.addEventListener('click', function (event) {
   event.stopPropagation();
-  addSection('Problem Statement');
+  addSection('');
 });
 els.title.addEventListener('input', function () {
   if (!selectedId) els.id.value = slugify(els.title.value);
