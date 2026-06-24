@@ -41,6 +41,26 @@ app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// ── Public route redirects ────────────────────────────────────────────────────
+// Software Architecture UI moved from /system-design → /software-architecture.
+// Keep legacy URLs working for old bookmarks + SEO.
+app.get(/^\/system-design(\/.*)?$/, (req, res) => {
+  const target = req.originalUrl.replace(/^\/system-design/, '/software-architecture');
+  res.redirect(301, target);
+});
+
+// ── Admin route alias ─────────────────────────────────────────────────────────
+// Admin UI lives under /admin/system-design historically. Expose the same UI at
+// /admin/software-architecture for consistency, while keeping the old URL.
+// NOTE: this MUST be registered before express.static(public/) otherwise the
+// legacy /admin/system-design folder will be served directly and this redirect
+// will never run.
+app.get(/^\/admin\/system-design(\/.*)?$/, (req, res) => {
+  const target = req.originalUrl.replace(/^\/admin\/system-design/, '/admin/software-architecture');
+  res.redirect(302, target);
+});
+app.use('/admin/software-architecture', express.static(path.join(__dirname, 'public', 'admin', 'system-design')));
+
 // ── Static assets (everything in public/ is served automatically) ─────────────
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -64,8 +84,8 @@ app.use('/api/pdf', pdfRoute);
 app.use('/print',   printRoute);
 
 // ── Sitemap ───────────────────────────────────────────────────────────────────
-// Dynamic sitemap that includes static pages + all published System Design
-// articles so Google can discover every /system-design/<id> page.
+// Dynamic sitemap that includes static pages + all published Software Architecture
+// articles so Google can discover every /software-architecture/<id> page.
 app.get('/sitemap.xml', async (_req, res, next) => {
   try {
     const firestore = require('./src/services/firestore');
@@ -87,7 +107,7 @@ app.get('/sitemap.xml', async (_req, res, next) => {
     const articleUrls = articles
       .filter((a) => !a.stub)
       .map((a) => `  <url>
-    <loc>${base}/system-design/${a.id}</loc>
+    <loc>${base}/software-architecture/${a.id}</loc>
     <lastmod>${a.updatedAt ? new Date(a.updatedAt).toISOString().slice(0, 10) : now}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
@@ -102,7 +122,7 @@ app.get('/sitemap.xml', async (_req, res, next) => {
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>${base}/system-design</loc>
+    <loc>${base}/software-architecture</loc>
     <lastmod>${now}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>

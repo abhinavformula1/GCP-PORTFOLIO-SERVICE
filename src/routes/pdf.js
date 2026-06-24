@@ -44,7 +44,7 @@ router.get('/export', pdfLimiter, async (req, res, next) => {
     const pdfBuffer = await generatePdf(printUrl);
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${id}-system-design.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${id}-software-architecture.pdf"`);
     res.setHeader('Content-Length', pdfBuffer.length);
     res.send(pdfBuffer);
   } catch (err) {

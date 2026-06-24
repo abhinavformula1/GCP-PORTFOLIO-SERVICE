@@ -250,9 +250,9 @@
                master/detail topic browser (architecture write-ups + worked
                examples). Pure client-side: the resume DOM is hidden, not
                removed, so the Download Resume button still works while in
-               this view. URL hash #/system-design/<id> is the source of
-               truth for which topic is rendered, so deep links are
-               shareable and back/forward both work. -->
+               this view. Uses clean History API URLs (/software-architecture/<id>)
+               for shareable deep links. Legacy hash URLs (#/system-design/<id>)
+               are redirected on load for backwards compatibility. -->
           <md-outlined-button class="systemdesign-btn" aria-label="Software Architecture" aria-pressed="false"
             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
             onclick="window.openSystemDesign && window.openSystemDesign()">
@@ -918,7 +918,7 @@
   <!-- type="module" enables ES `import`/`export` so main.js can pull in
        focused modules under /assets/{core,ui,chat,refer,recommendations}/.
        Modules are deferred by spec — no need for an explicit `defer`. -->
-  <script type="module" src="/assets/main.js"></script>
+  <script type="module" src="/assets/main.js?v=2026-06-24"></script>
 
 </body>
 
