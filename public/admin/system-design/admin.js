@@ -41,6 +41,7 @@ let adminAvatarObjectUrl = '';
 let autosaveTimer = 0;
 let articleSections = [];
 let sectionSeq = 0;
+let mediaAuditState = null;
 
 // Public filtering uses contentType (content type pills) + tags (domains). Categories are
 // intentionally removed to avoid a third, redundant taxonomy.
@@ -91,6 +92,11 @@ const els = {
   articleSettingsStatus: document.getElementById('articleSettingsStatus'),
   autoFixArticleOrderBtn: document.getElementById('autoFixArticleOrderBtn'),
   saveArticleSettingsBtn: document.getElementById('saveArticleSettingsBtn'),
+  mediaWorkspace: document.getElementById('mediaWorkspace'),
+  mediaOrphansOnly: document.getElementById('mediaOrphansOnly'),
+  refreshMediaAuditBtn: document.getElementById('refreshMediaAuditBtn'),
+  mediaAuditStatus: document.getElementById('mediaAuditStatus'),
+  mediaAuditPanel: document.getElementById('mediaAuditPanel'),
   tierSettingsWorkspace: document.getElementById('tierSettingsWorkspace'),
   tierSettingsPanel: document.getElementById('tierSettingsPanel'),
   tierSettingsStatus: document.getElementById('tierSettingsStatus'),
@@ -538,6 +544,7 @@ function handleAdminLoadError(err) {
   els.modules.hidden = true;
   els.policyWorkspace.hidden = true;
   els.articleSettingsWorkspace.hidden = true;
+  if (els.mediaWorkspace) els.mediaWorkspace.hidden = true;
   els.tierSettingsWorkspace.hidden = true;
   els.metadataConfigWorkspace.hidden = true;
   els.sponsorshipsWorkspace.hidden = true;
@@ -630,20 +637,23 @@ function renderContactPolicy(policy) {
 function setActiveModule(moduleName) {
   const isPolicy   = moduleName === 'contact-policy';
   const isSettings = moduleName === 'article-settings';
+  const isMedia    = moduleName === 'media-library';
   const isTier     = moduleName === 'tier-settings';
   const isMeta     = moduleName === 'metadata-config';
   const isSponsor  = moduleName === 'sponsorships';
   const isSeo      = moduleName === 'seo-config';
   const isAtlas    = moduleName === 'atlas-settings';
-  els.workspace.hidden = isPolicy || isSettings || isTier || isMeta || isSponsor || isSeo || isAtlas;
+  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
+  if (els.mediaWorkspace) els.mediaWorkspace.hidden = !isMedia;
   els.tierSettingsWorkspace.hidden = !isTier;
   els.metadataConfigWorkspace.hidden = !isMeta;
   els.sponsorshipsWorkspace.hidden = !isSponsor;
   els.seoConfigWorkspace.hidden = !isSeo;
   els.atlasSettingsWorkspace.hidden = !isAtlas;
   if (isSettings) renderArticleSettings();
+  if (isMedia)    renderMediaLibrary();
   if (isTier)     renderTierSettings();
   if (isMeta)     renderMetadataConfig();
   if (isSponsor)  renderSponsorships();
@@ -1427,6 +1437,186 @@ function renderArticleSettings() {
   renderArticleSettingsWarnings();
 }
 
+function formatBytes(n) {
+  const bytes = Number(n || 0);
+  if (!bytes || bytes < 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  let v = bytes;
+  while (v >= 1024 && i < units.length - 1) {
+    v = v / 1024;
+    i += 1;
+  }
+  const fixed = i === 0 ? 0 : (v >= 10 ? 1 : 2);
+  return v.toFixed(fixed) + ' ' + units[i];
+}
+
+function formatWhen(ts) {
+  const t = Number(ts || 0);
+  if (!t) return '';
+  try { return new Date(t).toLocaleString(); } catch (_) { return ''; }
+}
+
+async function renderMediaLibrary() {
+  if (!els.mediaAuditPanel) return;
+  // Avoid spamming the API on repeated tab toggles.
+  if (mediaAuditState && Array.isArray(mediaAuditState.objects)) {
+    paintMediaAudit();
+    return;
+  }
+  await refreshMediaAudit();
+}
+
+async function refreshMediaAudit() {
+  if (!els.mediaAuditPanel) return;
+  setSectionStatus(els.mediaAuditStatus, 'Loading media inventory…', 'info');
+  els.mediaAuditPanel.textContent = '';
+  try {
+    const data = await authedJson('/api/admin/media/audit');
+    mediaAuditState = data;
+    paintMediaAudit();
+    setSectionStatus(els.mediaAuditStatus, 'Media inventory updated.', 'success');
+  } catch (err) {
+    setSectionStatus(els.mediaAuditStatus, err.message || 'Failed to load media inventory.', 'error');
+  }
+}
+
+function paintMediaAudit() {
+  if (!els.mediaAuditPanel) return;
+  els.mediaAuditPanel.textContent = '';
+  const state = mediaAuditState || {};
+  const objects = Array.isArray(state.objects) ? state.objects.slice() : [];
+  const orphanOnly = !!els.mediaOrphansOnly?.checked;
+  const filtered = orphanOnly ? objects.filter(function (o) { return !!o.isOrphan; }) : objects;
+
+  const summary = document.createElement('div');
+  summary.className = 'sd-media-summary';
+  summary.innerHTML = '<div><strong>' + (state.bucket || 'media') + '</strong> · '
+    + String(state.prefix || 'media/') + '</div>'
+    + '<div>'
+    + (state.summary ? (
+      String(state.summary.totalObjects || 0) + ' objects · '
+      + formatBytes(state.summary.totalBytes || 0) + ' · '
+      + String(state.summary.orphanObjects || 0) + ' orphans'
+    ) : (String(objects.length) + ' objects'))
+    + '</div>';
+  els.mediaAuditPanel.appendChild(summary);
+
+  if (!filtered.length) {
+    const empty = document.createElement('div');
+    empty.className = 'sd-media-empty';
+    empty.textContent = orphanOnly ? 'No orphaned images found.' : 'No media objects found.';
+    els.mediaAuditPanel.appendChild(empty);
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'sd-media-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = '<tr><th>File</th><th>Used by</th></tr>';
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  filtered.forEach(function (o) {
+    const tr = document.createElement('tr');
+    if (o.isOrphan) tr.className = 'sd-media-row-orphan';
+
+    const fileTd = document.createElement('td');
+    const fileWrap = document.createElement('div');
+    fileWrap.className = 'sd-media-file';
+
+    const img = document.createElement('img');
+    img.className = 'sd-media-thumb';
+    img.loading = 'lazy';
+    img.alt = '';
+    img.src = o.url;
+
+    const meta = document.createElement('div');
+    const name = document.createElement('a');
+    name.className = 'sd-media-name';
+    name.href = o.url;
+    name.target = '_blank';
+    name.rel = 'noopener noreferrer';
+    name.textContent = String(o.name || '').replace(/^media\//, '');
+
+    const small = document.createElement('div');
+    small.className = 'sd-media-meta';
+    small.textContent = formatBytes(o.size || 0) + (o.updatedAt ? (' · ' + formatWhen(o.updatedAt)) : '');
+
+    meta.appendChild(name);
+    meta.appendChild(small);
+    fileWrap.appendChild(img);
+    fileWrap.appendChild(meta);
+    fileTd.appendChild(fileWrap);
+
+    const refsTd = document.createElement('td');
+    const refs = Array.isArray(o.referencedBy) ? o.referencedBy : [];
+    if (!refs.length) {
+      const wrap = document.createElement('div');
+      wrap.className = 'sd-media-refs';
+
+      const orphanLabel = document.createElement('div');
+      orphanLabel.className = 'sd-media-meta';
+      orphanLabel.textContent = 'Orphan (not referenced by any article)';
+      wrap.appendChild(orphanLabel);
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'sd-media-ref sd-media-ref-danger';
+      delBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span><span>Delete orphan</span>';
+      delBtn.addEventListener('click', async function () {
+        const filename = String(o.name || '').replace(/^media\//, '');
+        if (!confirm('Delete this orphaned image?\n\n' + filename + '\n\nThis cannot be undone.')) return;
+        delBtn.disabled = true;
+        setSectionStatus(els.mediaAuditStatus, 'Deleting ' + filename + '…', 'info');
+        try {
+          await authedJson('/api/admin/media/object?name=' + encodeURIComponent(o.name), { method: 'DELETE' });
+          setSectionStatus(els.mediaAuditStatus, 'Deleted ' + filename + '.', 'success');
+          // Refresh mapping after deletion.
+          mediaAuditState = null;
+          await refreshMediaAudit();
+        } catch (err) {
+          setSectionStatus(els.mediaAuditStatus, err.message || 'Delete failed.', 'error');
+        } finally {
+          delBtn.disabled = false;
+        }
+      });
+      wrap.appendChild(delBtn);
+      refsTd.appendChild(wrap);
+    } else {
+      const wrap = document.createElement('div');
+      wrap.className = 'sd-media-refs';
+      refs.slice(0, 6).forEach(function (r) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sd-media-ref';
+        btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">article</span><span></span>';
+        const label = btn.querySelector('span:last-child');
+        label.textContent = r.title || r.articleId || 'Article';
+        btn.addEventListener('click', function () {
+          const article = articles.find(function (a) { return a.id === r.articleId; });
+          setActiveModule('system-design');
+          if (article) fillForm(article);
+        });
+        wrap.appendChild(btn);
+      });
+      if (refs.length > 6) {
+        const more = document.createElement('div');
+        more.className = 'sd-media-meta';
+        more.textContent = '+' + (refs.length - 6) + ' more';
+        wrap.appendChild(more);
+      }
+      refsTd.appendChild(wrap);
+    }
+
+    tr.appendChild(fileTd);
+    tr.appendChild(refsTd);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  els.mediaAuditPanel.appendChild(table);
+}
+
 function autoFixArticleSettingsOrder() {
   const cards = Array.from(els.articleSettingsList.querySelectorAll('.sd-article-settings-card'));
   cards
@@ -2177,6 +2367,17 @@ els.modules.addEventListener('click', function (event) {
   if (!btn) return;
   setActiveModule(btn.dataset.module || 'system-design');
 });
+if (els.refreshMediaAuditBtn) {
+  els.refreshMediaAuditBtn.addEventListener('click', function () {
+    mediaAuditState = null;
+    refreshMediaAudit();
+  });
+}
+if (els.mediaOrphansOnly) {
+  els.mediaOrphansOnly.addEventListener('change', function () {
+    paintMediaAudit();
+  });
+}
 els.savePolicyBtn.addEventListener('click', function () {
   saveContactPolicy().catch(function (err) { setSectionStatus(els.policyTest, err.message, 'error'); });
 });
@@ -2290,7 +2491,7 @@ async function uploadThumbnail(file) {
   try {
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch('/api/media/upload', { method: 'POST', headers: authHeaders(), body: form });
+    const res = await fetch('/api/media/upload?preset=thumb', { method: 'POST', headers: authHeaders(), body: form });
     const json = await res.json().catch(function () { return {}; });
     if (!res.ok) throw new Error(json.message || json.error || 'Upload failed');
     currentThumbnailUrl = json.url;

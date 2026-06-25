@@ -29,7 +29,8 @@
     "google-auth-library": "^10.6.2",
     "jsforce": "^3.10.14",
     "multer": "^2.2.0",
-    "puppeteer-core": "^25.1.0"
+    "puppeteer-core": "^25.1.0",
+    "sharp": "^0.35.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -73,6 +73,10 @@
             <span class="material-symbols-outlined" aria-hidden="true">tune</span>
             <span>Article Settings</span>
           </button>
+          <button type="button" class="sd-admin-module" data-module="media-library">
+            <span class="material-symbols-outlined" aria-hidden="true">perm_media</span>
+            <span>Media Library</span>
+          </button>
           <button type="button" class="sd-admin-module" data-module="contact-policy">
             <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
             <span>Contact Policy</span>
@@ -220,7 +224,7 @@
                   <div class="sd-thumb-label">
                     <span class="material-symbols-outlined" aria-hidden="true">image</span>
                     <span>Thumbnail</span>
-                    <span class="sd-thumb-hint">Shown on article cards (JPEG, PNG, WebP, max 8 MB)</span>
+                    <span class="sd-thumb-hint">Shown on article cards (auto-normalised to JPEG, max 8 MB)</span>
                   </div>
                   <div class="sd-thumb-picker" id="articleThumbPicker">
                     <div class="sd-thumb-preview-wrap" id="articleThumbPreviewWrap" hidden>
@@ -233,7 +237,7 @@
                     <label class="sd-thumb-dropzone" id="articleThumbDropzone" tabindex="0"
                       role="button" aria-label="Upload thumbnail image">
                       <input type="file" id="articleThumbInput" class="sd-img-file-input"
-                        accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
                         aria-hidden="true">
                       <span class="material-symbols-outlined sd-thumb-upload-icon">upload</span>
                       <span class="sd-thumb-drop-text">Upload thumbnail</span>
@@ -448,6 +452,25 @@
       </div>
       <div id="articleSettingsStatus" class="sd-admin-section-status"></div>
       <div id="articleSettingsList" class="sd-article-settings-list"></div>
+    </section>
+
+    <!-- Media Library workspace -->
+    <section id="mediaWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <h2>Media Library</h2>
+          <p>See exactly which images are used by which articles, and safely delete orphaned uploads.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <label class="sd-media-toggle">
+            <input type="checkbox" id="mediaOrphansOnly">
+            <span>Orphans only</span>
+          </label>
+          <button type="button" id="refreshMediaAuditBtn">Refresh</button>
+        </div>
+      </div>
+      <div id="mediaAuditStatus" class="sd-admin-section-status"></div>
+      <div id="mediaAuditPanel" class="sd-media-panel"></div>
     </section>
 
     <!-- Tier Settings workspace -->
