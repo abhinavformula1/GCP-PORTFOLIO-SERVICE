@@ -1,0 +1,20 @@
+[
+  {
+    "name": "delete-old-versions",
+    "action": { "type": "Delete" },
+    "condition": {
+      "tagState": "any",
+      "packageNamePrefixes": ["app"],
+      "olderThan": "1d"
+    }
+  },
+  {
+    "name": "keep-recent-versions",
+    "action": { "type": "Keep" },
+    "mostRecentVersions": {
+      "packageNamePrefixes": ["app"],
+      "keepCount": 5
+    }
+  }
+]
+

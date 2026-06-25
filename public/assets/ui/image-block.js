@@ -199,7 +199,7 @@ export function createImageBlock(initialData, onChange) {
 
       const fileInput = document.createElement('input');
       fileInput.type = 'file';
-      fileInput.accept = 'image/jpeg,image/png,image/gif,image/webp,image/svg+xml';
+      fileInput.accept = 'image/jpeg,image/png,image/webp,image/svg+xml';
       fileInput.className = 'sd-img-file-input';
       fileInput.setAttribute('aria-hidden', 'true');
       fileInput.addEventListener('change', function () {
@@ -216,7 +216,7 @@ export function createImageBlock(initialData, onChange) {
 
       const dropHint = document.createElement('span');
       dropHint.className = 'sd-img-drop-hint';
-      dropHint.textContent = 'JPEG, PNG, GIF, WebP, SVG \u2014 max 8 MB';
+      dropHint.textContent = 'JPEG, PNG, WebP, SVG \u2014 max 8 MB (auto-normalised to JPEG)';
 
       dropZone.appendChild(fileInput);
       dropZone.appendChild(dropIcon);

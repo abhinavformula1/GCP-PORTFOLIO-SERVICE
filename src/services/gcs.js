@@ -21,6 +21,7 @@
 const { Storage } = require('@google-cloud/storage');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const sharp = require('sharp');
 
 const storage = new Storage();
 
@@ -28,7 +29,6 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
   'image/png',
-  'image/gif',
   'image/webp',
   'image/svg+xml',
 ]);
@@ -46,6 +46,38 @@ function getBucket() {
   return storage.bucket(name);
 }
 
+async function listMediaObjects({ prefix = 'media/' } = {}) {
+  const bucket = getBucket();
+  const [files] = await bucket.getFiles({ prefix });
+  return files.map((f) => {
+    const meta = f.metadata || {};
+    const size = meta.size ? Number(meta.size) : 0;
+    const updatedAt = meta.updated ? Date.parse(meta.updated) : null;
+    const contentType = meta.contentType || '';
+    return {
+      name: f.name,
+      url: `https://storage.googleapis.com/${bucket.name}/${f.name}`,
+      size,
+      updatedAt,
+      contentType,
+    };
+  });
+}
+
+async function deleteMediaObject(objectName) {
+  const name = String(objectName || '').trim();
+  if (!name.startsWith('media/')) {
+    const err = new Error('Invalid media object name.');
+    err.statusCode = 400;
+    throw err;
+  }
+  const bucket = getBucket();
+  const file = bucket.file(name);
+  // ignoreNotFound avoids turning cleanup into a noisy failure
+  await file.delete({ ignoreNotFound: true });
+  return { deleted: true, name };
+}
+
 /**
  * Upload a file buffer to GCS and return its public URL + metadata.
  *
@@ -56,9 +88,9 @@ function getBucket() {
  * @param {number}  opts.size      Byte length
  * @returns {Promise<{ url: string, mimeType: string, size: number }>}
  */
-async function uploadMedia({ buffer, mimetype, originalname, size }) {
+async function uploadMedia({ buffer, mimetype, originalname, size, preset }) {
   if (!ALLOWED_MIME_TYPES.has(mimetype)) {
-    const err = new Error(`Unsupported file type: ${mimetype}. Allowed: JPEG, PNG, GIF, WebP, SVG.`);
+    const err = new Error(`Unsupported file type: ${mimetype}. Allowed: JPEG, PNG, WebP, SVG.`);
     err.statusCode = 400;
     throw err;
   }
@@ -69,31 +101,54 @@ async function uploadMedia({ buffer, mimetype, originalname, size }) {
     throw err;
   }
 
-  const ext = path.extname(originalname).toLowerCase() || '.' + mimetype.split('/')[1];
   const safeName = path.basename(originalname, path.extname(originalname))
     .replace(/[^a-z0-9_-]/gi, '-')
     .toLowerCase()
     .slice(0, 40);
 
-  const uid = crypto.randomBytes(6).toString('hex');
-  const destName = `media/${Date.now()}-${uid}-${safeName}${ext}`;
+  const selectedPreset = preset === 'thumb' ? 'thumb' : 'article';
+  const maxWidth = selectedPreset === 'thumb' ? 1200 : 1600;
+
+  const img = mimetype === 'image/svg+xml'
+    ? sharp(buffer, { density: 300 })
+    : sharp(buffer);
+
+  const jpegBuffer = await img
+    .rotate()
+    .resize({ width: maxWidth, withoutEnlargement: true })
+    .flatten({ background: '#ffffff' })
+    .jpeg({ quality: 82, progressive: true, mozjpeg: true })
+    .toBuffer();
+
+  const digest = crypto.createHash('sha256').update(jpegBuffer).digest('hex').slice(0, 16);
+  const destName = `media/${digest}.jpg`;
 
   const bucket = getBucket();
   const file = bucket.file(destName);
 
-  await file.save(buffer, {
+  const [exists] = await file.exists();
+  if (!exists) {
+    await file.save(jpegBuffer, {
+      metadata: {
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=31536000, immutable',
+        metadata: {
+          originalName: originalname || safeName,
+          preset: selectedPreset,
+        },
+      },
+      resumable: false,
+    });
+  }
+
+  await file.setMetadata({
     metadata: {
-      contentType: mimetype,
-      cacheControl: 'public, max-age=31536000, immutable',
+      lastSeenAt: String(Date.now()),
     },
-    // predefinedAcl is omitted — the bucket uses uniform bucket-level access
-    // with allUsers:objectViewer, so every object is public automatically.
-    // Calling file.makePublic() on a uniform-access bucket throws a 400.
-    resumable: false,
-  });
+  }).catch(function () { /* non-fatal */ });
 
   const url = `https://storage.googleapis.com/${bucket.name}/${destName}`;
-  return { url, mimeType: mimetype, size };
+  return { url, mimeType: 'image/jpeg', size: jpegBuffer.length };
 }
 
-module.exports = { uploadMedia, ALLOWED_MIME_TYPES, MAX_BYTES };
+module.exports = { uploadMedia, listMediaObjects, deleteMediaObject, ALLOWED_MIME_TYPES, MAX_BYTES };
