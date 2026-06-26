@@ -42,6 +42,15 @@ let autosaveTimer = 0;
 let articleSections = [];
 let sectionSeq = 0;
 let mediaAuditState = null;
+const mediaAuditView = {
+  visibleCount: 0,
+  batchSize: 30,
+  observer: null,
+  query: '',
+  status: 'all',   // all | used | orphan
+  article: 'all',  // all | <articleId>
+  sort: 'newest',  // newest | oldest | largest | smallest | name_asc | name_desc
+};
 
 // Public filtering uses contentType (content type pills) + tags (domains). Categories are
 // intentionally removed to avoid a third, redundant taxonomy.
@@ -85,6 +94,8 @@ const els = {
   welcomeGuest:    document.getElementById('welcomeGuestBtn'),
   workspace:       document.getElementById('adminWorkspace'),
   authWall:        document.getElementById('adminAuthWall'),
+  shell:           document.getElementById('adminShell'),
+  toggleSidebarBtn: document.getElementById('toggleSidebarBtn'),
   modules:         document.getElementById('adminModules'),
   policyWorkspace: document.getElementById('contactPolicyWorkspace'),
   articleSettingsWorkspace: document.getElementById('articleSettingsWorkspace'),
@@ -215,6 +226,30 @@ const els = {
   confirmPublishBtn: document.getElementById('confirmPublishBtn'),
   publishActionLabel: document.getElementById('publishActionLabel'),
 };
+
+const SIDEBAR_COLLAPSE_KEY = 'sd_admin_sidebar_collapsed_v1';
+function setSidebarCollapsed(collapsed) {
+  if (!els.shell || !els.toggleSidebarBtn) return;
+  els.shell.classList.toggle('sd-admin-shell--sidebar-collapsed', !!collapsed);
+  els.toggleSidebarBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  els.toggleSidebarBtn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+  els.toggleSidebarBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  const ico = els.toggleSidebarBtn.querySelector('.material-symbols-outlined');
+  if (ico) ico.textContent = collapsed ? 'chevron_right' : 'chevron_left';
+  try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_e) { /* ignore */ }
+
+  // Tooltips for icon-only mode
+  if (els.modules) {
+    Array.from(els.modules.querySelectorAll('.sd-admin-module')).forEach(function (btn) {
+      const label = (btn.querySelector('span:last-child') && btn.querySelector('span:last-child').textContent)
+        ? btn.querySelector('span:last-child').textContent.trim()
+        : '';
+      if (!label) return;
+      if (collapsed) btn.setAttribute('title', label);
+      else btn.removeAttribute('title');
+    });
+  }
+}
 
 function setStatus(message, kind) {
   let status = document.getElementById('adminStatus');
@@ -1109,6 +1144,15 @@ function closeSectionActionMenus() {
   });
 }
 
+function closeMediaActionMenus() {
+  document.querySelectorAll('.sd-media-actions-menu').forEach(function (menu) {
+    menu.hidden = true;
+  });
+  document.querySelectorAll('.sd-media-actions-trigger[aria-expanded="true"]').forEach(function (trigger) {
+    trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
 function closeArticleDetailsMenu() {
   els.detailsActionsMenu.hidden = true;
   els.detailsActionsBtn.setAttribute('aria-expanded', 'false');
@@ -1457,6 +1501,32 @@ function formatWhen(ts) {
   try { return new Date(t).toLocaleString(); } catch (_) { return ''; }
 }
 
+function safeText(s) {
+  return String(s == null ? '' : s);
+}
+
+function pct(num, den) {
+  const n = Number(num || 0);
+  const d = Number(den || 0);
+  if (!d) return '0%';
+  const v = Math.max(0, Math.min(1, n / d)) * 100;
+  return (v < 1 ? v.toFixed(2) : v.toFixed(1)) + '%';
+}
+
+function computeMediaMetrics(objects) {
+  const items = Array.isArray(objects) ? objects : [];
+  const totalBytes = items.reduce(function (sum, o) { return sum + Number(o.size || 0); }, 0);
+  const used = items.filter(function (o) { return Array.isArray(o.referencedBy) && o.referencedBy.length; });
+  const orphan = items.filter(function (o) { return !Array.isArray(o.referencedBy) || o.referencedBy.length === 0; });
+  const usedBytes = used.reduce(function (sum, o) { return sum + Number(o.size || 0); }, 0);
+  const orphanBytes = orphan.reduce(function (sum, o) { return sum + Number(o.size || 0); }, 0);
+  return {
+    total: { count: items.length, bytes: totalBytes },
+    used: { count: used.length, bytes: usedBytes },
+    orphan: { count: orphan.length, bytes: orphanBytes },
+  };
+}
+
 async function renderMediaLibrary() {
   if (!els.mediaAuditPanel) return;
   // Avoid spamming the API on repeated tab toggles.
@@ -1474,6 +1544,7 @@ async function refreshMediaAudit() {
   try {
     const data = await authedJson('/api/admin/media/audit');
     mediaAuditState = data;
+    mediaAuditView.visibleCount = 0;
     paintMediaAudit();
     setSectionStatus(els.mediaAuditStatus, 'Media inventory updated.', 'success');
   } catch (err) {
@@ -1487,18 +1558,165 @@ function paintMediaAudit() {
   const state = mediaAuditState || {};
   const objects = Array.isArray(state.objects) ? state.objects.slice() : [];
   const orphanOnly = !!els.mediaOrphansOnly?.checked;
-  const filtered = orphanOnly ? objects.filter(function (o) { return !!o.isOrphan; }) : objects;
 
+  // Build article list for filter dropdown.
+  const refArticles = new Map(); // articleId -> title
+  objects.forEach(function (o) {
+    const refs = Array.isArray(o.referencedBy) ? o.referencedBy : [];
+    refs.forEach(function (r) {
+      if (!r || !r.articleId) return;
+      refArticles.set(r.articleId, r.title || r.articleId);
+    });
+  });
+  const articleOptions = Array.from(refArticles.entries())
+    .sort(function (a, b) { return String(a[1]).localeCompare(String(b[1])); })
+    .map(function (pair) { return { id: pair[0], title: pair[1] }; });
+
+  function isUsed(o) {
+    return Array.isArray(o.referencedBy) && o.referencedBy.length > 0;
+  }
+
+  // Apply filters
+  let filtered = objects.slice();
+  if (orphanOnly) filtered = filtered.filter(function (o) { return !!o.isOrphan; });
+  if (mediaAuditView.status === 'used') filtered = filtered.filter(isUsed);
+  if (mediaAuditView.status === 'orphan') filtered = filtered.filter(function (o) { return !isUsed(o); });
+  if (mediaAuditView.article !== 'all') {
+    filtered = filtered.filter(function (o) {
+      const refs = Array.isArray(o.referencedBy) ? o.referencedBy : [];
+      return refs.some(function (r) { return r.articleId === mediaAuditView.article; });
+    });
+  }
+  const q = String(mediaAuditView.query || '').trim().toLowerCase();
+  if (q) {
+    filtered = filtered.filter(function (o) {
+      const name = String(o.name || '').toLowerCase();
+      if (name.includes(q)) return true;
+      const refs = Array.isArray(o.referencedBy) ? o.referencedBy : [];
+      return refs.some(function (r) {
+        return String(r.title || r.articleId || '').toLowerCase().includes(q);
+      });
+    });
+  }
+
+  // Apply sort
+  filtered.sort(function (a, b) {
+    const aName = String(a.name || '');
+    const bName = String(b.name || '');
+    if (mediaAuditView.sort === 'oldest') return Number(a.updatedAt || 0) - Number(b.updatedAt || 0);
+    if (mediaAuditView.sort === 'largest') return Number(b.size || 0) - Number(a.size || 0);
+    if (mediaAuditView.sort === 'smallest') return Number(a.size || 0) - Number(b.size || 0);
+    if (mediaAuditView.sort === 'name_asc') return aName.localeCompare(bName);
+    if (mediaAuditView.sort === 'name_desc') return bName.localeCompare(aName);
+    return Number(b.updatedAt || 0) - Number(a.updatedAt || 0);
+  });
+
+  // Reset lazy-loading window if needed.
+  if (!mediaAuditView.visibleCount) {
+    mediaAuditView.visibleCount = Math.min(mediaAuditView.batchSize, filtered.length);
+  } else if (mediaAuditView.visibleCount > filtered.length) {
+    mediaAuditView.visibleCount = filtered.length;
+  }
+
+  // KPI cards (Palantir/Google admin style)
+  const kpis = document.createElement('div');
+  kpis.className = 'sd-media-kpis';
+  const metrics = computeMediaMetrics(objects);
+  const BUDGET_BYTES = 5 * 1024 * 1024 * 1024; // UI-only reference budget
+  kpis.innerHTML = ''
+    + '<div class="sd-media-kpi sd-media-kpi--total"><div class="sd-media-kpi-ico material-symbols-outlined" aria-hidden="true">folder</div><div><div class="sd-media-kpi-num">'
+    + metrics.total.count + '</div><div class="sd-media-kpi-lbl">Total files</div><div class="sd-media-kpi-sub">' + formatBytes(metrics.total.bytes) + '</div></div></div>'
+    + '<div class="sd-media-kpi sd-media-kpi--used"><div class="sd-media-kpi-ico material-symbols-outlined" aria-hidden="true">description</div><div><div class="sd-media-kpi-num">'
+    + metrics.used.count + '</div><div class="sd-media-kpi-lbl">Used in articles</div><div class="sd-media-kpi-sub">' + formatBytes(metrics.used.bytes) + ' (' + pct(metrics.used.bytes, metrics.total.bytes) + ')</div></div></div>'
+    + '<div class="sd-media-kpi sd-media-kpi--orphan"><div class="sd-media-kpi-ico material-symbols-outlined" aria-hidden="true">delete</div><div><div class="sd-media-kpi-num">'
+    + metrics.orphan.count + '</div><div class="sd-media-kpi-lbl">Orphaned files</div><div class="sd-media-kpi-sub">' + formatBytes(metrics.orphan.bytes) + ' (' + pct(metrics.orphan.bytes, metrics.total.bytes) + ')</div></div></div>'
+    + '<div class="sd-media-kpi sd-media-kpi--storage"><div class="sd-media-kpi-ico material-symbols-outlined" aria-hidden="true">pie_chart</div><div><div class="sd-media-kpi-num">'
+    + pct(metrics.total.bytes, BUDGET_BYTES) + '</div><div class="sd-media-kpi-lbl">Storage used</div><div class="sd-media-kpi-sub">of 5 GB</div></div></div>';
+  els.mediaAuditPanel.appendChild(kpis);
+
+  // Toolbar
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sd-media-toolbar';
+  toolbar.innerHTML = ''
+    + '<div class="sd-media-search-wrap">'
+    + '  <span class="material-symbols-outlined" aria-hidden="true">search</span>'
+    + '  <input class="sd-media-search" type="search" placeholder="Search by file name or article…" />'
+    + '</div>'
+    + '<select class="sd-media-select" data-field="status" aria-label="Status filter">'
+    + '  <option value="all">All status</option>'
+    + '  <option value="used">Used</option>'
+    + '  <option value="orphan">Orphan</option>'
+    + '</select>'
+    + '<select class="sd-media-select" data-field="article" aria-label="Article filter">'
+    + '  <option value="all">All articles</option>'
+    + '</select>'
+    + '<select class="sd-media-select" data-field="sort" aria-label="Sort">'
+    + '  <option value="newest">Sort: newest</option>'
+    + '  <option value="oldest">Sort: oldest</option>'
+    + '  <option value="largest">Sort: largest</option>'
+    + '  <option value="smallest">Sort: smallest</option>'
+    + '  <option value="name_asc">Sort: name A→Z</option>'
+    + '  <option value="name_desc">Sort: name Z→A</option>'
+    + '</select>';
+  els.mediaAuditPanel.appendChild(toolbar);
+
+  const searchInput = toolbar.querySelector('.sd-media-search');
+  const statusSel = toolbar.querySelector('select[data-field="status"]');
+  const articleSel = toolbar.querySelector('select[data-field="article"]');
+  const sortSel = toolbar.querySelector('select[data-field="sort"]');
+
+  if (searchInput) searchInput.value = safeText(mediaAuditView.query);
+  if (statusSel) statusSel.value = mediaAuditView.status;
+  if (sortSel) sortSel.value = mediaAuditView.sort;
+  if (articleSel) {
+    articleOptions.forEach(function (opt) {
+      const o = document.createElement('option');
+      o.value = opt.id;
+      o.textContent = opt.title;
+      articleSel.appendChild(o);
+    });
+    articleSel.value = mediaAuditView.article;
+  }
+
+  function bindFilterEvents() {
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        mediaAuditView.query = searchInput.value || '';
+        mediaAuditView.visibleCount = 0;
+        paintMediaAudit();
+      });
+    }
+    if (statusSel) {
+      statusSel.addEventListener('change', function () {
+        mediaAuditView.status = statusSel.value || 'all';
+        mediaAuditView.visibleCount = 0;
+        paintMediaAudit();
+      });
+    }
+    if (articleSel) {
+      articleSel.addEventListener('change', function () {
+        mediaAuditView.article = articleSel.value || 'all';
+        mediaAuditView.visibleCount = 0;
+        paintMediaAudit();
+      });
+    }
+    if (sortSel) {
+      sortSel.addEventListener('change', function () {
+        mediaAuditView.sort = sortSel.value || 'newest';
+        mediaAuditView.visibleCount = 0;
+        paintMediaAudit();
+      });
+    }
+  }
+  bindFilterEvents();
+
+  // Compact summary bar
   const summary = document.createElement('div');
   summary.className = 'sd-media-summary';
   summary.innerHTML = '<div><strong>' + (state.bucket || 'media') + '</strong> · '
     + String(state.prefix || 'media/') + '</div>'
     + '<div>'
-    + (state.summary ? (
-      String(state.summary.totalObjects || 0) + ' objects · '
-      + formatBytes(state.summary.totalBytes || 0) + ' · '
-      + String(state.summary.orphanObjects || 0) + ' orphans'
-    ) : (String(objects.length) + ' objects'))
+    + String(filtered.length) + ' results'
     + '</div>';
   els.mediaAuditPanel.appendChild(summary);
 
@@ -1513,80 +1731,59 @@ function paintMediaAudit() {
   const table = document.createElement('table');
   table.className = 'sd-media-table';
   const thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th>File</th><th>Used by</th></tr>';
+  thead.innerHTML = '<tr>'
+    + '<th class="sd-media-col-preview">Preview</th>'
+    + '<th>File</th>'
+    + '<th>Article</th>'
+    + '<th>Status</th>'
+    + '<th class="sd-media-col-size">Size</th>'
+    + '<th class="sd-media-col-uploaded">Uploaded</th>'
+    + '<th class="sd-media-col-actions">Actions</th>'
+    + '</tr>';
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  filtered.forEach(function (o) {
+  filtered.slice(0, mediaAuditView.visibleCount).forEach(function (o) {
     const tr = document.createElement('tr');
     if (o.isOrphan) tr.className = 'sd-media-row-orphan';
 
-    const fileTd = document.createElement('td');
-    const fileWrap = document.createElement('div');
-    fileWrap.className = 'sd-media-file';
+    const refs = Array.isArray(o.referencedBy) ? o.referencedBy : [];
 
+    // Preview
+    const previewTd = document.createElement('td');
+    previewTd.className = 'sd-media-col-preview';
     const img = document.createElement('img');
-    img.className = 'sd-media-thumb';
+    img.className = 'sd-media-thumb sd-media-thumb--sm';
     img.loading = 'lazy';
     img.alt = '';
     img.src = o.url;
+    previewTd.appendChild(img);
 
-    const meta = document.createElement('div');
-    const name = document.createElement('a');
-    name.className = 'sd-media-name';
-    name.href = o.url;
-    name.target = '_blank';
-    name.rel = 'noopener noreferrer';
-    name.textContent = String(o.name || '').replace(/^media\//, '');
+    // File
+    const fileTd = document.createElement('td');
+    const fileName = document.createElement('a');
+    fileName.className = 'sd-media-name';
+    fileName.href = o.url;
+    fileName.target = '_blank';
+    fileName.rel = 'noopener noreferrer';
+    fileName.textContent = String(o.name || '').replace(/^media\//, '');
+    const fileMeta = document.createElement('div');
+    fileMeta.className = 'sd-media-meta';
+    fileMeta.textContent = (o.contentType ? o.contentType : '') + (o.contentType ? ' · ' : '') + formatBytes(o.size || 0);
+    fileTd.appendChild(fileName);
+    fileTd.appendChild(fileMeta);
 
-    const small = document.createElement('div');
-    small.className = 'sd-media-meta';
-    small.textContent = formatBytes(o.size || 0) + (o.updatedAt ? (' · ' + formatWhen(o.updatedAt)) : '');
-
-    meta.appendChild(name);
-    meta.appendChild(small);
-    fileWrap.appendChild(img);
-    fileWrap.appendChild(meta);
-    fileTd.appendChild(fileWrap);
-
-    const refsTd = document.createElement('td');
-    const refs = Array.isArray(o.referencedBy) ? o.referencedBy : [];
+    // Article
+    const articleTd = document.createElement('td');
     if (!refs.length) {
-      const wrap = document.createElement('div');
-      wrap.className = 'sd-media-refs';
-
-      const orphanLabel = document.createElement('div');
-      orphanLabel.className = 'sd-media-meta';
-      orphanLabel.textContent = 'Orphan (not referenced by any article)';
-      wrap.appendChild(orphanLabel);
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'sd-media-ref sd-media-ref-danger';
-      delBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span><span>Delete orphan</span>';
-      delBtn.addEventListener('click', async function () {
-        const filename = String(o.name || '').replace(/^media\//, '');
-        if (!confirm('Delete this orphaned image?\n\n' + filename + '\n\nThis cannot be undone.')) return;
-        delBtn.disabled = true;
-        setSectionStatus(els.mediaAuditStatus, 'Deleting ' + filename + '…', 'info');
-        try {
-          await authedJson('/api/admin/media/object?name=' + encodeURIComponent(o.name), { method: 'DELETE' });
-          setSectionStatus(els.mediaAuditStatus, 'Deleted ' + filename + '.', 'success');
-          // Refresh mapping after deletion.
-          mediaAuditState = null;
-          await refreshMediaAudit();
-        } catch (err) {
-          setSectionStatus(els.mediaAuditStatus, err.message || 'Delete failed.', 'error');
-        } finally {
-          delBtn.disabled = false;
-        }
-      });
-      wrap.appendChild(delBtn);
-      refsTd.appendChild(wrap);
+      const orphanText = document.createElement('div');
+      orphanText.className = 'sd-media-meta';
+      orphanText.textContent = '(No article)';
+      articleTd.appendChild(orphanText);
     } else {
       const wrap = document.createElement('div');
       wrap.className = 'sd-media-refs';
-      refs.slice(0, 6).forEach(function (r) {
+      refs.slice(0, 2).forEach(function (r) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'sd-media-ref';
@@ -1600,21 +1797,180 @@ function paintMediaAudit() {
         });
         wrap.appendChild(btn);
       });
-      if (refs.length > 6) {
+      if (refs.length > 2) {
         const more = document.createElement('div');
         more.className = 'sd-media-meta';
-        more.textContent = '+' + (refs.length - 6) + ' more';
+        more.textContent = '+' + (refs.length - 2) + ' more';
         wrap.appendChild(more);
       }
-      refsTd.appendChild(wrap);
+      articleTd.appendChild(wrap);
     }
 
+    // Status
+    const statusTd = document.createElement('td');
+    const chip = document.createElement('span');
+    chip.className = 'sd-media-status ' + (refs.length ? 'sd-media-status--used' : 'sd-media-status--orphan');
+    chip.innerHTML = refs.length
+      ? '<span class="material-symbols-outlined" aria-hidden="true">check</span><span>Used</span>'
+      : '<span class="material-symbols-outlined" aria-hidden="true">delete</span><span>Orphan</span>';
+    statusTd.appendChild(chip);
+
+    // Size
+    const sizeTd = document.createElement('td');
+    sizeTd.className = 'sd-media-col-size';
+    sizeTd.textContent = formatBytes(o.size || 0);
+
+    // Uploaded
+    const uploadedTd = document.createElement('td');
+    uploadedTd.className = 'sd-media-col-uploaded';
+    uploadedTd.textContent = o.updatedAt ? formatWhen(o.updatedAt) : '';
+
+    // Actions
+    const actionsTd = document.createElement('td');
+    actionsTd.className = 'sd-media-col-actions';
+    const actionsWrap = document.createElement('div');
+    actionsWrap.className = 'reco-actions sd-media-actions';
+
+    const actionsBtn = document.createElement('button');
+    actionsBtn.type = 'button';
+    actionsBtn.className = 'reco-actions-trigger sd-media-actions-trigger';
+    actionsBtn.title = 'Row actions';
+    actionsBtn.setAttribute('aria-label', 'Row actions');
+    actionsBtn.setAttribute('aria-haspopup', 'menu');
+    actionsBtn.setAttribute('aria-expanded', 'false');
+    actionsBtn.appendChild(makeIcon('more_vert'));
+
+    const menu = document.createElement('div');
+    menu.className = 'reco-actions-menu sd-media-actions-menu';
+    menu.hidden = true;
+    menu.setAttribute('role', 'menu');
+
+    const openItem = document.createElement('button');
+    openItem.type = 'button';
+    openItem.className = 'reco-action-item';
+    openItem.setAttribute('role', 'menuitem');
+    openItem.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">open_in_new</span><span>Open file</span>';
+    openItem.addEventListener('click', function () {
+      closeMediaActionMenus();
+      window.open(o.url, '_blank', 'noopener,noreferrer');
+    });
+
+    const copyItem = document.createElement('button');
+    copyItem.type = 'button';
+    copyItem.className = 'reco-action-item';
+    copyItem.setAttribute('role', 'menuitem');
+    copyItem.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span><span>Copy URL</span>';
+    copyItem.addEventListener('click', async function () {
+      closeMediaActionMenus();
+      try {
+        await navigator.clipboard.writeText(o.url);
+        setSectionStatus(els.mediaAuditStatus, 'Copied URL.', 'success');
+      } catch (_) {
+        prompt('Copy URL:', o.url);
+      }
+    });
+
+    menu.append(openItem, copyItem);
+
+    if (refs.length) {
+      const articleItem = document.createElement('button');
+      articleItem.type = 'button';
+      articleItem.className = 'reco-action-item';
+      articleItem.setAttribute('role', 'menuitem');
+      articleItem.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">article</span><span>Open article</span>';
+      articleItem.addEventListener('click', function () {
+        closeMediaActionMenus();
+        const r = refs[0];
+        const article = articles.find(function (a) { return a.id === r.articleId; });
+        setActiveModule('system-design');
+        if (article) fillForm(article);
+      });
+      menu.appendChild(articleItem);
+    }
+
+    if (!refs.length) {
+      const delItem = document.createElement('button');
+      delItem.type = 'button';
+      delItem.className = 'reco-action-item reco-action-item-destructive';
+      delItem.setAttribute('role', 'menuitem');
+      delItem.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span><span>Delete</span>';
+      delItem.addEventListener('click', async function () {
+        closeMediaActionMenus();
+        const filename = String(o.name || '').replace(/^media\//, '');
+        if (!confirm('Delete this orphaned image?\n\n' + filename + '\n\nThis cannot be undone.')) return;
+        delItem.disabled = true;
+        setSectionStatus(els.mediaAuditStatus, 'Deleting ' + filename + '…', 'info');
+        try {
+          await authedJson('/api/admin/media/object?name=' + encodeURIComponent(o.name), { method: 'DELETE' });
+          setSectionStatus(els.mediaAuditStatus, 'Deleted ' + filename + '.', 'success');
+          mediaAuditState = null;
+          await refreshMediaAudit();
+        } catch (err) {
+          setSectionStatus(els.mediaAuditStatus, err.message || 'Delete failed.', 'error');
+        } finally {
+          delItem.disabled = false;
+        }
+      });
+      menu.appendChild(delItem);
+    }
+
+    actionsBtn.addEventListener('click', function (event) {
+      event.stopPropagation();
+      const willOpen = menu.hidden;
+      closeMediaActionMenus();
+      closeSectionActionMenus();
+      closeArticleDetailsMenu();
+      closePolicyRuleMenus();
+      menu.hidden = !willOpen;
+      actionsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+    menu.addEventListener('click', function (event) { event.stopPropagation(); });
+
+    actionsWrap.append(actionsBtn, menu);
+    actionsTd.appendChild(actionsWrap);
+
+    tr.appendChild(previewTd);
     tr.appendChild(fileTd);
-    tr.appendChild(refsTd);
+    tr.appendChild(articleTd);
+    tr.appendChild(statusTd);
+    tr.appendChild(sizeTd);
+    tr.appendChild(uploadedTd);
+    tr.appendChild(actionsTd);
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  els.mediaAuditPanel.appendChild(table);
+  const tableWrap = document.createElement('div');
+  tableWrap.className = 'sd-media-table-wrap';
+  tableWrap.appendChild(table);
+  els.mediaAuditPanel.appendChild(tableWrap);
+
+  // Lazy-load sentinel
+  const footer = document.createElement('div');
+  footer.className = 'sd-media-footer';
+  const shown = Math.min(mediaAuditView.visibleCount, filtered.length);
+  footer.innerHTML = '<span>Showing <strong>' + shown + '</strong> of <strong>' + filtered.length + '</strong></span>';
+  els.mediaAuditPanel.appendChild(footer);
+
+  if (shown < filtered.length) {
+    const sentinel = document.createElement('div');
+    sentinel.className = 'sd-media-sentinel';
+    sentinel.textContent = 'Loading more…';
+    els.mediaAuditPanel.appendChild(sentinel);
+
+    if (mediaAuditView.observer) {
+      try { mediaAuditView.observer.disconnect(); } catch (_) {}
+    }
+    mediaAuditView.observer = new IntersectionObserver(function (entries) {
+      const hit = entries && entries[0] && entries[0].isIntersecting;
+      if (!hit) return;
+      mediaAuditView.visibleCount = Math.min(filtered.length, mediaAuditView.visibleCount + mediaAuditView.batchSize);
+      paintMediaAudit();
+    }, { root: null, rootMargin: '240px 0px', threshold: 0.01 });
+    mediaAuditView.observer.observe(sentinel);
+  } else if (mediaAuditView.observer) {
+    try { mediaAuditView.observer.disconnect(); } catch (_) {}
+    mediaAuditView.observer = null;
+  }
 }
 
 function autoFixArticleSettingsOrder() {
@@ -2370,11 +2726,14 @@ els.modules.addEventListener('click', function (event) {
 if (els.refreshMediaAuditBtn) {
   els.refreshMediaAuditBtn.addEventListener('click', function () {
     mediaAuditState = null;
+    mediaAuditView.visibleCount = 0;
     refreshMediaAudit();
   });
 }
 if (els.mediaOrphansOnly) {
   els.mediaOrphansOnly.addEventListener('change', function () {
+    mediaAuditView.visibleCount = 0;
+    mediaAuditView.status = els.mediaOrphansOnly.checked ? 'orphan' : (mediaAuditView.status || 'all');
     paintMediaAudit();
   });
 }
@@ -2412,12 +2771,14 @@ document.addEventListener('click', function () {
   closeSectionActionMenus();
   closeArticleDetailsMenu();
   closePolicyRuleMenus();
+  closeMediaActionMenus();
 });
 document.addEventListener('keydown', function (event) {
   if (event.key === 'Escape') {
     closeSectionActionMenus();
     closeArticleDetailsMenu();
     closePolicyRuleMenus();
+    closeMediaActionMenus();
   }
 });
 els.detailsActionsBtn.addEventListener('click', function (event) {
@@ -2604,6 +2965,16 @@ document.querySelectorAll('.sd-policy-rule-card').forEach(function (card) {
 els.toggleLibraryBtn.addEventListener('click', function () {
   setArticleLibraryCollapsed(!els.workspace.classList.contains('sd-admin-workspace-library-collapsed'));
 });
+try {
+  setSidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1');
+} catch (_e) { /* ignore */ }
+if (els.toggleSidebarBtn) {
+  els.toggleSidebarBtn.addEventListener('click', function (event) {
+    event.stopPropagation();
+    const isCollapsed = !!els.shell?.classList.contains('sd-admin-shell--sidebar-collapsed');
+    setSidebarCollapsed(!isCollapsed);
+  });
+}
 els.togglePolicyInfoBtn.addEventListener('click', function () {
   setContactPolicyInfoCollapsed(!els.policyWorkspace.classList.contains('sd-admin-policy-info-collapsed'));
 });
