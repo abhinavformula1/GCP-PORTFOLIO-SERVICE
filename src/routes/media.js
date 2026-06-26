@@ -15,7 +15,7 @@ const { body, validationResult } = require('express-validator');
 const { requireAdmin } = require('../middleware/auth');
 const { uploadMedia, listMediaObjects, deleteMediaObject, MAX_BYTES } = require('../services/gcs');
 const { getSponsorship, upsertSponsorship, deleteSponsorship, listSystemDesignArticles } = require('../services/firestore');
-const { ValidationError } = require('../errors');
+const { AppError, ValidationError } = require('../errors');
 
 const router = express.Router();
 
@@ -55,11 +55,18 @@ router.post(
 //   - which objects are orphaned (safe-to-delete candidates)
 router.get('/admin/media/audit', requireAdmin, async (_req, res, next) => {
   try {
-    const bucket = process.env.MEDIA_BUCKET;
+    const bucket = resolveMediaBucketName();
     if (!bucket) throw new ValidationError('MEDIA_BUCKET is not configured on this server.');
 
-    const objects = await listMediaObjects({ prefix: 'media/' });
-    const refMap = await buildMediaReferenceMap({ bucket });
+    let objects;
+    let refMap;
+    try {
+      objects = await listMediaObjects({ prefix: 'media/' });
+      refMap = await buildMediaReferenceMap({ bucket });
+    } catch (err) {
+      throwAdcHelpIfNeeded(err);
+      throw err;
+    }
 
     const rows = objects.map((o) => {
       const refs = refMap.get(o.name) || [];
@@ -97,6 +104,28 @@ router.get('/admin/media/audit', requireAdmin, async (_req, res, next) => {
 
 function escapeRegExp(s) {
   return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function resolveMediaBucketName() {
+  let name = process.env.MEDIA_BUCKET;
+  const isProd = (process.env.NODE_ENV || 'development') === 'production' || !!process.env.K_SERVICE;
+  const isLocalPreview = process.env.ADMIN_LOCAL_PREVIEW === 'true' && !isProd;
+  if (!name && isLocalPreview) name = 'portfolio-service-media';
+  return name || '';
+}
+
+function isMissingAdc(err) {
+  const msg = String(err?.message || '');
+  return msg.includes('Could not load the default credentials');
+}
+
+function throwAdcHelpIfNeeded(err) {
+  if (!isMissingAdc(err)) return;
+  throw new AppError(
+    'Local preview needs GCP credentials to read Firestore/GCS. Run: gcloud auth application-default login',
+    503,
+    'GCP_AUTH_REQUIRED'
+  );
 }
 
 async function buildMediaReferenceMap({ bucket }) {
@@ -137,7 +166,7 @@ async function buildMediaReferenceMap({ bucket }) {
 // Deletes a single media object, but only if it's still orphaned at delete time.
 router.delete('/admin/media/object', requireAdmin, async (req, res, next) => {
   try {
-    const bucket = process.env.MEDIA_BUCKET;
+    const bucket = resolveMediaBucketName();
     if (!bucket) throw new ValidationError('MEDIA_BUCKET is not configured on this server.');
 
     const name = String(req.query?.name || req.body?.name || '').trim();
@@ -145,7 +174,13 @@ router.delete('/admin/media/object', requireAdmin, async (req, res, next) => {
     if (!name.startsWith('media/')) throw new ValidationError('Only media/ objects can be deleted.');
 
     // Re-check references at the moment of delete (race-safe).
-    const refMap = await buildMediaReferenceMap({ bucket });
+    let refMap;
+    try {
+      refMap = await buildMediaReferenceMap({ bucket });
+    } catch (err) {
+      throwAdcHelpIfNeeded(err);
+      throw err;
+    }
     const refs = refMap.get(name) || [];
     if (refs.length) {
       return res.status(409).json({

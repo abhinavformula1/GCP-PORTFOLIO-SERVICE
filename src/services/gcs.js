@@ -36,9 +36,14 @@ const ALLOWED_MIME_TYPES = new Set([
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 
 function getBucket() {
-  const name = process.env.MEDIA_BUCKET;
+  let name = process.env.MEDIA_BUCKET;
+  // Local preview convenience: let the admin UI work without env wiring.
+  // Production (Cloud Run) must always be explicitly configured.
+  const isProd = (process.env.NODE_ENV || 'development') === 'production' || !!process.env.K_SERVICE;
+  const isLocalPreview = process.env.ADMIN_LOCAL_PREVIEW === 'true' && !isProd;
+  if (!name && isLocalPreview) name = 'portfolio-service-media';
   if (!name) {
-    const err = new Error('Media storage is not configured on this server. Set the MEDIA_BUCKET environment variable.');
+    const err = new Error('MEDIA_BUCKET is not configured on this server.');
     err.statusCode = 503;
     err.isOperational = true;
     throw err;
