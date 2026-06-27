@@ -25,12 +25,13 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "express-validator": "^7.2.1",
+    "geoip-lite": "^1.4.10",
     "google-auth-library": "^10.6.2",
     "jsforce": "^3.10.14",
     "multer": "^2.2.0",
     "puppeteer-core": "^25.1.0",
     "sharp": "^0.35.2",
-    "geoip-lite": "^1.4.10"
+    "stripe": "^22.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

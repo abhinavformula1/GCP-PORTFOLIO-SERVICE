@@ -17,6 +17,7 @@ process.on('unhandledRejection', (reason) => {
 const express      = require('express');
 const path         = require('path');
 const config       = require('./src/config');
+const { billingWebhookHandler } = require('./src/routes/billing-webhook');
 const hireRoute           = require('./src/routes/hire');
 const questionRoute       = require('./src/routes/question');
 const recommendationRoute = require('./src/routes/recommendation');
@@ -30,6 +31,8 @@ const mediaRoute          = require('./src/routes/media');
 const pdfRoute            = require('./src/routes/pdf');
 const printRoute          = require('./src/routes/print');
 const analyticsRoute      = require('./src/routes/analytics');
+const billingRoute        = require('./src/routes/billing');
+const promotionsRoute     = require('./src/routes/promotions');
 const { errorHandler } = require('./src/middleware/errorHandler');
 
 const app  = express();
@@ -37,6 +40,9 @@ const PORT = config.server.port;
 
 // Trust Cloud Run's load balancer (fixes X-Forwarded-For for rate limiting)
 app.set('trust proxy', 1);
+
+// ── Stripe webhook (raw body required for signature verification) ─────────────
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), billingWebhookHandler);
 
 // ── Request parsing ───────────────────────────────────────────────────────────
 app.use(express.json());
@@ -82,6 +88,8 @@ app.use('/api', atlasRoute);
 app.use('/api', systemDesignRoute);
 app.use('/api', mediaRoute);
 app.use('/api', analyticsRoute);
+app.use('/api', billingRoute);
+app.use('/api', promotionsRoute);
 app.use('/api/pdf', pdfRoute);
 app.use('/print',   printRoute);
 
@@ -91,9 +99,10 @@ app.use('/print',   printRoute);
 app.get('/sitemap.xml', async (_req, res, next) => {
   try {
     const firestore = require('./src/services/firestore');
+    const adminConfig = require('./src/services/adminConfig');
     // Respect admin SEO toggle — return 404 if sitemap is disabled
     let seoConfig = {};
-    try { seoConfig = await firestore.getSeoConfig(); } catch (_) {}
+    try { seoConfig = await adminConfig.getSeoConfig(); } catch (_) {}
     if (seoConfig.sitemapEnabled === false) {
       return res.status(404).send('Not found');
     }

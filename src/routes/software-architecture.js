@@ -10,10 +10,13 @@
 
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, optionalAuth, requireAdmin } = require('../middleware/auth');
 const config = require('../config');
 const firestore = require('../services/firestore');
+const adminConfig = require('../services/adminConfig');
+const billing = require('../services/billing');
 const contactPolicy = require('../services/contactPolicy');
+const sponsorships = require('../services/sponsorships');
 const { generateChatResponse } = require('../services/gemini');
 const { ValidationError } = require('../errors');
 
@@ -168,7 +171,7 @@ function looksConfiguredPhone(value) {
 // ── Tier config (public read, admin write) ────────────────────────────────────
 router.get('/system-design/tier-config', async (_req, res) => {
   try {
-    const config = await firestore.getTierConfig();
+    const config = await adminConfig.getTierConfig();
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
     return res.status(200).json({ success: true, config });
   } catch (err) {
@@ -180,7 +183,7 @@ router.get('/system-design/tier-config', async (_req, res) => {
 // ── SEO / AEO configuration (public read, admin write) ────────────────────────
 router.get('/system-design/seo-config', async (_req, res) => {
   try {
-    const config = await firestore.getSeoConfig();
+    const config = await adminConfig.getSeoConfig();
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
     return res.status(200).json({ success: true, config });
   } catch (err) {
@@ -202,7 +205,7 @@ router.put('/admin/system-design/seo-config', requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
   try {
-    await firestore.upsertSeoConfig(req.body);
+    await adminConfig.upsertSeoConfig(req.body);
     return res.status(200).json({ success: true });
   } catch (err) {
     next(err);
@@ -212,7 +215,7 @@ router.put('/admin/system-design/seo-config', requireAdmin, [
 // ── Component registry (public read, admin write) ─────────────────────────────
 router.get('/system-design/component-registry', async (_req, res) => {
   try {
-    const enabled = await firestore.getComponentRegistry();
+    const enabled = await adminConfig.getComponentRegistry();
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
     return res.status(200).json({ success: true, enabled });
   } catch (err) {
@@ -227,7 +230,7 @@ router.put('/admin/system-design/component-registry', requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
   try {
-    await firestore.upsertComponentRegistry(req.body.enabled);
+    await adminConfig.upsertComponentRegistry(req.body.enabled);
     return res.status(200).json({ success: true });
   } catch (err) {
     next(err);
@@ -241,28 +244,60 @@ router.put('/admin/system-design/tier-config', requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
   try {
-    await firestore.upsertTierConfig(req.body);
+    await adminConfig.upsertTierConfig(req.body);
     return res.status(200).json({ success: true });
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/system-design/articles', async (_req, res) => {
+function sanitisePremiumArticle(article) {
+  if (!article || typeof article !== 'object') return article;
+  const a = Object.assign({}, article);
+  // Remove any content-bearing fields.
+  a.blocks = [];
+  if (a.en && typeof a.en === 'object') a.en = Object.assign({}, a.en, { body: '' });
+  if (a.fr && typeof a.fr === 'object') a.fr = Object.assign({}, a.fr, { body: '' });
+  if (Object.prototype.hasOwnProperty.call(a, 'bodyHtml')) a.bodyHtml = '';
+  return a;
+}
+
+router.get('/system-design/articles', optionalAuth, async (req, res) => {
   try {
+    const uid = String(req.user?.uid || '').trim();
+    const entitlement = uid ? await billing.getUserSubscriptionEntitlement(uid) : { active: false };
+    const canAccessPremium = !!entitlement.active;
+
     const articles = await firestore.listPublishedSystemDesignArticles();
+    const safe = (Array.isArray(articles) ? articles : []).map(function (a) {
+      const tier = String(a?.tier || '').trim().toLowerCase();
+      const premium = tier === 'premium';
+      const hasAccess = !premium || canAccessPremium;
+      const out = hasAccess ? a : sanitisePremiumArticle(a);
+      return Object.assign({}, out, { hasAccess });
+    });
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
-    return res.status(200).json({ success: true, articles });
+    return res.status(200).json({ success: true, articles: safe });
   } catch (err) {
     console.warn('[system-design] Firestore list failed:', err.message);
     return res.status(200).json({ success: true, articles: [], degraded: true });
   }
 });
 
-router.get('/system-design/articles/:id', async (req, res) => {
+router.get('/system-design/articles/:id', optionalAuth, async (req, res) => {
   try {
     const article = await firestore.getSystemDesignArticle(req.params.id);
     if (!article) return res.status(404).json({ success: false, error: 'Article not found.' });
+    const tier = String(article?.tier || '').trim().toLowerCase();
+    const premium = tier === 'premium';
+    if (premium) {
+      const uid = String(req.user?.uid || '').trim();
+      const entitlement = uid ? await billing.getUserSubscriptionEntitlement(uid) : { active: false };
+      const hasAccess = !!entitlement.active;
+      const out = hasAccess ? article : sanitisePremiumArticle(article);
+      res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+      return res.status(200).json({ success: true, article: Object.assign({}, out, { hasAccess }) });
+    }
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
     return res.status(200).json({ success: true, article });
   } catch (err) {
@@ -327,7 +362,7 @@ router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
         },
       });
     }
-    const saved = await firestore.upsertContactPolicyConfig({
+    const saved = await adminConfig.upsertContactPolicyConfig({
       privatePhone,
       allowedDomains,
       personalDomains,
@@ -428,7 +463,7 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
 router.get('/sponsorships/active', async (req, res) => {
   try {
     const placement = req.query.placement || null;
-    const sponsors = await firestore.listActiveSponsorships(placement);
+    const sponsors = await sponsorships.listActiveSponsorships(placement);
     res.set('Cache-Control', 'public, max-age=60, s-maxage=120');
     return res.status(200).json({ success: true, sponsors });
   } catch (err) {
@@ -440,7 +475,7 @@ router.get('/sponsorships/active', async (req, res) => {
 // Admin: list all sponsors
 router.get('/admin/sponsorships', requireAdmin, async (_req, res, next) => {
   try {
-    const sponsors = await firestore.listSponsorships();
+    const sponsors = await sponsorships.listSponsorships();
     return res.status(200).json({ success: true, sponsors });
   } catch (err) { next(err); }
 });
@@ -455,7 +490,7 @@ router.post('/admin/sponsorships', requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
   try {
-    const sponsor = await firestore.upsertSponsorship(null, req.body);
+    const sponsor = await sponsorships.upsertSponsorship(null, req.body);
     return res.status(201).json({ success: true, sponsor });
   } catch (err) { next(err); }
 });
@@ -468,7 +503,7 @@ router.put('/admin/sponsorships/:id', requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
   try {
-    const sponsor = await firestore.upsertSponsorship(req.params.id, req.body);
+    const sponsor = await sponsorships.upsertSponsorship(req.params.id, req.body);
     return res.status(200).json({ success: true, sponsor });
   } catch (err) { next(err); }
 });
@@ -476,7 +511,7 @@ router.put('/admin/sponsorships/:id', requireAdmin, [
 // Admin: delete sponsor
 router.delete('/admin/sponsorships/:id', requireAdmin, async (req, res, next) => {
   try {
-    await firestore.deleteSponsorship(req.params.id);
+    await sponsorships.deleteSponsorship(req.params.id);
     return res.status(200).json({ success: true });
   } catch (err) { next(err); }
 });
@@ -484,7 +519,7 @@ router.delete('/admin/sponsorships/:id', requireAdmin, async (req, res, next) =>
 // ── Atlas config (admin read/write) ──────────────────────────────────────────
 router.get('/admin/atlas/config', requireAdmin, async (_req, res, next) => {
   try {
-    const cfg = await firestore.getAtlasConfig();
+    const cfg = await adminConfig.getAtlasConfig();
     return res.status(200).json({ success: true, config: cfg });
   } catch (err) { return next(err); }
 });
@@ -499,7 +534,7 @@ router.put('/admin/atlas/config', requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
   try {
-    await firestore.upsertAtlasConfig({
+    await adminConfig.upsertAtlasConfig({
       enabledModels:        req.body.enabledModels,
       defaultModel:         req.body.defaultModel,
       budgetCapInr:         Number(req.body.budgetCapInr),

@@ -26,6 +26,25 @@ async function requireAuth(req, res, next) {
   }
 }
 
+/**
+ * Optional auth: if Authorization header is present, validate it and attach
+ * req.user. If header is missing, continue as guest.
+ */
+async function optionalAuth(req, _res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const m = /^Bearer\s+(.+)$/i.exec(header);
+    if (!m) return next();
+    req.user = await googleAuth.verifyIdToken(m[1]);
+    return next();
+  } catch (_err) {
+    // Optional auth must never break public endpoints. Treat invalid/expired
+    // tokens as "guest" and continue.
+    req.user = null;
+    return next();
+  }
+}
+
 async function requireAdmin(req, res, next) {
   if (config.admin.localPreview) {
     req.user = {
@@ -48,4 +67,4 @@ async function requireAdmin(req, res, next) {
   });
 }
 
-module.exports = { requireAuth, requireAdmin };
+module.exports = { requireAuth, optionalAuth, requireAdmin };
