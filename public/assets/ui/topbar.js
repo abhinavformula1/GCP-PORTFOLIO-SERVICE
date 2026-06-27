@@ -104,8 +104,13 @@ export function renderTopbar(target, options) {
     photoAlt:   opts.photoAlt,
   };
 
-  const left = opts.backHref ? createEl('a', { className: 'sd-admin-back', href: opts.backHref }, [
-    materialIcon('arrow_back'),
+  const left = opts.backHref ? createEl('a', {
+    className: 'sd-admin-back',
+    href: opts.backHref,
+    'aria-label': opts.backAriaLabel || (opts.backText || 'Back'),
+    title: opts.backTitle || (opts.backText || 'Back'),
+  }, [
+    materialIcon(opts.backIcon || 'arrow_back'),
     createEl('span', { text: opts.backText || 'Back' }),
   ]) : null;
 

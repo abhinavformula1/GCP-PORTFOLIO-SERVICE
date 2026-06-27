@@ -24,6 +24,7 @@
 const crypto                         = require('crypto');
 const express                        = require('express');
 const firestore                      = require('../services/firestore');
+const billing                        = require('../services/billing');
 const salesforce                     = require('../services/salesforce');
 const googleAuth                     = require('../services/googleAuth');
 const contactPolicy                  = require('../services/contactPolicy');
@@ -80,6 +81,12 @@ router.post('/session/start', async (req, res, next) => {
     //    email is in an allow-listed domain.
     const contact = await contactPolicy.resolveContactViewAsync({ email });
 
+    // 4.5 Subscription entitlement (best-effort; never blocks sign-in UX).
+    let subscription = { active: false, status: 'none', currentPeriodEnd: null, cancelAtPeriodEnd: false };
+    try {
+      subscription = await billing.getUserSubscriptionEntitlement(uid);
+    } catch (_) {}
+
     // 5. Respond with the bits the frontend needs to greet the user.
     //    firstSeenAt/lastSeenAt come back as Firestore Timestamps — convert.
     return res.status(200).json({
@@ -95,6 +102,7 @@ router.post('/session/start', async (req, res, next) => {
       // Server-side decision — frontend never has to ask "should I show this?",
       // it just renders whatever the server gave it.
       contact,
+      subscription,
     });
   } catch (err) {
     return next(err);

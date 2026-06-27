@@ -39,6 +39,7 @@ const {
   DEFAULT_GEMINI_MODEL_KEY,
 } = require('../services/atlas/respond');
 const firestore           = require('../services/firestore');
+const adminConfig         = require('../services/adminConfig');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -388,7 +389,7 @@ router.delete('/atlas/conversations/active',
 router.get('/atlas/config',
   async (req, res, next) => {
     try {
-      const cfg = await firestore.getAtlasConfig();
+      const cfg = await adminConfig.getAtlasConfig();
       // Filter enabledModels to only those that exist in GEMINI_MODELS
       const enabledModels = cfg.enabledModels.filter(function (k) { return !!GEMINI_MODELS[k]; });
       // Ensure defaultModel is in the enabled set; fall back to first enabled.

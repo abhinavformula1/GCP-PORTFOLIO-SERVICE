@@ -2,8 +2,13 @@
 
 const express   = require('express');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 const { AppError }           = require('../errors');
 const { generatePdf, resolveChromePath } = require('../services/pdf');
+const config = require('../config');
+const firestore = require('../services/firestore');
+const billing = require('../services/billing');
+const googleAuth = require('../services/googleAuth');
 
 const router = express.Router();
 
@@ -37,9 +42,44 @@ router.get('/export', pdfLimiter, async (req, res, next) => {
       return res.status(400).json({ success: false, code: 'BAD_REQUEST', error: 'Missing or invalid article id.' });
     }
 
+    const article = await firestore.getSystemDesignArticle(id);
+    if (!article) {
+      return res.status(404).json({ success: false, code: 'NOT_FOUND', error: 'Article not found.' });
+    }
+    const tier = String(article?.tier || '').trim().toLowerCase();
+    const isPremium = tier === 'premium';
+
+    // Premium PDFs require an active subscription.
+    let allowFull = !isPremium;
+    if (isPremium) {
+      const header = req.headers.authorization || '';
+      const m = /^Bearer\s+(.+)$/i.exec(header);
+      if (!m) {
+        return res.status(401).json({ success: false, code: 'UNAUTHORIZED', error: 'Sign in required to export premium PDFs.' });
+      }
+      const user = await googleAuth.verifyIdToken(m[1]);
+      const ent = await billing.getUserSubscriptionEntitlement(user.uid);
+      if (!ent || !ent.active) {
+        return res.status(403).json({ success: false, code: 'SUBSCRIPTION_REQUIRED', error: 'Premium subscription required to export this PDF.' });
+      }
+      allowFull = true;
+    }
+
     const proto   = req.headers['x-forwarded-proto'] || req.protocol;
     const host    = req.headers['x-forwarded-host']  || req.get('host');
-    const printUrl = `${proto}://${host}/print/system-design/${encodeURIComponent(id)}`;
+    let printUrl = `${proto}://${host}/print/system-design/${encodeURIComponent(id)}`;
+
+    // For premium: print endpoint must be protected; pass a short-lived signed token.
+    if (allowFull && isPremium) {
+      const secret = String(config.internal?.requestSecret || '').trim();
+      if (!secret) {
+        return res.status(503).json({ success: false, code: 'INTERNAL_SECRET_MISSING', error: 'Server is missing INTERNAL_REQUEST_SECRET.' });
+      }
+      const exp = Date.now() + 5 * 60 * 1000;
+      const base = `${id}:${exp}`;
+      const sig = crypto.createHmac('sha256', secret).update(base).digest('hex');
+      printUrl += `?e=${encodeURIComponent(String(exp))}&t=${encodeURIComponent(sig)}`;
+    }
 
     const pdfBuffer = await generatePdf(printUrl);
 

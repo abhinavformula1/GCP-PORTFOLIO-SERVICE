@@ -26,6 +26,7 @@
  */
 
 import { currentLang } from '../core/i18n.js';
+import { googleCredential, siteProfile } from '../core/state.js';
 import { blocksToHtml } from './sdblocks.js';
 import { iconCardsHtml } from './iconcards.js';
 import { mountSponsorSlot } from './sponsorship.js';
@@ -341,6 +342,7 @@ function normaliseCmsTopic(article) {
     tags:        Array.isArray(article.tags) ? article.tags : [],
     readMinutes: article.readMinutes ? Number(article.readMinutes) : null,
     tier:        article.tier || 'free',
+    hasAccess:   article.hasAccess !== false,
     stub:        !!article.stub,
     blocks,
     en: {
@@ -588,7 +590,10 @@ async function loadCmsTopics() {
   _cmsLoadStarted = true;
   try {
     const [articlesResp] = await Promise.all([
-      fetch('/api/system-design/articles', { headers: { Accept: 'application/json' }, credentials: 'same-origin' }),
+      fetch('/api/system-design/articles', {
+        headers: Object.assign({ Accept: 'application/json' }, googleCredential ? { Authorization: 'Bearer ' + googleCredential } : {}),
+        credentials: 'same-origin',
+      }),
       loadTierConfig(),
     ]);
     if (!articlesResp.ok) return;
@@ -1006,7 +1011,7 @@ function renderTopicDetail() {
   html += '</div>';
   html += '</div>';
   html += '</header>';
-  if (topic.tier === 'premium') {
+  if (topic.tier === 'premium' && topic.hasAccess === false) {
     // Use admin-configured benefit items if available, else fall back to article list
     let freeItems, premItems;
     if (_tierConfig && (_tierConfig.free?.items?.length || _tierConfig.premium?.items?.length)) {
@@ -1038,7 +1043,8 @@ function renderTopicDetail() {
     html += '<div><h3>Premium Tier</h3><p>Unlock premium articles. Coupon optional.</p></div>';
     html += '</div>';
     html += iconCardsHtml(premItems, { size: 'sm' });
-    html += '<a id="sdBuyNowBtn" href="mailto:abhinavformula1@gmail.com?subject=Buy%20Premium%20Access" class="sd-locked-cta">Buy now</a>';
+    html += '<button type="button" id="sdSubscribeBtn" class="sd-locked-cta">Subscribe</button>';
+    html += '<button type="button" id="sdManageSubBtn" class="sd-locked-cta sd-locked-cta-secondary" hidden>Manage</button>';
     html += '<div class="sd-coupon">';
     html += '<button type="button" class="sd-coupon-toggle" aria-expanded="false">Apply coupon</button>';
     html += '<div class="sd-coupon-form" hidden>';
@@ -1063,30 +1069,13 @@ function renderTopicDetail() {
   if (exportBtn) exportBtn.addEventListener('click', exportCurrentTopicPdf);
 
   // Premium gate UX: "Buy now" + progressive-disclosure coupon apply.
-  const buyNowBtn    = _sdDetail.querySelector('#sdBuyNowBtn');
+  const buyNowBtn    = _sdDetail.querySelector('#sdSubscribeBtn');
+  const manageBtn    = _sdDetail.querySelector('#sdManageSubBtn');
   const couponToggle = _sdDetail.querySelector('.sd-coupon-toggle');
   const couponForm   = _sdDetail.querySelector('.sd-coupon-form');
   const couponInput  = _sdDetail.querySelector('.sd-coupon-input');
   const couponApply  = _sdDetail.querySelector('.sd-coupon-apply');
   const couponMsg    = _sdDetail.querySelector('.sd-coupon-msg');
-
-  function buildPremiumMailtoHref(code) {
-    const email = 'abhinavformula1@gmail.com';
-    const subject = 'Buy Premium Access';
-    const lines = [
-      'Hi Abhinav,',
-      '',
-      'I want to unlock Premium Tier access for Software Architecture articles.',
-      '',
-      'Article: ' + (loc && loc.title ? loc.title : (_activeTopic || '')),
-      'Coupon: ' + (code ? code : '(none)'),
-      '',
-      'Please share the next steps.',
-    ];
-    return 'mailto:' + encodeURIComponent(email)
-      + '?subject=' + encodeURIComponent(subject)
-      + '&body=' + encodeURIComponent(lines.join('\\n'));
-  }
 
   function getStoredCoupon() {
     try { return String(sessionStorage.getItem(PREMIUM_COUPON_KEY) || '').trim(); } catch (_) { return ''; }
@@ -1097,7 +1086,7 @@ function renderTopicDetail() {
   }
 
   function syncBuyNowHref(code) {
-    if (buyNowBtn) buyNowBtn.href = buildPremiumMailtoHref(code);
+    if (buyNowBtn) buyNowBtn.dataset.coupon = code || '';
   }
 
   // Hydrate from session storage.
@@ -1110,6 +1099,116 @@ function renderTopicDetail() {
       couponForm.hidden = false;
       couponToggle.setAttribute('aria-expanded', 'true');
     }
+  }
+
+  function openUrl(url) {
+    if (!url) return;
+    try { window.open(url, '_blank', 'noopener'); } catch (_) { location.href = url; }
+  }
+
+  async function redeemPromo(code) {
+    const resp = await fetch('/api/billing/redeem-promo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+      credentials: 'same-origin',
+      body: JSON.stringify({ code }),
+    });
+    const data = await resp.json().catch(function () { return null; });
+    if (!resp.ok || !data || data.success === false) {
+      throw new Error((data && (data.error || data.message)) || 'Promo redemption failed.');
+    }
+    return data;
+  }
+
+  async function createCheckoutSession() {
+    const coupon = buyNowBtn ? String(buyNowBtn.dataset.coupon || '').trim() : '';
+    if (!googleCredential) {
+      // Prompt sign-in, then retry (best-effort).
+      try { sessionStorage.setItem('pending_subscribe', '1'); } catch (_) {}
+      if (typeof window.showWelcomeOverlay === 'function') {
+        window.showWelcomeOverlay();
+      } else {
+        alert('Please sign in first.');
+      }
+      let tries = 0;
+      const timer = setInterval(function () {
+        tries += 1;
+        if (googleCredential) {
+          clearInterval(timer);
+          createCheckoutSession().catch(function () {});
+        } else if (tries > 40) {
+          clearInterval(timer);
+        }
+      }, 250);
+      return;
+    }
+    const resp = await fetch('/api/billing/checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+      credentials: 'same-origin',
+      body: JSON.stringify({ plan: 'monthly', coupon }),
+    });
+    const data = await resp.json().catch(function () { return null; });
+    if (!resp.ok || !data || !data.url) {
+      const msg = (data && (data.error || data.message)) || 'Checkout failed.';
+      const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
+      if (looksLikeStripeMissing) {
+        if (!coupon) throw new Error('Stripe is not configured yet. Apply a promo code to unlock premium access.');
+        await redeemPromo(coupon);
+        // Premium entitlements are server-side; reload to refresh gated content.
+        location.reload();
+        return;
+      }
+      throw new Error(msg);
+    }
+    openUrl(data.url);
+  }
+
+  async function openPortal() {
+    if (!googleCredential) return createCheckoutSession();
+    const resp = await fetch('/api/billing/portal-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+      credentials: 'same-origin',
+      body: JSON.stringify({}),
+    });
+    const data = await resp.json().catch(function () { return null; });
+    if (!resp.ok || !data || !data.url) {
+      // If user doesn't have a customer yet, fallback to checkout.
+      return createCheckoutSession();
+    }
+    openUrl(data.url);
+  }
+
+  // Toggle CTA if the signed-in user is already a subscriber.
+  try {
+    const subActive = !!(siteProfile && siteProfile.subscription && siteProfile.subscription.active);
+    const isPromo = !!(siteProfile && siteProfile.subscription && siteProfile.subscription.promo);
+    if (subActive) {
+      if (buyNowBtn) buyNowBtn.hidden = true;
+      if (manageBtn) manageBtn.hidden = isPromo;
+    }
+  } catch (_) {}
+
+  if (buyNowBtn) {
+    buyNowBtn.addEventListener('click', function () {
+      buyNowBtn.disabled = true;
+      createCheckoutSession().catch(function (err) {
+        alert(err.message || 'Subscribe failed.');
+      }).finally(function () {
+        buyNowBtn.disabled = false;
+      });
+    });
+  }
+  if (manageBtn) {
+    manageBtn.addEventListener('click', function () {
+      manageBtn.disabled = true;
+      openPortal().catch(function (err) {
+        alert(err.message || 'Billing portal failed.');
+      }).finally(function () {
+        manageBtn.disabled = false;
+      });
+    });
   }
 
   if (couponToggle && couponForm) {
@@ -1161,7 +1260,9 @@ function exportCurrentTopicPdf() {
       '<span>Generating…</span>';
   }
 
-  fetch('/api/pdf/export?id=' + encodeURIComponent(_activeTopic))
+  fetch('/api/pdf/export?id=' + encodeURIComponent(_activeTopic), {
+    headers: googleCredential ? { 'Authorization': 'Bearer ' + googleCredential } : undefined,
+  })
     .then(function (res) {
       if (!res.ok) {
         return res.json().then(function (body) {

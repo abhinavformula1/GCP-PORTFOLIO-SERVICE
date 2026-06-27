@@ -18,7 +18,7 @@ const { body, validationResult } = require('express-validator');
 const { requireAdmin } = require('../middleware/auth');
 const { ValidationError } = require('../errors');
 const { analyticsTrackLimiter } = require('../middleware/rateLimiter');
-const firestore = require('../services/firestore');
+const analytics = require('../services/analytics');
 const geoip = require('geoip-lite');
 
 const router = express.Router();
@@ -126,7 +126,7 @@ router.post('/analytics/track', analyticsTrackLimiter, validateTrack, async (req
     const device = String(req.body.device || '').trim();
     const utm = req.body.utm && typeof req.body.utm === 'object' ? req.body.utm : null;
 
-    await firestore.trackPageView({
+    await analytics.trackPageView({
       clientId,
       path,
       referrer,
@@ -165,7 +165,7 @@ router.post('/analytics/event', analyticsTrackLimiter, validateEvent, async (req
     const user = req.body.user && typeof req.body.user === 'object' ? req.body.user : null;
     const geo = geoFromReq(req);
 
-    await firestore.recordAnalyticsEvent({
+    await analytics.recordAnalyticsEvent({
       type,
       clientId,
       path,
@@ -192,7 +192,7 @@ router.post('/analytics/event', analyticsTrackLimiter, validateEvent, async (req
 router.get('/admin/analytics/overview', requireAdmin, async (req, res, next) => {
   try {
     const month = String(req.query.month || '').trim();
-    const data = await firestore.getAnalyticsOverview({ month });
+    const data = await analytics.getAnalyticsOverview({ month });
     return res.status(200).json({ success: true, ...data });
   } catch (err) {
     return next(err);
@@ -201,7 +201,7 @@ router.get('/admin/analytics/overview', requireAdmin, async (req, res, next) => 
 
 router.get('/admin/analytics/today', requireAdmin, async (req, res, next) => {
   try {
-    const data = await firestore.getAnalyticsToday();
+    const data = await analytics.getAnalyticsToday();
     return res.status(200).json({ success: true, ...data });
   } catch (err) {
     return next(err);
@@ -212,7 +212,7 @@ router.post('/admin/analytics/cleanup-test', requireAdmin, async (req, res, next
   try {
     const month = String(req.query.month || '').trim();
     const paths = Array.isArray(req.body && req.body.paths) ? req.body.paths : undefined;
-    const data = await firestore.cleanupAnalyticsTestData({ month, paths });
+    const data = await analytics.cleanupAnalyticsTestData({ month, paths });
     return res.status(200).json({ success: true, ...data });
   } catch (err) {
     return next(err);
@@ -225,7 +225,7 @@ router.post('/admin/analytics/cleanup-today-test-users', requireAdmin, async (re
     const names = Array.isArray(req.body && req.body.names) ? req.body.names : undefined;
     const subs = Array.isArray(req.body && req.body.subs) ? req.body.subs : undefined;
     const paths = Array.isArray(req.body && req.body.paths) ? req.body.paths : undefined;
-    const data = await firestore.cleanupAnalyticsTodayTestUsers({ day, names, subs, paths });
+    const data = await analytics.cleanupAnalyticsTodayTestUsers({ day, names, subs, paths });
     return res.status(200).json({ success: true, ...data });
   } catch (err) {
     return next(err);

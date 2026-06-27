@@ -358,9 +358,23 @@
 }
 
 .sd-admin-topbar .topbar-inner {
-  max-width: 1360px;
+  /* Align with admin shell gutter (shell is 100% - 48px, centered). */
+  max-width: 1840px;
   justify-content: space-between;
   align-items: center;
+}
+
+/* Admin topbar: align left control closer to edge */
+.topbar.sd-admin-topbar {
+  /* Match the shell gutters (24px each side). */
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+@media (min-width: 1680px) {
+  .sd-admin-topbar .topbar-inner {
+    max-width: none;
+  }
 }
 
 .sd-admin-topbar .lang-select {
@@ -608,7 +622,7 @@
 /* ── Material list (article library) ─────────────────────────────────────── */
 .sd-admin-md-list {
   display: grid;
-  gap: 10px;
+  gap: 14px;
   padding: 0;
 }
 
@@ -618,13 +632,29 @@
   background: var(--surface);
   overflow: hidden;
   /* Material tokens (keep layout stable across breakpoints) */
-  --md-list-item-top-space: 10px;
-  --md-list-item-bottom-space: 10px;
-  --md-list-item-label-text-size: 0.95rem;
-  --md-list-item-label-text-weight: 800;
-  --md-list-item-supporting-text-size: 0.86rem;
-  --md-list-item-supporting-text-line-height: 1.35;
+  --md-list-item-top-space: 12px;
+  --md-list-item-bottom-space: 12px;
+  --md-list-item-label-text-size: 0.98rem;
+  --md-list-item-label-text-weight: 750;
+  --md-list-item-supporting-text-size: 0.88rem;
+  --md-list-item-supporting-text-line-height: 1.45;
   --md-list-item-supporting-text-color: var(--text-secondary);
+}
+
+/* Force calmer vertical rhythm (md-list-item tokens can be ignored depending on build) */
+.sd-admin-md-list md-list-item.sd-admin-li::part(content) {
+  padding: 18px 16px;
+}
+.sd-admin-md-list md-list-item.sd-admin-li::part(overline) {
+  margin-bottom: 4px;
+}
+.sd-admin-md-list md-list-item.sd-admin-li::part(headline) {
+  line-height: 1.4;
+  font-weight: 700;
+}
+.sd-admin-md-list md-list-item.sd-admin-li::part(supporting-text) {
+  margin-top: 8px;
+  line-height: 1.5;
 }
 
 .sd-admin-md-list md-list-item.sd-admin-li:hover {
@@ -643,6 +673,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+  margin-bottom: 2px;
 }
 
 .sd-admin-li-title {
@@ -650,7 +681,9 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  line-height: 1.25;
+  line-height: 1.4;
+  font-weight: 700;
+  margin-top: 2px;
 }
 
 .sd-admin-li-subtitle {
@@ -668,9 +701,9 @@
 }
 
 .sd-admin-li-meta {
-  margin-top: 6px;
+  margin-top: 10px;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 
 .sd-admin-article {
@@ -5712,6 +5745,18 @@ col.sd-tbl-action-col { width: 56px; }
   color: color-mix(in srgb, var(--text) 72%, var(--muted));
   font-weight: 850;
   font-size: 11px;
+}
+
+.sd-analytics-chip[data-kind="promo"][data-status="active"] {
+  background: color-mix(in srgb, #00b96b 14%, var(--surface));
+  border-color: color-mix(in srgb, #00b96b 26%, var(--border));
+  color: color-mix(in srgb, #00b96b 42%, var(--text));
+}
+
+.sd-analytics-chip[data-kind="promo"][data-status="disabled"] {
+  background: color-mix(in srgb, var(--surface) 94%, #999 6%);
+  border-color: color-mix(in srgb, #999 18%, var(--border));
+  color: color-mix(in srgb, var(--text) 62%, var(--muted));
 }
 
 .sd-analytics-user-page {

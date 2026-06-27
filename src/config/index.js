@@ -127,6 +127,26 @@ const config = {
   sfCallback: {
     secret: process.env.SF_CALLBACK_SECRET || '',
   },
+
+  // ── Billing / Subscriptions (Stripe) ─────────────────────────────────────────
+  // Optional in dev. In production, set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET.
+  stripe: {
+    secretKey:     process.env.STRIPE_SECRET_KEY || '',
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+    // Price IDs created in Stripe Dashboard (Products → Prices).
+    // Used by /api/billing/checkout-session when priceId isn't provided.
+    priceMonthly:  process.env.STRIPE_PRICE_MONTHLY || '',
+    priceYearly:   process.env.STRIPE_PRICE_YEARLY || '',
+    // Public URL of the site (used for success/cancel redirects).
+    siteUrl:       process.env.SITE_URL || 'http://localhost:8080',
+  },
+
+  internal: {
+    // Used to sign internal-only URLs (e.g. premium PDF print pages for Puppeteer).
+    // In production, set INTERNAL_REQUEST_SECRET.
+    requestSecret: process.env.INTERNAL_REQUEST_SECRET
+      || (process.env.ADMIN_LOCAL_PREVIEW === 'true' ? 'local-dev-internal-secret' : ''),
+  },
 };
 
 module.exports = config;

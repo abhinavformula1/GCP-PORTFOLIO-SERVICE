@@ -29,6 +29,7 @@ import {
 import { createComposer } from '../../assets/ui/composer.js';
 import { COMPONENT_REGISTRY, enabledBlockTypes } from '../../assets/ui/component-registry.js';
 import '../../assets/ui/loader.js';
+import { initPromotionsModule } from './modules/promotions.js';
 
 const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 
@@ -43,6 +44,7 @@ let articleSections = [];
 let sectionSeq = 0;
 let mediaAuditState = null;
 let analyticsState = null;
+let subscriptionsState = null;
 const mediaAuditView = {
   visibleCount: 0,
   batchSize: 30,
@@ -128,7 +130,9 @@ renderTopbar('#sharedTopbar', {
   className: 'topbar sd-admin-topbar',
   controlsClassName: 'sd-admin-auth',
   backHref: '/',
-  backText: 'Back to portfolio',
+  backIcon: 'home',
+  backText: 'Home',
+  backAriaLabel: 'Home',
   signInId: 'adminTopbarSignInBtn',
   userId: 'adminTopbarUser',
   avatarBtnId: 'adminAvatarBtn',
@@ -202,6 +206,21 @@ const els = {
   refreshAnalyticsBtn: document.getElementById('refreshAnalyticsBtn'),
   analyticsStatus: document.getElementById('analyticsStatus'),
   analyticsPanel: document.getElementById('analyticsPanel'),
+  subscriptionsWorkspace: document.getElementById('subscriptionsWorkspace'),
+  refreshSubscriptionsBtn: document.getElementById('refreshSubscriptionsBtn'),
+  subscriptionsStatus: document.getElementById('subscriptionsStatus'),
+  subscriptionsPanel: document.getElementById('subscriptionsPanel'),
+  promotionsWorkspace: document.getElementById('promotionsWorkspace'),
+  refreshPromosBtn: document.getElementById('refreshPromosBtn'),
+  newPromoBtn: document.getElementById('newPromoBtn'),
+  promosStatus: document.getElementById('promosStatus'),
+  promosPanel: document.getElementById('promosPanel'),
+  promoDrawer: document.getElementById('promoDrawer'),
+  promoDrawerTitle: document.getElementById('promoDrawerTitle'),
+  promoDrawerStatus: document.getElementById('promoDrawerStatus'),
+  closePromoDrawerBtn: document.getElementById('closePromoDrawerBtn'),
+  copyPromoBtn: document.getElementById('copyPromoBtn'),
+  savePromoBtn: document.getElementById('savePromoBtn'),
   seoSiteUrl: document.getElementById('seoSiteUrl'),
   seoSiteDescription: document.getElementById('seoSiteDescription'),
   seoOgImageUrl: document.getElementById('seoOgImageUrl'),
@@ -293,6 +312,8 @@ const els = {
   confirmPublishBtn: document.getElementById('confirmPublishBtn'),
   publishActionLabel: document.getElementById('publishActionLabel'),
 };
+
+const promotionsModule = initPromotionsModule({ els, authedJson, setSectionStatus, safeText });
 
 const SIDEBAR_COLLAPSE_KEY = 'sd_admin_sidebar_collapsed_v1';
 function setSidebarCollapsed(collapsed) {
@@ -746,7 +767,9 @@ function setActiveModule(moduleName) {
   const isSeo      = moduleName === 'seo-config';
   const isAtlas    = moduleName === 'atlas-settings';
   const isAnalytics = moduleName === 'analytics';
-  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas || isAnalytics;
+  const isSubs = moduleName === 'subscriptions';
+  const isPromos = moduleName === 'promotions';
+  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas || isAnalytics || isSubs || isPromos;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
   if (els.mediaWorkspace) els.mediaWorkspace.hidden = !isMedia;
@@ -756,6 +779,8 @@ function setActiveModule(moduleName) {
   els.seoConfigWorkspace.hidden = !isSeo;
   els.atlasSettingsWorkspace.hidden = !isAtlas;
   if (els.analyticsWorkspace) els.analyticsWorkspace.hidden = !isAnalytics;
+  if (els.subscriptionsWorkspace) els.subscriptionsWorkspace.hidden = !isSubs;
+  if (els.promotionsWorkspace) els.promotionsWorkspace.hidden = !isPromos;
   if (isSettings) renderArticleSettings();
   if (isMedia)    renderMediaLibrary();
   if (isTier)     renderTierSettings();
@@ -764,6 +789,8 @@ function setActiveModule(moduleName) {
   if (isSeo)      renderSeoConfig();
   if (isAtlas)    renderAtlasConfig();
   if (isAnalytics) renderAnalytics();
+  if (isSubs) renderSubscriptions();
+  if (isPromos) promotionsModule && promotionsModule.render ? promotionsModule.render() : null;
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
@@ -1323,9 +1350,9 @@ function fillForm(article) {
 function updateArticleStats() {
   const published = articles.filter(function (article) { return article.status === 'Published'; }).length;
   const drafts = articles.filter(function (article) { return article.status === 'Draft'; }).length;
-  els.totalCount.textContent = String(articles.length);
-  els.publishedCount.textContent = String(published);
-  els.draftCount.textContent = String(drafts);
+  if (els.totalCount) els.totalCount.textContent = String(articles.length);
+  if (els.publishedCount) els.publishedCount.textContent = String(published);
+  if (els.draftCount) els.draftCount.textContent = String(drafts);
 }
 
 function renderList() {
@@ -1949,6 +1976,112 @@ function paintAnalytics() {
     </div>
   `;
 }
+
+async function renderSubscriptions() {
+  if (!els.subscriptionsPanel) return;
+  if (subscriptionsState && Array.isArray(subscriptionsState.subscriptions)) {
+    paintSubscriptions();
+    return;
+  }
+  await refreshSubscriptions();
+}
+
+async function refreshSubscriptions() {
+  if (!els.subscriptionsPanel) return;
+  setSectionStatus(els.subscriptionsStatus, 'Loading subscriptions…', 'info');
+  els.subscriptionsPanel.textContent = '';
+  try {
+    const data = await authedJson('/api/admin/subscriptions/overview');
+    subscriptionsState = data;
+    paintSubscriptions();
+    setSectionStatus(els.subscriptionsStatus, 'Subscriptions updated.', 'success');
+  } catch (err) {
+    setSectionStatus(els.subscriptionsStatus, err.message || 'Failed to load subscriptions.', 'error');
+  }
+}
+
+function paintSubscriptions() {
+  if (!els.subscriptionsPanel) return;
+  els.subscriptionsPanel.textContent = '';
+  const state = subscriptionsState || {};
+  const kpis = state.kpis || {};
+  const rows = Array.isArray(state.subscriptions) ? state.subscriptions : [];
+
+  function money(cents, currency) {
+    const cur = String(currency || 'USD');
+    const val = Number(cents || 0) / 100;
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(val);
+    } catch (_) {
+      return cur + ' ' + val.toFixed(2);
+    }
+  }
+
+  const mrrEntries = kpis.mrrByCurrency && typeof kpis.mrrByCurrency === 'object' ? kpis.mrrByCurrency : {};
+  const mrrText = Object.keys(mrrEntries).length
+    ? Object.keys(mrrEntries).sort().map(function (cur) { return money(mrrEntries[cur], cur); }).join(' · ')
+    : '—';
+
+  const tbody = rows.slice(0, 200).map(function (r) {
+    const status = String(r.status || 'unknown');
+    const next = r.currentPeriodEnd ? new Date(Number(r.currentPeriodEnd)).toLocaleDateString() : '—';
+    const email = r.email ? String(r.email) : '';
+    const name = r.name ? String(r.name) : '—';
+    const plan = r.planNickname || (r.interval ? (r.intervalCount > 1 ? (r.intervalCount + '× ' + r.interval) : r.interval) : '—');
+    const price = (r.amount && r.currency)
+      ? money(r.amount, r.currency) + (r.interval ? (' / ' + (r.intervalCount > 1 ? (r.intervalCount + ' ' + r.interval) : r.interval)) : '')
+      : '—';
+    return `
+      <tr>
+        <td>
+          <div class="sd-analytics-user-name">${safeText(name)}</div>
+          <div class="sd-analytics-user-sub">${safeText(email || r.uid || '')}</div>
+        </td>
+        <td>${safeText(status)}</td>
+        <td>${safeText(plan)}</td>
+        <td class="sd-analytics-num">${safeText(price)}</td>
+        <td>${safeText(next)}${r.cancelAtPeriodEnd ? ' · cancels' : ''}</td>
+      </tr>`;
+  }).join('');
+
+  els.subscriptionsPanel.innerHTML = `
+    <div class="sd-media-kpis sd-analytics-kpis" role="region" aria-label="Subscription KPIs">
+      <div class="sd-media-kpi">
+        <div class="sd-media-kpi-label">Active</div>
+        <div class="sd-media-kpi-value">${Number(kpis.active || 0).toLocaleString()}</div>
+        <div class="sd-media-kpi-sub">trialing + active</div>
+      </div>
+      <div class="sd-media-kpi">
+        <div class="sd-media-kpi-label">Total</div>
+        <div class="sd-media-kpi-value">${Number(kpis.total || 0).toLocaleString()}</div>
+        <div class="sd-media-kpi-sub">all statuses</div>
+      </div>
+      <div class="sd-media-kpi">
+        <div class="sd-media-kpi-label">MRR</div>
+        <div class="sd-media-kpi-value">${safeText(mrrText)}</div>
+        <div class="sd-media-kpi-sub">by currency</div>
+      </div>
+    </div>
+
+    <div class="sd-analytics-table-wrap">
+      <table class="sd-analytics-table" style="min-width: 980px">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Status</th>
+            <th>Plan</th>
+            <th class="sd-analytics-num">Price</th>
+            <th>Renews</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tbody || '<tr><td colspan="5" class="sd-analytics-empty">No subscriptions yet.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 
 async function refreshMediaAudit() {
   if (!els.mediaAuditPanel) return;
@@ -3170,6 +3303,12 @@ if (els.analyticsMonth) {
   els.analyticsMonth.addEventListener('change', function () {
     analyticsState = null;
     refreshAnalytics();
+  });
+}
+if (els.refreshSubscriptionsBtn) {
+  els.refreshSubscriptionsBtn.addEventListener('click', function () {
+    subscriptionsState = null;
+    refreshSubscriptions();
   });
 }
 els.savePolicyBtn.addEventListener('click', function () {

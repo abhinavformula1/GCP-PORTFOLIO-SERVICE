@@ -15,7 +15,7 @@
  */
 
 const config = require('../config');
-const firestore = require('./firestore');
+const adminConfig = require('./adminConfig');
 
 /**
  * Extract a normalised lowercase domain from an email address.
@@ -144,7 +144,7 @@ async function getContactPolicyConfig() {
     };
   }
   try {
-    const stored = await firestore.getContactPolicyConfig();
+    const stored = await adminConfig.getContactPolicyConfig();
     if (stored) {
       const defaults = defaultPolicy();
       return {

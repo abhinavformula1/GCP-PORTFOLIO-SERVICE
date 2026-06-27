@@ -14,7 +14,8 @@ const multer  = require('multer');
 const { body, validationResult } = require('express-validator');
 const { requireAdmin } = require('../middleware/auth');
 const { uploadMedia, listMediaObjects, deleteMediaObject, MAX_BYTES } = require('../services/gcs');
-const { getSponsorship, upsertSponsorship, deleteSponsorship, listSystemDesignArticles } = require('../services/firestore');
+const { listSystemDesignArticles } = require('../services/firestore');
+const sponsorBanner = require('../services/sponsorBanner');
 const { AppError, ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -201,7 +202,7 @@ router.delete('/admin/media/object', requireAdmin, async (req, res, next) => {
 // ── GET /api/media/sponsorship ───────────────────────────────────────────────
 router.get('/media/sponsorship', async (_req, res, next) => {
   try {
-    const sponsorship = await getSponsorship();
+    const sponsorship = await sponsorBanner.getSponsorBanner();
     res.json({ ok: true, sponsorship: sponsorship || null });
   } catch (err) {
     next(err);
@@ -232,7 +233,7 @@ router.put(
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         updatedAt: new Date(),
       };
-      await upsertSponsorship(data);
+      await sponsorBanner.upsertSponsorBanner(data);
       res.json({ ok: true });
     } catch (err) {
       next(err);
@@ -243,7 +244,7 @@ router.put(
 // ── DELETE /api/media/sponsorship ────────────────────────────────────────────
 router.delete('/media/sponsorship', requireAdmin, async (_req, res, next) => {
   try {
-    await deleteSponsorship();
+    await sponsorBanner.deleteSponsorBanner();
     res.json({ ok: true });
   } catch (err) {
     next(err);
