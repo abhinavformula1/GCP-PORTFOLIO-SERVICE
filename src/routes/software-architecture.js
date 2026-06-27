@@ -8,8 +8,6 @@
  * fallback content for local/dev outages or an empty CMS collection.
  */
 
-const fs = require('node:fs/promises');
-const path = require('node:path');
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
@@ -21,44 +19,9 @@ const { ValidationError } = require('../errors');
 
 const router = express.Router();
 const BODY_MAX_LEN = 60000;
-const SEED_FILE = path.join(__dirname, '../../content/system-design/articles.seed.json');
 
-function canUseLocalSeedFallback() {
+function isLocalDev() {
   return config.server.env !== 'production' && !process.env.K_SERVICE;
-}
-
-async function loadSeedArticles({ publishedOnly } = {}) {
-  const raw = await fs.readFile(SEED_FILE, 'utf8');
-  const articles = JSON.parse(raw);
-  if (!Array.isArray(articles)) throw new ValidationError('Seed file must contain an article array.');
-  return articles
-    .filter((article) => {
-      if (!publishedOnly) return true;
-      const status = String(article.status || 'Published').toLowerCase();
-      return status === 'published' || article.stub;
-    })
-    .map((article) => ({
-      ...article,
-      contentType: article.contentType
-        || (String(article.category || '').trim().toLowerCase() === 'architecture' ? 'architecture' : 'system-design'),
-    }))
-    .sort((a, b) => Number(a.order || 999) - Number(b.order || 999)
-      || String(a.en?.title || a.id || '').localeCompare(String(b.en?.title || b.id || '')));
-}
-
-async function localSeedFallback(res, { publishedOnly, articleId } = {}) {
-  if (!canUseLocalSeedFallback()) return false;
-  const articles = await loadSeedArticles({ publishedOnly });
-  if (articleId) {
-    const article = articles.find((item) => item.id === articleId);
-    if (!article) return false;
-    res.set('Cache-Control', 'no-store');
-    res.status(200).json({ success: true, article, source: 'local-seed' });
-    return true;
-  }
-  res.set('Cache-Control', 'no-store');
-  res.status(200).json({ success: true, articles, source: 'local-seed' });
-  return true;
 }
 
 const validateArticle = [
@@ -287,7 +250,6 @@ router.put('/admin/system-design/tier-config', requireAdmin, [
 
 router.get('/system-design/articles', async (_req, res) => {
   try {
-    if (await localSeedFallback(res, { publishedOnly: true })) return;
     const articles = await firestore.listPublishedSystemDesignArticles();
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
     return res.status(200).json({ success: true, articles });
@@ -299,7 +261,6 @@ router.get('/system-design/articles', async (_req, res) => {
 
 router.get('/system-design/articles/:id', async (req, res) => {
   try {
-    if (await localSeedFallback(res, { publishedOnly: true, articleId: req.params.id })) return;
     const article = await firestore.getSystemDesignArticle(req.params.id);
     if (!article) return res.status(404).json({ success: false, error: 'Article not found.' });
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
@@ -312,7 +273,6 @@ router.get('/system-design/articles/:id', async (req, res) => {
 
 router.get('/admin/system-design/articles', requireAdmin, async (_req, res, next) => {
   try {
-    if (await localSeedFallback(res)) return;
     const articles = await firestore.listSystemDesignArticles();
     return res.status(200).json({ success: true, articles });
   } catch (err) {
@@ -351,7 +311,7 @@ router.put('/admin/contact-policy', requireAdmin, async (req, res, next) => {
     const personalDomains = validateDomains(req.body?.personalDomains || []);
     const allowedEmails = validateEmails(req.body?.allowedEmails || []);
     const blockedDomains = validateDomains(req.body?.blockedDomains || []);
-    if (canUseLocalSeedFallback()) {
+    if (isLocalDev()) {
       return res.status(200).json({
         success: true,
         policy: {
@@ -457,35 +417,6 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
     }
     const saved = await firestore.getSystemDesignArticle(result.id);
     return res.status(200).json({ success: true, article: saved, version: result.version });
-  } catch (err) {
-    return next(err);
-  }
-});
-
-router.post('/admin/system-design/seed', requireAdmin, async (req, res, next) => {
-  try {
-    const raw = await fs.readFile(SEED_FILE, 'utf8');
-    const articles = JSON.parse(raw);
-    if (!Array.isArray(articles)) throw new ValidationError('Seed file must contain an article array.');
-
-    if (config.admin.localPreview) {
-      return res.status(200).json({
-        success: true,
-        imported: articles.length,
-        results: articles.map((article) => ({ id: article.id, version: 'local-preview' })),
-        source: 'local-preview',
-      });
-    }
-
-    const results = [];
-    for (const article of articles) {
-      if (!article.contentType) article.contentType = 'system-design';
-      results.push(await firestore.upsertSystemDesignArticle(article, {
-        publishedBy: req.user.email,
-      }));
-    }
-
-    return res.status(200).json({ success: true, imported: results.length, results });
   } catch (err) {
     return next(err);
   }

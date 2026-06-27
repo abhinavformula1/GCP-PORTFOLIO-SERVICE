@@ -82,4 +82,19 @@ const atlasLimiter = rateLimit({
   skip: () => config.server.env === 'test',
 });
 
-module.exports = { hireLimiter, questionLimiter, recommendationLimiter, atlasLimiter };
+// Analytics tracking: low-cost, but can be noisy. Keep it generous enough for
+// normal navigation while blocking obvious abuse.
+const analyticsTrackLimiter = rateLimit({
+  windowMs:       60 * 1000, // 1 minute
+  max:            120,
+  standardHeaders: 'draft-7',
+  legacyHeaders:  false,
+  message: {
+    success: false,
+    code:    'RATE_LIMIT_ERROR',
+    error:   'Too many analytics events. Please slow down.',
+  },
+  skip: () => config.server.env === 'test',
+});
+
+module.exports = { hireLimiter, questionLimiter, recommendationLimiter, atlasLimiter, analyticsTrackLimiter };

@@ -130,6 +130,8 @@ export function createComposer(options) {
   let editable = editToggle ? opts.startEditing === true : true;
   let editBtn = null;
   let saveBtn = null;
+  let cancelBtn = null;
+  let baselineBlocks = null;
 
   const element = document.createElement('div');
   element.className = 'composer';
@@ -182,6 +184,7 @@ export function createComposer(options) {
 
   function setEditable(next) {
     if (!editToggle) return;
+    const wasEditable = editable;
     editable = !!next;
     surface.contentEditable = editable ? 'true' : 'false';
     element.classList.toggle('composer-locked', !editable);
@@ -235,6 +238,17 @@ export function createComposer(options) {
       btn.disabled = !editable;
     });
     if (saveBtn) saveBtn.disabled = !editable;
+
+    if (cancelBtn) cancelBtn.disabled = !editable;
+
+    // Entering edit mode: snapshot baseline for Cancel.
+    if (!wasEditable && editable) {
+      baselineBlocks = getBlocks();
+      if (typeof opts.onBeginEdit === 'function') {
+        try { opts.onBeginEdit(); } catch (_) {}
+      }
+    }
+
     // Lock/unlock all embedded dedicated block components.
     surface.querySelectorAll('[data-block]').forEach(function (el) {
       if (typeof el._setEditable === 'function') el._setEditable(editable);
@@ -771,6 +785,23 @@ export function createComposer(options) {
     toolbar.appendChild(editBtn);
   }
 
+  if (editToggle) {
+    cancelBtn = makeButton({ icon: 'close', label: 'Cancel', title: 'Discard changes' });
+    cancelBtn.classList.add('composer-tool-cancel');
+    cancelBtn.addEventListener('click', function () {
+      if (baselineBlocks) {
+        setBlocks(baselineBlocks);
+        flushChange();
+      }
+      if (typeof opts.onCancel === 'function') {
+        try { opts.onCancel(); } catch (_) {}
+      }
+      setStatus('');
+      setEditable(false);
+    });
+    toolbar.appendChild(cancelBtn);
+  }
+
   if (hasSave) {
     saveBtn = makeButton({ icon: 'save', label: opts.saveLabel || 'Save', title: 'Save' });
     saveBtn.classList.add('composer-tool-save');
@@ -783,6 +814,7 @@ export function createComposer(options) {
         .then(function () { return opts.onSave(); })
         .then(function (message) {
           setStatus(message || 'Saved.', 'success');
+          baselineBlocks = getBlocks();
           if (editToggle) setEditable(false);
           if (editToggle) setTimeout(function () { setStatus(''); }, 3000);
         })

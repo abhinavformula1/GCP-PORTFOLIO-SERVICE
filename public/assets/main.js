@@ -77,6 +77,208 @@ import '/assets/ui/loader.js';
 
   renderTechFooter('#sharedFooter');
 
+  // ── Lightweight first-party analytics (no GA) ───────────────────────────────
+  // Anonymous client id stored in localStorage. Used to compute monthly uniques
+  // without storing IP/email. Admin dashboard reads aggregates from Firestore.
+  (function initAnalytics() {
+    try {
+      if (location.pathname.startsWith('/admin/')) return;
+      if (location.pathname.startsWith('/print/')) return;
+
+      const KEY = 'portfolio_anon_cid_v1';
+      function uuid() {
+        if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+          return globalThis.crypto.randomUUID();
+        }
+        // Fallback: non-crypto unique-ish token (good enough for a portfolio).
+        return 'cid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+      }
+      let clientId = localStorage.getItem(KEY);
+      if (!clientId) {
+        clientId = uuid();
+        localStorage.setItem(KEY, clientId);
+      }
+
+      let lastPath = '';
+      let timer = 0;
+      let activePath = '';
+      let activeStart = Date.now();
+      let activeMs = 0;
+      let visible = true;
+      let maxScrollPct = 0;
+
+      function getApproxRegion() {
+        // Best-effort only. Prefer BCP-47 region from browser locale (e.g. en-IN → IN).
+        try {
+          if (globalThis.Intl && Intl.Locale) {
+            const loc = new Intl.Locale(navigator.language || 'en');
+            return (loc && loc.region) ? String(loc.region) : '';
+          }
+        } catch (_) {}
+        return '';
+      }
+
+      function getTimezone() {
+        try {
+          return String(Intl.DateTimeFormat().resolvedOptions().timeZone || '');
+        } catch (_) {
+          return '';
+        }
+      }
+
+      function userPayload() {
+        // Uses live ES-module binding `siteProfile` imported at top.
+        try {
+          if (!siteProfile || siteProfile.type === 'guest') return null;
+          const sub = String(siteProfile.sub || '').trim();
+          const name = String(siteProfile.name || '').trim();
+          if (!sub) return null;
+          return { sub, name };
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function computeScrollPct() {
+        try {
+          const doc = document.documentElement;
+          const scrollTop = window.scrollY || doc.scrollTop || 0;
+          const viewport = window.innerHeight || doc.clientHeight || 0;
+          const height = Math.max(doc.scrollHeight || 0, doc.offsetHeight || 0);
+          const bottom = scrollTop + viewport;
+          if (!height) return 0;
+          const pct = Math.max(0, Math.min(100, Math.round((bottom / height) * 100)));
+          return pct;
+        } catch (_) {
+          return 0;
+        }
+      }
+
+      function sendEvent(type, data) {
+        const payload = JSON.stringify(Object.assign({
+          clientId,
+          type,
+          host: location.host || '',
+          lang: document.documentElement.lang || '',
+          device: (function () {
+            try {
+              if (globalThis.matchMedia && matchMedia('(max-width: 720px)').matches) return 'mobile';
+              if (globalThis.matchMedia && matchMedia('(pointer: coarse)').matches) return 'mobile';
+            } catch (_) {}
+            return 'desktop';
+          })(),
+          tz: getTimezone(),
+          region: getApproxRegion(),
+          user: userPayload(),
+        }, data || {}));
+
+        if (navigator.sendBeacon) {
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon('/api/analytics/event', blob);
+          return;
+        }
+        fetch('/api/analytics/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true,
+          credentials: 'same-origin',
+        }).catch(function () {});
+      }
+
+      function flushEngagement(reason) {
+        try {
+          const now = Date.now();
+          if (visible) activeMs += Math.max(0, now - activeStart);
+          activeStart = now;
+          const dwellMs = Math.max(0, Math.round(activeMs));
+          const path = activePath || (location.pathname + location.search);
+          if (dwellMs >= 1500 && path) {
+            sendEvent('engagement', {
+              path,
+              dwellMs,
+              scrollPct: Math.max(0, Math.min(100, Math.round(maxScrollPct))),
+              reason: String(reason || ''),
+            });
+          }
+          activeMs = 0;
+          maxScrollPct = 0;
+        } catch (_) {}
+      }
+
+      function send() {
+        const path = location.pathname + location.search;
+        if (!path || path === lastPath) return;
+
+        // Previous page engagement (SPA nav).
+        if (activePath && activePath !== path) {
+          flushEngagement('nav');
+        }
+
+        lastPath = path;
+        if (!activePath) activePath = path;
+        if (activePath !== path) activePath = path;
+        activeStart = Date.now();
+        activeMs = 0;
+        maxScrollPct = computeScrollPct();
+
+        let utm = null;
+        try {
+          const sp = new URLSearchParams(location.search || '');
+          const source = (sp.get('utm_source') || '').trim();
+          const medium = (sp.get('utm_medium') || '').trim();
+          const campaign = (sp.get('utm_campaign') || '').trim();
+          const content = (sp.get('utm_content') || '').trim();
+          const term = (sp.get('utm_term') || '').trim();
+          if (source || medium || campaign || content || term) {
+            utm = { source, medium, campaign, content, term };
+          }
+        } catch (_) {}
+
+        sendEvent('page_view', {
+          path,
+          referrer: document.referrer || '',
+          utm,
+        });
+      }
+
+      function schedule() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () { timer = 0; send(); }, 150);
+      }
+
+      // Initial page load.
+      send();
+
+      // SPA navigations (History API) for software-architecture pages.
+      const _push = history.pushState;
+      const _replace = history.replaceState;
+      history.pushState = function () { _push.apply(this, arguments); schedule(); };
+      history.replaceState = function () { _replace.apply(this, arguments); schedule(); };
+      window.addEventListener('popstate', schedule);
+
+      window.addEventListener('scroll', function () {
+        const pct = computeScrollPct();
+        if (pct > maxScrollPct) maxScrollPct = pct;
+      }, { passive: true });
+
+      document.addEventListener('visibilitychange', function () {
+        const now = Date.now();
+        if (document.visibilityState === 'hidden') {
+          if (visible) activeMs += Math.max(0, now - activeStart);
+          visible = false;
+        } else {
+          visible = true;
+          activeStart = now;
+        }
+      });
+
+      window.addEventListener('pagehide', function () {
+        flushEngagement('hide');
+      });
+    } catch (_) { /* analytics must never break the page */ }
+  })();
+
   // Shared state (siteProfile, googleCredential, pendingChatHistory,
   // myRecommendation) lives in ./core/state.js. Reads use the live
   // bindings — ES module imports stay in sync when the setter mutates

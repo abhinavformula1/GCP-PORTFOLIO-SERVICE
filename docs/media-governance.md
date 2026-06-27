@@ -38,7 +38,10 @@ In the admin UI you can view:
 Server-side upload (`POST /api/media/upload`):
 - Accepts JPEG/PNG/WebP/SVG uploads
 - Normalises output to **JPEG**
-- Resizes to a standard **max width** (article: 1600px, thumb: 1200px)
+- Resizes to a standard output per preset:
+  - `preset=article`: **max width 1600px**, keeps aspect ratio (no fixed height)
+  - `preset=thumb`: **max width 1200px**, keeps aspect ratio
+  - `preset=hero`: **1600×900 (16:9)**, resized with **cover crop** for consistent hero tiles
 - Uses content hash naming (`media/<hash>.jpg`) to **dedupe** re-uploads
 
 ### Operational playbook
