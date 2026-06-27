@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
   <link rel="stylesheet" href="/assets/style.css">
-  <link rel="stylesheet" href="./styles.css?v=2026-06-26-6">
+  <link rel="stylesheet" href="./styles.css?v=2026-06-27-13">
   <!-- Hide icon ligature text until Material Symbols font is ready (anti-FOUC) -->
   <style>.material-symbols-outlined{visibility:hidden}.fonts-loaded .material-symbols-outlined{visibility:visible}</style>
   <script>
@@ -111,6 +111,10 @@
           <button type="button" class="sd-admin-module" data-module="atlas-settings">
             <span class="material-symbols-outlined" aria-hidden="true">smart_toy</span>
             <span>Atlas AI</span>
+          </button>
+          <button type="button" class="sd-admin-module" data-module="analytics">
+            <span class="material-symbols-outlined" aria-hidden="true">query_stats</span>
+            <span>Analytics</span>
           </button>
         </div>
       <!-- (removed) sidebar status card -->
@@ -839,13 +843,36 @@
       </div>
     </section>
 
-      <div id="sharedFooter"></div>
+    <!-- Analytics workspace -->
+    <section id="analyticsWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Telemetry</div>
+          <h2>Analytics</h2>
+          <p>Monitor monthly visitors, page views, and recent activity trends.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <label class="sd-analytics-month">
+            <span class="visually-hidden">Month</span>
+            <input id="analyticsMonth" type="month" />
+          </label>
+          <button type="button" id="refreshAnalyticsBtn">
+            <span class="material-symbols-outlined" aria-hidden="true">refresh</span> Refresh
+          </button>
+        </div>
+      </div>
+      <div id="analyticsStatus" class="sd-admin-section-status"></div>
+      <div id="analyticsPanel" class="sd-analytics-panel"></div>
+    </section>
+
     </div>
   </main>
+
+  <div id="sharedFooter"></div>
 
   <div id="sharedAtlasShell"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./admin.js?v=2026-06-26-6"></script>
+  <script type="module" src="./admin.js?v=2026-06-27-16"></script>
 </body>
 </html>

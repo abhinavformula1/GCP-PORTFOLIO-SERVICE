@@ -42,6 +42,7 @@ let autosaveTimer = 0;
 let articleSections = [];
 let sectionSeq = 0;
 let mediaAuditState = null;
+let analyticsState = null;
 const mediaAuditView = {
   visibleCount: 0,
   batchSize: 30,
@@ -51,6 +52,67 @@ const mediaAuditView = {
   article: 'all',  // all | <articleId>
   sort: 'newest',  // newest | oldest | largest | smallest | name_asc | name_desc
 };
+const analyticsView = {
+  month: '', // YYYY-MM
+};
+
+// Track media object references per article so "Replace image" doesn't leave
+// orphaned GCS objects behind. After a successful save we diff and attempt a
+// safe delete; backend re-checks orphan status before deleting (409 if used).
+const mediaRefsByArticleId = new Map(); // articleId -> Set('media/<file>')
+function extractMediaObjectNamesFromText(text) {
+  const raw = String(text || '');
+  const names = new Set();
+
+  // Full public URLs: https://storage.googleapis.com/<bucket>/media/<file>
+  const rePublic = /https?:\/\/storage\.googleapis\.com\/[^/"'\s]+\/(media\/[^"'\s?#]+)/gi;
+  let m;
+  while ((m = rePublic.exec(raw)) !== null) {
+    const name = String(m[1] || '').split('?')[0].split('#')[0].trim();
+    if (name.startsWith('media/')) names.add(name);
+  }
+
+  // Inline paths: /media/<file>
+  const rePath = /(?:^|[("'\\s])\/?(media\/[a-z0-9][a-z0-9._-]*\.(?:jpg|jpeg|png|webp))(?:[)"'\\s?#]|$)/gi;
+  while ((m = rePath.exec(raw)) !== null) {
+    const name = String(m[1] || '').split('?')[0].split('#')[0].trim();
+    if (name.startsWith('media/')) names.add(name);
+  }
+  return names;
+}
+
+function computeMediaRefsFromArticle(article) {
+  const a = article || {};
+  const en = a.en || {};
+  const set = new Set();
+  extractMediaObjectNamesFromText(en.body || '').forEach(function (n) { set.add(n); });
+  extractMediaObjectNamesFromText(a.thumbnail || '').forEach(function (n) { set.add(n); });
+  return set;
+}
+
+function diffRemovedMedia(prevSet, nextSet) {
+  const removed = [];
+  if (!prevSet || !prevSet.size) return removed;
+  const next = nextSet || new Set();
+  prevSet.forEach(function (name) {
+    if (!next.has(name)) removed.push(name);
+  });
+  return removed;
+}
+
+function autoCleanupRemovedMedia(articleId, removedNames) {
+  const id = String(articleId || '').trim();
+  if (!id) return;
+  const names = Array.isArray(removedNames) ? removedNames.filter(Boolean) : [];
+  if (!names.length) return;
+  Promise.allSettled(names.map(function (name) {
+    return authedJson('/api/admin/media/object?name=' + encodeURIComponent(name), { method: 'DELETE' })
+      .catch(function (err) {
+        if (err && err.status === 409) return null; // still referenced
+        return null;
+      });
+  })).catch(function () {});
+}
 
 // Public filtering uses contentType (content type pills) + tags (domains). Categories are
 // intentionally removed to avoid a third, redundant taxonomy.
@@ -77,7 +139,7 @@ renderTopbar('#sharedTopbar', {
   photoAlt: 'Signed-in admin profile photo',
 });
 renderTechFooter('#sharedFooter', {
-  className: 'sponsors-footer sd-admin-footer',
+  className: 'sponsors-footer',
   i18n: false,
 });
 
@@ -135,6 +197,11 @@ const els = {
   atlasModelRows: document.getElementById('atlasModelRows'),
   atlasModelSelectorVisible: document.getElementById('atlasModelSelectorVisible'),
   atlasBudgetCapInr: document.getElementById('atlasBudgetCapInr'),
+  analyticsWorkspace: document.getElementById('analyticsWorkspace'),
+  analyticsMonth: document.getElementById('analyticsMonth'),
+  refreshAnalyticsBtn: document.getElementById('refreshAnalyticsBtn'),
+  analyticsStatus: document.getElementById('analyticsStatus'),
+  analyticsPanel: document.getElementById('analyticsPanel'),
   seoSiteUrl: document.getElementById('seoSiteUrl'),
   seoSiteDescription: document.getElementById('seoSiteDescription'),
   seoOgImageUrl: document.getElementById('seoOgImageUrl'),
@@ -678,7 +745,8 @@ function setActiveModule(moduleName) {
   const isSponsor  = moduleName === 'sponsorships';
   const isSeo      = moduleName === 'seo-config';
   const isAtlas    = moduleName === 'atlas-settings';
-  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas;
+  const isAnalytics = moduleName === 'analytics';
+  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas || isAnalytics;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
   if (els.mediaWorkspace) els.mediaWorkspace.hidden = !isMedia;
@@ -687,6 +755,7 @@ function setActiveModule(moduleName) {
   els.sponsorshipsWorkspace.hidden = !isSponsor;
   els.seoConfigWorkspace.hidden = !isSeo;
   els.atlasSettingsWorkspace.hidden = !isAtlas;
+  if (els.analyticsWorkspace) els.analyticsWorkspace.hidden = !isAnalytics;
   if (isSettings) renderArticleSettings();
   if (isMedia)    renderMediaLibrary();
   if (isTier)     renderTierSettings();
@@ -694,6 +763,7 @@ function setActiveModule(moduleName) {
   if (isSponsor)  renderSponsorships();
   if (isSeo)      renderSeoConfig();
   if (isAtlas)    renderAtlasConfig();
+  if (isAnalytics) renderAnalytics();
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
@@ -911,6 +981,7 @@ function buildSectionTitleInput(section) {
   input.spellcheck = false;
   input.autocomplete = 'off';
   input.value = (section.type || '');
+  section._typeInput = input;
 
   function sync() {
     // If empty, we intentionally store '' so sectionsToBlocks() omits the heading.
@@ -1020,8 +1091,19 @@ function buildSectionCard(section, index) {
   const composer = createComposer({
     tools: ['format', 'structure', 'insert', 'ai'],
     toolbarMode: 'inline',
-    editToggle: true,
-    startEditing: section.startEditing === true,
+    // Drafts should be frictionless (always editable). Published articles must be
+    // explicitly unlocked via "Edit" to avoid accidental republish behavior.
+    editToggle: !!(els.statusField && els.statusField.value === 'Published'),
+    startEditing: (els.statusField && els.statusField.value === 'Published') ? (section.startEditing === true) : true,
+    onBeginEdit: function () {
+      section._baselineType = section.type || '';
+    },
+    onCancel: function () {
+      if (section._baselineType == null) return;
+      section.type = String(section._baselineType || '').trim();
+      if (section._typeInput) section._typeInput.value = section.type;
+      renderPreview();
+    },
     ariaLabel: section.type + ' section',
     placeholder: '',
     aiAssist: composerAiAssist,
@@ -1232,6 +1314,10 @@ function fillForm(article) {
   renderPreview();
   updateWorkflowChrome(els.statusField.value, item.id ? 'Saved in Firestore' : 'New draft', item.id ? 'saved' : 'new');
   renderList();
+
+  if (item.id) {
+    mediaRefsByArticleId.set(item.id, computeMediaRefsFromArticle(item));
+  }
 }
 
 function updateArticleStats() {
@@ -1260,11 +1346,16 @@ function renderList() {
   list.className = 'sd-admin-md-list';
   articles.forEach(function (article) {
     const en = article.en || {};
+    const rawType = String(article.contentType || 'system-design').trim().toLowerCase();
+    const normalizedType = (rawType === 'architecture' || rawType === 'case-study' || rawType === 'system-design')
+      ? rawType
+      : 'system-design';
 
     const item = document.createElement('md-list-item');
     item.setAttribute('type', 'button');
     item.className = 'sd-admin-li';
     item.dataset.id = article.id;
+    item.dataset.contentType = normalizedType;
     if (article.id === selectedId) {
       item.setAttribute('checked', '');
       item.classList.add('sd-admin-li-active');
@@ -1275,11 +1366,14 @@ function renderList() {
     overline.className = 'sd-admin-li-overline';
     const status = document.createElement('span');
     status.className = 'sd-admin-chip';
+    status.dataset.kind = 'status';
     status.dataset.status = article.status || 'Draft';
     status.textContent = article.status || 'Draft';
     const typeChip = document.createElement('span');
     typeChip.className = 'sd-admin-chip sd-admin-chip-muted';
-    typeChip.textContent = contentTypeLabel(article.contentType || 'system-design');
+    typeChip.dataset.kind = 'type';
+    typeChip.dataset.type = normalizedType;
+    typeChip.textContent = contentTypeLabel(normalizedType);
     overline.append(status, typeChip);
 
     const headline = document.createElement('div');
@@ -1535,6 +1629,325 @@ async function renderMediaLibrary() {
     return;
   }
   await refreshMediaAudit();
+}
+
+function monthIdNow() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return y + '-' + m;
+}
+
+function ensureAnalyticsMonth() {
+  if (!els.analyticsMonth) return monthIdNow();
+  const current = String(els.analyticsMonth.value || '').trim();
+  if (current) return current;
+  const v = monthIdNow();
+  els.analyticsMonth.value = v;
+  return v;
+}
+
+async function renderAnalytics() {
+  if (!els.analyticsPanel) return;
+  const month = ensureAnalyticsMonth();
+  if (analyticsState && analyticsView.month === month) {
+    paintAnalytics();
+    return;
+  }
+  await refreshAnalytics();
+}
+
+async function refreshAnalytics() {
+  if (!els.analyticsPanel) return;
+  const month = ensureAnalyticsMonth();
+  analyticsView.month = month;
+  setSectionStatus(els.analyticsStatus, 'Loading analytics…', 'info');
+  els.analyticsPanel.textContent = '';
+  try {
+    const results = await Promise.all([
+      authedJson('/api/admin/analytics/overview?month=' + encodeURIComponent(month)),
+      authedJson('/api/admin/analytics/today'),
+    ]);
+    const data = results[0] || {};
+    const today = results[1] || {};
+    analyticsState = Object.assign({}, data, { today });
+    paintAnalytics();
+    setSectionStatus(els.analyticsStatus, 'Analytics updated.', 'success');
+  } catch (err) {
+    setSectionStatus(els.analyticsStatus, err.message || 'Failed to load analytics.', 'error');
+  }
+}
+
+function paintAnalytics() {
+  if (!els.analyticsPanel) return;
+  els.analyticsPanel.textContent = '';
+
+  const state = analyticsState || {};
+  const totals = state.totals || {};
+  const series = Array.isArray(state.series) ? state.series : [];
+  const topPages = Array.isArray(state.topPages) ? state.topPages : [];
+  const topReferrers = Array.isArray(state.topReferrers) ? state.topReferrers : [];
+  const topCampaigns = Array.isArray(state.topCampaigns) ? state.topCampaigns : [];
+  const recentUsers = Array.isArray(state.recentUsers) ? state.recentUsers : [];
+  const today = state.today && typeof state.today === 'object' ? state.today : null;
+  const todayUsers = today && Array.isArray(today.users) ? today.users : [];
+
+  function utmLabel(utm, key) {
+    const u = utm && typeof utm === 'object' ? utm : null;
+    if (u && (u.source || u.medium || u.campaign)) {
+      const parts = [];
+      if (u.source) parts.push(u.source);
+      if (u.medium) parts.push(u.medium);
+      if (u.campaign) parts.push(u.campaign);
+      return parts.join(' · ');
+    }
+    return String(key || '').split('|').slice(0, 3).filter(Boolean).join(' · ') || 'Campaign';
+  }
+
+  function formatMs(ms) {
+    const n = Math.max(0, Number(ms || 0));
+    if (!n) return '0m';
+    const mins = Math.round(n / 60000);
+    if (mins < 60) return mins + 'm';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h + 'h ' + m + 'm';
+  }
+
+  function shortPathLabel(path) {
+    const raw = String(path || '');
+    if (!raw) return { label: '', chips: [] };
+    try {
+      const u = new URL(raw, 'https://x.local');
+      const chips = [];
+      const source = (u.searchParams.get('utm_source') || '').trim();
+      const medium = (u.searchParams.get('utm_medium') || '').trim();
+      const campaign = (u.searchParams.get('utm_campaign') || '').trim();
+      if (source) chips.push(source);
+      if (medium) chips.push(medium);
+      if (campaign) chips.push(campaign);
+      const label = (u.pathname && u.pathname !== '/') ? u.pathname : 'Home';
+      return { label, chips };
+    } catch (_) {
+      const base = raw.split('?')[0] || raw;
+      return { label: base === '/' ? 'Home' : base, chips: [] };
+    }
+  }
+
+  function sparklineSvg(values, opts) {
+    const options = opts || {};
+    const w = 720;
+    const h = 108;
+    const pad = 10;
+    const list = Array.isArray(values) ? values.map((v) => Number(v || 0)) : [];
+    if (!list.length) return '';
+    const max = Math.max.apply(Math, list.concat([1]));
+    const step = (w - pad * 2) / Math.max(1, list.length - 1);
+    function pt(i, v) {
+      const x = pad + step * i;
+      const y = pad + (h - pad * 2) * (1 - (v / max));
+      return [x, y];
+    }
+    const pts = list.map((v, i) => pt(i, v));
+    const d = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(2) + ' ' + p[1].toFixed(2)).join(' ');
+    const area = `M ${pad} ${h - pad} ` + pts.map((p) => `L ${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(' ') + ` L ${w - pad} ${h - pad} Z`;
+    const stroke = options.stroke || '#2f6fed';
+    const fill = options.fill || 'rgba(47,111,237,0.10)';
+    return `
+      <svg class="sd-analytics-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+        <path d="${area}" fill="${fill}"></path>
+        <path d="${d}" fill="none" stroke="${stroke}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>`;
+  }
+
+  const viewsSeries = series.map((d) => Number(d.pageViews || 0));
+  const visitorsSeries = series.map((d) => Number(d.uniqueVisitors || 0));
+  const last14Views = viewsSeries.reduce((s, v) => s + v, 0);
+  const last14Visitors = visitorsSeries.reduce((s, v) => s + v, 0);
+
+  const recentVisitorChips = recentUsers.slice(0, 6).map(function (u) {
+    const label = u && u.kind === 'signed'
+      ? (u.name || 'Signed-in')
+      : (u && u.label ? u.label : 'Anonymous');
+    const region = u && u.region ? String(u.region) : '';
+    return `<span class="sd-analytics-chip" title="${safeText(region ? (label + ' · ' + region) : label)}">${safeText(label)}</span>`;
+  }).join('');
+
+  const signedCount = todayUsers.filter((u) => u && u.kind === 'signed').length;
+  const anonCount = todayUsers.length - signedCount;
+  const todayReadMs = todayUsers.reduce((s, u) => s + Number(u.readMs || 0), 0);
+  const todayPdf = todayUsers.reduce((s, u) => s + Number(u.pdfDownloads || 0), 0);
+
+  const todayRows = todayUsers.slice(0, 50).map(function (u) {
+    const name = u.kind === 'signed'
+      ? (u.name || 'Signed-in user')
+      : 'Anonymous';
+    const city = u.geoCity ? String(u.geoCity) : '—';
+    const country = u.geoCountry ? String(u.geoCountry) : (u.region ? String(u.region) : '—');
+    const pages = Array.isArray(u.pages) ? u.pages : [];
+    const pageLines = pages.slice(0, 3).map(function (p) {
+      const path = String(p.path || '');
+      const parsed = shortPathLabel(path);
+      const pv = Number(p.pageViews || 0);
+      const rm = Number(p.readMs || 0);
+      const chips = parsed.chips.map((c) => `<span class="sd-analytics-chip">${safeText(c)}</span>`).join('');
+      return `<div class="sd-analytics-user-page"><span class="sd-analytics-user-page-name">${safeText(parsed.label)}</span><span class="sd-analytics-user-page-meta">${pv} · ${formatMs(rm)}</span>${chips ? `<span class="sd-analytics-user-page-chips">${chips}</span>` : ''}</div>`;
+    }).join('');
+    return `
+      <tr>
+        <td>
+          <div class="sd-analytics-user">
+            <span class="sd-analytics-avatar" aria-hidden="true">${safeText((name || 'A').slice(0, 1).toUpperCase())}</span>
+            <span class="sd-analytics-user-meta">
+              <span class="sd-analytics-user-name">${safeText(name)}</span>
+              <span class="sd-analytics-user-sub">${safeText(u.kind === 'signed' ? 'Signed-in' : 'Anonymous')}${u.device ? ' · ' + safeText(u.device) : ''}${u.tz ? ' · ' + safeText(u.tz) : ''}</span>
+            </span>
+          </div>
+        </td>
+        <td>${safeText(city)}</td>
+        <td>${safeText(country)}</td>
+        <td class="sd-analytics-num">${Number(u.pageViews || 0).toLocaleString()}</td>
+        <td class="sd-analytics-num">${formatMs(u.readMs || 0)}</td>
+        <td class="sd-analytics-num">${Number(u.pdfDownloads || 0).toLocaleString()}</td>
+        <td>
+          ${pageLines || '<div class="sd-analytics-empty">No pages captured yet.</div>'}
+        </td>
+      </tr>`;
+  }).join('');
+
+  function rankedRows(items, getLabel, getValue) {
+    const list = Array.isArray(items) ? items.slice(0, 10) : [];
+    const max = list.reduce((m, it) => Math.max(m, Number(getValue(it) || 0)), 0) || 1;
+    if (!list.length) return '';
+    return list.map(function (it, i) {
+      const v = Number(getValue(it) || 0);
+      const w = Math.max(3, Math.round((v / max) * 100));
+      const label = getLabel(it);
+      return `<div class="sd-analytics-rank-row">
+        <span class="sd-analytics-rank">${i + 1}</span>
+        <span class="sd-analytics-rank-label" title="${safeText(label)}">${safeText(label)}</span>
+        <span class="sd-analytics-rank-bar" aria-hidden="true"><i style="width:${w}%"></i></span>
+        <span class="sd-analytics-rank-val">${v.toLocaleString()}</span>
+      </div>`;
+    }).join('');
+  }
+
+  els.analyticsPanel.innerHTML = `
+    <div class="sd-analytics-grid">
+      <div class="sd-media-kpis sd-analytics-kpis" role="region" aria-label="Analytics KPIs">
+        <div class="sd-media-kpi">
+          <div class="sd-media-kpi-label">Monthly Visitors</div>
+          <div class="sd-media-kpi-value">${Number(totals.uniqueVisitors || 0).toLocaleString()}</div>
+          <div class="sd-media-kpi-sub">Unique visitors · ${recentVisitorChips || 'No visitor names yet'}</div>
+        </div>
+        <div class="sd-media-kpi">
+          <div class="sd-media-kpi-label">Monthly Page Views</div>
+          <div class="sd-media-kpi-value">${Number(totals.pageViews || 0).toLocaleString()}</div>
+          <div class="sd-media-kpi-sub">All tracked page views</div>
+        </div>
+        <div class="sd-media-kpi">
+          <div class="sd-media-kpi-label">Monthly PDF Downloads</div>
+          <div class="sd-media-kpi-value">${Number(state && state.totals && state.totals.pdfDownloads ? state.totals.pdfDownloads : 0).toLocaleString()}</div>
+          <div class="sd-media-kpi-sub">Resume + article exports</div>
+        </div>
+      </div>
+
+      <div class="sd-analytics-trendcard" role="region" aria-label="Last 14 days trend">
+        <div class="sd-analytics-trend-head">
+          <strong>Last 14 days</strong>
+          <span class="sd-analytics-legend">
+            <span class="sd-analytics-legend-item"><i data-kind="views"></i>Views</span>
+            <span class="sd-analytics-legend-item"><i data-kind="visitors"></i>Visitors</span>
+          </span>
+        </div>
+        <div class="sd-analytics-sparks">
+          <div class="sd-analytics-spark-wrap">
+            ${sparklineSvg(viewsSeries, { stroke: 'color-mix(in srgb, var(--md-sys-color-primary) 86%, #111)', fill: 'color-mix(in srgb, var(--md-sys-color-primary) 16%, transparent)' })}
+          </div>
+          <div class="sd-analytics-spark-wrap">
+            ${sparklineSvg(visitorsSeries, { stroke: 'color-mix(in srgb, var(--success) 72%, #111)', fill: 'color-mix(in srgb, var(--success) 12%, transparent)' })}
+          </div>
+        </div>
+        <div class="sd-analytics-trend-foot">
+          <div><strong>${last14Views.toLocaleString()}</strong><span>views</span></div>
+          <div><strong>${last14Visitors.toLocaleString()}</strong><span>visitors</span></div>
+        </div>
+        <details class="sd-analytics-breakdown">
+          <summary>Daily breakdown</summary>
+          <div class="sd-analytics-breakdown-rows">
+            ${series.map(function (d) {
+              return `<div class="sd-analytics-break-row"><span>${safeText(d.date)}</span><span>${Number(d.pageViews || 0).toLocaleString()} views</span><span>${Number(d.uniqueVisitors || 0).toLocaleString()} visitors</span></div>`;
+            }).join('')}
+          </div>
+        </details>
+      </div>
+
+      <div class="sd-analytics-insights" role="region" aria-label="Top insights">
+        <div class="sd-analytics-insight">
+          <div class="sd-analytics-insight-head">
+            <strong>Top pages</strong>
+            <span class="sd-analytics-trend-sub">This month</span>
+          </div>
+          ${topPages.length ? rankedRows(topPages, function (it) {
+            const parsed = shortPathLabel(it && it.path ? it.path : '');
+            return parsed.label;
+          }, function (it) { return it && it.pageViews; }) : '<div class="sd-analytics-empty">No page data yet.</div>'}
+        </div>
+
+        <div class="sd-analytics-insight">
+          <div class="sd-analytics-insight-head">
+            <strong>Top referrers</strong>
+            <span class="sd-analytics-trend-sub">Domain only</span>
+          </div>
+          ${topReferrers.length ? rankedRows(topReferrers, function (it) {
+            const name = String(it && it.referrer ? it.referrer : '');
+            return name === 'direct' ? 'Direct' : (name === 'internal' ? 'Internal' : name);
+          }, function (it) { return it && it.pageViews; }) : '<div class="sd-analytics-empty">No referrer data yet.</div>'}
+        </div>
+
+        <div class="sd-analytics-insight">
+          <div class="sd-analytics-insight-head">
+            <strong>Top campaigns</strong>
+            <span class="sd-analytics-trend-sub">UTM attribution</span>
+          </div>
+          ${topCampaigns.length ? rankedRows(topCampaigns, function (it) {
+            return utmLabel(it && it.utm ? it.utm : null, it && it.key ? it.key : '');
+          }, function (it) { return it && it.pageViews; }) : '<div class="sd-analytics-empty">No UTM campaigns yet.</div>'}
+        </div>
+      </div>
+
+      <div class="sd-analytics-today" role="region" aria-label="Today users">
+        <div class="sd-analytics-trend-head">
+          <strong>Today</strong>
+          <span class="sd-analytics-trend-sub">${safeText(today && today.day ? today.day : '')} · ${todayUsers.length} users</span>
+        </div>
+        <div class="sd-analytics-today-kpis">
+          <div><strong>${signedCount}</strong><span>signed-in</span></div>
+          <div><strong>${anonCount}</strong><span>anonymous</span></div>
+          <div><strong>${formatMs(todayReadMs)}</strong><span>read time</span></div>
+          <div><strong>${todayPdf}</strong><span>PDFs</span></div>
+        </div>
+        <div class="sd-analytics-table-wrap">
+          <table class="sd-analytics-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>City</th>
+                <th>Country</th>
+                <th class="sd-analytics-num">Views</th>
+                <th class="sd-analytics-num">Read</th>
+                <th class="sd-analytics-num">PDFs</th>
+                <th>Top pages</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${todayRows || '<tr><td colspan="7" class="sd-analytics-empty">No users yet today. Open the public site to generate traffic.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 async function refreshMediaAudit() {
@@ -2571,6 +2984,8 @@ async function loadArticles() {
 
 async function saveArticleWithStatus(status, opts) {
   const options = opts || {};
+  const beforeId = selectedId || slugify(els.id.value || els.title.value);
+  const prevRefs = beforeId ? (mediaRefsByArticleId.get(beforeId) || new Set()) : new Set();
   const article = articleFromForm();
   article.status = status;
   article.stub = status === 'Coming soon';
@@ -2587,6 +3002,14 @@ async function saveArticleWithStatus(status, opts) {
     body:   JSON.stringify(article),
   });
   const saved = data.article;
+
+  // Auto-cleanup: if the save removed any media objects (e.g. Replace image),
+  // try deleting them now. Safe: backend checks "still orphan?" at delete time.
+  const nextRefs = computeMediaRefsFromArticle(saved);
+  const removed = diffRemovedMedia(prevRefs, nextRefs);
+  autoCleanupRemovedMedia(saved.id, removed);
+  mediaRefsByArticleId.set(saved.id, nextRefs);
+
   articles = articles.filter(function (item) { return item.id !== saved.id; }).concat(saved)
     .sort(function (a, b) { return Number(a.order || 999) - Number(b.order || 999); });
   if (options.silent) {
@@ -2735,6 +3158,18 @@ if (els.mediaOrphansOnly) {
     mediaAuditView.visibleCount = 0;
     mediaAuditView.status = els.mediaOrphansOnly.checked ? 'orphan' : (mediaAuditView.status || 'all');
     paintMediaAudit();
+  });
+}
+if (els.refreshAnalyticsBtn) {
+  els.refreshAnalyticsBtn.addEventListener('click', function () {
+    analyticsState = null;
+    refreshAnalytics();
+  });
+}
+if (els.analyticsMonth) {
+  els.analyticsMonth.addEventListener('change', function () {
+    analyticsState = null;
+    refreshAnalytics();
   });
 }
 els.savePolicyBtn.addEventListener('click', function () {

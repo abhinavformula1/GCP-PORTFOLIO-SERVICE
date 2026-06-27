@@ -111,16 +111,27 @@ async function uploadMedia({ buffer, mimetype, originalname, size, preset }) {
     .toLowerCase()
     .slice(0, 40);
 
-  const selectedPreset = preset === 'thumb' ? 'thumb' : 'article';
+  const selectedPreset = preset === 'thumb' ? 'thumb' : (preset === 'hero' ? 'hero' : 'article');
   const maxWidth = selectedPreset === 'thumb' ? 1200 : 1600;
 
   const img = mimetype === 'image/svg+xml'
     ? sharp(buffer, { density: 300 })
     : sharp(buffer);
 
-  const jpegBuffer = await img
-    .rotate()
-    .resize({ width: maxWidth, withoutEnlargement: true })
+  const jpegPipeline = img.rotate();
+  if (selectedPreset === 'hero') {
+    // Hero images are always 16:9 for consistent tiles/headers.
+    jpegPipeline.resize({
+      width: 1600,
+      height: 900,
+      fit: 'cover',
+      position: 'attention',
+    });
+  } else {
+    jpegPipeline.resize({ width: maxWidth, withoutEnlargement: true });
+  }
+
+  const jpegBuffer = await jpegPipeline
     .flatten({ background: '#ffffff' })
     .jpeg({ quality: 82, progressive: true, mozjpeg: true })
     .toBuffer();

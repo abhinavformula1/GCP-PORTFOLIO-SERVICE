@@ -198,10 +198,15 @@ function blocksToHtml(blocks, opts) {
  */
 function buildPrintDocument(article, opts) {
   const options = opts || {};
-  const title  = article.title   || article.id || 'Design Note';
-  const sub    = article.subtitle || article.description || '';
+  const loc = (article && article.en) ? article.en : (article || {});
+  const title  = loc.title || article.title || article.id || 'Design Note';
+  const sub    = loc.subtitle || article.subtitle || article.description || '';
   const tags   = Array.isArray(article.tags) ? article.tags : [];
   const mins   = article.readMinutes ? String(article.readMinutes) + ' min read' : '';
+  const contentType = String(article.contentType || '').trim().toLowerCase();
+  const typeLabel = contentType === 'architecture'
+    ? 'Architecture Note'
+    : (contentType === 'case-study' ? 'Case Study' : 'System Design');
   const date   = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const bodyHtml = blocksToHtml(article.blocks || [], options);
@@ -232,6 +237,67 @@ body {
   print-color-adjust: exact;
 }
 
+.sd-print-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.sd-print-meta {
+  font-size: 9.5pt;
+  color: rgba(17, 17, 17, 0.72);
+  letter-spacing: 0.01em;
+}
+
+.sd-print-meta strong {
+  color: #111;
+  font-weight: 700;
+}
+
+.sd-print-sep {
+  margin: 0 6px;
+  color: rgba(17, 17, 17, 0.42);
+}
+
+.sd-article-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.14);
+}
+
+.sd-article-title {
+  margin-top: 6px;
+}
+
+.sd-article-sub {
+  margin-top: 6px;
+  color: rgba(17, 17, 17, 0.72);
+}
+
+.sd-article-meta {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.sd-article-meta .sd-tag {
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  background: rgba(17, 17, 17, 0.04);
+  color: rgba(17, 17, 17, 0.86);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 9pt;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sd-article-meta .sd-read-time {
+  color: rgba(17, 17, 17, 0.64);
+  font-size: 9pt;
+  font-weight: 600;
+}
+
 .sd-print-image-lite {
   border: 1px solid rgba(0,0,0,0.12);
   border-radius: 10px;
@@ -246,13 +312,17 @@ body {
 </head>
 <body>
 <div class="sd-print-header">
-  <span class="sd-print-logo">Abhinav Kumar &mdash; System Design</span>
-  <span class="sd-print-date">${esc(date)}</span>
+  <div class="sd-print-meta">
+    <strong>Abhinav Kumar</strong>
+    <span class="sd-print-sep">·</span>
+    <span>${esc(typeLabel)}</span>
+    <span class="sd-print-sep">·</span>
+    <span>${esc(date)}</span>
+  </div>
 </div>
 
 <article class="sd-article">
   <header class="sd-article-header">
-    <div class="sd-kicker">DESIGN NOTE</div>
     <h1 class="sd-article-title">${esc(title)}</h1>
     ${sub ? `<p class="sd-article-sub">${esc(sub)}</p>` : ''}
     <div class="sd-article-meta">

@@ -1180,6 +1180,15 @@ function exportCurrentTopicPdf() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      // Best-effort analytics (must never block download UX).
+      try {
+        const cid = localStorage.getItem('portfolio_anon_cid_v1') || '';
+        if (navigator.sendBeacon && cid) {
+          const payload = JSON.stringify({ clientId: cid, type: 'pdf_download', pdfKind: 'software-architecture', pdfId: _activeTopic, path: location.pathname + location.search });
+          navigator.sendBeacon('/api/analytics/event', new Blob([payload], { type: 'application/json' }));
+        }
+      } catch (_) {}
     })
     .catch(function (err) {
        

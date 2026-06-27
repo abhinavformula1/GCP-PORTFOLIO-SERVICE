@@ -62,32 +62,6 @@ const router = express.Router();
 const TEXT_MAX_LEN  = 2000;
 const REPLY_MAX_LEN = 1000;
 
-function localPreviewRecommendations() {
-  const now = Date.now();
-  return [
-    {
-      id: 'local-reco-1',
-      name: 'Maya Chen',
-      company: 'Salesforce',
-      avatarUrl: '',
-      text: 'Abhinav brings the rare mix of Salesforce depth, integration discipline, and product-minded execution. He can turn ambiguous enterprise requirements into clean, reviewable architecture.',
-      reply: 'Thank you, Maya. This is exactly the kind of enterprise engineering standard I try to bring to every project.',
-      submittedAt: now - 4 * 24 * 60 * 60 * 1000,
-      updatedAt: now - 4 * 24 * 60 * 60 * 1000,
-      repliedAt: now - 3 * 24 * 60 * 60 * 1000,
-    },
-    {
-      id: 'local-reco-2',
-      name: 'Rahul Mehta',
-      company: 'Google Cloud',
-      avatarUrl: '',
-      text: 'The portfolio feels like a working product, not a static resume. The GCP, Firestore, Cloud Run, and AI assistant story is strong for senior application engineering roles.',
-      submittedAt: now - 2 * 24 * 60 * 60 * 1000,
-      updatedAt: now - 2 * 24 * 60 * 60 * 1000,
-    },
-  ];
-}
-
 // ── GET /api/recommendations ─────────────────────────────────────────────────
 //
 // Public, unauthenticated. Reads from Firestore only (no SF calls per page
@@ -96,15 +70,6 @@ function localPreviewRecommendations() {
 // Response shape is intentionally PII-light: name + company + avatar are
 // public (the recruiter consented when they submitted), email is NOT.
 router.get('/recommendations', async (_req, res, _next) => {
-  if (config.admin.localPreview) {
-    res.set('Cache-Control', 'no-store');
-    return res.status(200).json({
-      success: true,
-      recommendations: localPreviewRecommendations(),
-      source: 'local-preview',
-    });
-  }
-
   // Graceful degradation: if Firestore is unreachable (local dev with no
   // gcloud ADC; prod outage; quota exhausted), the public page should still
   // render. Returning an empty list with a 200 keeps the section rendering

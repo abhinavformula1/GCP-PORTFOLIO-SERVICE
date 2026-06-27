@@ -635,6 +635,14 @@ export function downloadResumePdf() {
     closeResumePreview();
     return;
   }
+  // Best-effort analytics (must never block download UX).
+  try {
+    const cid = localStorage.getItem('portfolio_anon_cid_v1') || '';
+    if (navigator.sendBeacon && cid) {
+      const payload = JSON.stringify({ clientId: cid, type: 'pdf_download', pdfKind: 'resume', pdfId: _currentFilename, path: location.pathname + location.search });
+      navigator.sendBeacon('/api/analytics/event', new Blob([payload], { type: 'application/json' }));
+    }
+  } catch (_) {}
   _currentDoc.save(_currentFilename);
   closeResumePreview();
 }

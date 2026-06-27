@@ -10,7 +10,6 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "content:publish-system-design": "node scripts/publish-system-design-article.js",
-    "content:seed-system-design": "node scripts/publish-system-design-article.js content/system-design/articles.seed.json",
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky"
   },
@@ -30,7 +29,8 @@
     "jsforce": "^3.10.14",
     "multer": "^2.2.0",
     "puppeteer-core": "^25.1.0",
-    "sharp": "^0.35.2"
+    "sharp": "^0.35.2",
+    "geoip-lite": "^1.4.10"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
