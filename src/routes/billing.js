@@ -249,6 +249,54 @@ router.post('/billing/checkout-session-guest', validateEmbeddedCheckout, async (
   }
 });
 
+// Guest checkout (redirect): local-dev fallback when STRIPE_PUBLISHABLE_KEY is not set.
+// Returns a hosted Checkout URL (session.url).
+router.post('/billing/checkout-session-guest-redirect', validateCheckout, async (req, res, next) => {
+  try {
+    assertStripeConfigured();
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new ValidationError(errors.array()[0].msg);
+
+    const plan = String(req.body.plan || '').trim();
+    const coupon = String(req.body.coupon || '').trim();
+    const priceId = String(req.body.priceId || '').trim()
+      || (plan === 'yearly' ? config.stripe.priceYearly : config.stripe.priceMonthly);
+    if (!priceId) throw new AppError('Missing Stripe price id. Set STRIPE_PRICE_MONTHLY (and optionally STRIPE_PRICE_YEARLY).', 503, 'STRIPE_PRICE_NOT_CONFIGURED');
+
+    const stripe = getStripe();
+    const siteUrl = String(config.stripe.siteUrl || '').replace(/\/$/, '');
+    const successUrl = `${siteUrl}/?billing=success`;
+    const cancelUrl = `${siteUrl}/?billing=cancel`;
+
+    let discounts = undefined;
+    if (coupon) {
+      try {
+        const promoList = await stripe.promotionCodes.list({ code: coupon, active: true, limit: 1 });
+        const promo = promoList && promoList.data && promoList.data[0] ? promoList.data[0] : null;
+        if (promo && promo.id) discounts = [{ promotion_code: promo.id }];
+      } catch (_) {}
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: true,
+      discounts,
+      subscription_data: { metadata: { guest: '1' } },
+      metadata: { guest: '1' },
+    });
+
+    if (!session || !session.url) {
+      throw new AppError('Checkout failed.', 503, 'STRIPE_CHECKOUT_FAILED');
+    }
+    return res.status(200).json({ success: true, url: session.url });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 const validateClaim = [
   body('sessionId').trim().isLength({ min: 6, max: 200 }).withMessage('Missing Stripe session id.'),
 ];

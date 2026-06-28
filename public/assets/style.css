@@ -375,6 +375,10 @@ md-text-button:not(:defined) { visibility: hidden; }
   --md-dialog-container-shape: 18px;
   --md-dialog-headline-size: 16px;
   --md-dialog-headline-weight: 700;
+  /* Material Web tip: use width/height on <md-dialog> itself. */
+  width: min(1140px, 96vw);
+  max-width: calc(100vw - 16px);
+  max-height: min(88vh, 900px);
 }
 .stripe-checkout-dialog::part(container) {
   width: min(1140px, 96vw);
