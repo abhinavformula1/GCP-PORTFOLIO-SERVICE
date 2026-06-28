@@ -149,6 +149,13 @@ async function openEmbeddedCheckout(token) {
   });
   const data = await resp.json().catch(function () { return null; });
   if (!resp.ok || !data || !data.clientSecret) {
+    if (resp.status === 401) {
+      // Token is expired or audience mismatch (GOOGLE_CLIENT_ID). Route user through sign-in again.
+      try { sessionStorage.setItem('pending_subscribe', '1'); } catch (_) {}
+      if (typeof window.showWelcomeOverlay === 'function') window.showWelcomeOverlay();
+      showToast('Your sign-in expired. Please sign in again.', { kind: 'warning', duration: 6000 });
+      throw new Error('Invalid Google credential.', { cause: new Error('401') });
+    }
     const msg = (data && (data.error || data.message)) || 'Checkout failed.';
     const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
     if (looksLikeStripeMissing) throw new Error('Stripe billing isn’t enabled yet on this environment.');
@@ -1235,28 +1242,9 @@ function renderTopicDetail() {
       }, 250);
       return;
     }
-    // Preferred UX: Embedded Checkout in a modal. Fallback: redirect checkout.
-    try {
-      await openEmbeddedCheckout(token);
-      return;
-    } catch (err) {
-      const resp = await fetch('/api/billing/checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        credentials: 'same-origin',
-        body: JSON.stringify({ plan: 'monthly', uiMode: 'redirect' }),
-      });
-      const data = await resp.json().catch(function () { return null; });
-      if (!resp.ok || !data || !data.url) {
-        const msg = (data && (data.error || data.message)) || (err && err.message) || 'Checkout failed.';
-        const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
-        if (looksLikeStripeMissing) {
-          throw new Error('Stripe billing isn’t enabled yet on this environment.', { cause: err });
-        }
-        throw new Error(msg, { cause: err });
-      }
-      openUrl(data.url);
-    }
+    // Modal-only UX: do NOT navigate away to Stripe-hosted pages.
+    // Stripe-hosted checkout pages cannot be embedded in a modal; use Embedded Checkout instead.
+    await openEmbeddedCheckout(token);
   }
 
   async function openPortal() {
