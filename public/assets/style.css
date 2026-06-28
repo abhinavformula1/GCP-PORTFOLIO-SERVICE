@@ -161,6 +161,7 @@ md-dialog { margin: auto; }
 md-dialog:not(:defined) > * { visibility: hidden; }
 md-filled-button:not(:defined),
 md-outlined-button:not(:defined),
+md-text-button:not(:defined),
 md-outlined-text-field:not(:defined),
 md-fab:not(:defined) { visibility: hidden; }
 
@@ -178,16 +179,105 @@ md-fab:not(:defined) { visibility: hidden; }
   justify-content: flex-end;
   gap: 12px;
 }
+.topbar-with-header-nav {
+  /* Promote the header nav into the top level: remove the extra "bar"
+     feeling so the nav pill becomes the primary surface. */
+  background: transparent;
+  border-bottom: 0;
+  padding-top: 18px;
+  padding-bottom: 12px;
+}
+.topbar-with-header-nav .topbar-inner {
+  justify-content: space-between;
+  gap: 16px;
+}
+.topbar-with-header-nav .header-nav {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.topbar-with-header-nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.topbar-with-header-nav .topbar-controls {
+  margin-left: auto;
+}
 .topbar-controls {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
+/* ── Language picker (globe icon + dialog) ───────────────────────────────── */
+.lang-picker { display: contents; }
+.lang-picker-btn {
+  --md-outlined-icon-button-container-size: 40px;
+  --md-outlined-icon-button-container-shape: 10px;
+  --md-outlined-icon-button-outline-width: 1px;
+  --md-outlined-icon-button-outline-color: color-mix(in srgb, var(--md-sys-color-outline) 55%, transparent);
+  --md-outlined-icon-button-icon-color: var(--md-sys-color-on-surface-variant);
+  /* keep quiet */
+  --md-outlined-icon-button-hover-state-layer-color: transparent;
+  --md-outlined-icon-button-pressed-state-layer-color: transparent;
+  --md-outlined-icon-button-focus-state-layer-color: transparent;
+}
+.lang-picker-dialog {
+  --md-dialog-container-color: var(--md-sys-color-surface);
+  --md-dialog-headline-size: 22px;
+  --md-dialog-supporting-text-size: 14px;
+  min-width: min(920px, 92vw);
+}
+.lang-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px 16px;
+  padding: 6px 2px 2px 2px;
+}
+.lang-picker-option {
+  border: 0;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+}
+.lang-picker-option[data-selected="true"] {
+  background: color-mix(in srgb, #01347A 16%, transparent);
+  color: #01347A;
+}
+.lang-picker-option:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent); }
+.lang-picker-close {
+  --md-text-button-hover-state-layer-color: transparent;
+  --md-text-button-pressed-state-layer-color: transparent;
+}
+
+@media (max-width: 860px) {
+  .lang-picker-dialog { min-width: min(720px, 94vw); }
+  .lang-picker-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .lang-picker-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 /* keep the FOUC guard from earlier — extend it for the new components */
 md-outlined-select:not(:defined),
 md-select-option:not(:defined),
 md-icon-button:not(:defined),
-md-outlined-icon-button:not(:defined) { visibility: hidden; }
+md-outlined-icon-button:not(:defined),
+md-text-button:not(:defined) { visibility: hidden; }
+
+/* Ensure M3 dialogs (welcome/sign-in) sit above all app overlays. */
+md-dialog {
+  position: fixed;
+  z-index: 9999;
+}
 .topbar-label {
   font-size: 11px;
   color: var(--text-muted);
@@ -336,6 +426,11 @@ a:hover { text-decoration: underline; }
   margin: 0 auto;
   padding: 48px 32px 80px;
 }
+
+/* Software Architecture reading mode: remove the portfolio identity hero.
+   The SA view has its own page header (title + subtitle) in the content area. */
+:root.sa-reading .header { display: none; }
+:root.sa-reading .page { padding-top: 18px; }
 
 /* ── Header ── */
 .header {
@@ -558,6 +653,191 @@ a:hover { text-decoration: underline; }
 }
 .hero-actions .hire-me-btn { margin-top: 0; }
 
+/* ── Header primary nav (mock: Home / Software Architecture + CTAs + menu) ── */
+.header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 24px;
+  padding: 0;
+  margin: 0;
+  /* Allow right-side actions to align near topbar controls */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.header-nav-left { display: flex; align-items: center; gap: 10px; }
+.header-nav-links { display: flex; align-items: center; gap: 16px; }
+
+/* Stripe-style: text links with an underline active state. */
+.header-nav-link {
+  --md-text-button-container-height: 40px;
+  --md-text-button-label-text-size: 14px;
+  --md-text-button-label-text-weight: 600;
+  --md-text-button-label-text-color: var(--md-sys-color-on-surface);
+  --md-text-button-hover-label-text-color: var(--md-sys-color-on-surface);
+  --md-text-button-pressed-label-text-color: var(--md-sys-color-on-surface);
+  /* Remove hover/press background state layer (quiet, flat links). */
+  --md-text-button-hover-state-layer-color: transparent;
+  --md-text-button-pressed-state-layer-color: transparent;
+  --md-text-button-focus-state-layer-color: transparent;
+  /* Reduce text-to-text whitespace between links. */
+  --md-text-button-leading-space: 6px;
+  --md-text-button-trailing-space: 6px;
+  position: relative;
+  border-radius: 0;
+}
+.header-nav-link[aria-pressed="true"] {
+  /* Matches the generated image */
+  --md-text-button-label-text-color: #01347A;
+  --md-text-button-hover-label-text-color: #01347A;
+  --md-text-button-pressed-label-text-color: #01347A;
+  box-shadow: none;
+}
+.header-nav-link[aria-pressed="true"]::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 4px;
+  height: 2px;
+  background: #01347A;
+  border-radius: 0;
+}
+
+.header-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-left: auto;
+}
+.header-nav-download {
+  /* Resume: same as Get in touch (filled). */
+  --md-filled-button-container-height: 40px;
+  --md-filled-button-container-color: #01347A;
+  --md-filled-button-container-shape: 10px;
+  /* Slightly roomier than primary CTA (requested). */
+  --md-filled-button-leading-space: 18px;
+  --md-filled-button-trailing-space: 18px;
+  --md-filled-button-with-leading-icon-leading-space: 16px;
+  --md-filled-button-with-leading-icon-trailing-space: 18px;
+  --md-filled-button-with-icon-spacing: 12px;
+  --md-filled-button-icon-size: 20px;
+  /* Quiet hover/press. */
+  --md-filled-button-hover-state-layer-color: transparent;
+  --md-filled-button-pressed-state-layer-color: transparent;
+  --md-filled-button-focus-state-layer-color: transparent;
+}
+.header-nav-primary {
+  --md-filled-button-container-height: 40px;
+  /* Matches the generated image */
+  --md-filled-button-container-color: #01347A;
+  --md-filled-button-container-shape: 10px;
+  --md-filled-button-leading-space: 14px;
+  --md-filled-button-trailing-space: 14px;
+  --md-filled-button-with-leading-icon-leading-space: 14px;
+  --md-filled-button-with-leading-icon-trailing-space: 14px;
+  --md-filled-button-with-icon-spacing: 10px;
+  /* Remove hover/press background overlay */
+  --md-filled-button-hover-state-layer-color: transparent;
+  --md-filled-button-pressed-state-layer-color: transparent;
+  --md-filled-button-focus-state-layer-color: transparent;
+  /* .hire-me-btn has legacy hero spacing; neutralize in header nav */
+  margin-top: 0 !important;
+}
+
+.header-nav-overflow-btn,
+.header-nav-hamburger {
+  --md-outlined-icon-button-container-size: 36px;
+  --md-outlined-icon-button-icon-size: 20px;
+  --md-outlined-icon-button-outline-width: 1px;
+  --md-outlined-icon-button-outline-color: color-mix(in srgb, var(--md-sys-color-outline) 70%, transparent);
+  /* Stop the circle/pill look in the header */
+  --md-outlined-icon-button-container-shape: 10px;
+  /* Remove hover/press background overlay */
+  --md-outlined-icon-button-hover-state-layer-color: transparent;
+  --md-outlined-icon-button-pressed-state-layer-color: transparent;
+  --md-outlined-icon-button-focus-state-layer-color: transparent;
+}
+.header-nav-hamburger { display: none; }
+
+.header-nav-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 220px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 60%, transparent);
+  background: var(--md-sys-color-surface);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.18);
+}
+.header-nav-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.header-nav-menu-item:hover,
+.header-nav-menu-item:focus-visible {
+  background: transparent;
+  outline: 2px solid color-mix(in srgb, var(--md-sys-color-outline) 60%, transparent);
+  outline-offset: 2px;
+}
+.header-nav-menu-item .material-symbols-outlined { font-size: 18px; color: var(--md-sys-color-on-surface-variant); }
+
+.header-mobile-sheet {
+  position: fixed;
+  inset: 64px 12px auto 12px;
+  z-index: 9999;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 60%, transparent);
+  background: var(--md-sys-color-surface);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.18);
+}
+.header-mobile-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.header-mobile-item:hover,
+.header-mobile-item:focus-visible {
+  background: transparent;
+  outline: 2px solid color-mix(in srgb, var(--md-sys-color-outline) 60%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .header-nav { flex-wrap: wrap; }
+  .header-nav-links { display: none; }
+  .header-nav-overflow-btn { display: none; }
+  .header-nav-hamburger { display: inline-flex; }
+  .header-nav-right { width: 100%; flex-wrap: wrap; }
+  .header-nav-primary,
+  .header-nav-download {
+    width: 100%;
+  }
+  .header-nav-download { order: 2; }
+  .header-nav-primary { order: 1; }
+  .header-mobile-sheet { inset: 136px 12px auto 12px; }
+}
+
 /* ── Outlined brand CTA (Refer Me, System Design, Leave a Recommendation) ──
    Salesforce-blue text + matching outline; same height + padding tokens
    as the filled brand button (.hire-me-btn) so all four CTAs read as a
@@ -597,8 +877,11 @@ a:hover { text-decoration: underline; }
 .systemdesign-btn [slot="icon"],
 .admin-btn [slot="icon"] { margin-inline-end: 4px; }
 
-.home-btn[aria-pressed="true"],
-.systemdesign-btn[aria-pressed="true"] {
+/* Legacy "active pill" style for the old outlined hero buttons.
+   Keep it scoped to outlined buttons so it does NOT affect the new
+   header nav (which uses <md-text-button>). */
+md-outlined-button.home-btn[aria-pressed="true"],
+md-outlined-button.systemdesign-btn[aria-pressed="true"] {
   --md-outlined-button-container-color: #e8f3ff;
   --md-outlined-button-outline-color: #0070D2;
   --md-outlined-button-label-text-color: #005a9c;
@@ -615,7 +898,7 @@ a:hover { text-decoration: underline; }
    plain <button> (not <md-outlined-button>) because this CTA needs an
    aria-busy spinner state during PDF generation, which is easier to
    wire up without the shadow-DOM indirection. */
-.download-resume-btn {
+button.download-resume-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -636,20 +919,20 @@ a:hover { text-decoration: underline; }
   transition: background var(--md-sys-motion-duration-short3, 150ms) var(--md-sys-motion-easing-standard, ease),
               border-color var(--md-sys-motion-duration-short3, 150ms) var(--md-sys-motion-easing-standard, ease);
 }
-.download-resume-btn:hover {
+button.download-resume-btn:hover {
   background: color-mix(in srgb, #0070D2 8%, transparent);
 }
-.download-resume-btn:active {
+button.download-resume-btn:active {
   background: color-mix(in srgb, #0070D2 12%, transparent);
 }
 /* Generation in flight — visual cue that we're working, plus blocks
    double-clicks (the JS handler also disables the button). */
-.download-resume-btn[aria-busy="true"],
-.download-resume-btn:disabled {
+button.download-resume-btn[aria-busy="true"],
+button.download-resume-btn:disabled {
   opacity: 0.7;
   cursor: progress;
 }
-.download-resume-btn .material-symbols-outlined { font-size: 20px; }
+button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
 
 /* ── Modal dialog sizing (shared by Hire-Me + Refer-Me + Resume-Preview + Contact-Info) ── */
 #hireMeOverlay,
@@ -1943,6 +2226,12 @@ a:hover { text-decoration: underline; }
   transition: opacity 0.15s;
 }
 .sd-locked-cta:hover { opacity: 0.88; }
+.sd-locked-cta:disabled,
+.sd-locked-cta[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 /* Coupon (progressive disclosure) — keep secondary to the primary CTA. */
 .sd-coupon {

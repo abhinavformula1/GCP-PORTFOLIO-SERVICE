@@ -21,11 +21,44 @@ const billing = require('../services/billing');
 
 const router = express.Router();
 
+function isSafeDevRuntime() {
+  // Only expose diagnostics locally / non-production.
+  // Cloud Run sets K_SERVICE; treat that as production-like even if NODE_ENV misconfigured.
+  return (config.server.env || 'development') !== 'production' && !process.env.K_SERVICE;
+}
+
 function assertStripeConfigured() {
   if (!isStripeConfigured()) {
     throw new AppError('Stripe is not configured. Missing STRIPE_SECRET_KEY.', 503, 'STRIPE_NOT_CONFIGURED');
   }
 }
+
+router.get('/billing/status', (_req, res) => {
+  if (!isSafeDevRuntime()) return res.status(404).json({ success: false, error: 'Not found.' });
+
+  const key = String(config.stripe.secretKey || '');
+  const mode = key.startsWith('sk_test_') ? 'test' : key.startsWith('sk_live_') ? 'live' : key ? 'unknown' : 'unset';
+
+  return res.status(200).json({
+    success: true,
+    env: config.server.env,
+    adminLocalPreview: !!config.admin.localPreview,
+    stripe: {
+      configured: isStripeConfigured(),
+      secretKeySet: !!config.stripe.secretKey,
+      mode,
+      webhookSecretSet: !!config.stripe.webhookSecret,
+      priceMonthlySet: !!config.stripe.priceMonthly,
+      priceYearlySet: !!config.stripe.priceYearly,
+      siteUrl: config.stripe.siteUrl,
+      endpoints: {
+        checkoutSession: '/api/billing/checkout-session',
+        portalSession: '/api/billing/portal-session',
+        webhook: '/api/billing/webhook',
+      },
+    },
+  });
+});
 
 const validateCheckout = [
   body('priceId').optional().trim().isLength({ min: 4, max: 128 }),

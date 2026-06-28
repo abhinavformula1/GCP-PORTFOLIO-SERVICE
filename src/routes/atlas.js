@@ -34,6 +34,7 @@ const express                    = require('express');
 const { body, validationResult } = require('express-validator');
 const { requireAuth }            = require('../middleware/auth');
 const { atlasLimiter }           = require('../middleware/rateLimiter');
+const config                     = require('../config');
 const {
   ask, askStream, MAX_USER_MSG_CHARS, MAX_HISTORY_TURNS, GEMINI_MODELS,
   DEFAULT_GEMINI_MODEL_KEY,
@@ -402,6 +403,21 @@ router.get('/atlas/config',
         modelSelectorVisible: cfg.modelSelectorVisible,
       });
     } catch (err) {
+      // Local preview mode is used for admin UX work without requiring GCP
+      // credentials. If Firestore isn't configured locally, fall back to a
+      // safe default config so the chat UI can still boot.
+      if (config.admin.localPreview) {
+        const fallbackEnabled = ['flash-lite', 'flash'].filter(function (k) { return !!GEMINI_MODELS[k]; });
+        return res.json({
+          enabledModels: fallbackEnabled.length ? fallbackEnabled : [DEFAULT_GEMINI_MODEL_KEY],
+          defaultModel: fallbackEnabled.includes('flash-lite')
+            ? 'flash-lite'
+            : (fallbackEnabled[0] || DEFAULT_GEMINI_MODEL_KEY),
+          modelSelectorVisible: true,
+          degraded: true,
+          degradedReason: 'FIRESTORE_NOT_CONFIGURED',
+        });
+      }
       return next(err);
     }
   }

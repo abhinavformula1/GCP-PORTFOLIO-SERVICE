@@ -327,6 +327,13 @@ export function applyPageLang(lang) {
   document.documentElement.lang = lang;
 }
 
+// Single source of truth for UI language pickers.
+// Add new languages here (and in LANG / PAGE_LANG) without touching layout code.
+export const SUPPORTED_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'fr', label: 'Français' },
+];
+
 // ── currentLang (live binding) ───────────────────────────────────────────────
 // Default to English; main.js's setLang orchestrator updates this whenever
 // the user picks from the language select. Importers (chat, recommendations,

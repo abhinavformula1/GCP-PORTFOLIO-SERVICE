@@ -10,21 +10,10 @@
  */
 
 import { createEl, materialIcon, syncTopbarControlHeights } from './dom.js';
+import { renderLanguagePicker, updateLanguagePicker } from './language-picker.js';
 
-function renderLanguageSelect(id) {
-  return createEl('md-outlined-select', {
-    id,
-    className: 'lang-select',
-    value: 'en',
-    'aria-label': 'Language',
-  }, [
-    createEl('md-select-option', { value: 'en', selected: true }, [
-      createEl('div', { slot: 'headline', text: 'English' }),
-    ]),
-    createEl('md-select-option', { value: 'fr' }, [
-      createEl('div', { slot: 'headline', text: 'Français' }),
-    ]),
-  ]);
+function renderLanguageControl(ids) {
+  return renderLanguagePicker({ btn: ids.langBtn, dialog: ids.langDialog });
 }
 
 function renderThemeToggle(id) {
@@ -40,9 +29,9 @@ function renderThemeToggle(id) {
   ]);
 }
 
-function renderSignInButton(id, initiallyHidden, i18nKey) {
+function renderSignInButton(id, initiallyHidden, i18nKey, onClick) {
   const labelAttrs = i18nKey ? { 'data-i18n': i18nKey } : {};
-  return createEl('button', {
+  const btn = createEl('button', {
     id,
     className: 'topbar-signin-btn',
     'aria-label': 'Sign in',
@@ -51,6 +40,10 @@ function renderSignInButton(id, initiallyHidden, i18nKey) {
     materialIcon('login'),
     createEl('span', { ...labelAttrs, text: 'Sign in' }),
   ]);
+  if (typeof onClick === 'function') {
+    btn.addEventListener('click', onClick);
+  }
+  return btn;
 }
 
 function renderUserMenu(ids, handlers) {
@@ -92,7 +85,8 @@ export function renderTopbar(target, options) {
 
   const opts = options || {};
   const ids = {
-    lang:       opts.langId       || 'langSelect',
+    langBtn:    opts.langBtnId    || 'langPickerBtn',
+    langDialog: opts.langDialogId || 'langPickerDialog',
     theme:      opts.themeId      || 'themeToggleBtn',
     signIn:     opts.signInId     || 'topbarSignInBtn',
     user:       opts.userId       || 'topbarUser',
@@ -115,9 +109,9 @@ export function renderTopbar(target, options) {
   ]) : null;
 
   const controls = [
-    renderLanguageSelect(ids.lang),
+    renderLanguageControl(ids),
     renderThemeToggle(ids.theme),
-    renderSignInButton(ids.signIn, !!opts.signInHidden, opts.signInI18nKey),
+    renderSignInButton(ids.signIn, !!opts.signInHidden, opts.signInI18nKey, opts.handlers && opts.handlers.signIn),
     renderUserMenu(ids, opts.handlers || {}),
   ];
 
@@ -130,6 +124,10 @@ export function renderTopbar(target, options) {
 
   root.replaceChildren(topbar);
   syncTopbarControlHeights(root);
+}
+
+export function updateTopbarLanguage(lang) {
+  updateLanguagePicker(lang, { btn: 'langPickerBtn', dialog: 'langPickerDialog' });
 }
 
 export function updateTopbarUser(p) {

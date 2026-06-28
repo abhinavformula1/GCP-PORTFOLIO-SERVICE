@@ -65,8 +65,9 @@ import {
 } from './recommendations/recommendations.js';
 import {
   initSystemDesign, openSystemDesign, closeSystemDesign,
-} from './ui/software-architecture.js';
-import { renderTopbar }     from './ui/topbar.js';
+} from './ui/software-architecture.js?v=2026-06-28-force-locked-2';
+import { renderTopbar, updateTopbarLanguage } from './ui/topbar.js';
+import { renderHeaderNavIntoTopbar, setHeaderAdminVisible } from './ui/header-nav.js';
 import { renderTechFooter } from './ui/footer.js';
 import { renderAtlasShell } from './ui/atlas-shell.js';
 import { mountSponsorSlot } from './ui/sponsorship.js';
@@ -320,7 +321,8 @@ import '/assets/ui/loader.js';
 
     // Wipe any in-flight chat state so the next user starts clean
     resetChatState();
-    const chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
+    const assistantOverlay = document.getElementById('assistantOverlay');
+    const chatOpen = !!(assistantOverlay && !assistantOverlay.hasAttribute('hidden'));
     if (chatOpen) {
       forceCloseAssistant();
     }
@@ -333,17 +335,28 @@ import '/assets/ui/loader.js';
     signOut({ broadcast: false, showOverlay: false });
   });
   renderTopbar('#sharedTopbar', {
-    signInHidden: true,
+    // Show Sign in for guests by default; updateTopbarUser() will hide it for signed-in users.
+    signInHidden: false,
     signInI18nKey: 'topbarSignIn',
     handlers: {
       toggleUserMenu,
       signOut,
+      signIn: showWelcomeOverlayWithGsi,
     },
   });
 
+  renderHeaderNavIntoTopbar({
+    onHome: closeSystemDesign,
+    onSystemDesign: openSystemDesign,
+    onGetInTouch: openHireMe,
+    onReferMe: openReferMe,
+    onContactInfo: openContactInfo,
+    onAdmin: openSystemDesignAdmin,
+    onResume: generateResumePdf,
+  });
+
   function setAdminNavVisible(visible) {
-    const adminBtn = document.getElementById('systemDesignAdminBtn');
-    if (adminBtn) adminBtn.toggleAttribute('hidden', !visible);
+    setHeaderAdminVisible(visible);
   }
 
   function refreshAdminNav() {
@@ -372,6 +385,8 @@ import '/assets/ui/loader.js';
     window.open('/admin/software-architecture/', '_blank', 'noopener');
   }
   window.openSystemDesignAdmin = openSystemDesignAdmin;
+
+  // Header-nav menus are handled inside ui/header-nav.js
 
   // initGoogleSignIn → ./core/auth.js. We wrap the module function so we
   // can inject the GOOGLE_CLIENT_ID + handleGoogleSignIn callback. The
@@ -471,7 +486,8 @@ import '/assets/ui/loader.js';
         if (chatRes && chatRes.success && chatRes.chat) {
           setPendingChatHistory(chatRes.chat);
         }
-        const chatOpen = !document.getElementById('assistantOverlay').hasAttribute('hidden');
+        const assistantOverlay = document.getElementById('assistantOverlay');
+        const chatOpen = !!(assistantOverlay && !assistantOverlay.hasAttribute('hidden'));
         if (chatOpen) applyGoogleProfileToChat(profile);
 
         // Now that we know the visitor's sub, re-fetch the recommendation
@@ -524,15 +540,15 @@ import '/assets/ui/loader.js';
   // belongs at the boot layer, where we can see both modules at once.
   function setLang(lang) {
     setCurrentLang(lang);
-    const langSelect = document.getElementById('langSelect');
-    if (langSelect && langSelect.value !== lang) langSelect.value = lang;
+    try { localStorage.setItem('portfolio_lang', lang); } catch (_) {}
+    try { updateTopbarLanguage(lang); } catch (_) {}
     applyPageLang(lang);
     const teaserText = document.querySelector('.chat-teaser-text');
     const teaserCta  = document.querySelector('.chat-teaser-cta');
     if (teaserText) teaserText.textContent = t().teaserText;
     if (teaserCta)  teaserCta.textContent  = t().teaserCta;
     const overlay = document.getElementById('assistantOverlay');
-    if (!overlay.hasAttribute('hidden')) {
+    if (overlay && !overlay.hasAttribute('hidden')) {
       openAssistant();
     }
   }
@@ -568,16 +584,7 @@ import '/assets/ui/loader.js';
     sr.appendChild(style);
   }
 
-  // Wire the M3 outlined-select to setLang. Listen on `change` (fires when
-  // the user picks an option from the dropdown menu).
-  //
-  customElements.whenDefined('md-outlined-select').then(function () {
-    const langSelect = document.getElementById('langSelect');
-    if (!langSelect) return;
-    langSelect.addEventListener('change', function () {
-      setLang(langSelect.value);
-    });
-  });
+  // Language is driven by the globe icon + dialog in ui/language-picker.js.
 
   // Force breathing space inside <md-filled-button> for our two brand
   // buttons (.hire-me-btn and .hm-submit). In @material/web@1.5.1, the
@@ -616,20 +623,44 @@ import '/assets/ui/loader.js';
   // Theme toggle (light/dark): extracted to ./core/theme.js
   initTheme();
 
-  // Populate page content in default language on load
-  applyPageLang('en');
+  // Populate page content in preferred language on load
+  (function initLanguageFromStorage() {
+    let lang = 'en';
+    try {
+      const stored = localStorage.getItem('portfolio_lang');
+      if (stored) lang = stored;
+    } catch (_) {}
+    setLang(lang);
+  })();
 
   // Location popover (timezone-aware): extracted to ./ui/location.js
   initLocationPopover();
 
   // Rehydrate signed-in state from the server using the stored credential.
-  if (googleCredential) {
-    restoreSessionFromCredential(googleCredential).then(function (restored) {
-      if (!restored && !siteProfile) showWelcomeOverlayWithGsi();
-    });
-  } else {
-    showWelcomeOverlayWithGsi();
+  function shouldSkipWelcomeOverlayForLocalPreview() {
+    return fetch('/api/local-preview', { credentials: 'same-origin' })
+      .then(function (resp) { return resp.json().catch(function () { return null; }).then(function (data) { return { ok: resp.ok, data }; }); })
+      .then(function (out) {
+        const enabled = !!(out && out.ok && out.data && out.data.enabled);
+        if (!enabled) return false;
+        // In local preview mode, default to a guest session and avoid forcing sign-in.
+        if (!siteProfile) saveSiteProfile({ type: 'guest' });
+        hideWelcomeOverlay();
+        return true;
+      })
+      .catch(function () { return false; });
   }
+
+  shouldSkipWelcomeOverlayForLocalPreview().then(function (skipped) {
+    if (skipped) return;
+    if (googleCredential) {
+      restoreSessionFromCredential(googleCredential).then(function (restored) {
+        if (!restored && !siteProfile) showWelcomeOverlayWithGsi();
+      });
+    } else {
+      showWelcomeOverlayWithGsi();
+    }
+  });
 
   // Guest button on welcome overlay
   document.getElementById('welcomeGuestBtn').addEventListener('click', function () {
@@ -660,12 +691,7 @@ import '/assets/ui/loader.js';
     });
   });
 
-  // Top-bar "Sign in" button — re-opens the welcome overlay so guests can
-  // upgrade to a signed-in session at any time.
-  const topbarSignInBtn = document.getElementById('topbarSignInBtn');
-  if (topbarSignInBtn) {
-    topbarSignInBtn.addEventListener('click', showWelcomeOverlayWithGsi);
-  }
+  // Top-bar "Sign in" click handler is wired by ui/topbar.js via handlers.signIn
 
   // Init Google Sign-In once the GIS library has loaded
   if (GOOGLE_CLIENT_ID) {

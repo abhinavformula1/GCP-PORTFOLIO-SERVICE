@@ -54,7 +54,53 @@ let _userToggledSidebar = false;
 
 const SIDEBAR_COLLAPSE_KEY = 'sd_topics_collapsed';
 const LIST_FILTERS_KEY = 'sd_list_filters_v1';
+// Keep legacy key for existing sessions; now used for promo codes too.
 const PREMIUM_COUPON_KEY = 'sd_premium_coupon_v1';
+
+let _localPreviewEnabled = null;
+function closeWelcomeOverlayIfOpen() {
+  const overlay = document.getElementById('welcomeOverlay');
+  if (!overlay) return;
+  try {
+    if (typeof overlay.close === 'function') overlay.close();
+    else overlay.setAttribute('hidden', '');
+  } catch (_) {}
+}
+
+function forceLockedEnabled() {
+  try {
+    return new URLSearchParams(location.search).get('forceLocked') === '1';
+  } catch (_) {
+    return false;
+  }
+}
+
+function articlesApiUrl() {
+  return '/api/system-design/articles' + (forceLockedEnabled() ? '?forceLocked=1' : '');
+}
+async function isLocalPreviewEnabled() {
+  if (_localPreviewEnabled !== null) return _localPreviewEnabled;
+  try {
+    const resp = await fetch('/api/local-preview', { credentials: 'same-origin' });
+    const data = await resp.json().catch(function () { return null; });
+    _localPreviewEnabled = !!(resp.ok && data && data.enabled);
+  } catch (_) {
+    _localPreviewEnabled = false;
+  }
+  if (_localPreviewEnabled) {
+    // If an earlier click set subscribe-pending, clear it so the sign-in modal
+    // doesn't keep reappearing during UX work.
+    try { sessionStorage.removeItem('pending_subscribe'); } catch (_) {}
+    closeWelcomeOverlayIfOpen();
+  }
+  return _localPreviewEnabled;
+}
+
+async function authTokenOrNull() {
+  if (googleCredential) return String(googleCredential);
+  const local = await isLocalPreviewEnabled();
+  return local ? 'local-admin-preview' : '';
+}
 
 function persistListFilters() {
   try {
@@ -509,7 +555,7 @@ function renderLandingMain() {
       if (t.readMinutes) html += '<span class="sd-card-read"><span class="material-symbols-outlined">schedule</span>' + t.readMinutes + ' ' + uiText('minRead') + '</span>';
       html += '</div>';
       html += '<div class="sd-card-arrow"><span class="material-symbols-outlined">arrow_forward</span></div>';
-      if (t.tier === 'premium') html += '<span class="material-symbols-outlined sd-card-lock" aria-label="Premium">lock</span>';
+      if (t.tier === 'premium' && t.hasAccess === false) html += '<span class="material-symbols-outlined sd-card-lock" aria-label="Locked">lock</span>';
       html += '</article>';
     });
   } else {
@@ -545,7 +591,7 @@ function renderLandingMain() {
 
   _sdDetail.querySelectorAll('.sd-article-card').forEach(function (card) {
     card.addEventListener('click', function () {
-      navigate(PATH_PREFIX + '/' + card.getAttribute('data-topic-id'));
+      navigate(PATH_PREFIX + '/' + card.getAttribute('data-topic-id') + (forceLockedEnabled() ? '?forceLocked=1' : ''));
       handleRoute();
     });
   });
@@ -589,9 +635,10 @@ async function loadCmsTopics() {
   if (_cmsLoadStarted) return;
   _cmsLoadStarted = true;
   try {
+    const token = await authTokenOrNull();
     const [articlesResp] = await Promise.all([
-      fetch('/api/system-design/articles', {
-        headers: Object.assign({ Accept: 'application/json' }, googleCredential ? { Authorization: 'Bearer ' + googleCredential } : {}),
+      fetch(articlesApiUrl(), {
+        headers: Object.assign({ Accept: 'application/json' }, token ? { Authorization: 'Bearer ' + token } : {}),
         credentials: 'same-origin',
       }),
       loadTierConfig(),
@@ -696,8 +743,8 @@ function renderTopicList() {
       group += '<span class="sd-topic-title" data-i18n="' + topicKey(t.id, 'title') + '">' + escapeHtml(loc.title) + '</span>';
       group += '<span class="sd-topic-sub" data-i18n="' + topicKey(t.id, 'subtitle') + '">' + escapeHtml(loc.subtitle) + '</span>';
       group += '</span>';
-      if (t.tier === 'premium') {
-        group += '<span class="material-symbols-outlined sd-lock-icon" aria-label="Premium">lock</span>';
+      if (t.tier === 'premium' && t.hasAccess === false) {
+        group += '<span class="material-symbols-outlined sd-lock-icon" aria-label="Locked">lock</span>';
       }
       group += '</button>';
       group += '</li>';
@@ -916,8 +963,8 @@ function renderLanding() {
       // Arrow
       html += '<div class="sd-card-arrow"><span class="material-symbols-outlined">arrow_forward</span></div>';
 
-      if (t.tier === 'premium') {
-        html += '<span class="material-symbols-outlined sd-card-lock" aria-label="Premium">lock</span>';
+      if (t.tier === 'premium' && t.hasAccess === false) {
+        html += '<span class="material-symbols-outlined sd-card-lock" aria-label="Locked">lock</span>';
       }
       html += '</article>';
     });
@@ -1040,15 +1087,15 @@ function renderTopicDetail() {
     html += '<div class="sd-tier-card sd-tier-premium">';
     html += '<div class="sd-tier-card-head">';
     html += '<span class="material-symbols-outlined" aria-hidden="true">workspace_premium</span>';
-    html += '<div><h3>Premium Tier</h3><p>Unlock premium articles. Coupon optional.</p></div>';
+    html += '<div><h3>Premium Tier</h3><p>Unlock premium articles. Promo code optional.</p></div>';
     html += '</div>';
     html += iconCardsHtml(premItems, { size: 'sm' });
     html += '<button type="button" id="sdSubscribeBtn" class="sd-locked-cta">Subscribe</button>';
     html += '<button type="button" id="sdManageSubBtn" class="sd-locked-cta sd-locked-cta-secondary" hidden>Manage</button>';
     html += '<div class="sd-coupon">';
-    html += '<button type="button" class="sd-coupon-toggle" aria-expanded="false">Apply coupon</button>';
+    html += '<button type="button" class="sd-coupon-toggle" aria-expanded="false">Apply promo code</button>';
     html += '<div class="sd-coupon-form" hidden>';
-    html += '<input class="sd-coupon-input" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Enter coupon">';
+    html += '<input class="sd-coupon-input" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Enter promo code">';
     html += '<button type="button" class="sd-coupon-apply">Apply</button>';
     html += '<div class="sd-coupon-msg" aria-live="polite"></div>';
     html += '</div>';
@@ -1101,15 +1148,35 @@ function renderTopicDetail() {
     }
   }
 
+  function openPromoBox(message) {
+    if (!couponForm || !couponToggle) return;
+    couponForm.hidden = false;
+    couponToggle.setAttribute('aria-expanded', 'true');
+    if (couponMsg && message) couponMsg.textContent = message;
+    if (couponInput) {
+      try { couponInput.focus(); } catch (_) {}
+    }
+  }
+
   function openUrl(url) {
     if (!url) return;
-    try { window.open(url, '_blank', 'noopener'); } catch (_) { location.href = url; }
+    try {
+      const win = window.open(url, '_blank', 'noopener');
+      // Popup blockers often return null/undefined without throwing.
+      if (!win) location.href = url;
+    } catch (_) {
+      location.href = url;
+    }
   }
 
   async function redeemPromo(code) {
+    if (await isLocalPreviewEnabled()) {
+      return { localPreview: true, code: String(code || '').trim().toUpperCase() };
+    }
+    const token = await authTokenOrNull();
     const resp = await fetch('/api/billing/redeem-promo', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+      headers: { 'Content-Type': 'application/json', 'Authorization': token ? ('Bearer ' + token) : '' },
       credentials: 'same-origin',
       body: JSON.stringify({ code }),
     });
@@ -1122,9 +1189,17 @@ function renderTopicDetail() {
 
   async function createCheckoutSession() {
     const coupon = buyNowBtn ? String(buyNowBtn.dataset.coupon || '').trim() : '';
-    if (!googleCredential) {
+    const token = await authTokenOrNull();
+    if (!forceLockedEnabled() && await isLocalPreviewEnabled()) {
+      openPromoBox('Local preview: premium is already unlocked. No sign-in required.');
+      try { sessionStorage.removeItem('pending_subscribe'); } catch (_) {}
+      closeWelcomeOverlayIfOpen();
+      return;
+    }
+    if (!token) {
       // Prompt sign-in, then retry (best-effort).
       try { sessionStorage.setItem('pending_subscribe', '1'); } catch (_) {}
+      openPromoBox('Sign in to continue.');
       if (typeof window.showWelcomeOverlay === 'function') {
         window.showWelcomeOverlay();
       } else {
@@ -1144,7 +1219,7 @@ function renderTopicDetail() {
     }
     const resp = await fetch('/api/billing/checkout-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       credentials: 'same-origin',
       body: JSON.stringify({ plan: 'monthly', coupon }),
     });
@@ -1153,7 +1228,10 @@ function renderTopicDetail() {
       const msg = (data && (data.error || data.message)) || 'Checkout failed.';
       const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
       if (looksLikeStripeMissing) {
-        if (!coupon) throw new Error('Stripe is not configured yet. Apply a promo code to unlock premium access.');
+        if (!coupon) {
+          openPromoBox('Stripe isn’t enabled yet. Enter a promo code to unlock premium access.');
+          return;
+        }
         await redeemPromo(coupon);
         // Premium entitlements are server-side; reload to refresh gated content.
         location.reload();
@@ -1165,10 +1243,11 @@ function renderTopicDetail() {
   }
 
   async function openPortal() {
-    if (!googleCredential) return createCheckoutSession();
+    const token = await authTokenOrNull();
+    if (!token) return createCheckoutSession();
     const resp = await fetch('/api/billing/portal-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       credentials: 'same-origin',
       body: JSON.stringify({}),
     });
@@ -1193,10 +1272,13 @@ function renderTopicDetail() {
   if (buyNowBtn) {
     buyNowBtn.addEventListener('click', function () {
       buyNowBtn.disabled = true;
+      // Immediate feedback so it never feels like a dead click.
+      buyNowBtn.textContent = 'Starting…';
       createCheckoutSession().catch(function (err) {
         alert(err.message || 'Subscribe failed.');
       }).finally(function () {
         buyNowBtn.disabled = false;
+        buyNowBtn.textContent = 'Subscribe';
       });
     });
   }
@@ -1220,19 +1302,43 @@ function renderTopicDetail() {
     });
   }
 
-  function applyCoupon() {
+  async function applyCoupon() {
     if (!couponInput || !couponMsg) return;
     const code = String(couponInput.value || '').trim();
     if (!code) {
-      couponMsg.textContent = 'Enter a coupon code.';
+      couponMsg.textContent = 'Enter a promo code.';
       return;
     }
     setStoredCoupon(code);
     couponMsg.textContent = 'Applied: ' + code;
     syncBuyNowHref(code);
+
+    // Make "Apply" do something real (Meta/Stripe UX): if signed-in, redeem now.
+    const token = await authTokenOrNull();
+    if (await isLocalPreviewEnabled()) {
+      couponMsg.textContent = 'Applied locally (preview mode).';
+      try { sessionStorage.removeItem('pending_subscribe'); } catch (_) {}
+      closeWelcomeOverlayIfOpen();
+      return;
+    }
+    if (!token) {
+      openPromoBox('Sign in to apply this promo code.');
+      if (typeof window.showWelcomeOverlay === 'function') {
+        try { sessionStorage.setItem('pending_subscribe', '1'); } catch (_) {}
+        window.showWelcomeOverlay();
+      }
+      return;
+    }
+    couponMsg.textContent = 'Applying…';
+    redeemPromo(code).then(function () {
+      // Premium entitlements are server-side; reload to refresh gated content.
+      location.reload();
+    }).catch(function (err) {
+      couponMsg.textContent = (err && err.message) ? err.message : 'Promo redemption failed.';
+    });
   }
 
-  if (couponApply) couponApply.addEventListener('click', applyCoupon);
+  if (couponApply) couponApply.addEventListener('click', function () { applyCoupon(); });
   if (couponInput) {
     couponInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
@@ -1319,6 +1425,10 @@ function setView(view) {
   if (!ensureDom()) return;
   _activeView = view;
   const sysOn = view === 'sysdesign';
+  try {
+    // Reading mode: hide portfolio identity header; focus on content discovery.
+    document.documentElement.classList.toggle('sa-reading', sysOn);
+  } catch (_) {}
   const body = document.querySelector('.body');
   if (body) {
     body.classList.toggle('sd-mode', sysOn);

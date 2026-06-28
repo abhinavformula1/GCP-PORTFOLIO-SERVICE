@@ -13,8 +13,22 @@ const googleAuth = require('../services/googleAuth');
 const config = require('../config');
 const { AppError } = require('../errors');
 
+function localPreviewUser() {
+  return {
+    uid: 'local-admin-preview',
+    email: 'local-admin@localhost',
+    name: 'Local Admin Preview',
+    picture: '',
+  };
+}
+
 async function requireAuth(req, res, next) {
   try {
+    if (config.admin.localPreview) {
+      // Local UX work should not require Google auth setup.
+      req.user = localPreviewUser();
+      return next();
+    }
     const header = req.headers.authorization || '';
     const m = /^Bearer\s+(.+)$/i.exec(header);
     if (!m) throw new AppError('Missing Authorization header.', 401, 'UNAUTHORIZED');
@@ -32,6 +46,10 @@ async function requireAuth(req, res, next) {
  */
 async function optionalAuth(req, _res, next) {
   try {
+    if (config.admin.localPreview) {
+      req.user = localPreviewUser();
+      return next();
+    }
     const header = req.headers.authorization || '';
     const m = /^Bearer\s+(.+)$/i.exec(header);
     if (!m) return next();
@@ -47,12 +65,7 @@ async function optionalAuth(req, _res, next) {
 
 async function requireAdmin(req, res, next) {
   if (config.admin.localPreview) {
-    req.user = {
-      uid: 'local-admin-preview',
-      email: 'local-admin@localhost',
-      name: 'Local Admin Preview',
-      picture: '',
-    };
+    req.user = localPreviewUser();
     return next();
   }
 
