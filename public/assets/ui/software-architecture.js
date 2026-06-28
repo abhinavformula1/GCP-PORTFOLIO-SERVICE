@@ -31,6 +31,7 @@ import { blocksToHtml } from './sdblocks.js';
 import { iconCardsHtml } from './iconcards.js';
 import { mountSponsorSlot } from './sponsorship.js';
 import { showToast } from './toast.js';
+import { openBillingCheckoutModal, initBillingClaimFlow } from './billing-checkout.js';
 
 // ── Topic catalogue ──────────────────────────────────────────────────────────
 //
@@ -52,9 +53,6 @@ let _cmsLoadStarted = false;
 let _cmsLoaded   = false;
 let _tierConfig  = null;
 let _userToggledSidebar = false;
-let _stripePublishableKey = null;
-let _embeddedCheckout = null;
-let _stripeDialog = null;
 
 const SIDEBAR_COLLAPSE_KEY = 'sd_topics_collapsed';
 const LIST_FILTERS_KEY = 'sd_list_filters_v1';
@@ -79,144 +77,6 @@ function forceLockedEnabled() {
 
 function articlesApiUrl() {
   return '/api/system-design/articles' + (forceLockedEnabled() ? '?forceLocked=1' : '');
-}
-
-async function getStripePublishableKey() {
-  if (_stripePublishableKey !== null) return _stripePublishableKey;
-  try {
-    const res = await fetch('/api/billing/public-config', { credentials: 'same-origin' });
-    const data = await res.json().catch(function () { return null; });
-    _stripePublishableKey = (data && data.publishableKey) ? String(data.publishableKey) : '';
-  } catch (_) {
-    _stripePublishableKey = '';
-  }
-  return _stripePublishableKey;
-}
-
-function ensureStripeDialog() {
-  if (_stripeDialog && _stripeDialog.isConnected) return _stripeDialog;
-
-  const dlg = document.createElement('md-dialog');
-  dlg.className = 'stripe-checkout-dialog';
-  dlg.id = 'stripeCheckoutDialog';
-  dlg.innerHTML = `
-    <div slot="headline" class="stripe-checkout-head">
-      <span>Complete payment</span>
-      <button type="button" class="stripe-checkout-close" aria-label="Close">
-        <span class="material-symbols-outlined" aria-hidden="true">close</span>
-      </button>
-    </div>
-    <div slot="content" class="stripe-checkout-body">
-      <div id="stripeCheckoutMount" class="stripe-checkout-mount"></div>
-    </div>
-  `;
-  document.body.appendChild(dlg);
-
-  const closeBtn = dlg.querySelector('.stripe-checkout-close');
-  if (closeBtn) closeBtn.addEventListener('click', function () {
-    try { if (typeof dlg.close === 'function') dlg.close(); } catch (_) {}
-  });
-
-  dlg.addEventListener('close', function () {
-    try {
-      if (_embeddedCheckout && typeof _embeddedCheckout.destroy === 'function') _embeddedCheckout.destroy();
-    } catch (_) {}
-    _embeddedCheckout = null;
-    const mount = dlg.querySelector('#stripeCheckoutMount');
-    if (mount) mount.replaceChildren();
-  });
-
-  _stripeDialog = dlg;
-  return dlg;
-}
-
-async function openEmbeddedCheckout(token) {
-  const pk = await getStripePublishableKey();
-  if (!pk) {
-    showToast('Stripe publishable key is missing on this environment (set STRIPE_PUBLISHABLE_KEY).', { kind: 'error', duration: 7000 });
-    const e = new Error('Stripe publishable key missing.');
-    e.toastShown = true;
-    throw e;
-  }
-  if (!window.Stripe) {
-    showToast('Stripe.js failed to load. Please refresh and try again.', { kind: 'error' });
-    const e = new Error('Stripe.js missing.');
-    e.toastShown = true;
-    throw e;
-  }
-
-  async function fetchClientSecret() {
-    const authed = !!token;
-    const endpoint = authed ? '/api/billing/checkout-session' : '/api/billing/checkout-session-guest';
-    const headers = authed
-      ? { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
-      : { 'Content-Type': 'application/json' };
-    const resp = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      credentials: 'same-origin',
-      body: JSON.stringify({ plan: 'monthly', uiMode: 'embedded' }),
-    });
-    const data = await resp.json().catch(function () { return null; });
-    if (!resp.ok || !data || !data.clientSecret) {
-      if (resp.status === 401) {
-        // Token is expired or audience mismatch (GOOGLE_CLIENT_ID). Route user through sign-in again.
-        try { sessionStorage.setItem('pending_subscribe', '1'); } catch (_) {}
-        if (typeof window.showWelcomeOverlay === 'function') window.showWelcomeOverlay();
-        showToast('Your sign-in expired. Please sign in again.', { kind: 'warning', duration: 6000 });
-        throw new Error('Invalid Google credential.', { cause: new Error('401') });
-      }
-      const msg = (data && (data.error || data.message)) || 'Checkout failed.';
-      const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
-      if (looksLikeStripeMissing) throw new Error('Stripe billing isn’t enabled yet on this environment.');
-      throw new Error(msg);
-    }
-    return String(data.clientSecret);
-  }
-
-  const dlg = ensureStripeDialog();
-  if (typeof dlg.show === 'function') dlg.show();
-  else dlg.removeAttribute('hidden');
-
-  const stripe = window.Stripe(pk);
-  if (typeof stripe.createEmbeddedCheckoutPage === 'function') {
-    // Stripe.js (2026+) API
-    _embeddedCheckout = await stripe.createEmbeddedCheckoutPage({ fetchClientSecret });
-  } else if (typeof stripe.initEmbeddedCheckout === 'function') {
-    // Back-compat for older Stripe.js builds
-    const cs = await fetchClientSecret();
-    _embeddedCheckout = await stripe.initEmbeddedCheckout({ clientSecret: cs });
-  } else {
-    throw new Error('Embedded Checkout is not supported by this Stripe.js version.');
-  }
-  const mount = dlg.querySelector('#stripeCheckoutMount');
-  if (!mount) throw new Error('Checkout mount missing.');
-  _embeddedCheckout.mount(mount);
-}
-
-async function claimCheckoutSession(sessionId) {
-  const token = await authTokenOrNull();
-  if (!token) {
-    try { sessionStorage.setItem('pending_claim_session_id', String(sessionId || '')); } catch (_) {}
-    if (typeof window.showWelcomeOverlay === 'function') window.showWelcomeOverlay();
-    showToast('Sign in to unlock your purchase.', { kind: 'warning', duration: 6000 });
-    return false;
-  }
-  const resp = await fetch('/api/billing/claim', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    credentials: 'same-origin',
-    body: JSON.stringify({ sessionId }),
-  });
-  const data = await resp.json().catch(function () { return null; });
-  if (!resp.ok || !data || data.success !== true) {
-    const msg = (data && (data.error || data.message)) || 'Claim failed.';
-    showToast(msg, { kind: 'error', duration: 7000 });
-    return false;
-  }
-  showToast('Subscription activated. Premium is now unlocked.', { kind: 'success', duration: 6000 });
-  try { sessionStorage.removeItem('pending_claim_session_id'); } catch (_) {}
-  return true;
 }
 async function isLocalPreviewEnabled() {
   if (_localPreviewEnabled !== null) return _localPreviewEnabled;
@@ -1262,7 +1122,7 @@ function renderTopicDetail() {
   }
 
   async function createCheckoutSession() {
-    const token = await authTokenOrNull();
+    const _token = await authTokenOrNull();
     if (!forceLockedEnabled() && await isLocalPreviewEnabled()) {
       try { sessionStorage.removeItem('pending_subscribe'); } catch (_) {}
       closeWelcomeOverlayIfOpen();
@@ -1270,7 +1130,12 @@ function renderTopicDetail() {
     }
     // Modal-only UX: do NOT navigate away to Stripe-hosted pages.
     // Stripe-hosted checkout pages cannot be embedded in a modal; use Embedded Checkout instead.
-    await openEmbeddedCheckout(token);
+    await openBillingCheckoutModal({
+      plan: 'monthly',
+      openContactInfo: function () {
+        if (typeof window.openContactInfo === 'function') window.openContactInfo();
+      },
+    });
   }
 
   async function openPortal() {
@@ -1548,56 +1413,18 @@ export function initSystemDesign() {
   loadSeoConfig(); // non-blocking — updates meta tags and SITE_BASE from Firestore
   loadCmsTopics();
 
-  // Stripe embedded checkout return: stash session_id so the user can claim after sign-in.
-  try {
-    const qs = new URLSearchParams(location.search || '');
-    const checkout = qs.get('checkout');
-    const sessionId = qs.get('session_id');
-    if (checkout === 'return' && sessionId) {
-      try { sessionStorage.setItem('pending_claim_session_id', sessionId); } catch (_) {}
-      // Clean the URL (avoid leaking session id if they copy/share the link).
-      qs.delete('checkout');
-      qs.delete('session_id');
-      const clean = location.pathname + (qs.toString() ? '?' + qs.toString() : '');
-      history.replaceState({}, '', clean);
-
-      showToast('Payment received. Sign in to unlock premium on this account.', { kind: 'success', duration: 8000 });
-      if (googleCredential) {
-        claimCheckoutSession(sessionId).then(function (ok) {
-          if (ok) {
-            // Refresh the current route so premium locks disappear.
-            loadCmsTopics();
-            handleRoute();
-          }
-        }).catch(function () {});
-      } else if (typeof window.showWelcomeOverlay === 'function') {
-        window.showWelcomeOverlay();
-      }
-    }
-  } catch (_) {}
-
-  // If payment completed earlier, auto-claim once the user signs in.
-  // (Covers the case where they dismiss the sign-in prompt and come back later.)
-  try {
-    let tries = 0;
-    const timer = setInterval(function () {
-      tries += 1;
-      let pending = '';
-      try { pending = sessionStorage.getItem('pending_claim_session_id') || ''; } catch (_) {}
-      if (!pending) { clearInterval(timer); return; }
-      if (googleCredential) {
-        clearInterval(timer);
-        claimCheckoutSession(pending).then(function (ok) {
-          if (ok) {
-            loadCmsTopics();
-            handleRoute();
-          }
-        }).catch(function () {});
-        return;
-      }
-      if (tries > 180) clearInterval(timer); // ~90s
-    }, 500);
-  } catch (_) {}
+  // Billing claim flow (Stripe return_url + auto-claim after sign-in).
+  initBillingClaimFlow({
+    getCredential: function () { return googleCredential; },
+    getAuthTokenOrNull: authTokenOrNull,
+    showWelcomeOverlay: function () {
+      if (typeof window.showWelcomeOverlay === 'function') window.showWelcomeOverlay();
+    },
+    onClaimed: function () {
+      loadCmsTopics();
+      handleRoute();
+    },
+  });
 
   window.addEventListener('popstate', handleRoute);
   const observer = new MutationObserver(function () {
