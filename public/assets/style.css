@@ -294,13 +294,15 @@ md-text-button:not(:defined) { visibility: hidden; }
 /* ── Toast notifications (shared) ─────────────────────────────────────────── */
 .toast-stack {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: 16px; /* overridden dynamically by toast.js to sit below the topbar */
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   z-index: 10000;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(420px, calc(100vw - 32px));
+  width: min(920px, calc(100vw - 32px)); /* banner, but not “too much” */
   pointer-events: none;
 }
 .toast-item {
@@ -371,20 +373,62 @@ md-text-button:not(:defined) { visibility: hidden; }
 .stripe-checkout-dialog {
   --md-dialog-container-color: var(--md-sys-color-surface-container-high);
   --md-dialog-container-shape: 18px;
+  --md-dialog-headline-size: 16px;
+  --md-dialog-headline-weight: 700;
 }
 .stripe-checkout-dialog::part(container) {
   width: min(980px, 96vw);
-  max-height: min(86vh, 860px);
+  max-height: min(88vh, 900px);
 }
 .stripe-checkout-body {
-  min-height: 420px;
+  min-height: 520px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 .stripe-checkout-mount {
   flex: 1 1 auto;
-  min-height: 420px;
+  min-height: 520px;
+  overflow: auto;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.stripe-checkout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stripe-checkout-close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+  transition: background 150ms ease, color 150ms ease;
+}
+.stripe-checkout-close:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  color: var(--md-sys-color-on-surface);
+}
+.stripe-checkout-close .material-symbols-outlined { font-size: 20px; }
+
+@media (max-width: 560px) {
+  .stripe-checkout-dialog::part(container) {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+  .stripe-checkout-body,
+  .stripe-checkout-mount {
+    min-height: 72vh;
+  }
 }
 
 /* Ensure M3 dialogs (welcome/sign-in) sit above all app overlays. */

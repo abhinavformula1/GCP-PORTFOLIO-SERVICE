@@ -13,10 +13,12 @@
 
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const { FieldValue } = require('@google-cloud/firestore');
 const config = require('../config');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { ValidationError, AppError } = require('../errors');
 const { getStripe, isStripeConfigured } = require('../services/stripe');
+const firestore = require('../services/firestore');
 const billing = require('../services/billing');
 
 const router = express.Router();
@@ -76,6 +78,18 @@ const validateCheckout = [
   body('uiMode').optional().trim().isIn(['redirect', 'embedded']),
 ];
 
+const validateEmbeddedCheckout = [
+  body('priceId').optional().trim().isLength({ min: 4, max: 128 }),
+  body('plan').optional().trim().isIn(['monthly', 'yearly']),
+  body('coupon').optional().trim().isLength({ min: 1, max: 80 }),
+  body('uiMode').optional().trim().isIn(['embedded']),
+];
+
+function embeddedReturnUrl(siteUrl) {
+  const base = String(siteUrl || '').replace(/\/$/, '');
+  return `${base}/software-architecture?checkout=return&session_id={CHECKOUT_SESSION_ID}`;
+}
+
 router.post('/billing/checkout-session', requireAuth, validateCheckout, async (req, res, next) => {
   try {
     assertStripeConfigured();
@@ -123,8 +137,9 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: wantsEmbedded ? undefined : successUrl,
       cancel_url: wantsEmbedded ? undefined : cancelUrl,
-      ui_mode: wantsEmbedded ? 'embedded' : undefined,
-      return_url: wantsEmbedded ? `${siteUrl}/software-architecture?checkout=return` : undefined,
+      // Stripe UI-mode is versioned. Newer versions use `embedded_page`, older use `embedded`.
+      ui_mode: wantsEmbedded ? 'embedded_page' : undefined,
+      return_url: wantsEmbedded ? embeddedReturnUrl(siteUrl) : undefined,
       allow_promotion_codes: true,
       discounts,
       subscription_data: {
@@ -141,7 +156,23 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
       },
     };
 
-    const session = await stripe.checkout.sessions.create(sessionParams);
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create(sessionParams);
+    } catch (err) {
+      // Back-compat: older Stripe API versions reject embedded_page.
+      const msg = String(err && err.message || '');
+      const param = String(err && err.param || '');
+      if (wantsEmbedded && (param === 'ui_mode' || /ui_mode/i.test(msg))) {
+        session = await stripe.checkout.sessions.create({
+          ...sessionParams,
+          ui_mode: 'embedded',
+          return_url: embeddedReturnUrl,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     // Best-effort: store the checkout session pointer for audit/debug.
     billing.appendStripeCheckoutInitiated({ uid, email, name, sessionId: session.id, priceId }).catch(function () {});
@@ -150,6 +181,129 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
       return res.status(200).json({ success: true, clientSecret: session.client_secret });
     }
     return res.status(200).json({ success: true, url: session.url });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Guest checkout: opens embedded checkout without requiring Google sign-in.
+// After payment, the user must "claim" the subscription by signing in and
+// linking the Checkout Session to their Google account.
+router.post('/billing/checkout-session-guest', validateEmbeddedCheckout, async (req, res, next) => {
+  try {
+    assertStripeConfigured();
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new ValidationError(errors.array()[0].msg);
+
+    const plan = String(req.body.plan || '').trim();
+    const coupon = String(req.body.coupon || '').trim();
+    const priceId = String(req.body.priceId || '').trim()
+      || (plan === 'yearly' ? config.stripe.priceYearly : config.stripe.priceMonthly);
+    if (!priceId) throw new AppError('Missing Stripe price id. Set STRIPE_PRICE_MONTHLY (and optionally STRIPE_PRICE_YEARLY).', 503, 'STRIPE_PRICE_NOT_CONFIGURED');
+
+    const stripe = getStripe();
+    const siteUrl = String(config.stripe.siteUrl || '').replace(/\/$/, '');
+
+    let discounts = undefined;
+    if (coupon) {
+      try {
+        const promoList = await stripe.promotionCodes.list({ code: coupon, active: true, limit: 1 });
+        const promo = promoList && promoList.data && promoList.data[0] ? promoList.data[0] : null;
+        if (promo && promo.id) discounts = [{ promotion_code: promo.id }];
+      } catch (_) {}
+    }
+
+    const sessionParams = {
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      ui_mode: 'embedded_page',
+      return_url: embeddedReturnUrl(siteUrl),
+      allow_promotion_codes: true,
+      discounts,
+      subscription_data: {
+        metadata: { guest: '1' },
+      },
+      metadata: { guest: '1' },
+    };
+
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create(sessionParams);
+    } catch (err) {
+      const msg = String(err && err.message || '');
+      const param = String(err && err.param || '');
+      if (param === 'ui_mode' || /ui_mode/i.test(msg)) {
+        session = await stripe.checkout.sessions.create({
+          ...sessionParams,
+          ui_mode: 'embedded',
+          return_url: embeddedReturnUrl(siteUrl),
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    return res.status(200).json({ success: true, clientSecret: session.client_secret });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+const validateClaim = [
+  body('sessionId').trim().isLength({ min: 6, max: 200 }).withMessage('Missing Stripe session id.'),
+];
+
+router.post('/billing/claim', requireAuth, validateClaim, async (req, res, next) => {
+  try {
+    assertStripeConfigured();
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new ValidationError(errors.array()[0].msg);
+
+    const stripe = getStripe();
+    const uid = String(req.user?.uid || '').trim();
+    const email = String(req.user?.email || '').trim().toLowerCase();
+    if (!uid || !email) throw new AppError('Missing user identity.', 401, 'UNAUTHORIZED');
+
+    const sessionId = String(req.body.sessionId || '').trim();
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const customerId = String(session && session.customer || '').trim();
+    const subscriptionId = String(session && session.subscription || '').trim();
+    const paidEmail = String(
+      (session && session.customer_details && session.customer_details.email)
+      || (session && session.customer_email)
+      || ''
+    ).trim().toLowerCase();
+
+    if (!customerId || !subscriptionId) {
+      throw new AppError('Checkout session is not complete yet. Please try again after payment.', 409, 'CHECKOUT_NOT_COMPLETE');
+    }
+    if (!paidEmail || paidEmail !== email) {
+      throw new AppError('This Stripe checkout was completed with a different email. Please sign in with the same email used during payment.', 409, 'CHECKOUT_EMAIL_MISMATCH');
+    }
+
+    // Best-effort: tag the subscription with uid so future webhook updates can resolve ownership.
+    try {
+      await stripe.subscriptions.update(subscriptionId, {
+        metadata: { uid, email: req.user.email || '', name: req.user.name || '' },
+      });
+    } catch (_) {}
+
+    // Persist customer->uid mapping, then hydrate subscription entitlement into billingUsers.
+    await firestore.getDb().collection('billingCustomers').doc(customerId).set({
+      uid,
+      stripeCustomerId: customerId,
+      email: req.user.email || null,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    // Ensure local object has uid metadata even if update failed above.
+    if (sub && typeof sub === 'object') {
+      sub.metadata = { ...(sub.metadata || {}), uid };
+    }
+    await billing.upsertStripeSubscription(sub);
+
+    return res.status(200).json({ success: true });
   } catch (err) {
     return next(err);
   }
