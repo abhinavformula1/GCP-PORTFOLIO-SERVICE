@@ -54,8 +54,6 @@ let _userToggledSidebar = false;
 
 const SIDEBAR_COLLAPSE_KEY = 'sd_topics_collapsed';
 const LIST_FILTERS_KEY = 'sd_list_filters_v1';
-// Keep legacy key for existing sessions; now used for promo codes too.
-const PREMIUM_COUPON_KEY = 'sd_premium_coupon_v1';
 
 let _localPreviewEnabled = null;
 function closeWelcomeOverlayIfOpen() {
@@ -1087,19 +1085,11 @@ function renderTopicDetail() {
     html += '<div class="sd-tier-card sd-tier-premium">';
     html += '<div class="sd-tier-card-head">';
     html += '<span class="material-symbols-outlined" aria-hidden="true">workspace_premium</span>';
-    html += '<div><h3>Premium Tier</h3><p>Unlock premium articles. Promo code optional.</p></div>';
+    html += '<div><h3>Premium Tier</h3><p>Unlock premium articles.</p></div>';
     html += '</div>';
     html += iconCardsHtml(premItems, { size: 'sm' });
     html += '<button type="button" id="sdSubscribeBtn" class="sd-locked-cta">Subscribe</button>';
     html += '<button type="button" id="sdManageSubBtn" class="sd-locked-cta sd-locked-cta-secondary" hidden>Manage</button>';
-    html += '<div class="sd-coupon">';
-    html += '<button type="button" class="sd-coupon-toggle" aria-expanded="false">Apply promo code</button>';
-    html += '<div class="sd-coupon-form" hidden>';
-    html += '<input class="sd-coupon-input" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Enter promo code">';
-    html += '<button type="button" class="sd-coupon-apply">Apply</button>';
-    html += '<div class="sd-coupon-msg" aria-live="polite"></div>';
-    html += '</div>';
-    html += '</div>';
     html += '</div>';
 
     html += '</div>';
@@ -1115,49 +1105,9 @@ function renderTopicDetail() {
   const exportBtn = _sdDetail.querySelector('.sd-export-btn');
   if (exportBtn) exportBtn.addEventListener('click', exportCurrentTopicPdf);
 
-  // Premium gate UX: "Buy now" + progressive-disclosure coupon apply.
+  // Premium gate UX: "Subscribe" -> Stripe Checkout.
   const buyNowBtn    = _sdDetail.querySelector('#sdSubscribeBtn');
   const manageBtn    = _sdDetail.querySelector('#sdManageSubBtn');
-  const couponToggle = _sdDetail.querySelector('.sd-coupon-toggle');
-  const couponForm   = _sdDetail.querySelector('.sd-coupon-form');
-  const couponInput  = _sdDetail.querySelector('.sd-coupon-input');
-  const couponApply  = _sdDetail.querySelector('.sd-coupon-apply');
-  const couponMsg    = _sdDetail.querySelector('.sd-coupon-msg');
-
-  function getStoredCoupon() {
-    try { return String(sessionStorage.getItem(PREMIUM_COUPON_KEY) || '').trim(); } catch (_) { return ''; }
-  }
-
-  function setStoredCoupon(code) {
-    try { sessionStorage.setItem(PREMIUM_COUPON_KEY, code); } catch (_) {}
-  }
-
-  function syncBuyNowHref(code) {
-    if (buyNowBtn) buyNowBtn.dataset.coupon = code || '';
-  }
-
-  // Hydrate from session storage.
-  if (buyNowBtn) {
-    const stored = getStoredCoupon();
-    syncBuyNowHref(stored);
-    if (stored && couponInput && couponMsg && couponToggle && couponForm) {
-      couponInput.value = stored;
-      couponMsg.textContent = 'Applied: ' + stored;
-      couponForm.hidden = false;
-      couponToggle.setAttribute('aria-expanded', 'true');
-    }
-  }
-
-  function openPromoBox(message) {
-    if (!couponForm || !couponToggle) return;
-    couponForm.hidden = false;
-    couponToggle.setAttribute('aria-expanded', 'true');
-    if (couponMsg && message) couponMsg.textContent = message;
-    if (couponInput) {
-      try { couponInput.focus(); } catch (_) {}
-    }
-  }
-
   function openUrl(url) {
     if (!url) return;
     try {
@@ -1169,29 +1119,9 @@ function renderTopicDetail() {
     }
   }
 
-  async function redeemPromo(code) {
-    if (await isLocalPreviewEnabled()) {
-      return { localPreview: true, code: String(code || '').trim().toUpperCase() };
-    }
-    const token = await authTokenOrNull();
-    const resp = await fetch('/api/billing/redeem-promo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': token ? ('Bearer ' + token) : '' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ code }),
-    });
-    const data = await resp.json().catch(function () { return null; });
-    if (!resp.ok || !data || data.success === false) {
-      throw new Error((data && (data.error || data.message)) || 'Promo redemption failed.');
-    }
-    return data;
-  }
-
   async function createCheckoutSession() {
-    const coupon = buyNowBtn ? String(buyNowBtn.dataset.coupon || '').trim() : '';
     const token = await authTokenOrNull();
     if (!forceLockedEnabled() && await isLocalPreviewEnabled()) {
-      openPromoBox('Local preview: premium is already unlocked. No sign-in required.');
       try { sessionStorage.removeItem('pending_subscribe'); } catch (_) {}
       closeWelcomeOverlayIfOpen();
       return;
@@ -1199,7 +1129,6 @@ function renderTopicDetail() {
     if (!token) {
       // Prompt sign-in, then retry (best-effort).
       try { sessionStorage.setItem('pending_subscribe', '1'); } catch (_) {}
-      openPromoBox('Sign in to continue.');
       if (typeof window.showWelcomeOverlay === 'function') {
         window.showWelcomeOverlay();
       } else {
@@ -1221,21 +1150,14 @@ function renderTopicDetail() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       credentials: 'same-origin',
-      body: JSON.stringify({ plan: 'monthly', coupon }),
+      body: JSON.stringify({ plan: 'monthly' }),
     });
     const data = await resp.json().catch(function () { return null; });
     if (!resp.ok || !data || !data.url) {
       const msg = (data && (data.error || data.message)) || 'Checkout failed.';
       const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
       if (looksLikeStripeMissing) {
-        if (!coupon) {
-          openPromoBox('Stripe isn’t enabled yet. Enter a promo code to unlock premium access.');
-          return;
-        }
-        await redeemPromo(coupon);
-        // Premium entitlements are server-side; reload to refresh gated content.
-        location.reload();
-        return;
+        throw new Error('Stripe billing isn’t enabled yet on this environment.');
       }
       throw new Error(msg);
     }
@@ -1290,61 +1212,6 @@ function renderTopicDetail() {
       }).finally(function () {
         manageBtn.disabled = false;
       });
-    });
-  }
-
-  if (couponToggle && couponForm) {
-    couponToggle.addEventListener('click', function () {
-      const isOpen = !couponForm.hidden;
-      couponForm.hidden = isOpen;
-      couponToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-      if (!isOpen && couponInput) couponInput.focus();
-    });
-  }
-
-  async function applyCoupon() {
-    if (!couponInput || !couponMsg) return;
-    const code = String(couponInput.value || '').trim();
-    if (!code) {
-      couponMsg.textContent = 'Enter a promo code.';
-      return;
-    }
-    setStoredCoupon(code);
-    couponMsg.textContent = 'Applied: ' + code;
-    syncBuyNowHref(code);
-
-    // Make "Apply" do something real (Meta/Stripe UX): if signed-in, redeem now.
-    const token = await authTokenOrNull();
-    if (await isLocalPreviewEnabled()) {
-      couponMsg.textContent = 'Applied locally (preview mode).';
-      try { sessionStorage.removeItem('pending_subscribe'); } catch (_) {}
-      closeWelcomeOverlayIfOpen();
-      return;
-    }
-    if (!token) {
-      openPromoBox('Sign in to apply this promo code.');
-      if (typeof window.showWelcomeOverlay === 'function') {
-        try { sessionStorage.setItem('pending_subscribe', '1'); } catch (_) {}
-        window.showWelcomeOverlay();
-      }
-      return;
-    }
-    couponMsg.textContent = 'Applying…';
-    redeemPromo(code).then(function () {
-      // Premium entitlements are server-side; reload to refresh gated content.
-      location.reload();
-    }).catch(function (err) {
-      couponMsg.textContent = (err && err.message) ? err.message : 'Promo redemption failed.';
-    });
-  }
-
-  if (couponApply) couponApply.addEventListener('click', function () { applyCoupon(); });
-  if (couponInput) {
-    couponInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        applyCoupon();
-      }
     });
   }
   if (typeof _sdDetail.scrollIntoView === 'function') {

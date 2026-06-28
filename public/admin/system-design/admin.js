@@ -29,7 +29,6 @@ import {
 import { createComposer } from '../../assets/ui/composer.js';
 import { COMPONENT_REGISTRY, enabledBlockTypes } from '../../assets/ui/component-registry.js';
 import '../../assets/ui/loader.js';
-import { initPromotionsModule } from './modules/promotions.js';
 
 const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 
@@ -210,17 +209,6 @@ const els = {
   refreshSubscriptionsBtn: document.getElementById('refreshSubscriptionsBtn'),
   subscriptionsStatus: document.getElementById('subscriptionsStatus'),
   subscriptionsPanel: document.getElementById('subscriptionsPanel'),
-  promotionsWorkspace: document.getElementById('promotionsWorkspace'),
-  refreshPromosBtn: document.getElementById('refreshPromosBtn'),
-  newPromoBtn: document.getElementById('newPromoBtn'),
-  promosStatus: document.getElementById('promosStatus'),
-  promosPanel: document.getElementById('promosPanel'),
-  promoDrawer: document.getElementById('promoDrawer'),
-  promoDrawerTitle: document.getElementById('promoDrawerTitle'),
-  promoDrawerStatus: document.getElementById('promoDrawerStatus'),
-  closePromoDrawerBtn: document.getElementById('closePromoDrawerBtn'),
-  copyPromoBtn: document.getElementById('copyPromoBtn'),
-  savePromoBtn: document.getElementById('savePromoBtn'),
   seoSiteUrl: document.getElementById('seoSiteUrl'),
   seoSiteDescription: document.getElementById('seoSiteDescription'),
   seoOgImageUrl: document.getElementById('seoOgImageUrl'),
@@ -312,8 +300,6 @@ const els = {
   confirmPublishBtn: document.getElementById('confirmPublishBtn'),
   publishActionLabel: document.getElementById('publishActionLabel'),
 };
-
-const promotionsModule = initPromotionsModule({ els, authedJson, setSectionStatus, safeText });
 
 const SIDEBAR_COLLAPSE_KEY = 'sd_admin_sidebar_collapsed_v1';
 function setSidebarCollapsed(collapsed) {
@@ -768,8 +754,7 @@ function setActiveModule(moduleName) {
   const isAtlas    = moduleName === 'atlas-settings';
   const isAnalytics = moduleName === 'analytics';
   const isSubs = moduleName === 'subscriptions';
-  const isPromos = moduleName === 'promotions';
-  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas || isAnalytics || isSubs || isPromos;
+  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas || isAnalytics || isSubs;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
   if (els.mediaWorkspace) els.mediaWorkspace.hidden = !isMedia;
@@ -780,7 +765,6 @@ function setActiveModule(moduleName) {
   els.atlasSettingsWorkspace.hidden = !isAtlas;
   if (els.analyticsWorkspace) els.analyticsWorkspace.hidden = !isAnalytics;
   if (els.subscriptionsWorkspace) els.subscriptionsWorkspace.hidden = !isSubs;
-  if (els.promotionsWorkspace) els.promotionsWorkspace.hidden = !isPromos;
   if (isSettings) renderArticleSettings();
   if (isMedia)    renderMediaLibrary();
   if (isTier)     renderTierSettings();
@@ -790,7 +774,6 @@ function setActiveModule(moduleName) {
   if (isAtlas)    renderAtlasConfig();
   if (isAnalytics) renderAnalytics();
   if (isSubs) renderSubscriptions();
-  if (isPromos) promotionsModule && promotionsModule.render ? promotionsModule.render() : null;
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });

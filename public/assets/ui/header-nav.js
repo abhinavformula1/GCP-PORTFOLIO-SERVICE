@@ -118,6 +118,8 @@ export function renderHeaderNavIntoTopbar(opts) {
         id: 'headerMobileMenuBtn',
         'aria-label': 'Menu',
       }, [materialIcon('menu')]),
+      // Slot for topbar controls (lang/theme/sign-in/avatar) that topbar.js renders.
+      createEl('div', { className: 'header-nav-topbar-controls', id: 'headerNavTopbarControls', 'aria-label': 'Preferences' }),
       createEl('div', {
         className: 'header-nav-menu',
         id: 'headerOverflowMenu',
@@ -205,6 +207,19 @@ export function renderHeaderNavIntoTopbar(opts) {
 
   // Insert nav before the right-side topbar controls.
   topbarInner.prepend(nav);
+
+  // Move topbar-controls into header-nav-right for unified right-side grouping
+  const topbarControls = topbarInner.querySelector('.topbar-controls');
+  const headerNavRight = nav.querySelector('.header-nav-right');
+  if (topbarControls && headerNavRight) {
+    const slot = headerNavRight.querySelector('#headerNavTopbarControls');
+    // Move all control children (lang, theme, signin, avatar) into header-nav-right
+    Array.from(topbarControls.children).forEach(function(child) {
+      (slot || headerNavRight).appendChild(child);
+    });
+    // Remove empty topbar-controls container
+    topbarControls.remove();
+  }
 
   // Wire actions (use window exports already present from main.js).
   const homeBtn = nav.querySelector('.home-btn');

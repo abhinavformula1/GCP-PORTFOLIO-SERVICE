@@ -52,6 +52,22 @@ export function renderTechFooter(target, options) {
             height: '36',
           }),
         ]),
+        createEl('span', { className: 'sponsor-divider' }),
+        createEl('a', {
+          href: 'https://stripe.com',
+          target: '_blank',
+          rel: 'noopener',
+          className: 'sponsor-link sponsor-link-stripe',
+          'aria-label': 'Stripe',
+        }, [
+          createEl('img', {
+            className: 'sponsor-logo',
+            src: '/assets/img/stripe.svg',
+            alt: 'Stripe',
+            width: '112',
+            height: '34',
+          }),
+        ]),
       ]),
     ]),
     createEl('p', {
