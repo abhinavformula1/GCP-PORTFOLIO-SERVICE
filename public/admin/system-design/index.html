@@ -120,10 +120,6 @@
             <span class="material-symbols-outlined" aria-hidden="true">credit_card</span>
             <span>Subscriptions</span>
           </button>
-          <button type="button" class="sd-admin-module" data-module="promotions">
-            <span class="material-symbols-outlined" aria-hidden="true">local_offer</span>
-            <span>Promotions</span>
-          </button>
         </div>
       <!-- (removed) sidebar status card -->
     </aside>
@@ -869,70 +865,6 @@
       </div>
       <div id="subscriptionsStatus" class="sd-admin-section-status"></div>
       <div id="subscriptionsPanel" class="sd-analytics-panel"></div>
-    </section>
-
-    <!-- Promotions workspace -->
-    <section id="promotionsWorkspace" class="sd-article-settings" hidden>
-      <div class="sd-article-settings-head">
-        <div>
-          <div class="sd-admin-section-kicker">Growth</div>
-          <h2>Promotions</h2>
-          <p>Create promo codes in Firestore (no Stripe required). Redemptions are tracked and grant time-bound premium access.</p>
-        </div>
-        <div class="sd-article-settings-actions">
-          <button type="button" id="newPromoBtn" class="sd-admin-primary">
-            <span class="material-symbols-outlined" aria-hidden="true">add</span> New promo
-          </button>
-          <button type="button" id="refreshPromosBtn">
-            <span class="material-symbols-outlined" aria-hidden="true">refresh</span> Refresh
-          </button>
-        </div>
-      </div>
-      <div id="promosStatus" class="sd-admin-section-status"></div>
-      <div id="promosPanel" class="sd-analytics-panel"></div>
-
-      <!-- Promo edit drawer (same UX as Sponsorships) -->
-      <div id="promoDrawer" class="sd-sponsor-drawer" hidden>
-        <div class="sd-sponsor-drawer-head">
-          <h3 id="promoDrawerTitle">New Promo</h3>
-          <button type="button" id="closePromoDrawerBtn" aria-label="Close">
-            <span class="material-symbols-outlined" aria-hidden="true">close</span>
-          </button>
-        </div>
-        <div id="promoDrawerStatus" class="sd-admin-section-status"></div>
-        <div class="sd-sponsor-form">
-          <label class="sd-sponsor-field">
-            <span>Code <span class="sd-required">*</span></span>
-            <input id="promoCode" type="text" placeholder="LAUNCH30" maxlength="24">
-          </label>
-          <label class="sd-sponsor-field">
-            <span>Days <span class="sd-required">*</span></span>
-            <input id="promoDays" type="number" min="1" max="365" value="30">
-          </label>
-          <label class="sd-sponsor-field">
-            <span>Max redemptions <span class="sd-hint">(optional)</span></span>
-            <input id="promoMaxRedemptions" type="number" min="1" max="100000" placeholder="e.g. 200">
-          </label>
-          <div class="sd-sponsor-row">
-            <label class="sd-sponsor-field">
-              <span>Start date <span class="sd-hint">(optional)</span></span>
-              <input id="promoStartsAt" type="date">
-            </label>
-            <label class="sd-sponsor-field">
-              <span>End date <span class="sd-hint">(optional)</span></span>
-              <input id="promoExpiresAt" type="date">
-            </label>
-          </div>
-          <label class="sd-sponsor-field sd-sponsor-toggle-field">
-            <span>Active</span>
-            <input id="promoActive" type="checkbox" checked>
-          </label>
-        </div>
-        <div class="sd-sponsor-drawer-actions">
-          <button type="button" id="copyPromoBtn" class="sd-sponsor-delete-btn" style="border-color: var(--md-sys-color-outline); color: var(--text);">Copy code</button>
-          <button type="button" id="savePromoBtn" class="sd-admin-primary sd-sponsor-save-btn">Save promo</button>
-        </div>
-      </div>
     </section>
 
     </div>

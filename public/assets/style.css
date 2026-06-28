@@ -61,7 +61,8 @@
   --surface:         var(--md-sys-color-surface-container);
   --surface-2:       var(--md-sys-color-surface-container-high);
   --border:          var(--md-sys-color-outline-variant);
-  --accent:          var(--md-sys-color-primary);
+  /* Accent blue (links/headings/icons) should match primary CTAs. */
+  --accent:          var(--brand-blue);
   --accent-soft:     var(--md-sys-color-primary-container);
   --text:            var(--md-sys-color-on-surface);
   --text-secondary:  var(--md-sys-color-on-surface-variant);
@@ -69,6 +70,14 @@
   --success:         var(--md-sys-color-success);
   --tag-bg:          var(--md-sys-color-primary-container);
   --tag-text:        var(--md-sys-color-primary);
+
+  /* ── Brand ────────────────────────────────────────────────────────────────
+     One source of truth for "portfolio blue" used by primary buttons/toggles.
+     - Matches the generated-image header CTA: #01347A
+     - Original spec (kept as a reference):  #0B3A6A
+  */
+  --brand-blue: #01347A;
+  --brand-blue-original: #0B3A6A;
 
   color-scheme: dark;
 }
@@ -189,13 +198,20 @@ md-fab:not(:defined) { visibility: hidden; }
 }
 .topbar-with-header-nav .topbar-inner {
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
 }
 .topbar-with-header-nav .header-nav {
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
+  /* Stretch so right-side spacer can push icons to the edge. */
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: none;
+}
+.topbar-with-header-nav .header-nav-right {
+  margin-left: auto;
 }
 .topbar-with-header-nav {
   background: var(--surface);
@@ -204,22 +220,24 @@ md-fab:not(:defined) { visibility: hidden; }
   padding-bottom: 10px;
 }
 .topbar-with-header-nav .topbar-controls {
-  margin-left: auto;
+  margin-left: 0;
+  flex-shrink: 0;
 }
 .topbar-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 /* ── Language picker (globe icon + dialog) ───────────────────────────────── */
 .lang-picker { display: contents; }
 .lang-picker-btn {
   --md-outlined-icon-button-container-size: 40px;
-  --md-outlined-icon-button-container-shape: 10px;
-  --md-outlined-icon-button-outline-width: 1px;
-  --md-outlined-icon-button-outline-color: color-mix(in srgb, var(--md-sys-color-outline) 55%, transparent);
+  --md-outlined-icon-button-container-shape: 50%;
+  --md-outlined-icon-button-icon-size: 20px;
+  --md-outlined-icon-button-outline-color: var(--md-sys-color-outline);
   --md-outlined-icon-button-icon-color: var(--md-sys-color-on-surface-variant);
+  --md-outlined-icon-button-hover-icon-color: var(--md-sys-color-on-surface);
   /* keep quiet */
   --md-outlined-icon-button-hover-state-layer-color: transparent;
   --md-outlined-icon-button-pressed-state-layer-color: transparent;
@@ -288,7 +306,8 @@ md-dialog {
   position: relative;
 }
 .topbar-user[hidden] { display: none; }
-/* Sign-in: matches the 40px height of the language select + theme toggle
+/* Sign-in: keep guest state aligned with avatar state.
+   Sign-in: matches the 40px height of the language select + theme toggle
    for visual rhythm in the topbar. M3 outlined-button shape (8px radius)
    and on-surface-variant outline mirror the language-select chrome. */
 .topbar-signin-btn {
@@ -325,11 +344,11 @@ md-dialog {
   align-items: center;
 }
 .topbar-user-photo {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--accent);
+  border: 0;
   transition: opacity 0.15s;
 }
 .topbar-avatar-btn:hover .topbar-user-photo { opacity: 0.85; }
@@ -409,11 +428,12 @@ md-dialog {
   --md-outlined-icon-button-outline-color:                      var(--md-sys-color-outline);
   --md-outlined-icon-button-icon-color:                         var(--md-sys-color-on-surface-variant);
   --md-outlined-icon-button-hover-icon-color:                   var(--md-sys-color-on-surface);
-  --md-outlined-icon-button-selected-container-color:           var(--md-sys-color-primary);
-  --md-outlined-icon-button-selected-icon-color:                var(--md-sys-color-on-primary);
-  --md-outlined-icon-button-selected-hover-icon-color:          var(--md-sys-color-on-primary);
-  --md-outlined-icon-button-selected-focus-icon-color:          var(--md-sys-color-on-primary);
-  --md-outlined-icon-button-selected-pressed-icon-color:        var(--md-sys-color-on-primary);
+  /* Ensure selected (filled) state matches primary CTAs (Resume/Get in touch). */
+  --md-outlined-icon-button-selected-container-color:           var(--brand-blue);
+  --md-outlined-icon-button-selected-icon-color:                #ffffff;
+  --md-outlined-icon-button-selected-hover-icon-color:          #ffffff;
+  --md-outlined-icon-button-selected-focus-icon-color:          #ffffff;
+  --md-outlined-icon-button-selected-pressed-icon-color:        #ffffff;
 }
 .theme-toggle .material-symbols-outlined { font-size: 20px; }
 
@@ -585,7 +605,7 @@ a:hover { text-decoration: underline; }
 .hm-submit,
 .resume-preview-download {
   --md-filled-button-container-height: 48px;
-  --md-filled-button-container-color: #0070D2;
+  --md-filled-button-container-color: var(--brand-blue);
   --md-filled-button-label-text-color: #ffffff;
   --md-filled-button-icon-color: #ffffff;
   --md-filled-button-hover-label-text-color: #ffffff;
@@ -661,7 +681,6 @@ a:hover { text-decoration: underline; }
   gap: 24px;
   padding: 0;
   margin: 0;
-  /* Allow right-side actions to align near topbar controls */
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -688,10 +707,16 @@ a:hover { text-decoration: underline; }
 }
 .header-nav-link[aria-pressed="true"] {
   /* Matches the generated image */
-  --md-text-button-label-text-color: #01347A;
-  --md-text-button-hover-label-text-color: #01347A;
-  --md-text-button-pressed-label-text-color: #01347A;
+  --md-text-button-label-text-color: var(--brand-blue);
+  --md-text-button-hover-label-text-color: var(--brand-blue);
+  --md-text-button-pressed-label-text-color: var(--brand-blue);
   box-shadow: none;
+}
+.systemdesign-btn.header-nav-link {
+  /* Keep "Software Architecture" branded even when not active. */
+  --md-text-button-label-text-color: var(--brand-blue);
+  --md-text-button-hover-label-text-color: var(--brand-blue);
+  --md-text-button-pressed-label-text-color: var(--brand-blue);
 }
 .header-nav-link[aria-pressed="true"]::after {
   content: '';
@@ -700,20 +725,29 @@ a:hover { text-decoration: underline; }
   right: 6px;
   bottom: 4px;
   height: 2px;
-  background: #01347A;
+  background: var(--brand-blue);
   border-radius: 0;
 }
 
 .header-nav-right {
   display: flex;
   align-items: center;
-  gap: 24px;
+  justify-content: flex-end;
+  gap: 16px;
   margin-left: auto;
+  /* Take remaining width so `.header-nav-spacer` can expand. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.header-nav-topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .header-nav-download {
   /* Resume: same as Get in touch (filled). */
   --md-filled-button-container-height: 40px;
-  --md-filled-button-container-color: #01347A;
+  --md-filled-button-container-color: var(--brand-blue);
   --md-filled-button-container-shape: 10px;
   /* Slightly roomier than primary CTA (requested). */
   --md-filled-button-leading-space: 18px;
@@ -730,7 +764,7 @@ a:hover { text-decoration: underline; }
 .header-nav-primary {
   --md-filled-button-container-height: 40px;
   /* Matches the generated image */
-  --md-filled-button-container-color: #01347A;
+  --md-filled-button-container-color: var(--brand-blue);
   --md-filled-button-container-shape: 10px;
   --md-filled-button-leading-space: 14px;
   --md-filled-button-trailing-space: 14px;
@@ -757,6 +791,9 @@ a:hover { text-decoration: underline; }
   --md-outlined-icon-button-hover-state-layer-color: transparent;
   --md-outlined-icon-button-pressed-state-layer-color: transparent;
   --md-outlined-icon-button-focus-state-layer-color: transparent;
+}
+.header-nav-overflow-btn {
+  margin-left: 0;
 }
 .header-nav-hamburger { display: none; }
 
@@ -824,17 +861,37 @@ a:hover { text-decoration: underline; }
 }
 
 @media (max-width: 720px) {
+  .topbar-with-header-nav .topbar-inner {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .topbar-with-header-nav .header-nav {
+    order: 2;
+    width: 100%;
+  }
+  .topbar-with-header-nav .topbar-controls {
+    order: 1;
+    margin-left: auto;
+  }
   .header-nav { flex-wrap: wrap; }
   .header-nav-links { display: none; }
   .header-nav-overflow-btn { display: none; }
-  .header-nav-hamburger { display: inline-flex; }
-  .header-nav-right { width: 100%; flex-wrap: wrap; }
+  .header-nav-hamburger {
+    display: inline-flex;
+    order: 1;
+    margin-right: auto;
+  }
+  .header-nav-right {
+    width: 100%;
+    order: 3;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
   .header-nav-primary,
   .header-nav-download {
-    width: 100%;
+    flex: 1;
+    min-width: 140px;
   }
-  .header-nav-download { order: 2; }
-  .header-nav-primary { order: 1; }
   .header-mobile-sheet { inset: 136px 12px auto 12px; }
 }
 
@@ -1696,12 +1753,12 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
 }
 .sd-sa-collapse:hover {
   background: var(--surface);
-  border-color: color-mix(in srgb, #0070D2 35%, transparent);
-  color: #0070D2;
+  border-color: color-mix(in srgb, var(--brand-blue) 35%, transparent);
+  color: var(--brand-blue);
 }
 .sd-sa-collapse:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #0070D2 12%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-blue) 12%, transparent);
 }
 .sd-sa-collapse .material-symbols-outlined { font-size: 19px; }
 
@@ -1765,12 +1822,12 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
 }
 .sd-topics-collapse-btn:hover {
   background: var(--surface);
-  border-color: color-mix(in srgb, #0070D2 35%, transparent);
-  color: #0070D2;
+  border-color: color-mix(in srgb, var(--brand-blue) 35%, transparent);
+  color: var(--brand-blue);
 }
 .sd-topics-collapse-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #0070D2 12%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-blue) 12%, transparent);
 }
 .sd-topics-collapse-btn .material-symbols-outlined {
   font-size: 19px;
@@ -1814,11 +1871,11 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
 }
 .sd-topic-search:focus-within {
   background: var(--surface);
-  border-color: color-mix(in srgb, #0070D2 45%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, #0070D2 10%, transparent);
+  border-color: color-mix(in srgb, var(--brand-blue) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-blue) 10%, transparent);
 }
 .sd-topic-search .material-symbols-outlined {
-  color: #0070D2;
+  color: var(--brand-blue);
   font-size: 18px;
 }
 .sd-topic-search input {
@@ -1854,7 +1911,7 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
   text-align: left;
 }
 .sd-overview-link .material-symbols-outlined {
-  color: #0070D2;
+  color: var(--brand-blue);
   font-size: 19px;
 }
 .sd-overview-link:hover {
@@ -1862,9 +1919,9 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
   border-color: color-mix(in srgb, var(--md-sys-color-outline) 18%, transparent);
 }
 .sd-overview-link.sd-active {
-  background: color-mix(in srgb, #0070D2 8%, transparent);
-  border-color: color-mix(in srgb, #0070D2 35%, transparent);
-  box-shadow: inset 3px 0 0 #0070D2;
+  background: color-mix(in srgb, var(--brand-blue) 8%, transparent);
+  border-color: color-mix(in srgb, var(--brand-blue) 35%, transparent);
+  box-shadow: inset 3px 0 0 var(--brand-blue);
 }
 
 .sd-topic-list {
@@ -1945,14 +2002,14 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
   border-color: color-mix(in srgb, var(--md-sys-color-outline) 18%, transparent);
 }
 .sd-topic-item.sd-active .sd-topic-btn {
-  background: color-mix(in srgb, #0070D2 8%, transparent);
-  border-color: color-mix(in srgb, #0070D2 35%, transparent);
-  box-shadow: inset 3px 0 0 #0070D2;
+  background: color-mix(in srgb, var(--brand-blue) 8%, transparent);
+  border-color: color-mix(in srgb, var(--brand-blue) 35%, transparent);
+  box-shadow: inset 3px 0 0 var(--brand-blue);
 }
 
 .sd-topic-icon {
   font-size: 18px;
-  color: #0070D2;
+  color: var(--brand-blue);
   margin-top: 1px;
   flex-shrink: 0;
 }
@@ -2832,7 +2889,7 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
 }
 
 .sd-article-eyebrow {
-  color: #0070D2;
+  color: var(--brand-blue);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.1px;
@@ -2881,9 +2938,9 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  color: #0070D2;
-  background: color-mix(in srgb, #0070D2 8%, transparent);
-  border: 1px solid color-mix(in srgb, #0070D2 25%, transparent);
+  color: var(--brand-blue);
+  background: color-mix(in srgb, var(--brand-blue) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 25%, transparent);
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
@@ -3090,15 +3147,15 @@ figure.sd-image-block figcaption {
 }
 
 .sd-hero-block {
-  background: linear-gradient(135deg, color-mix(in srgb, #0070D2 10%, transparent), var(--surface));
-  border: 1px solid color-mix(in srgb, #0070D2 22%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand-blue) 10%, transparent), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 22%, transparent);
   border-radius: 18px;
   margin-bottom: 22px;
   padding: 22px;
 }
 
 .sd-kicker {
-  color: #0070D2;
+  color: var(--brand-blue);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 1px;
@@ -4107,6 +4164,9 @@ figure.sd-image-block figcaption {
 }
 .sponsor-link-sf .sponsor-logo {
   height: 36px;
+}
+.sponsor-link-stripe .sponsor-logo {
+  height: 28px;
 }
 /* Legacy text label, kept for safety in case any future per-brand
    render path still uses it. The current footer drops it because the

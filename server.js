@@ -32,7 +32,6 @@ const pdfRoute            = require('./src/routes/pdf');
 const printRoute          = require('./src/routes/print');
 const analyticsRoute      = require('./src/routes/analytics');
 const billingRoute        = require('./src/routes/billing');
-const promotionsRoute     = require('./src/routes/promotions');
 const { errorHandler } = require('./src/middleware/errorHandler');
 
 const app  = express();
@@ -89,7 +88,6 @@ app.use('/api', systemDesignRoute);
 app.use('/api', mediaRoute);
 app.use('/api', analyticsRoute);
 app.use('/api', billingRoute);
-app.use('/api', promotionsRoute);
 app.use('/api/pdf', pdfRoute);
 app.use('/print',   printRoute);
 
