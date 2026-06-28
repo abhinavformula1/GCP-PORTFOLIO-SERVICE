@@ -130,6 +130,27 @@ export async function openBillingCheckoutModal(deps) {
   const plan = deps && deps.plan ? String(deps.plan) : 'monthly';
   const pk = await getStripePublishableKey();
   if (!pk) {
+    // Local-dev fallback: allow redirect checkout without Stripe.js publishable key.
+    const isLocalhost = (location && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'));
+    if (isLocalhost) {
+      const resp = await fetch('/api/billing/checkout-session-guest-redirect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ plan, uiMode: 'redirect' }),
+      });
+      const data = await resp.json().catch(function () { return null; });
+      if (resp.ok && data && data.url) {
+        showToast('Opening Stripe Checkout (local dev fallback).', { kind: 'info', duration: 3500 });
+        location.href = String(data.url);
+        return;
+      }
+      showToast('Stripe publishable key missing (set STRIPE_PUBLISHABLE_KEY).', { kind: 'error', duration: 7000 });
+      const e = new Error('Stripe publishable key missing.');
+      e.toastShown = true;
+      throw e;
+    }
+
     showToast('Stripe publishable key is missing on this environment (set STRIPE_PUBLISHABLE_KEY).', { kind: 'error', duration: 7000 });
     const e = new Error('Stripe publishable key missing.');
     e.toastShown = true;
