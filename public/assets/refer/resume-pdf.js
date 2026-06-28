@@ -572,9 +572,12 @@ function clearPreviewState() {
  * clicks Download (→ `downloadResumePdf`) or Close (→ `closeResumePreview`).
  *
  * Manages the trigger button's loading state during generation.
- * Errors surface as a single user-visible alert; everything else is
+ * Errors surface as a single user-visible toast; everything else is
  * silent so we don't spam the console for non-developers.
  */
+
+import { showToast } from '../ui/toast.js';
+
 export function generateResumePdf() {
   const btn = document.querySelector('.download-resume-btn');
   const lbl = btn && btn.querySelector('[data-i18n="downloadResume"]');
@@ -594,7 +597,10 @@ export function generateResumePdf() {
     })
     .catch(function (err) {
       console.error('[resume] generation failed:', err);
-      alert('Sorry — resume generation failed. Please try again, or use the Refer Me option to share my profile.');
+      showToast('Sorry — resume generation failed. Please try again, or use the Refer Me option to share my profile.', {
+        kind: 'error',
+        duration: 7000,
+      });
     })
     .then(function () {
       if (lbl) lbl.textContent = origLabel || 'Download Resume';

@@ -30,6 +30,7 @@ import { googleCredential, siteProfile } from '../core/state.js';
 import { blocksToHtml } from './sdblocks.js';
 import { iconCardsHtml } from './iconcards.js';
 import { mountSponsorSlot } from './sponsorship.js';
+import { showToast } from './toast.js';
 
 // ── Topic catalogue ──────────────────────────────────────────────────────────
 //
@@ -1132,7 +1133,7 @@ function renderTopicDetail() {
       if (typeof window.showWelcomeOverlay === 'function') {
         window.showWelcomeOverlay();
       } else {
-        alert('Please sign in first.');
+        showToast('Please sign in first.', { kind: 'warning' });
       }
       let tries = 0;
       const timer = setInterval(function () {
@@ -1197,7 +1198,7 @@ function renderTopicDetail() {
       // Immediate feedback so it never feels like a dead click.
       buyNowBtn.textContent = 'Starting…';
       createCheckoutSession().catch(function (err) {
-        alert(err.message || 'Subscribe failed.');
+        showToast(err.message || 'Subscribe failed.', { kind: 'error' });
       }).finally(function () {
         buyNowBtn.disabled = false;
         buyNowBtn.textContent = 'Subscribe';
@@ -1208,7 +1209,7 @@ function renderTopicDetail() {
     manageBtn.addEventListener('click', function () {
       manageBtn.disabled = true;
       openPortal().catch(function (err) {
-        alert(err.message || 'Billing portal failed.');
+        showToast(err.message || 'Billing portal failed.', { kind: 'error' });
       }).finally(function () {
         manageBtn.disabled = false;
       });
@@ -1267,7 +1268,7 @@ function exportCurrentTopicPdf() {
     .catch(function (err) {
        
       console.error('[PDF export]', err);
-      alert('PDF generation failed: ' + err.message);
+      showToast('PDF generation failed: ' + err.message, { kind: 'error', duration: 7000 });
     })
     .finally(function () {
       if (btn) {

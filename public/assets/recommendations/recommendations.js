@@ -40,6 +40,7 @@ import {
   myRecommendation, setMyRecommendation,
 } from '../core/state.js';
 import { PAGE_LANG, currentLang } from '../core/i18n.js';
+import { showToast } from '../ui/toast.js';
 
 // Resolve a single i18n string for the active language with fallback to
 // English. Used for the kebab/confirm/button labels — duplicated here
@@ -532,7 +533,7 @@ export function openLeaveRecommendation() {
       welcome.show();
       return;
     }
-    alert('Please sign in with Google first to leave a recommendation.');
+    showToast('Please sign in with Google first to leave a recommendation.', { kind: 'warning' });
     return;
   }
 
