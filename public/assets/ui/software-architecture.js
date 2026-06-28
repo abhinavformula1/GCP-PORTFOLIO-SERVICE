@@ -52,6 +52,9 @@ let _cmsLoadStarted = false;
 let _cmsLoaded   = false;
 let _tierConfig  = null;
 let _userToggledSidebar = false;
+let _stripePublishableKey = null;
+let _embeddedCheckout = null;
+let _stripeDialog = null;
 
 const SIDEBAR_COLLAPSE_KEY = 'sd_topics_collapsed';
 const LIST_FILTERS_KEY = 'sd_list_filters_v1';
@@ -76,6 +79,91 @@ function forceLockedEnabled() {
 
 function articlesApiUrl() {
   return '/api/system-design/articles' + (forceLockedEnabled() ? '?forceLocked=1' : '');
+}
+
+async function getStripePublishableKey() {
+  if (_stripePublishableKey !== null) return _stripePublishableKey;
+  try {
+    const res = await fetch('/api/billing/public-config', { credentials: 'same-origin' });
+    const data = await res.json().catch(function () { return null; });
+    _stripePublishableKey = (data && data.publishableKey) ? String(data.publishableKey) : '';
+  } catch (_) {
+    _stripePublishableKey = '';
+  }
+  return _stripePublishableKey;
+}
+
+function ensureStripeDialog() {
+  if (_stripeDialog && _stripeDialog.isConnected) return _stripeDialog;
+
+  const dlg = document.createElement('md-dialog');
+  dlg.className = 'stripe-checkout-dialog';
+  dlg.id = 'stripeCheckoutDialog';
+  dlg.innerHTML = `
+    <div slot="headline">Complete payment</div>
+    <div slot="content" class="stripe-checkout-body">
+      <div id="stripeCheckoutMount" class="stripe-checkout-mount"></div>
+    </div>
+    <div slot="actions">
+      <md-text-button id="stripeCheckoutCloseBtn">Close</md-text-button>
+    </div>
+  `;
+  document.body.appendChild(dlg);
+
+  const closeBtn = dlg.querySelector('#stripeCheckoutCloseBtn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function () {
+      try { if (typeof dlg.close === 'function') dlg.close(); } catch (_) {}
+    });
+  }
+
+  dlg.addEventListener('close', function () {
+    try {
+      if (_embeddedCheckout && typeof _embeddedCheckout.destroy === 'function') _embeddedCheckout.destroy();
+    } catch (_) {}
+    _embeddedCheckout = null;
+    const mount = dlg.querySelector('#stripeCheckoutMount');
+    if (mount) mount.replaceChildren();
+  });
+
+  _stripeDialog = dlg;
+  return dlg;
+}
+
+async function openEmbeddedCheckout(token) {
+  const pk = await getStripePublishableKey();
+  if (!pk) {
+    showToast('Stripe publishable key is missing on this environment (set STRIPE_PUBLISHABLE_KEY).', { kind: 'error', duration: 7000 });
+    throw new Error('Stripe publishable key missing.');
+  }
+  if (!window.Stripe) {
+    showToast('Stripe.js failed to load. Please refresh and try again.', { kind: 'error' });
+    throw new Error('Stripe.js missing.');
+  }
+
+  const resp = await fetch('/api/billing/checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    credentials: 'same-origin',
+    body: JSON.stringify({ plan: 'monthly', uiMode: 'embedded' }),
+  });
+  const data = await resp.json().catch(function () { return null; });
+  if (!resp.ok || !data || !data.clientSecret) {
+    const msg = (data && (data.error || data.message)) || 'Checkout failed.';
+    const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
+    if (looksLikeStripeMissing) throw new Error('Stripe billing isn’t enabled yet on this environment.');
+    throw new Error(msg);
+  }
+
+  const dlg = ensureStripeDialog();
+  if (typeof dlg.show === 'function') dlg.show();
+  else dlg.removeAttribute('hidden');
+
+  const stripe = window.Stripe(pk);
+  _embeddedCheckout = await stripe.initEmbeddedCheckout({ clientSecret: data.clientSecret });
+  const mount = dlg.querySelector('#stripeCheckoutMount');
+  if (!mount) throw new Error('Checkout mount missing.');
+  _embeddedCheckout.mount(mount);
 }
 async function isLocalPreviewEnabled() {
   if (_localPreviewEnabled !== null) return _localPreviewEnabled;
@@ -1147,22 +1235,28 @@ function renderTopicDetail() {
       }, 250);
       return;
     }
-    const resp = await fetch('/api/billing/checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      credentials: 'same-origin',
-      body: JSON.stringify({ plan: 'monthly' }),
-    });
-    const data = await resp.json().catch(function () { return null; });
-    if (!resp.ok || !data || !data.url) {
-      const msg = (data && (data.error || data.message)) || 'Checkout failed.';
-      const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
-      if (looksLikeStripeMissing) {
-        throw new Error('Stripe billing isn’t enabled yet on this environment.');
+    // Preferred UX: Embedded Checkout in a modal. Fallback: redirect checkout.
+    try {
+      await openEmbeddedCheckout(token);
+      return;
+    } catch (err) {
+      const resp = await fetch('/api/billing/checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        credentials: 'same-origin',
+        body: JSON.stringify({ plan: 'monthly', uiMode: 'redirect' }),
+      });
+      const data = await resp.json().catch(function () { return null; });
+      if (!resp.ok || !data || !data.url) {
+        const msg = (data && (data.error || data.message)) || (err && err.message) || 'Checkout failed.';
+        const looksLikeStripeMissing = resp.status === 503 && /stripe/i.test(msg);
+        if (looksLikeStripeMissing) {
+          throw new Error('Stripe billing isn’t enabled yet on this environment.', { cause: err });
+        }
+        throw new Error(msg, { cause: err });
       }
-      throw new Error(msg);
+      openUrl(data.url);
     }
-    openUrl(data.url);
   }
 
   async function openPortal() {

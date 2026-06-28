@@ -367,6 +367,26 @@ md-text-button:not(:defined) { visibility: hidden; }
 }
 .toast-success .toast-icon { color: var(--md-sys-color-success, #16a34a); }
 
+/* ── Stripe embedded checkout modal ─────────────────────────────────────── */
+.stripe-checkout-dialog {
+  --md-dialog-container-color: var(--md-sys-color-surface-container-high);
+  --md-dialog-container-shape: 18px;
+}
+.stripe-checkout-dialog::part(container) {
+  width: min(980px, 96vw);
+  max-height: min(86vh, 860px);
+}
+.stripe-checkout-body {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stripe-checkout-mount {
+  flex: 1 1 auto;
+  min-height: 420px;
+}
+
 /* Ensure M3 dialogs (welcome/sign-in) sit above all app overlays. */
 md-dialog {
   position: fixed;
