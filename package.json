@@ -7,6 +7,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "dev:preview": "ADMIN_LOCAL_PREVIEW=true node server.js",
+    "stripe:listen": "bash scripts/stripe-listen.sh",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "content:publish-system-design": "node scripts/publish-system-design-article.js",

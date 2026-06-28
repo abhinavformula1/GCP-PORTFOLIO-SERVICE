@@ -17,6 +17,7 @@ const adminConfig = require('../services/adminConfig');
 const billing = require('../services/billing');
 const contactPolicy = require('../services/contactPolicy');
 const sponsorships = require('../services/sponsorships');
+const localPreviewContent = require('../services/localPreviewContent');
 const { generateChatResponse } = require('../services/gemini');
 const { ValidationError } = require('../errors');
 
@@ -264,9 +265,10 @@ function sanitisePremiumArticle(article) {
 
 router.get('/system-design/articles', optionalAuth, async (req, res) => {
   try {
+    const forceLocked = config.admin.localPreview && String(req.query.forceLocked || '') === '1';
     const uid = String(req.user?.uid || '').trim();
     const entitlement = uid ? await billing.getUserSubscriptionEntitlement(uid) : { active: false };
-    const canAccessPremium = !!entitlement.active;
+    const canAccessPremium = forceLocked ? false : (config.admin.localPreview ? true : !!entitlement.active);
 
     const articles = await firestore.listPublishedSystemDesignArticles();
     const safe = (Array.isArray(articles) ? articles : []).map(function (a) {
@@ -280,6 +282,24 @@ router.get('/system-design/articles', optionalAuth, async (req, res) => {
     return res.status(200).json({ success: true, articles: safe });
   } catch (err) {
     console.warn('[system-design] Firestore list failed:', err.message);
+    if (config.admin.localPreview) {
+      const forceLocked = String(req.query.forceLocked || '') === '1';
+      const canAccessPremium = true;
+      const articles = localPreviewContent.getLocalPreviewArticles();
+      const safe = articles.map(function (a) {
+        const tier = String(a?.tier || '').trim().toLowerCase();
+        const premium = tier === 'premium';
+        const hasAccess = forceLocked ? false : (!premium || canAccessPremium);
+        const out = hasAccess ? a : sanitisePremiumArticle(a);
+        return Object.assign({}, out, { hasAccess });
+      });
+      return res.status(200).json({
+        success: true,
+        articles: safe,
+        degraded: true,
+        degradedReason: 'FIRESTORE_NOT_CONFIGURED',
+      });
+    }
     return res.status(200).json({ success: true, articles: [], degraded: true });
   }
 });
@@ -291,9 +311,10 @@ router.get('/system-design/articles/:id', optionalAuth, async (req, res) => {
     const tier = String(article?.tier || '').trim().toLowerCase();
     const premium = tier === 'premium';
     if (premium) {
+      const forceLocked = config.admin.localPreview && String(req.query.forceLocked || '') === '1';
       const uid = String(req.user?.uid || '').trim();
       const entitlement = uid ? await billing.getUserSubscriptionEntitlement(uid) : { active: false };
-      const hasAccess = !!entitlement.active;
+      const hasAccess = forceLocked ? false : (config.admin.localPreview ? true : !!entitlement.active);
       const out = hasAccess ? article : sanitisePremiumArticle(article);
       res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
       return res.status(200).json({ success: true, article: Object.assign({}, out, { hasAccess }) });
@@ -302,6 +323,19 @@ router.get('/system-design/articles/:id', optionalAuth, async (req, res) => {
     return res.status(200).json({ success: true, article });
   } catch (err) {
     console.warn('[system-design] Firestore read failed:', err.message);
+    if (config.admin.localPreview) {
+      const article = localPreviewContent.getLocalPreviewArticle(req.params.id);
+      if (!article) return res.status(404).json({ success: false, error: 'Article not found.' });
+      const tier = String(article?.tier || '').trim().toLowerCase();
+      const premium = tier === 'premium';
+      if (premium) {
+        const forceLocked = String(req.query.forceLocked || '') === '1';
+        const hasAccess = forceLocked ? false : true;
+        const out = hasAccess ? article : sanitisePremiumArticle(article);
+        return res.status(200).json({ success: true, article: Object.assign({}, out, { hasAccess }), degraded: true });
+      }
+      return res.status(200).json({ success: true, article, degraded: true });
+    }
     return res.status(503).json({ success: false, error: 'System Design content is unavailable.' });
   }
 });
@@ -311,6 +345,18 @@ router.get('/admin/system-design/articles', requireAdmin, async (_req, res, next
     const articles = await firestore.listSystemDesignArticles();
     return res.status(200).json({ success: true, articles });
   } catch (err) {
+    // Local preview mode is used to iterate on UX without requiring live GCP
+    // credentials. If Firestore isn't configured locally, degrade gracefully
+    // so the admin UI still loads.
+    if (config.admin.localPreview) {
+      console.warn('[admin] Firestore unavailable in local preview:', err.message);
+      return res.status(200).json({
+        success: true,
+        articles: [],
+        degraded: true,
+        degradedReason: 'FIRESTORE_NOT_CONFIGURED',
+      });
+    }
     return next(err);
   }
 });

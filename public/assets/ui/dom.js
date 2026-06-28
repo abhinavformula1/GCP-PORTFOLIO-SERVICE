@@ -19,6 +19,8 @@ export function createEl(tag, attrs, children) {
       el.id = value;
     } else if (key === 'slot') {
       el.slot = value;
+    } else if (key === 'type') {
+      el.type = value;
     } else if (key === 'value') {
       el.value = value;
     } else if (key === 'title') {
@@ -51,6 +53,8 @@ export function createEl(tag, attrs, children) {
       el.ariaModal = value;
     } else if (key === 'role') {
       el.role = value;
+    } else if (key.startsWith('aria-') || key.startsWith('data-')) {
+      el.setAttribute(key, String(value));
     } else if (key === 'data-i18n') {
       el.dataset.i18n = value;
     }

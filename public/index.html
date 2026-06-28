@@ -83,7 +83,7 @@
   <!-- Hide icon ligature text until Material Symbols font is ready (anti-FOUC) -->
   <style>.material-symbols-outlined{visibility:hidden}.fonts-loaded .material-symbols-outlined{visibility:visible}</style>
 
-  <link rel="stylesheet" href="/assets/style.css" />
+  <link rel="stylesheet" href="/assets/style.css?v=2026-06-28-header-nav-19" />
 
   <!-- ── Google AdSense ──
        Managed from Admin → SEO & AEO → Google AdSense Publisher ID.
@@ -220,67 +220,6 @@
             <span data-i18n="contactInfo">Contact info</span>
           </button>
         </div>
-        <div class="hero-actions">
-          <md-outlined-button class="home-btn" aria-label="Home" aria-pressed="true"
-            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
-            onclick="window.closeSystemDesign && window.closeSystemDesign()">
-            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">home</span>
-            <span data-i18n="home">Home</span>
-          </md-outlined-button>
-          <md-outlined-button class="hire-me-btn hire-me-btn-neutral" aria-label="Get in touch"
-            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
-            onclick="window.openHireMe && window.openHireMe()">
-            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">waving_hand</span>
-            <span data-i18n="getInTouch">Get In Touch</span>
-          </md-outlined-button>
-          <!-- "Refer Me" — secondary CTA. Pure client-side: the modal hands
-               the visitor a ready-to-send email body and a one-click resume
-               download. Sending happens from the visitor's own email account
-               so we don't become an outbound spam vector and don't need a
-               verified sender domain. The Recommendations feature already
-               carries the SF integration narrative; this stays deliberately
-               backend-free. -->
-          <md-outlined-button class="refer-btn" aria-label="Refer me"
-            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
-            onclick="window.openReferMe && window.openReferMe()">
-            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">forward_to_inbox</span>
-            <span data-i18n="referMe">Refer Me</span>
-          </md-outlined-button>
-          <!-- "Software Architecture" — tertiary CTA that swaps the body into a
-               master/detail topic browser (architecture write-ups + worked
-               examples). Pure client-side: the resume DOM is hidden, not
-               removed, so the Download Resume button still works while in
-               this view. Uses clean History API URLs (/software-architecture/<id>)
-               for shareable deep links. Legacy hash URLs (#/system-design/<id>)
-               are redirected on load for backwards compatibility. -->
-          <md-outlined-button class="systemdesign-btn" aria-label="Software Architecture" aria-pressed="false"
-            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
-            onclick="window.openSystemDesign && window.openSystemDesign()">
-            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">account_tree</span>
-            <span data-i18n="systemDesign">Software Architecture</span>
-          </md-outlined-button>
-          <md-outlined-button class="admin-btn" id="systemDesignAdminBtn" aria-label="Admin" hidden
-            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.click();}"
-            onclick="window.openSystemDesignAdmin && window.openSystemDesignAdmin()">
-            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">admin_panel_settings</span>
-            <span>Admin</span>
-          </md-outlined-button>
-          <!-- Direct resume download — no form, no friction. Highest-frequency
-               recruiter action; placing it inline in the hero converts more
-               than hiding it behind a modal.
-               The PDF is built at click time from this very page's DOM
-               (see generateResumePdf in main.js) — no static asset to keep
-               in sync, and language toggle (EN/FR) carries through. -->
-          <button type="button" class="download-resume-btn"
-            onclick="window.generateResumePdf && window.generateResumePdf()">
-            <span class="material-symbols-outlined" aria-hidden="true">download</span>
-            <span data-i18n="downloadResume">Download Resume</span>
-          </button>
-        </div>
-      </div>
-      <div class="exp-badge">
-        <div class="years">12+</div>
-        <div class="label" data-i18n="yearsExp">Years Experience</div>
       </div>
     </header>
 
@@ -918,7 +857,7 @@
   <!-- type="module" enables ES `import`/`export` so main.js can pull in
        focused modules under /assets/{core,ui,chat,refer,recommendations}/.
        Modules are deferred by spec — no need for an explicit `defer`. -->
-  <script type="module" src="/assets/main.js?v=2026-06-27-analytics-1"></script>
+  <script type="module" src="/assets/main.js?v=2026-06-28-systemdesign-fix-3"></script>
 
 </body>
 
