@@ -46,6 +46,7 @@ router.get('/billing/status', (_req, res) => {
     stripe: {
       configured: isStripeConfigured(),
       secretKeySet: !!config.stripe.secretKey,
+      publishableKeySet: !!config.stripe.publishableKey,
       mode,
       webhookSecretSet: !!config.stripe.webhookSecret,
       priceMonthlySet: !!config.stripe.priceMonthly,
@@ -60,10 +61,19 @@ router.get('/billing/status', (_req, res) => {
   });
 });
 
+// Public (no auth): exposes the minimum Stripe config needed by the frontend.
+router.get('/billing/public-config', (_req, res) => {
+  return res.status(200).json({
+    success: true,
+    publishableKey: config.stripe.publishableKey || '',
+  });
+});
+
 const validateCheckout = [
   body('priceId').optional().trim().isLength({ min: 4, max: 128 }),
   body('plan').optional().trim().isIn(['monthly', 'yearly']),
   body('coupon').optional().trim().isLength({ min: 1, max: 80 }),
+  body('uiMode').optional().trim().isIn(['redirect', 'embedded']),
 ];
 
 router.post('/billing/checkout-session', requireAuth, validateCheckout, async (req, res, next) => {
@@ -104,13 +114,17 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
       }
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const uiMode = String(req.body.uiMode || 'redirect').trim();
+    const wantsEmbedded = uiMode === 'embedded';
+    const sessionParams = {
       mode: 'subscription',
       client_reference_id: uid,
       customer_email: email || undefined,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
+      success_url: wantsEmbedded ? undefined : successUrl,
+      cancel_url: wantsEmbedded ? undefined : cancelUrl,
+      ui_mode: wantsEmbedded ? 'embedded' : undefined,
+      return_url: wantsEmbedded ? `${siteUrl}/software-architecture?checkout=return` : undefined,
       allow_promotion_codes: true,
       discounts,
       subscription_data: {
@@ -125,11 +139,16 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
         email: email || '',
         name: name || '',
       },
-    });
+    };
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     // Best-effort: store the checkout session pointer for audit/debug.
     billing.appendStripeCheckoutInitiated({ uid, email, name, sessionId: session.id, priceId }).catch(function () {});
 
+    if (wantsEmbedded) {
+      return res.status(200).json({ success: true, clientSecret: session.client_secret });
+    }
     return res.status(200).json({ success: true, url: session.url });
   } catch (err) {
     return next(err);
