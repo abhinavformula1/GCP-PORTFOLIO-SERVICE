@@ -291,6 +291,82 @@ md-icon-button:not(:defined),
 md-outlined-icon-button:not(:defined),
 md-text-button:not(:defined) { visibility: hidden; }
 
+/* ── Toast notifications (shared) ─────────────────────────────────────────── */
+.toast-stack {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast-item {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 20px 1fr 32px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 26%, transparent);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.toast-item.toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast-item.toast-out {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.toast-icon {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.toast-text {
+  font-size: 13px;
+  line-height: 1.35;
+}
+.toast-close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+  transition: background 150ms ease, color 150ms ease;
+}
+.toast-close:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  color: var(--md-sys-color-on-surface);
+}
+.toast-error {
+  border-color: color-mix(in srgb, var(--md-sys-color-error) 38%, transparent);
+}
+.toast-error .toast-icon { color: var(--md-sys-color-error); }
+.toast-warning {
+  border-color: color-mix(in srgb, #f59e0b 46%, transparent);
+}
+.toast-warning .toast-icon { color: #f59e0b; }
+.toast-success {
+  border-color: color-mix(in srgb, var(--md-sys-color-success, #16a34a) 38%, transparent);
+}
+.toast-success .toast-icon { color: var(--md-sys-color-success, #16a34a); }
+
 /* Ensure M3 dialogs (welcome/sign-in) sit above all app overlays. */
 md-dialog {
   position: fixed;
