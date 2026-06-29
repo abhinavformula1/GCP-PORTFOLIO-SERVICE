@@ -129,10 +129,6 @@ function resolveWithPolicy(viewer, policy) {
  *   matchedDomain: string | null
  * }}
  */
-function resolveContactView(viewer) {
-  return resolveWithPolicy(viewer, defaultPolicy());
-}
-
 async function getContactPolicyConfig() {
   if (canUseLocalDefaults()) {
     return {
@@ -187,10 +183,8 @@ async function resolveContactViewAsync(viewer) {
 }
 
 module.exports = {
-  resolveContactView,
   resolveContactViewAsync,
   getContactPolicyConfig,
   normaliseDomains,
   normaliseEmails,
-  domainOf,
 };

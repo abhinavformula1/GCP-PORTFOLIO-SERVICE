@@ -10,39 +10,13 @@
  * via `htmlToBlocks`, with an `html` fallback block so nothing is ever lost.
  */
 
-export const BLOCK_DEFS = [
-  { type: 'heading',    label: 'Heading',        icon: 'title',          hint: 'Section heading (e.g. Problem, Solution).' },
-  { type: 'paragraph',  label: 'Paragraph',      icon: 'notes',          hint: 'A block of prose. Supports **bold**, _italic_, `code`.' },
-  { type: 'bullets',    label: 'Bullet list',    icon: 'format_list_bulleted', hint: 'A list of points, one per line.' },
-  { type: 'hero',       label: 'Selected design', icon: 'stars',         hint: 'Highlighted summary with a decision grid.' },
-  { type: 'cards',      label: 'Info cards',     icon: 'grid_view',      hint: 'Titled cards, e.g. design goals.' },
-  { type: 'flow',       label: 'Flow',           icon: 'linear_scale',   hint: 'Left-to-right steps, e.g. trust boundaries.' },
-  { type: 'comparison', label: 'Comparison',     icon: 'compare_arrows', hint: 'Options with a status and verdict.' },
-  { type: 'sequence',   label: 'Sequence',       icon: 'format_list_numbered', hint: 'Numbered steps for an architecture flow.' },
-  { type: 'matrix',     label: 'Matrix table',   icon: 'table_rows',     hint: 'Key/value rows, e.g. security properties.' },
-  { type: 'risks',      label: 'Risk grid',      icon: 'warning',        hint: 'Risk cards with a severity level.' },
-  { type: 'code',       label: 'Code block',     icon: 'terminal',       hint: 'A code snippet with syntax language label.' },
-  { type: 'image',      label: 'Image',          icon: 'image',          hint: 'Upload a JPEG, PNG, GIF, WebP or SVG with alt text and caption.' },
-  { type: 'html',       label: 'Custom HTML',    icon: 'code',           hint: 'Advanced: raw HTML preserved as-is.' },
-];
-
 const RISK_LEVELS = ['low', 'medium', 'high'];
-
-export function blockLabel(type) {
-  const def = BLOCK_DEFS.find(function (item) { return item.type === type; });
-  return def ? def.label : 'Block';
-}
-
-export function blockIcon(type) {
-  const def = BLOCK_DEFS.find(function (item) { return item.type === type; });
-  return def ? def.icon : 'widgets';
-}
 
 function uid() {
   return 'block-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 }
 
-export function newBlock(type) {
+function newBlock(type) {
   const base = { id: uid(), type };
   switch (type) {
     case 'heading':    return Object.assign(base, { text: '' });
@@ -245,31 +219,6 @@ export function blockToHtml(block) {
 export function blocksToHtml(blocks) {
   if (!Array.isArray(blocks)) return '';
   return blocks.map(blockToHtml).filter(Boolean).join('');
-}
-
-// ── Plain-text summary (for read-only cards / search) ──────────────────────────
-
-export function blockSummary(block) {
-  if (!block) return '';
-  switch (block.type) {
-    case 'heading':   return cleanText(block.heading || block.text);
-    case 'paragraph': return cleanText(block.text);
-    case 'bullets':   return (block.items || []).map(cleanText).filter(Boolean).join(' · ');
-    case 'hero':      return cleanText(block.heading || block.text || block.kicker);
-    case 'cards':     return (block.items || []).map(function (i) { return cleanText(i.title); }).filter(Boolean).join(' · ');
-    case 'flow':      return (block.steps || []).map(cleanText).filter(Boolean).join(' → ');
-    case 'comparison':return (block.rows || []).map(function (r) { return cleanText(r.title); }).filter(Boolean).join(' · ');
-    case 'sequence':  return (block.steps || []).map(cleanText).filter(Boolean).join(' · ');
-    case 'matrix':    return (block.rows || []).map(function (r) {
-      const cells = matrixRowCells(r);
-      return cleanText(cells[0]);
-    }).filter(Boolean).join(' · ');
-    case 'risks':     return (block.items || []).map(function (i) { return cleanText(i.title); }).filter(Boolean).join(' · ');
-    case 'code':      return (block.code || '').split('\n')[0].slice(0, 60) || (block.lang || 'code') + ' snippet';
-    case 'image':     return block.alt || block.caption || 'Image';
-    case 'html':      return 'Custom HTML block';
-    default:          return '';
-  }
 }
 
 // ── HTML → blocks (migration of legacy rich articles) ──────────────────────────

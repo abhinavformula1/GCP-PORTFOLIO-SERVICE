@@ -68,8 +68,9 @@ import {
 import {
   initSystemDesign, openSystemDesign, closeSystemDesign,
 } from './ui/software-architecture.js?v=2026-06-28-force-locked-2';
-import { renderTopbar, updateTopbarLanguage } from './ui/topbar.js';
-import { renderHeaderNavIntoTopbar, setHeaderAdminVisible } from './ui/header-nav.js';
+import { updateTopbarLanguage } from './ui/topbar.js';
+import { setHeaderAdminVisible } from './ui/header-nav.js';
+import { renderAppHeader } from './ui/app-header.js?v=2026-06-29-nav-align-1';
 import { renderTechFooter } from './ui/footer.js';
 import { renderAtlasShell } from './ui/atlas-shell.js';
 import { mountSponsorSlot } from './ui/sponsorship.js';
@@ -336,57 +337,59 @@ import '/assets/ui/loader.js';
   onCrossTabSignOut(function () {
     signOut({ broadcast: false, showOverlay: false });
   });
-  renderTopbar('#sharedTopbar', {
-    // Show Sign in for guests by default; updateTopbarUser() will hide it for signed-in users.
-    signInHidden: false,
-    signInI18nKey: 'topbarSignIn',
-    handlers: {
-      toggleUserMenu,
-      signOut,
-      signIn: showWelcomeOverlayWithGsi,
-      manageBilling: function () {
-        closeUserMenu();
-        openBillingAccountDialog({
-          profile: siteProfile,
-          showWelcomeOverlay: showWelcomeOverlayWithGsi,
-          openPortal: async function () {
-            if (!googleCredential) return false;
-            const resp = await fetch('/api/billing/portal-session', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
-              credentials: 'same-origin',
-              body: JSON.stringify({}),
-            });
-            const data = await resp.json().catch(function () { return null; });
-            if (!resp.ok || !data || !data.url) return false;
-            const url = String(data.url);
-            try {
-              const win = window.open(url, '_blank', 'noopener');
-              if (!win) location.href = url;
-            } catch (_) {
-              location.href = url;
-            }
-            return true;
-          },
-          openCheckout: async function () {
-            await openBillingCheckoutModal({
-              plan: 'monthly',
-              openContactInfo: openContactInfo,
-            });
-          },
-        });
+  renderAppHeader('#sharedTopbar', {
+    mode: 'public',
+    topbar: {
+      // Show Sign in for guests by default; updateTopbarUser() will hide it for signed-in users.
+      signInHidden: false,
+      signInI18nKey: 'topbarSignIn',
+      handlers: {
+        toggleUserMenu,
+        signOut,
+        signIn: showWelcomeOverlayWithGsi,
+        manageBilling: function () {
+          closeUserMenu();
+          openBillingAccountDialog({
+            profile: siteProfile,
+            showWelcomeOverlay: showWelcomeOverlayWithGsi,
+            openPortal: async function () {
+              if (!googleCredential) return false;
+              const resp = await fetch('/api/billing/portal-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+                credentials: 'same-origin',
+                body: JSON.stringify({}),
+              });
+              const data = await resp.json().catch(function () { return null; });
+              if (!resp.ok || !data || !data.url) return false;
+              const url = String(data.url);
+              try {
+                const win = window.open(url, '_blank', 'noopener');
+                if (!win) location.href = url;
+              } catch (_) {
+                location.href = url;
+              }
+              return true;
+            },
+            openCheckout: async function () {
+              await openBillingCheckoutModal({
+                plan: 'monthly',
+                openContactInfo: openContactInfo,
+              });
+            },
+          });
+        },
       },
     },
-  });
-
-  renderHeaderNavIntoTopbar({
-    onHome: closeSystemDesign,
-    onSystemDesign: openSystemDesign,
-    onGetInTouch: openHireMe,
-    onReferMe: openReferMe,
-    onContactInfo: openContactInfo,
-    onAdmin: openSystemDesignAdmin,
-    onResume: generateResumePdf,
+    nav: {
+      onHome: closeSystemDesign,
+      onSystemDesign: openSystemDesign,
+      onGetInTouch: openHireMe,
+      onReferMe: openReferMe,
+      onContactInfo: openContactInfo,
+      onAdmin: openSystemDesignAdmin,
+      onResume: generateResumePdf,
+    },
   });
 
   function setAdminNavVisible(visible) {
@@ -557,6 +560,7 @@ import '/assets/ui/loader.js';
           name:        data.name || '',
           email:       data.email || '',
           picture:     data.picture || null,
+          tier:        data.tier || 'free',
           isReturning: !!data.isReturning,
           visitCount:  data.visitCount || 1,
           lastSeenAt:  data.lastSeenAt || null,

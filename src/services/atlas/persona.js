@@ -279,7 +279,5 @@ function buildSystemPrompt() {
 const SYSTEM_PROMPT = buildSystemPrompt();
 
 module.exports = {
-  KNOWLEDGE_BASE,
   SYSTEM_PROMPT,
-  buildSystemPrompt,
 };

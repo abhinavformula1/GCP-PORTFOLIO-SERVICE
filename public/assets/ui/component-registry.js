@@ -152,7 +152,7 @@ export const COMPONENT_REGISTRY = [
 ];
 
 /** Map from registry id → INSERT_ITEMS type key in composer.js */
-export const BLOCK_ID_TO_TYPE = {
+const BLOCK_ID_TO_TYPE = {
   block_table:      'matrix',
   block_hero:       'hero',
   block_cards:      'cards',

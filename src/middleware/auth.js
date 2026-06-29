@@ -22,6 +22,21 @@ function localPreviewUser() {
   };
 }
 
+function isSafeLocalDevRuntime() {
+  // Cloud Run sets K_SERVICE; treat that as production-like even if NODE_ENV is wrong.
+  return (config.server.env || 'development') !== 'production' && !process.env.K_SERVICE;
+}
+
+function isLocalhostRequest(req) {
+  const hostRaw = req.headers['x-forwarded-host'] || req.headers.host || '';
+  const host = String(Array.isArray(hostRaw) ? hostRaw[0] : hostRaw).split(',')[0].trim().toLowerCase();
+  return host.startsWith('localhost') || host.startsWith('127.0.0.1');
+}
+
+function shouldAllowLocalAdminToken(req, token) {
+  return isSafeLocalDevRuntime() && isLocalhostRequest(req) && token === 'local-admin-preview';
+}
+
 async function requireAuth(req, res, next) {
   try {
     if (config.admin.localPreview) {
@@ -32,6 +47,11 @@ async function requireAuth(req, res, next) {
     const header = req.headers.authorization || '';
     const m = /^Bearer\s+(.+)$/i.exec(header);
     if (!m) throw new AppError('Missing Authorization header.', 401, 'UNAUTHORIZED');
+
+    if (shouldAllowLocalAdminToken(req, m[1])) {
+      req.user = localPreviewUser();
+      return next();
+    }
 
     req.user = await googleAuth.verifyIdToken(m[1]);
     return next();
@@ -53,6 +73,12 @@ async function optionalAuth(req, _res, next) {
     const header = req.headers.authorization || '';
     const m = /^Bearer\s+(.+)$/i.exec(header);
     if (!m) return next();
+
+    if (shouldAllowLocalAdminToken(req, m[1])) {
+      req.user = localPreviewUser();
+      return next();
+    }
+
     req.user = await googleAuth.verifyIdToken(m[1]);
     return next();
   } catch (_err) {
@@ -68,6 +94,17 @@ async function requireAdmin(req, res, next) {
     req.user = localPreviewUser();
     return next();
   }
+
+  // Localhost dev escape hatch for CMS work without Google OAuth setup.
+  // Only enabled on localhost and never on Cloud Run.
+  try {
+    const header = req.headers.authorization || '';
+    const m = /^Bearer\s+(.+)$/i.exec(header);
+    if (m && shouldAllowLocalAdminToken(req, m[1])) {
+      req.user = localPreviewUser();
+      return next();
+    }
+  } catch (_) {}
 
   await requireAuth(req, res, (err) => {
     if (err) return next(err);

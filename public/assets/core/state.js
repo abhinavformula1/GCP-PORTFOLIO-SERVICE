@@ -24,8 +24,7 @@
 // reference the same names without typos drifting apart.
 export const STORAGE_PROFILE    = 'portfolio_profile';
 export const STORAGE_CREDENTIAL = 'portfolio_credential';
-export const STORAGE_TOAST_FLAG = 'welcome_toast_shown';
-export const STORAGE_SIGNOUT_EVENT = 'portfolio_signout_event';
+const STORAGE_SIGNOUT_EVENT = 'portfolio_signout_event';
 
 // ── siteProfile ──────────────────────────────────────────────────────────────
 // The in-memory snapshot of the signed-in (or guest) visitor. Shape:

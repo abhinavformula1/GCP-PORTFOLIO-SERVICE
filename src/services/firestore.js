@@ -52,6 +52,7 @@ async function getUser(uid) {
  *     visitCount,    // post-increment count
  *     firstSeenAt,   // Firestore Timestamp | null
  *     lastSeenAt,    // Firestore Timestamp | null  (pre-update value)
+ *     tier,          // 'free' by default for signed-in users
  *   }
  */
 async function upsertUserVisit({ uid, email, name, picture }) {
@@ -63,18 +64,23 @@ async function upsertUserVisit({ uid, email, name, picture }) {
 
     if (snap.exists) {
       const existing = snap.data();
-      tx.update(ref, {
+      const existingTier = existing && existing.tier ? String(existing.tier) : '';
+      const update = {
         email,
         name,
         picture:    picture || null,
         lastSeenAt: now,
         visitCount: FieldValue.increment(1),
-      });
+      };
+      // Backfill default tier for legacy users.
+      if (!existingTier) update.tier = 'free';
+      tx.update(ref, update);
       return {
         isReturning: true,
         visitCount:  (existing.visitCount || 0) + 1,
         firstSeenAt: existing.firstSeenAt || null,
         lastSeenAt:  existing.lastSeenAt  || null,
+        tier:        existingTier || 'free',
       };
     }
 
@@ -85,12 +91,14 @@ async function upsertUserVisit({ uid, email, name, picture }) {
       firstSeenAt: now,
       lastSeenAt:  now,
       visitCount:  1,
+      tier:        'free',
     });
     return {
       isReturning: false,
       visitCount:  1,
       firstSeenAt: null,
       lastSeenAt:  null,
+      tier:        'free',
     };
   });
 }

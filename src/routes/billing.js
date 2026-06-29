@@ -367,6 +367,18 @@ router.post('/billing/claim', requireAuth, validateClaim, async (req, res, next)
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
 
+    // Ensure the uid doc has display identity even for guest->claim flows.
+    // (Guest checkout sessions don't carry uid, so webhooks can't populate billingUsers.)
+    const paidName = String((session && session.customer_details && session.customer_details.name) || '').trim();
+    await firestore.getDb().collection('billingUsers').doc(uid).set({
+      uid,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+      email: req.user.email || paidEmail || null,
+      name: req.user.name || paidName || null,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
     const sub = await stripe.subscriptions.retrieve(subscriptionId);
     // Ensure local object has uid metadata even if update failed above.
     if (sub && typeof sub === 'object') {
@@ -403,8 +415,63 @@ router.post('/billing/portal-session', requireAuth, async (req, res, next) => {
 
 router.get('/admin/subscriptions/overview', requireAdmin, async (req, res, next) => {
   try {
-    const data = await billing.getSubscriptionsOverview();
-    return res.status(200).json({ success: true, ...data });
+    let data = await billing.getSubscriptionsOverview();
+    const key = String(config.stripe.secretKey || '');
+    const stripeMode = key.startsWith('sk_test_') ? 'test' : key.startsWith('sk_live_') ? 'live' : 'unknown';
+
+    // Best-effort backfill: some legacy rows may be missing current period data.
+    // For small datasets, hydrate from Stripe and persist into billingUsers.
+    try {
+      if (isStripeConfigured()) {
+        const stripe = getStripe();
+        const rows = Array.isArray(data.subscriptions) ? data.subscriptions : [];
+        const needs = rows.filter((r) => r && r.stripeSubscriptionId && !r.currentPeriodEnd).slice(0, 25);
+        if (needs.length) {
+          for (const r of needs) {
+            try {
+              const sub = await stripe.subscriptions.retrieve(String(r.stripeSubscriptionId));
+              if (sub && typeof sub === 'object') {
+                sub.metadata = { ...(sub.metadata || {}), uid: String(r.uid || '') };
+              }
+              await billing.upsertStripeSubscription(sub);
+              // Patch response row for this request (no extra Firestore read).
+              const endMs = sub && sub.current_period_end ? Number(sub.current_period_end) * 1000 : null;
+              const startMs = sub && sub.current_period_start ? Number(sub.current_period_start) * 1000 : null;
+              r.currentPeriodStart = startMs;
+              r.currentPeriodEnd = endMs;
+              r.cancelAtPeriodEnd = !!(sub && sub.cancel_at_period_end);
+            } catch (_) {}
+          }
+          data = { ...data, subscriptions: rows };
+        }
+      }
+    } catch (_) {}
+
+    return res.status(200).json({ success: true, stripeMode, ...data });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Admin: cancel/resume a subscription (at period end).
+router.post('/admin/subscriptions/cancel', requireAdmin, [
+  body('subscriptionId').trim().isLength({ min: 6, max: 200 }).withMessage('Missing Stripe subscription id.'),
+  body('cancelAtPeriodEnd').optional().isBoolean().withMessage('cancelAtPeriodEnd must be a boolean.'),
+], async (req, res, next) => {
+  try {
+    assertStripeConfigured();
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new ValidationError(errors.array()[0].msg);
+
+    const stripe = getStripe();
+    const subscriptionId = String(req.body.subscriptionId || '').trim();
+    const cancelAtPeriodEnd = req.body.cancelAtPeriodEnd !== false;
+
+    const sub = await stripe.subscriptions.update(subscriptionId, {
+      cancel_at_period_end: cancelAtPeriodEnd,
+    });
+    await billing.upsertStripeSubscription(sub);
+    return res.status(200).json({ success: true, cancelAtPeriodEnd: !!sub.cancel_at_period_end, status: sub.status || '' });
   } catch (err) {
     return next(err);
   }
