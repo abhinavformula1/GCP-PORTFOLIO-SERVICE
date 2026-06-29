@@ -70,10 +70,21 @@ function renderUserMenu(ids, handlers) {
     signOutButton.addEventListener('click', handlers.signOut);
   }
 
+  const billingBtn = createEl('button', {
+    id: ids.manageBillingBtn,
+    className: 'topbar-menuitem',
+    text: 'Billing & invoices',
+    hidden: true,
+  });
+  if (typeof handlers?.manageBilling === 'function') {
+    billingBtn.addEventListener('click', handlers.manageBilling);
+  }
+
   return createEl('div', { id: ids.user, className: 'topbar-user', hidden: true }, [
     avatarButton,
     createEl('div', { id: ids.dropdown, className: 'topbar-dropdown', hidden: true }, [
       createEl('div', { id: ids.userName, className: 'topbar-dropdown-name' }),
+      billingBtn,
       signOutButton,
     ]),
   ]);
@@ -94,6 +105,7 @@ export function renderTopbar(target, options) {
     userPhoto:  opts.userPhotoId  || 'topbarUserPhoto',
     dropdown:   opts.dropdownId   || 'topbarDropdown',
     userName:   opts.userNameId   || 'topbarUserName',
+    manageBillingBtn: opts.manageBillingId || 'topbarManageBillingBtn',
     signOutBtn: opts.signOutId    || '',
     photoAlt:   opts.photoAlt,
   };
@@ -134,10 +146,12 @@ export function updateTopbarUser(p) {
   const el       = document.getElementById('topbarUser');
   const photo    = document.getElementById('topbarUserPhoto');
   const name     = document.getElementById('topbarUserName');
+  const billing  = document.getElementById('topbarManageBillingBtn');
   const signInEl = document.getElementById('topbarSignInBtn');
   if (!el) return;
 
   const signedIn = !!(p && p.type !== 'guest' && p.picture);
+  const subActive = !!(p && p.subscription && p.subscription.active);
 
   if (signedIn) {
     photo.src = p.picture;
@@ -145,9 +159,14 @@ export function updateTopbarUser(p) {
     if (name) name.textContent = p.name;
     el.removeAttribute('hidden');
     if (signInEl) signInEl.setAttribute('hidden', '');
+    if (billing) {
+      if (subActive) billing.removeAttribute('hidden');
+      else billing.setAttribute('hidden', '');
+    }
   } else {
     el.setAttribute('hidden', '');
     if (signInEl) signInEl.removeAttribute('hidden');
+    if (billing) billing.setAttribute('hidden', '');
   }
 }
 

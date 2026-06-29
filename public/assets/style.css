@@ -588,6 +588,24 @@ md-dialog {
   text-align: left;
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
+.topbar-menuitem {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.topbar-menuitem:hover,
+.topbar-menuitem:focus-visible {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+.topbar-menuitem[hidden] { display: none; }
 .topbar-signout:hover,
 .topbar-signout:focus-visible {
   background: var(--surface-2);

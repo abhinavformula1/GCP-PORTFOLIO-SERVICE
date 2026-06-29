@@ -342,6 +342,32 @@ import '/assets/ui/loader.js';
       toggleUserMenu,
       signOut,
       signIn: showWelcomeOverlayWithGsi,
+      manageBilling: function () {
+        closeUserMenu();
+        // Always available for signed-in subscribers via avatar menu.
+        if (!googleCredential) {
+          showWelcomeOverlayWithGsi();
+          return;
+        }
+        fetch('/api/billing/portal-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+          credentials: 'same-origin',
+          body: JSON.stringify({}),
+        })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            const url = data && data.url ? String(data.url) : '';
+            if (!url) return;
+            try {
+              const win = window.open(url, '_blank', 'noopener');
+              if (!win) location.href = url;
+            } catch (_) {
+              location.href = url;
+            }
+          })
+          .catch(function () {});
+      },
     },
   });
 
