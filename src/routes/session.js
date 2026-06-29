@@ -28,9 +28,20 @@ const billing                        = require('../services/billing');
 const salesforce                     = require('../services/salesforce');
 const googleAuth                     = require('../services/googleAuth');
 const contactPolicy                  = require('../services/contactPolicy');
+const config                         = require('../config');
 const { ValidationError }            = require('../errors');
 
 const router = express.Router();
+
+function isSafeLocalDevRuntime() {
+  return (config.server.env || 'development') !== 'production' && !process.env.K_SERVICE;
+}
+
+function isLocalhostRequest(req) {
+  const hostRaw = req.headers['x-forwarded-host'] || req.headers.host || '';
+  const host = String(Array.isArray(hostRaw) ? hostRaw[0] : hostRaw).split(',')[0].trim().toLowerCase();
+  return host.startsWith('localhost') || host.startsWith('127.0.0.1');
+}
 
 // POST /api/session/start
 // Body:    { credential: "<google id token>" }
@@ -42,11 +53,29 @@ router.post('/session/start', async (req, res, next) => {
       throw new ValidationError('Missing Google credential.');
     }
 
+    // Localhost dev token for CMS work without Google OAuth setup.
+    if (isSafeLocalDevRuntime() && isLocalhostRequest(req) && credential === 'local-admin-preview') {
+      return res.status(200).json({
+        success: true,
+        isReturning: true,
+        sub: 'local-admin-preview',
+        name: 'Local Admin Preview',
+        email: 'local-admin@localhost',
+        picture: null,
+        tier: 'free',
+        visitCount: 1,
+        firstSeenAt: null,
+        lastSeenAt: null,
+        contact: { canSeePhone: false, phone: null, matchedDomain: null },
+        subscription: { active: false, status: 'guest', currentPeriodEnd: null, cancelAtPeriodEnd: false },
+      });
+    }
+
     // 1. Verify the ID token (signature + audience + expiry)
     const { uid, email, name, picture } = await googleAuth.verifyIdToken(credential);
 
     // 2. Upsert the user document — degrade gracefully if Firestore is down
-    let visit = { isReturning: false, visitCount: 1, firstSeenAt: null, lastSeenAt: null };
+    let visit = { isReturning: false, visitCount: 1, firstSeenAt: null, lastSeenAt: null, tier: 'free' };
     try {
       visit = await firestore.upsertUserVisit({ uid, email, name, picture });
     } catch (fsErr) {
@@ -96,6 +125,7 @@ router.post('/session/start', async (req, res, next) => {
       name:        name || '',
       email,
       picture:     picture || null,
+      tier:        String(visit && visit.tier ? visit.tier : 'free'),
       visitCount:  visit.visitCount,
       firstSeenAt: visit.firstSeenAt && visit.firstSeenAt.toMillis ? visit.firstSeenAt.toMillis() : null,
       lastSeenAt:  visit.lastSeenAt  && visit.lastSeenAt.toMillis  ? visit.lastSeenAt.toMillis()  : null,

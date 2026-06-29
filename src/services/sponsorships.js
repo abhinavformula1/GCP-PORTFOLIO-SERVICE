@@ -41,12 +41,6 @@ async function listActiveSponsorships(placement) {
     });
 }
 
-async function getSponsorship(id) {
-  const snap = await firestore.getDb().collection(SPONSORSHIPS_COLLECTION).doc(id).get();
-  if (!snap.exists) return null;
-  return normaliseSponsor(snap.id, snap.data());
-}
-
 async function upsertSponsorship(id, data) {
   const ref = id
     ? firestore.getDb().collection(SPONSORSHIPS_COLLECTION).doc(id)
@@ -76,7 +70,6 @@ async function deleteSponsorship(id) {
 module.exports = {
   listSponsorships,
   listActiveSponsorships,
-  getSponsorship,
   upsertSponsorship,
   deleteSponsorship,
 };

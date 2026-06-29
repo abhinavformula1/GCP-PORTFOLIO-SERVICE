@@ -13,10 +13,7 @@
  *   <sd-loader variant="linear"></sd-loader>
  *   <sd-loader overlay label="Saving…"></sd-loader>
  *
- * Usage (JS):
- *   import { showLoader, hideLoader } from '/assets/ui/loader.js';
- *   const handle = showLoader(el, { label: 'Saving…', overlay: true });
- *   handle.hide();
+ * Usage (JS): import this module once so <sd-loader> is registered.
  *
  * Attributes:
  *   label   — visible text beside the indicator (optional)
@@ -146,33 +143,4 @@ class SdLoader extends HTMLElement {
 
 if (!customElements.get('sd-loader')) {
   customElements.define('sd-loader', SdLoader);
-}
-
-/* ── Programmatic helpers ─────────────────────────────────────────────────── */
-
-/**
- * showLoader(container, options?) → { hide, el }
- * Options: { label, size, variant, overlay }
- */
-export function showLoader(container, options) {
-  const opts   = options || {};
-  const el     = document.createElement('sd-loader');
-  if (opts.label)   el.setAttribute('label',   opts.label);
-  if (opts.size)    el.setAttribute('size',     opts.size);
-  if (opts.variant) el.setAttribute('variant',  opts.variant);
-  if (opts.overlay) el.setAttribute('overlay',  '');
-
-  const parent = container || document.body;
-  if (opts.overlay && getComputedStyle(parent).position === 'static') {
-    parent.style.position = 'relative';
-  }
-  parent.appendChild(el);
-
-  return { hide() { el.remove(); }, el };
-}
-
-/** Removes the first <sd-loader> inside `container`. */
-export function hideLoader(container) {
-  const el = (container || document.body).querySelector('sd-loader');
-  if (el) el.remove();
 }

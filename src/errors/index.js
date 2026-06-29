@@ -32,13 +32,6 @@ class ValidationError extends AppError {
   }
 }
 
-/** 429 — Caller has been rate-limited. */
-class RateLimitError extends AppError {
-  constructor(message = 'Too many requests. Please try again later.') {
-    super(message, 429, 'RATE_LIMIT_ERROR');
-  }
-}
-
 /** 502 — Downstream Salesforce API call failed. */
 class SalesforceError extends AppError {
   constructor(message, detail = '') {
@@ -57,7 +50,6 @@ class SalesforceAuthError extends AppError {
 module.exports = {
   AppError,
   ValidationError,
-  RateLimitError,
   SalesforceError,
   SalesforceAuthError,
 };

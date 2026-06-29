@@ -218,6 +218,13 @@ md-fab:not(:defined) { visibility: hidden; }
   border-bottom: 1px solid var(--border);
   padding-top: 10px;
   padding-bottom: 10px;
+  /* Align header contents with `.page` inner padding (32px). */
+  padding-left: 0;
+  padding-right: 0;
+}
+.topbar-with-header-nav .topbar-inner {
+  padding-left: 32px;
+  padding-right: 32px;
 }
 .topbar-with-header-nav .topbar-controls {
   margin-left: 0;
@@ -960,16 +967,37 @@ a:hover { text-decoration: underline; }
   min-width: 0;
 }
 .header-nav-left { display: flex; align-items: center; gap: 10px; }
-.header-nav-links { display: flex; align-items: center; gap: 16px; }
+.header-nav-links { display: flex; align-items: center; gap: 22px; }
+
+/* Shared “Home/back” link style used across public + admin topbars. */
+.topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  height: 40px;          /* match header-nav md-text-button height */
+  padding: 0 6px;        /* match header-nav link edge inset */
+  text-decoration: none;
+  white-space: nowrap;
+}
+.topbar-back .material-symbols-outlined { font-size: 18px; }
+.topbar-back:hover,
+.topbar-back:focus-visible {
+  text-decoration: none;
+}
 
 /* Stripe-style: text links with an underline active state. */
 .header-nav-link {
   --md-text-button-container-height: 40px;
   --md-text-button-label-text-size: 14px;
-  --md-text-button-label-text-weight: 600;
-  --md-text-button-label-text-color: var(--md-sys-color-on-surface);
-  --md-text-button-hover-label-text-color: var(--md-sys-color-on-surface);
-  --md-text-button-pressed-label-text-color: var(--md-sys-color-on-surface);
+  /* Match admin “Home” text styling */
+  --md-text-button-label-text-weight: 700;
+  --md-text-button-label-text-color: var(--accent);
+  --md-text-button-hover-label-text-color: var(--accent);
+  --md-text-button-pressed-label-text-color: var(--accent);
   /* Remove hover/press background state layer (quiet, flat links). */
   --md-text-button-hover-state-layer-color: transparent;
   --md-text-button-pressed-state-layer-color: transparent;
@@ -981,18 +1009,12 @@ a:hover { text-decoration: underline; }
   border-radius: 0;
 }
 .header-nav-link[aria-pressed="true"] {
-  /* Matches the generated image */
-  --md-text-button-label-text-color: var(--brand-blue);
-  --md-text-button-hover-label-text-color: var(--brand-blue);
-  --md-text-button-pressed-label-text-color: var(--brand-blue);
+  --md-text-button-label-text-color: var(--accent);
+  --md-text-button-hover-label-text-color: var(--accent);
+  --md-text-button-pressed-label-text-color: var(--accent);
   box-shadow: none;
 }
-.systemdesign-btn.header-nav-link {
-  /* Keep "Software Architecture" branded even when not active. */
-  --md-text-button-label-text-color: var(--brand-blue);
-  --md-text-button-hover-label-text-color: var(--brand-blue);
-  --md-text-button-pressed-label-text-color: var(--brand-blue);
-}
+/* Software Architecture should follow Home styling (no special-case). */
 .header-nav-link[aria-pressed="true"]::after {
   content: '';
   position: absolute;
@@ -1000,7 +1022,7 @@ a:hover { text-decoration: underline; }
   right: 6px;
   bottom: 4px;
   height: 2px;
-  background: var(--brand-blue);
+  background: var(--accent);
   border-radius: 0;
 }
 
@@ -1135,7 +1157,7 @@ a:hover { text-decoration: underline; }
   outline-offset: 2px;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 860px) {
   .topbar-with-header-nav .topbar-inner {
     flex-wrap: wrap;
     gap: 12px;

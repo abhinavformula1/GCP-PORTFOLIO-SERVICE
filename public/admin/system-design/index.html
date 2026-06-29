@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
-  <link rel="stylesheet" href="/assets/style.css">
-  <link rel="stylesheet" href="./styles.css?v=2026-06-27-17">
+  <link rel="stylesheet" href="/assets/style.css?v=2026-06-29-header-hamburger-1">
+  <link rel="stylesheet" href="./styles.css?v=2026-06-30-home-left">
   <!-- Hide icon ligature text until Material Symbols font is ready (anti-FOUC) -->
   <style>.material-symbols-outlined{visibility:hidden}.fonts-loaded .material-symbols-outlined{visibility:visible}</style>
   <script>
@@ -62,69 +62,327 @@
   </md-dialog>
 
   <main class="sd-admin-shell sd-admin-shell--sidebar" id="adminShell">
-    <aside class="sd-admin-nav" aria-label="Admin navigation">
-      <div class="sd-admin-nav-brand">
-        <span class="material-symbols-outlined sd-admin-nav-mark" aria-hidden="true">auto_stories</span>
-        <div>
-          <div class="sd-admin-nav-title">Portfolio Service</div>
-          <div class="sd-admin-nav-sub">Admin Panel</div>
+    <div class="sd-admin-nav-scrim" id="sidebarScrim" aria-hidden="true"></div>
+
+    <aside class="sd-admin-nav" id="adminNav" aria-label="Admin navigation">
+      <div class="sd-admin-nav-brand" style="display:none" aria-hidden="true"></div>
+
+
+      <nav id="adminModules" class="sd-admin-modules" hidden aria-label="Admin modules">
+
+        <div class="sd-nav-section">
+          <div class="sd-nav-section-label" aria-hidden="true">Content</div>
+          <button type="button" class="sd-admin-module sd-admin-module-active" data-module="system-design" data-short="Articles">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">article</span>
+            <span class="sd-admin-module-label">Software Architecture</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Articles</span>
+          </button>
+          <button type="button" class="sd-admin-module" data-module="article-settings" data-short="Settings">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">tune</span>
+            <span class="sd-admin-module-label">Article Settings</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Settings</span>
+          </button>
+          <button type="button" class="sd-admin-module" data-module="media-library" data-short="Media">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">perm_media</span>
+            <span class="sd-admin-module-label">Media Library</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Media</span>
+          </button>
         </div>
-        <button type="button" class="sd-admin-nav-collapse" id="toggleSidebarBtn"
-          aria-label="Collapse sidebar" aria-expanded="true" title="Collapse sidebar">
-          <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+
+        <div class="sd-nav-section">
+          <div class="sd-nav-section-label" aria-hidden="true">Growth</div>
+          <button type="button" class="sd-admin-module" data-module="contact-policy" data-short="Contact">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">admin_panel_settings</span>
+            <span class="sd-admin-module-label">Contact Policy</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Contact</span>
+          </button>
+          <button type="button" class="sd-admin-module" data-module="sponsorships" data-short="Sponsors">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">campaign</span>
+            <span class="sd-admin-module-label">Sponsorships</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Sponsors</span>
+          </button>
+          <button type="button" class="sd-admin-module" data-module="seo-config" data-short="SEO">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">travel_explore</span>
+            <span class="sd-admin-module-label">SEO &amp; AEO</span>
+            <span class="sd-admin-module-short" aria-hidden="true">SEO</span>
+          </button>
+        </div>
+
+        <div class="sd-nav-section">
+          <div class="sd-nav-section-label" aria-hidden="true">Intelligence</div>
+          <button type="button" class="sd-admin-module" data-module="atlas-settings" data-short="Atlas AI">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">smart_toy</span>
+            <span class="sd-admin-module-label">Atlas AI</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Atlas AI</span>
+          </button>
+          <button type="button" class="sd-admin-module" data-module="analytics" data-short="Analytics">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">query_stats</span>
+            <span class="sd-admin-module-label">Analytics</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Analytics</span>
+          </button>
+        </div>
+
+        <div class="sd-nav-section">
+          <div class="sd-nav-section-label" aria-hidden="true">Revenue</div>
+          <button type="button" class="sd-admin-module" data-module="tier-settings" data-short="Tiers">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">workspace_premium</span>
+            <span class="sd-admin-module-label">Tier Settings</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Tiers</span>
+          </button>
+          <button type="button" class="sd-admin-module" data-module="subscriptions" data-short="Revenue">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">credit_card</span>
+            <span class="sd-admin-module-label">Subscriptions</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Revenue</span>
+          </button>
+        </div>
+
+        <div class="sd-nav-section">
+          <div class="sd-nav-section-label" aria-hidden="true">System</div>
+          <button type="button" class="sd-admin-module" data-module="metadata-config" data-short="Config">
+            <span class="material-symbols-outlined sd-admin-module-icon" aria-hidden="true">toggle_on</span>
+            <span class="sd-admin-module-label">Metadata Config</span>
+            <span class="sd-admin-module-short" aria-hidden="true">Config</span>
+          </button>
+        </div>
+
+      </nav>
+    </aside>
+
+    <!-- ── Sub-panel: secondary navigation per module (Gamma-style) ───────── -->
+    <aside class="sd-admin-subpanel" id="adminSubpanel" aria-label="Module navigation">
+
+      <!-- Articles / Content -->
+      <div class="sd-subpanel-pane" data-subpanel="system-design">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">article</span>
+          <span>Content</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="all">
+            <span class="material-symbols-outlined" aria-hidden="true">list</span>All Articles
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="drafts">
+            <span class="material-symbols-outlined" aria-hidden="true">draft</span>Drafts
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="published">
+            <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Published
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="archived">
+            <span class="material-symbols-outlined" aria-hidden="true">archive</span>Archived
+          </button>
+        </nav>
+        <div class="sd-subpanel-divider"></div>
+        <button type="button" class="sd-subpanel-new-btn" data-subpanel-action="new">
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>New Article
         </button>
       </div>
 
-      <div id="adminModules" class="sd-admin-modules" hidden aria-label="Admin modules">
-          <button type="button" class="sd-admin-module sd-admin-module-active" data-module="system-design">
-            <span class="material-symbols-outlined" aria-hidden="true">article</span>
-            <span>Software Architecture</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="article-settings">
-            <span class="material-symbols-outlined" aria-hidden="true">tune</span>
-            <span>Article Settings</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="media-library">
-            <span class="material-symbols-outlined" aria-hidden="true">perm_media</span>
-            <span>Media Library</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="contact-policy">
-            <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
-            <span>Contact Policy</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="tier-settings">
-            <span class="material-symbols-outlined" aria-hidden="true">workspace_premium</span>
-            <span>Tier Settings</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="metadata-config">
-            <span class="material-symbols-outlined" aria-hidden="true">toggle_on</span>
-            <span>Metadata Config</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="sponsorships">
-            <span class="material-symbols-outlined" aria-hidden="true">campaign</span>
-            <span>Sponsorships</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="seo-config">
-            <span class="material-symbols-outlined" aria-hidden="true">travel_explore</span>
-            <span>SEO &amp; AEO</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="atlas-settings">
-            <span class="material-symbols-outlined" aria-hidden="true">smart_toy</span>
-            <span>Atlas AI</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="analytics">
-            <span class="material-symbols-outlined" aria-hidden="true">query_stats</span>
-            <span>Analytics</span>
-          </button>
-          <button type="button" class="sd-admin-module" data-module="subscriptions">
-            <span class="material-symbols-outlined" aria-hidden="true">credit_card</span>
-            <span>Subscriptions</span>
-          </button>
+      <!-- Article Settings -->
+      <div class="sd-subpanel-pane" data-subpanel="article-settings">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+          <span>Article Settings</span>
         </div>
-      <!-- (removed) sidebar status card -->
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="display">
+            <span class="material-symbols-outlined" aria-hidden="true">view_agenda</span>Display
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="categories">
+            <span class="material-symbols-outlined" aria-hidden="true">category</span>Categories
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="tags">
+            <span class="material-symbols-outlined" aria-hidden="true">label</span>Tags
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="reading-time">
+            <span class="material-symbols-outlined" aria-hidden="true">schedule</span>Reading Time
+          </button>
+        </nav>
+      </div>
+
+      <!-- Media Library -->
+      <div class="sd-subpanel-pane" data-subpanel="media-library">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">perm_media</span>
+          <span>Media Library</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="all">
+            <span class="material-symbols-outlined" aria-hidden="true">grid_view</span>All Media
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="images">
+            <span class="material-symbols-outlined" aria-hidden="true">image</span>Images
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="videos">
+            <span class="material-symbols-outlined" aria-hidden="true">play_circle</span>Videos
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="documents">
+            <span class="material-symbols-outlined" aria-hidden="true">description</span>Documents
+          </button>
+        </nav>
+      </div>
+
+      <!-- Contact Policy -->
+      <div class="sd-subpanel-pane" data-subpanel="contact-policy">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
+          <span>Contact Policy</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="rules">
+            <span class="material-symbols-outlined" aria-hidden="true">rule</span>Policy Rules
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="blocked">
+            <span class="material-symbols-outlined" aria-hidden="true">block</span>Blocked Domains
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="allowed">
+            <span class="material-symbols-outlined" aria-hidden="true">verified</span>Allowed Emails
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="test">
+            <span class="material-symbols-outlined" aria-hidden="true">science</span>Test Email
+          </button>
+        </nav>
+      </div>
+
+      <!-- Sponsorships -->
+      <div class="sd-subpanel-pane" data-subpanel="sponsorships">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">campaign</span>
+          <span>Sponsorships</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="active">
+            <span class="material-symbols-outlined" aria-hidden="true">star</span>Active Sponsors
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="archive">
+            <span class="material-symbols-outlined" aria-hidden="true">archive</span>Archive
+          </button>
+        </nav>
+      </div>
+
+      <!-- SEO -->
+      <div class="sd-subpanel-pane" data-subpanel="seo-config">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">travel_explore</span>
+          <span>SEO &amp; AEO</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="meta">
+            <span class="material-symbols-outlined" aria-hidden="true">tag</span>Meta Tags
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="sitemap">
+            <span class="material-symbols-outlined" aria-hidden="true">account_tree</span>Sitemap
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="structured">
+            <span class="material-symbols-outlined" aria-hidden="true">data_object</span>Structured Data
+          </button>
+        </nav>
+      </div>
+
+      <!-- Atlas AI -->
+      <div class="sd-subpanel-pane" data-subpanel="atlas-settings">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">smart_toy</span>
+          <span>Atlas AI</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="config">
+            <span class="material-symbols-outlined" aria-hidden="true">settings_suggest</span>AI Config
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="prompts">
+            <span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>Prompts
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="training">
+            <span class="material-symbols-outlined" aria-hidden="true">model_training</span>Training Data
+          </button>
+        </nav>
+      </div>
+
+      <!-- Analytics -->
+      <div class="sd-subpanel-pane" data-subpanel="analytics">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">query_stats</span>
+          <span>Analytics</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="overview">
+            <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>Overview
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="traffic">
+            <span class="material-symbols-outlined" aria-hidden="true">trending_up</span>Traffic
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="engagement">
+            <span class="material-symbols-outlined" aria-hidden="true">favorite</span>Engagement
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="sources">
+            <span class="material-symbols-outlined" aria-hidden="true">share</span>Sources
+          </button>
+        </nav>
+      </div>
+
+      <!-- Tier Settings -->
+      <div class="sd-subpanel-pane" data-subpanel="tier-settings">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">workspace_premium</span>
+          <span>Tier Settings</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="free">
+            <span class="material-symbols-outlined" aria-hidden="true">person</span>Free Tier
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="pro">
+            <span class="material-symbols-outlined" aria-hidden="true">verified</span>Pro Tier
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="enterprise">
+            <span class="material-symbols-outlined" aria-hidden="true">business</span>Enterprise
+          </button>
+        </nav>
+      </div>
+
+      <!-- Subscriptions / Revenue -->
+      <div class="sd-subpanel-pane" data-subpanel="subscriptions">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">credit_card</span>
+          <span>Revenue</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="active">
+            <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Active
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="cancelled">
+            <span class="material-symbols-outlined" aria-hidden="true">cancel</span>Cancelled
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="mrr">
+            <span class="material-symbols-outlined" aria-hidden="true">attach_money</span>MRR
+          </button>
+        </nav>
+      </div>
+
+      <!-- Metadata Config -->
+      <div class="sd-subpanel-pane" data-subpanel="metadata-config">
+        <div class="sd-subpanel-header">
+          <span class="material-symbols-outlined" aria-hidden="true">toggle_on</span>
+          <span>Config</span>
+        </div>
+        <nav class="sd-subpanel-nav">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="flags">
+            <span class="material-symbols-outlined" aria-hidden="true">flag</span>Feature Flags
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="site">
+            <span class="material-symbols-outlined" aria-hidden="true">language</span>Site Config
+          </button>
+        </nav>
+      </div>
+
     </aside>
 
     <div class="sd-admin-main">
+
+    <div class="sd-admin-mobile-topbar">
+      <button type="button" class="sd-admin-mobile-nav-btn" id="mobileSidebarBtn" aria-label="Open navigation" aria-expanded="false">
+        <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+        <span>Menu</span>
+      </button>
+    </div>
 
     <div id="adminAuthWall" class="sd-admin-auth-wall">
       <span class="material-symbols-outlined sd-admin-auth-wall-icon" aria-hidden="true">lock</span>
@@ -134,22 +392,6 @@
     </div>
 
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
-      <aside class="sd-admin-list-panel">
-        <div class="sd-admin-list-head">
-          <div class="sd-admin-list-actions">
-            <button type="button" id="toggleArticleLibraryBtn" title="Collapse article library" aria-expanded="true" aria-label="Collapse article library">
-              <span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>
-              <span class="sd-admin-collapse-label">Collapse</span>
-            </button>
-            <button type="button" id="newArticleBtn" title="New article">
-              <span class="material-symbols-outlined" aria-hidden="true">add</span>
-              <span>New</span>
-            </button>
-          </div>
-        </div>
-        <div class="sd-admin-rail-label" aria-hidden="true">Articles</div>
-        <div id="articleList" class="sd-admin-list"></div>
-      </aside>
 
       <section class="sd-admin-editor-shell">
         <section class="sd-admin-editor">
@@ -280,29 +522,28 @@
     </section>
 
     <section id="contactPolicyWorkspace" class="sd-admin-policy" hidden>
-      <div class="sd-admin-policy-copy">
-        <div class="sd-admin-policy-copy-head">
-          <div>
-            <div class="sd-admin-section-kicker">Contact policy</div>
-            <h2>Phone visibility rules</h2>
-          </div>
-          <button type="button" id="toggleContactPolicyInfoBtn" class="sd-admin-panel-toggle" title="Collapse policy info" aria-label="Collapse policy info" aria-expanded="true">
-            <span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>
-          </button>
-        </div>
-        <div class="sd-admin-policy-copy-body">
-          <p>Company email domains can see the private phone number. Personal domains stay blocked unless the exact email is approved.</p>
+
+      <!-- ── Page header ──────────────────────────────────────────────────── -->
+      <div class="sd-policy-page-header">
+        <div class="sd-policy-page-header-text">
+          <h2>Phone visibility rules</h2>
+          <p>Control when your private phone number is revealed based on visitor email domain.</p>
           <div id="contactPolicyMeta" class="sd-admin-policy-meta"></div>
         </div>
-        <div class="sd-admin-rail-label" aria-hidden="true">Policy</div>
+        <div class="sd-policy-page-header-actions">
+          <button type="button" id="saveContactPolicyBtn" class="sd-admin-primary">
+            <span class="material-symbols-outlined" aria-hidden="true">save</span>Save policy
+          </button>
+        </div>
       </div>
-      <div class="sd-admin-policy-card">
-        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="privatePhone">
-          <div class="sd-authoring-card-head sd-policy-rule-head">
-            <div>
-              <div class="sd-admin-section-kicker">Private</div>
-              <h3>Private phone number</h3>
-              <p>Stored in Firestore and only revealed on the public site when the viewer passes your policy rules.</p>
+
+      <!-- ── Rule cards grid ───────────────────────────────────────────────── -->
+      <div class="sd-policy-cards-grid">
+
+        <section class="sd-policy-rule-card" data-policy-card="privatePhone" data-policy-type="private">
+          <div class="sd-policy-rule-card-header">
+            <div class="sd-policy-chip sd-policy-chip--private">
+              <span class="material-symbols-outlined" aria-hidden="true">lock</span>Private
             </div>
             <div class="reco-actions sd-policy-rule-actions">
               <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Private phone actions" aria-haspopup="menu" aria-expanded="false">
@@ -310,24 +551,24 @@
               </button>
               <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
                 <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
-                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                  <span>Edit</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span><span>Edit</span>
                 </button>
               </div>
             </div>
           </div>
+          <h3>Private phone number</h3>
+          <p>Stored in Firestore and only revealed when the visitor passes your policy rules.</p>
           <div id="contactPrivatePhoneView" class="sd-policy-rule-values"></div>
           <label class="sd-policy-rule-edit" hidden>Private phone
             <input id="contactPrivatePhone" type="tel" placeholder="+91 98765 43210">
             <button type="button" class="sd-policy-done-btn">Done</button>
           </label>
         </section>
-        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="personalDomains">
-          <div class="sd-authoring-card-head sd-policy-rule-head">
-            <div>
-              <div class="sd-admin-section-kicker">Blocked</div>
-              <h3>Personal domains</h3>
-              <p>These public email domains never reveal the private phone number.</p>
+
+        <section class="sd-policy-rule-card" data-policy-card="personalDomains" data-policy-type="blocked">
+          <div class="sd-policy-rule-card-header">
+            <div class="sd-policy-chip sd-policy-chip--blocked">
+              <span class="material-symbols-outlined" aria-hidden="true">block</span>Blocked
             </div>
             <div class="reco-actions sd-policy-rule-actions">
               <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Personal domains actions" aria-haspopup="menu" aria-expanded="false">
@@ -335,24 +576,24 @@
               </button>
               <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
                 <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
-                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                  <span>Edit</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span><span>Edit</span>
                 </button>
               </div>
             </div>
           </div>
+          <h3>Personal domains</h3>
+          <p>Public email domains (gmail.com, yahoo.com…) never reveal the private phone number.</p>
           <div id="contactPersonalDomainsView" class="sd-policy-rule-values"></div>
           <label class="sd-policy-rule-edit" hidden>Blocked Personal Domains
             <textarea id="contactPersonalDomains" rows="5" placeholder="gmail.com&#10;yahoo.com&#10;outlook.com"></textarea>
             <button type="button" class="sd-policy-done-btn">Done</button>
           </label>
         </section>
-        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="allowedEmails">
-          <div class="sd-authoring-card-head sd-policy-rule-head">
-            <div>
-              <div class="sd-admin-section-kicker">Allowed</div>
-              <h3>Email exceptions</h3>
-              <p>Exact personal emails that should still see the private phone number.</p>
+
+        <section class="sd-policy-rule-card" data-policy-card="allowedEmails" data-policy-type="allowed">
+          <div class="sd-policy-rule-card-header">
+            <div class="sd-policy-chip sd-policy-chip--allowed">
+              <span class="material-symbols-outlined" aria-hidden="true">verified</span>Allowed
             </div>
             <div class="reco-actions sd-policy-rule-actions">
               <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Allowed email actions" aria-haspopup="menu" aria-expanded="false">
@@ -360,24 +601,24 @@
               </button>
               <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
                 <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
-                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                  <span>Edit</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span><span>Edit</span>
                 </button>
               </div>
             </div>
           </div>
+          <h3>Email exceptions</h3>
+          <p>Specific personal emails that should still see the private phone number.</p>
           <div id="contactAllowedEmailsView" class="sd-policy-rule-values"></div>
           <label class="sd-policy-rule-edit" hidden>Allowed Email Exceptions
             <textarea id="contactAllowedEmails" rows="4" placeholder="trusted.person@gmail.com"></textarea>
             <button type="button" class="sd-policy-done-btn">Done</button>
           </label>
         </section>
-        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="blockedDomains">
-          <div class="sd-authoring-card-head sd-policy-rule-head">
-            <div>
-              <div class="sd-admin-section-kicker">Blocked</div>
-              <h3>Company domains</h3>
-              <p>Company-looking domains that should not reveal the phone number.</p>
+
+        <section class="sd-policy-rule-card" data-policy-card="blockedDomains" data-policy-type="blocked">
+          <div class="sd-policy-rule-card-header">
+            <div class="sd-policy-chip sd-policy-chip--blocked">
+              <span class="material-symbols-outlined" aria-hidden="true">block</span>Blocked
             </div>
             <div class="reco-actions sd-policy-rule-actions">
               <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Blocked company domain actions" aria-haspopup="menu" aria-expanded="false">
@@ -385,24 +626,24 @@
               </button>
               <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
                 <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
-                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                  <span>Edit</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span><span>Edit</span>
                 </button>
               </div>
             </div>
           </div>
+          <h3>Company domains</h3>
+          <p>Company-looking domains that should not reveal the phone number.</p>
           <div id="contactBlockedDomainsView" class="sd-policy-rule-values"></div>
           <label class="sd-policy-rule-edit" hidden>Blocked Company Domains
             <textarea id="contactBlockedDomains" rows="4" placeholder="spamdomain.com"></textarea>
             <button type="button" class="sd-policy-done-btn">Done</button>
           </label>
         </section>
-        <section class="sd-authoring-card sd-policy-rule-card" data-policy-card="allowedDomains">
-          <div class="sd-authoring-card-head sd-policy-rule-head">
-            <div>
-              <div class="sd-admin-section-kicker">Tracked</div>
-              <h3>Strategic company domains</h3>
-              <p>Domains to explicitly track as always allowed company targets.</p>
+
+        <section class="sd-policy-rule-card" data-policy-card="allowedDomains" data-policy-type="tracked">
+          <div class="sd-policy-rule-card-header">
+            <div class="sd-policy-chip sd-policy-chip--tracked">
+              <span class="material-symbols-outlined" aria-hidden="true">bookmark</span>Tracked
             </div>
             <div class="reco-actions sd-policy-rule-actions">
               <button type="button" class="reco-actions-trigger sd-policy-rule-action-btn" aria-label="Allowed company domain actions" aria-haspopup="menu" aria-expanded="false">
@@ -410,27 +651,40 @@
               </button>
               <div class="reco-actions-menu sd-policy-rule-menu" role="menu" hidden>
                 <button type="button" class="reco-action-item sd-policy-edit-btn" role="menuitem">
-                  <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                  <span>Edit</span>
+                  <span class="material-symbols-outlined" aria-hidden="true">edit</span><span>Edit</span>
                 </button>
               </div>
             </div>
           </div>
+          <h3>Strategic company domains</h3>
+          <p>Always-allowed company targets explicitly tracked for visibility.</p>
           <div id="contactAllowedDomainsView" class="sd-policy-rule-values"></div>
           <label class="sd-policy-rule-edit" hidden>Always Allowed Company Domains
             <textarea id="contactAllowedDomains" rows="3" placeholder="google.com&#10;salesforce.com"></textarea>
             <button type="button" class="sd-policy-done-btn">Done</button>
           </label>
         </section>
-        <label>Test Email
-          <input id="contactTestEmail" type="email" placeholder="recruiter@google.com">
-        </label>
-        <div id="contactPolicyTestResult" class="sd-admin-policy-result"></div>
-        <div class="sd-admin-actions">
-          <button type="button" id="testContactPolicyBtn">Test access</button>
-          <button type="button" id="saveContactPolicyBtn" class="sd-admin-primary">Save policy</button>
-        </div>
+
       </div>
+
+      <!-- ── Test email card ───────────────────────────────────────────────── -->
+      <div class="sd-policy-test-card">
+        <div class="sd-policy-test-card-header">
+          <span class="material-symbols-outlined" aria-hidden="true">science</span>
+          <div>
+            <h3>Test access</h3>
+            <p>Check if an email address would pass your policy and see the phone number.</p>
+          </div>
+        </div>
+        <div class="sd-policy-test-card-body">
+          <input id="contactTestEmail" type="email" placeholder="recruiter@google.com" aria-label="Email to test">
+          <button type="button" id="testContactPolicyBtn" class="sd-admin-primary">
+            <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>Run test
+          </button>
+        </div>
+        <div id="contactPolicyTestResult" class="sd-admin-policy-result"></div>
+      </div>
+
     </section>
 
     <section id="articleSettingsWorkspace" class="sd-article-settings" hidden>
@@ -875,6 +1129,6 @@
   <div id="sharedAtlasShell"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./admin.js?v=2026-06-27-20"></script>
+  <script type="module" src="./admin.js?v=2026-06-30-home-left"></script>
 </body>
 </html>

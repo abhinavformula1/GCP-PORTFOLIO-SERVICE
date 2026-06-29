@@ -19,7 +19,7 @@
  */
 
 // ── LANG (chat assistant runtime strings) ────────────────────────────────────
-export const LANG = {
+const LANG = {
   en: {
     teaserText: 'Hi! Looking to hire a Salesforce engineer?',
     teaserCta: "Let's talk",

@@ -110,13 +110,16 @@ export function renderTopbar(target, options) {
     photoAlt:   opts.photoAlt,
   };
 
+  const shouldShowBackIcon = opts.backIcon !== null && opts.backIcon !== false && opts.backIcon !== '';
+  const backIconName = opts.backIcon === undefined ? 'arrow_back' : String(opts.backIcon || '');
+
   const left = opts.backHref ? createEl('a', {
-    className: 'sd-admin-back',
+    className: 'topbar-back',
     href: opts.backHref,
     'aria-label': opts.backAriaLabel || (opts.backText || 'Back'),
     title: opts.backTitle || (opts.backText || 'Back'),
   }, [
-    materialIcon(opts.backIcon || 'arrow_back'),
+    ...(shouldShowBackIcon ? [materialIcon(backIconName)] : []),
     createEl('span', { text: opts.backText || 'Back' }),
   ]) : null;
 

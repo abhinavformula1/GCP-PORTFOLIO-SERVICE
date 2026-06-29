@@ -181,12 +181,15 @@ async function getSubscriptionsOverview() {
       name: data.name || null,
       email: data.email || null,
       status: data.status || 'unknown',
+      stripeCustomerId: data.stripeCustomerId || null,
+      stripeSubscriptionId: data.stripeSubscriptionId || null,
       priceId: data.priceId || null,
       planNickname: data.planNickname || null,
       amount: Number(data.amount || 0),
       currency: data.currency || null,
       interval: data.interval || null,
       intervalCount: Number(data.intervalCount || 1),
+      currentPeriodStart: data.currentPeriodStart || null,
       currentPeriodEnd: data.currentPeriodEnd || null,
       cancelAtPeriodEnd: data.cancelAtPeriodEnd === true,
       updatedAt: data.updatedAt && data.updatedAt.toMillis ? data.updatedAt.toMillis() : null,
@@ -195,10 +198,47 @@ async function getSubscriptionsOverview() {
     };
   });
 
+  // Backfill missing identity (name/email) from /users/{uid}.
+  // This fixes legacy rows where billingUsers was created by webhook before we
+  // started persisting display identity at claim-time.
+  try {
+    const missing = rows
+      .map((r, idx) => ({ r, idx }))
+      .filter(({ r }) => (!r.name || !r.email) && r.uid);
+    if (missing.length) {
+      const filled = await Promise.all(missing.map(async ({ r, idx }) => {
+        try {
+          const u = await firestore.getUser(r.uid);
+          if (!u) return null;
+          const name = r.name || u.name || null;
+          const email = r.email || u.email || null;
+          // Best-effort persist so future reads are complete.
+          if (name || email) {
+            await firestore.getDb().collection(BILLING_USERS_COLLECTION).doc(r.uid).set({
+              name,
+              email,
+              updatedAt: FieldValue.serverTimestamp(),
+            }, { merge: true });
+          }
+          return { idx, name, email };
+        } catch (_) {
+          return null;
+        }
+      }));
+      filled.filter(Boolean).forEach((f) => {
+        rows[f.idx] = { ...rows[f.idx], name: f.name || rows[f.idx].name, email: f.email || rows[f.idx].email };
+      });
+    }
+  } catch (_) {}
+
   const active = rows.filter((r) => r.status === 'active' || r.status === 'trialing');
   const mrrByCurrency = active.reduce((acc, r) => {
     const cur = String(r.mrrCurrency || 'USD');
     acc[cur] = (acc[cur] || 0) + Number(r.mrrCents || 0);
+    return acc;
+  }, {});
+  const arrByCurrency = Object.keys(mrrByCurrency).reduce((acc, cur) => {
+    acc[cur] = Number(mrrByCurrency[cur] || 0) * 12;
     return acc;
   }, {});
 
@@ -214,6 +254,7 @@ async function getSubscriptionsOverview() {
       active: active.length,
       statusCounts: counts,
       mrrByCurrency,
+      arrByCurrency,
     },
     subscriptions: rows,
   };

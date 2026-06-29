@@ -10,7 +10,7 @@ import {
 } from '../../assets/core/state.js';
 import { initTheme } from '../../assets/core/theme.js';
 import { hideWelcomeOverlay, showWelcomeOverlay } from '../../assets/ui/welcome.js';
-import { renderTopbar }     from '../../assets/ui/topbar.js';
+import { renderAppHeader } from '../../assets/ui/app-header.js?v=2026-06-29-nav-align-1';
 import { renderTechFooter } from '../../assets/ui/footer.js';
 import { renderAtlasShell } from '../../assets/ui/atlas-shell.js';
 import {
@@ -28,6 +28,10 @@ import {
 } from '../../assets/ui/sdblocks.js';
 import { createComposer } from '../../assets/ui/composer.js';
 import { COMPONENT_REGISTRY, enabledBlockTypes } from '../../assets/ui/component-registry.js';
+import { renderDataTable } from '../../assets/ui/datatable.js';
+import { renderKpiCards } from '../../assets/ui/kpi-cards.js';
+import { renderToggleCardGroups } from '../../assets/ui/toggle-cards.js';
+import { showToast } from '../../assets/ui/toast.js';
 import '../../assets/ui/loader.js';
 
 const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
@@ -125,21 +129,24 @@ function contentTypeLabel(value) {
   return 'System Design';
 }
 
-renderTopbar('#sharedTopbar', {
-  className: 'topbar sd-admin-topbar',
-  controlsClassName: 'sd-admin-auth',
-  backHref: '/',
-  backIcon: 'home',
-  backText: 'Home',
-  backAriaLabel: 'Home',
-  signInId: 'adminTopbarSignInBtn',
-  userId: 'adminTopbarUser',
-  avatarBtnId: 'adminAvatarBtn',
-  userPhotoId: 'adminUserPhoto',
-  dropdownId: 'adminTopbarDropdown',
-  userNameId: 'adminUserName',
-  signOutId: 'adminSignOut',
-  photoAlt: 'Signed-in admin profile photo',
+renderAppHeader('#sharedTopbar', {
+  mode: 'admin',
+  topbar: {
+    className: 'topbar sd-admin-topbar',
+    controlsClassName: 'sd-admin-auth',
+    backHref: '/',
+    backIcon: null,
+    backText: 'Home',
+    backAriaLabel: 'Home',
+    signInId: 'adminTopbarSignInBtn',
+    userId: 'adminTopbarUser',
+    avatarBtnId: 'adminAvatarBtn',
+    userPhotoId: 'adminUserPhoto',
+    dropdownId: 'adminTopbarDropdown',
+    userNameId: 'adminUserName',
+    signOutId: 'adminSignOut',
+    photoAlt: 'Signed-in admin profile photo',
+  },
 });
 renderTechFooter('#sharedFooter', {
   className: 'sponsors-footer',
@@ -161,8 +168,10 @@ const els = {
   workspace:       document.getElementById('adminWorkspace'),
   authWall:        document.getElementById('adminAuthWall'),
   shell:           document.getElementById('adminShell'),
-  toggleSidebarBtn: document.getElementById('toggleSidebarBtn'),
-  modules:         document.getElementById('adminModules'),
+  modules:             document.getElementById('adminModules'),
+  adminNav:            document.getElementById('adminNav'),
+  sidebarScrim:        document.getElementById('sidebarScrim'),
+  mobileSidebarBtn:    document.getElementById('mobileSidebarBtn'),
   policyWorkspace: document.getElementById('contactPolicyWorkspace'),
   articleSettingsWorkspace: document.getElementById('articleSettingsWorkspace'),
   articleSettingsList: document.getElementById('articleSettingsList'),
@@ -302,28 +311,26 @@ const els = {
   publishActionLabel: document.getElementById('publishActionLabel'),
 };
 
-const SIDEBAR_COLLAPSE_KEY = 'sd_admin_sidebar_collapsed_v1';
-function setSidebarCollapsed(collapsed) {
-  if (!els.shell || !els.toggleSidebarBtn) return;
-  els.shell.classList.toggle('sd-admin-shell--sidebar-collapsed', !!collapsed);
-  els.toggleSidebarBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-  els.toggleSidebarBtn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-  els.toggleSidebarBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-  const ico = els.toggleSidebarBtn.querySelector('.material-symbols-outlined');
-  if (ico) ico.textContent = collapsed ? 'chevron_right' : 'chevron_left';
-  try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_e) { /* ignore */ }
 
-  // Tooltips for icon-only mode
-  if (els.modules) {
-    Array.from(els.modules.querySelectorAll('.sd-admin-module')).forEach(function (btn) {
-      const label = (btn.querySelector('span:last-child') && btn.querySelector('span:last-child').textContent)
-        ? btn.querySelector('span:last-child').textContent.trim()
-        : '';
-      if (!label) return;
-      if (collapsed) btn.setAttribute('title', label);
-      else btn.removeAttribute('title');
-    });
-  }
+// Mobile drawer helpers
+function openMobileNav() {
+  if (!els.adminNav || !els.sidebarScrim) return;
+  els.adminNav.classList.add('sd-admin-nav--open');
+  els.sidebarScrim.classList.add('sd-nav-scrim--visible');
+  if (els.mobileSidebarBtn) els.mobileSidebarBtn.setAttribute('aria-expanded', 'true');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMobileNav() {
+  if (!els.adminNav || !els.sidebarScrim) return;
+  els.adminNav.classList.remove('sd-admin-nav--open');
+  els.sidebarScrim.classList.remove('sd-nav-scrim--visible');
+  if (els.mobileSidebarBtn) els.mobileSidebarBtn.setAttribute('aria-expanded', 'false');
+  document.body.style.overflow = '';
+}
+
+function isMobileNavMode() {
+  return window.matchMedia('(max-width: 980px)').matches;
 }
 
 function setStatus(message, kind) {
@@ -795,10 +802,20 @@ function setActiveModule(moduleName) {
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
+
+  // Sub-panel: activate matching pane and open the panel
+  const subpanel = document.getElementById('adminSubpanel');
+  if (subpanel) {
+    subpanel.querySelectorAll('.sd-subpanel-pane').forEach(function (pane) {
+      pane.classList.toggle('sd-subpanel-pane-active', pane.dataset.subpanel === moduleName);
+    });
+    document.body.classList.add('sd-subpanel-open');
+  }
 }
 
 function setArticleLibraryCollapsed(collapsed) {
   els.workspace.classList.toggle('sd-admin-workspace-library-collapsed', collapsed);
+  if (!els.toggleLibraryBtn) return;
   els.toggleLibraryBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   els.toggleLibraryBtn.setAttribute('aria-label', collapsed ? 'Expand article library' : 'Collapse article library');
   els.toggleLibraryBtn.title = collapsed ? 'Expand article library' : 'Collapse article library';
@@ -809,6 +826,7 @@ function setArticleLibraryCollapsed(collapsed) {
 }
 
 function setContactPolicyInfoCollapsed(collapsed) {
+  if (!els.togglePolicyInfoBtn) return;
   els.policyWorkspace.classList.toggle('sd-admin-policy-info-collapsed', collapsed);
   els.togglePolicyInfoBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   els.togglePolicyInfoBtn.setAttribute('aria-label', collapsed ? 'Expand policy info' : 'Collapse policy info');
@@ -1357,6 +1375,7 @@ function updateArticleStats() {
 }
 
 function renderList() {
+  if (!els.list) return;
   els.list.textContent = '';
   updateArticleStats();
   if (!articles.length) {
@@ -1862,23 +1881,7 @@ function paintAnalytics() {
 
   els.analyticsPanel.innerHTML = `
     <div class="sd-analytics-grid">
-      <div class="sd-media-kpis sd-analytics-kpis" role="region" aria-label="Analytics KPIs">
-        <div class="sd-media-kpi">
-          <div class="sd-media-kpi-label">Monthly Visitors</div>
-          <div class="sd-media-kpi-value">${Number(totals.uniqueVisitors || 0).toLocaleString()}</div>
-          <div class="sd-media-kpi-sub">Unique visitors · ${recentVisitorChips || 'No visitor names yet'}</div>
-        </div>
-        <div class="sd-media-kpi">
-          <div class="sd-media-kpi-label">Monthly Page Views</div>
-          <div class="sd-media-kpi-value">${Number(totals.pageViews || 0).toLocaleString()}</div>
-          <div class="sd-media-kpi-sub">All tracked page views</div>
-        </div>
-        <div class="sd-media-kpi">
-          <div class="sd-media-kpi-label">Monthly PDF Downloads</div>
-          <div class="sd-media-kpi-value">${Number(state && state.totals && state.totals.pdfDownloads ? state.totals.pdfDownloads : 0).toLocaleString()}</div>
-          <div class="sd-media-kpi-sub">Resume + article exports</div>
-        </div>
-      </div>
+      <div id="analyticsKpiMount"></div>
 
       <div class="sd-analytics-trendcard" role="region" aria-label="Last 14 days trend">
         <div class="sd-analytics-trend-head">
@@ -1976,6 +1979,28 @@ function paintAnalytics() {
       </div>
     </div>
   `;
+
+  // Analytics KPI cards (reusable component)
+  try {
+    const mount = document.getElementById('analyticsKpiMount');
+    if (mount) {
+      renderKpiCards(mount, {
+        ariaLabel: 'Analytics KPIs',
+        cards: [
+          { title: 'Monthly Visitors', value: Number(totals.uniqueVisitors || 0).toLocaleString(), icon: 'group', iconVariant: 'users', trend: 'vs last 30 days' },
+          { title: 'Monthly Page Views', value: Number(totals.pageViews || 0).toLocaleString(), icon: 'bar_chart', iconVariant: 'mrr', trend: 'vs last 30 days' },
+          { title: 'Monthly PDF Downloads', value: Number(state && state.totals && state.totals.pdfDownloads ? state.totals.pdfDownloads : 0).toLocaleString(), icon: 'picture_as_pdf', iconVariant: 'arr', trend: 'vs last 30 days' },
+        ],
+      });
+      // Add the “recent visitor chips” detail below cards (keeps the cards clean).
+      if (recentVisitorChips) {
+        const note = document.createElement('div');
+        note.className = 'sd-analytics-kpi-note';
+        note.innerHTML = 'Recent visitors · ' + recentVisitorChips;
+        mount.appendChild(note);
+      }
+    }
+  } catch (_) {}
 }
 
 async function renderSubscriptions() {
@@ -1995,7 +2020,8 @@ async function refreshSubscriptions() {
     const data = await authedJson('/api/admin/subscriptions/overview');
     subscriptionsState = data;
     paintSubscriptions();
-    setSectionStatus(els.subscriptionsStatus, 'Subscriptions updated.', 'success');
+    setSectionStatus(els.subscriptionsStatus, '', '');
+    try { showToast('Subscriptions updated.', { kind: 'success' }); } catch (_) {}
   } catch (err) {
     setSectionStatus(els.subscriptionsStatus, err.message || 'Failed to load subscriptions.', 'error');
   }
@@ -2007,6 +2033,7 @@ function paintSubscriptions() {
   const state = subscriptionsState || {};
   const kpis = state.kpis || {};
   const rows = Array.isArray(state.subscriptions) ? state.subscriptions : [];
+  const stripeMode = String(state.stripeMode || 'unknown');
 
   function money(cents, currency) {
     const cur = String(currency || 'USD');
@@ -2018,69 +2045,244 @@ function paintSubscriptions() {
     }
   }
 
+  function dashBase() {
+    if (stripeMode === 'test') return 'https://dashboard.stripe.com/test';
+    return 'https://dashboard.stripe.com';
+  }
+
+  function intervalLabel(r) {
+    const i = String(r && r.interval || '');
+    const c = Number(r && r.intervalCount || 1) || 1;
+    if (!i) return '—';
+    return c === 1 ? (i === 'month' ? 'Monthly' : (i === 'year' ? 'Yearly' : i)) : (c + '× ' + i);
+  }
+
+  function fmtDate(ms) {
+    const t = Number(ms || 0);
+    if (!t) return '—';
+    try { return new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' }); } catch (_) {}
+    return new Date(t).toDateString();
+  }
+
+  function daysLeft(ms) {
+    const t = Number(ms || 0);
+    if (!t) return '';
+    const d = Math.ceil((t - Date.now()) / (24 * 60 * 60 * 1000));
+    if (!isFinite(d)) return '';
+    if (d < 0) return 'expired';
+    if (d === 0) return 'today';
+    return d + ' days left';
+  }
+
   const mrrEntries = kpis.mrrByCurrency && typeof kpis.mrrByCurrency === 'object' ? kpis.mrrByCurrency : {};
   const mrrText = Object.keys(mrrEntries).length
     ? Object.keys(mrrEntries).sort().map(function (cur) { return money(mrrEntries[cur], cur); }).join(' · ')
     : '—';
+  const arrEntries = kpis.arrByCurrency && typeof kpis.arrByCurrency === 'object' ? kpis.arrByCurrency : {};
+  const arrText = Object.keys(arrEntries).length
+    ? Object.keys(arrEntries).sort().map(function (cur) { return money(arrEntries[cur], cur); }).join(' · ')
+    : (Object.keys(mrrEntries).length ? (Object.keys(mrrEntries).sort().map(function (cur) { return money(mrrEntries[cur] * 12, cur); }).join(' · ')) : '—');
 
-  const tbody = rows.slice(0, 200).map(function (r) {
+  // KPI cards (reusable component)
+  els.subscriptionsPanel.innerHTML = `<div id="subsKpiMount"></div>`;
+  const subsKpiMount = document.getElementById('subsKpiMount');
+  if (subsKpiMount) {
+    renderKpiCards(subsKpiMount, {
+      ariaLabel: 'Subscription KPIs',
+      cards: [
+        { title: 'Active Subscriptions', value: Number(kpis.active || 0).toLocaleString(), icon: 'group', iconVariant: 'users', trend: '0% vs last 30 days' },
+        { title: 'Total Subscribers', value: Number(kpis.total || 0).toLocaleString(), icon: 'person', iconVariant: 'ok', trend: '0% vs last 30 days' },
+        { title: 'Monthly Recurring Revenue', value: safeText(mrrText), kicker: 'MRR', icon: 'payments', iconVariant: 'mrr', trend: '0% vs last 30 days' },
+        { title: 'Annual Recurring Revenue', value: safeText(arrText), kicker: 'ARR', icon: 'monitoring', iconVariant: 'arr', trend: '0% vs last 30 days' },
+      ],
+    });
+  }
+
+  // Table (reusable DataTable)
+  const tableMount = document.createElement('div');
+  els.subscriptionsPanel.appendChild(tableMount);
+
+  const tableRows = rows.slice(0, 200).map(function (r) {
     const status = String(r.status || 'unknown');
-    const next = r.currentPeriodEnd ? new Date(Number(r.currentPeriodEnd)).toLocaleDateString() : '—';
     const email = r.email ? String(r.email) : '';
-    const name = r.name ? String(r.name) : '—';
-    const plan = r.planNickname || (r.interval ? (r.intervalCount > 1 ? (r.intervalCount + '× ' + r.interval) : r.interval) : '—');
-    const price = (r.amount && r.currency)
-      ? money(r.amount, r.currency) + (r.interval ? (' / ' + (r.intervalCount > 1 ? (r.intervalCount + ' ' + r.interval) : r.interval)) : '')
-      : '—';
-    return `
-      <tr>
-        <td>
-          <div class="sd-analytics-user-name">${safeText(name)}</div>
-          <div class="sd-analytics-user-sub">${safeText(email || r.uid || '')}</div>
-        </td>
-        <td>${safeText(status)}</td>
-        <td>${safeText(plan)}</td>
-        <td class="sd-analytics-num">${safeText(price)}</td>
-        <td>${safeText(next)}${r.cancelAtPeriodEnd ? ' · cancels' : ''}</td>
-      </tr>`;
-  }).join('');
+    const name = r.name ? String(r.name) : '';
+    const plan = r.planNickname || 'Premium plan';
+    const interval = intervalLabel(r);
+    const amount = (r.amount && r.currency) ? (money(r.amount, r.currency) + ' / ' + (String(r.interval || '') === 'year' ? 'year' : 'month')) : '—';
+    const start = r.currentPeriodStart ? fmtDate(r.currentPeriodStart) : '—';
+    const end = r.currentPeriodEnd ? fmtDate(r.currentPeriodEnd) : '—';
+    const renew = r.currentPeriodEnd ? fmtDate(r.currentPeriodEnd) : '—';
+    const left = r.currentPeriodEnd ? daysLeft(r.currentPeriodEnd) : '';
+    const customerId = r.stripeCustomerId ? String(r.stripeCustomerId) : '';
+    const subId = r.stripeSubscriptionId ? String(r.stripeSubscriptionId) : '';
+    return Object.assign({}, r, {
+      _status: status,
+      _email: email,
+      _name: name,
+      _plan: plan,
+      _intervalLabel: interval,
+      _amountLabel: amount,
+      _periodLabel: start + ' – ' + end,
+      _daysLeft: left,
+      _renewDate: renew,
+      _renewMeta: r.cancelAtPeriodEnd ? 'Cancels at period end' : 'Renews automatically',
+      _customerId: customerId,
+      _subId: subId,
+    });
+  });
 
-  els.subscriptionsPanel.innerHTML = `
-    <div class="sd-media-kpis sd-analytics-kpis" role="region" aria-label="Subscription KPIs">
-      <div class="sd-media-kpi">
-        <div class="sd-media-kpi-label">Active</div>
-        <div class="sd-media-kpi-value">${Number(kpis.active || 0).toLocaleString()}</div>
-        <div class="sd-media-kpi-sub">trialing + active</div>
-      </div>
-      <div class="sd-media-kpi">
-        <div class="sd-media-kpi-label">Total</div>
-        <div class="sd-media-kpi-value">${Number(kpis.total || 0).toLocaleString()}</div>
-        <div class="sd-media-kpi-sub">all statuses</div>
-      </div>
-      <div class="sd-media-kpi">
-        <div class="sd-media-kpi-label">MRR</div>
-        <div class="sd-media-kpi-value">${safeText(mrrText)}</div>
-        <div class="sd-media-kpi-sub">by currency</div>
-      </div>
-    </div>
+  renderDataTable(tableMount, {
+    ariaLabel: 'Subscriptions',
+    tableClassName: 'sd-subs-table',
+    minWidth: 1180,
+    responsive: true,
+    emptyText: 'No subscriptions yet.',
+    rows: tableRows,
+    columns: [
+      {
+        key: 'subscriber',
+        header: 'Subscriber',
+        width: 380,
+        renderHtml: function (r) {
+          return (
+            '<div class="sd-subs-subscriber-top">' +
+              '<strong class="sd-subs-name">' + safeText(r._name || r._email || r.uid || '—') + '</strong>' +
+            '</div>' +
+            '<div class="sd-subs-subscriber-sub">' +
+              '<span>' + safeText(r._email || 'No email available') + '</span>' +
+              '<span class="sd-subs-dot">·</span>' +
+              '<span class="sd-subs-muted">' + safeText(r.uid || '') + '</span>' +
+            '</div>'
+          );
+        },
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        width: 110,
+        renderHtml: function (r) {
+          return '<div class="sd-subs-statuscell">' +
+            '<span class="sd-subs-status sd-subs-status-' + safeText(r._status) + '">' + safeText(r._status) + '</span>' +
+          '</div>';
+        },
+      },
+      { key: 'plan', header: 'Plan', width: 160, renderText: function (r) { return r._plan; } },
+      { key: 'interval', header: 'Billing interval', width: 140, renderText: function (r) { return r._intervalLabel; } },
+      { key: 'amount', header: 'Amount', width: 120, align: 'right', renderText: function (r) { return r._amountLabel; } },
+      {
+        key: 'period',
+        header: 'Current period',
+        width: 200,
+        renderHtml: function (r) {
+          return '<div>' + safeText(r._periodLabel) + '</div>' +
+            (r._daysLeft ? ('<div class="sd-subs-muted">' + safeText(r._daysLeft) + '</div>') : '');
+        },
+      },
+      {
+        key: 'renews',
+        header: 'Renews on',
+        width: 170,
+        renderHtml: function (r) {
+          return '<div>' + safeText(r._renewDate || '—') + '</div>' +
+            (r._renewMeta ? ('<div class="sd-subs-muted">' + safeText(r._renewMeta) + '</div>') : '');
+        },
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        width: 90,
+        align: 'right',
+        renderHtml: function (r) {
+          return (
+            '<button type="button" class="sd-subs-kebab" aria-label="Actions"' +
+              ' data-uid="' + safeText(r.uid || '') + '"' +
+              ' data-email="' + safeText(r._email || '') + '"' +
+              ' data-customer="' + safeText(r._customerId || '') + '"' +
+              ' data-subscription="' + safeText(r._subId || '') + '"' +
+            '><span aria-hidden="true">⋯</span></button>'
+          );
+        },
+      },
+    ],
+  });
 
-    <div class="sd-analytics-table-wrap">
-      <table class="sd-analytics-table" style="min-width: 980px">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Status</th>
-            <th>Plan</th>
-            <th class="sd-analytics-num">Price</th>
-            <th>Renews</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tbody || '<tr><td colspan="5" class="sd-analytics-empty">No subscriptions yet.</td></tr>'}
-        </tbody>
-      </table>
-    </div>
-  `;
+  // Actions: open Stripe dashboard / copy.
+  els.subscriptionsPanel.querySelectorAll('.sd-subs-kebab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const customer = String(btn.dataset.customer || '');
+      const sub = String(btn.dataset.subscription || '');
+      const uid = String(btn.dataset.uid || '');
+      const email = String(btn.dataset.email || '');
+      const lines = [
+        uid ? ('uid: ' + uid) : '',
+        email ? ('email: ' + email) : '',
+        customer ? ('stripeCustomerId: ' + customer) : '',
+        sub ? ('stripeSubscriptionId: ' + sub) : '',
+      ].filter(Boolean).join('\n');
+
+      // Lightweight popover menu (admin UX).
+      const existing = document.getElementById('sdSubsMenu');
+      if (existing) existing.remove();
+      const menu = document.createElement('div');
+      menu.id = 'sdSubsMenu';
+      menu.className = 'sd-subs-menu';
+      menu.setAttribute('role', 'menu');
+
+      function addItem(label, onClick, danger) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sd-subs-menu-item' + (danger ? ' sd-subs-menu-item--danger' : '');
+        b.textContent = label;
+        b.addEventListener('click', function () {
+          try { menu.remove(); } catch (_) {}
+          onClick();
+        });
+        menu.appendChild(b);
+      }
+
+      addItem('Copy details', function () {
+        try {
+          if (navigator.clipboard && lines) {
+            navigator.clipboard.writeText(lines).then(function () {
+              setSectionStatus(els.subscriptionsStatus, 'Copied subscription details.', 'success');
+            }).catch(function () {});
+          }
+        } catch (_) {}
+      });
+      if (customer) addItem('Open Stripe customer', function () {
+        try { window.open(dashBase() + '/customers/' + customer, '_blank', 'noopener'); } catch (_) {}
+      });
+      if (sub) addItem('Open Stripe subscription', function () {
+        try { window.open(dashBase() + '/subscriptions/' + sub, '_blank', 'noopener'); } catch (_) {}
+      });
+      if (sub) addItem('Cancel subscription (period end)', function () {
+        if (!confirm('Cancel this subscription at period end?')) return;
+        authedJson('/api/admin/subscriptions/cancel', {
+          method: 'POST',
+          body: JSON.stringify({ subscriptionId: sub, cancelAtPeriodEnd: true }),
+        }).then(function () {
+          subscriptionsState = null;
+          refreshSubscriptions();
+        }).catch(function (err) {
+          setSectionStatus(els.subscriptionsStatus, err.message || 'Cancel failed.', 'error');
+        });
+      }, true);
+
+      document.body.appendChild(menu);
+      try {
+        const r = btn.getBoundingClientRect();
+        menu.style.top = Math.round(r.bottom + 8 + window.scrollY) + 'px';
+        menu.style.left = Math.min(window.innerWidth - 220, Math.round(r.right - 200 + window.scrollX)) + 'px';
+      } catch (_) {}
+      setTimeout(function () {
+        document.addEventListener('click', function onDoc(e) {
+          const t = e && e.target;
+          if (t && (menu.contains(t) || btn.contains(t))) return;
+          try { menu.remove(); } catch (_) {}
+        }, { once: true });
+      }, 0);
+    });
+  });
 }
 
 
@@ -2696,52 +2898,38 @@ async function renderMetadataConfig() {
   } catch (_) {
     _metaEnabledMap = {};
   }
-  panel.innerHTML = '';
 
-  // Group components by their group label
-  const groups = {};
+  // Group components by their group label and render via reusable Toggle Cards.
+  const byGroup = {};
   COMPONENT_REGISTRY.forEach(function (comp) {
-    if (!groups[comp.group]) groups[comp.group] = [];
-    groups[comp.group].push(comp);
+    if (!byGroup[comp.group]) byGroup[comp.group] = [];
+    byGroup[comp.group].push(comp);
   });
 
-  Object.entries(groups).forEach(function ([groupName, components]) {
-    const section = document.createElement('div');
-    section.className = 'sd-meta-config-group';
+  const groups = Object.entries(byGroup).map(function ([groupName, comps]) {
+    return {
+      title: groupName,
+      items: comps.map(function (comp) {
+        return {
+          id: comp.id,
+          label: comp.label,
+          hint: comp.hint,
+          icon: comp.icon,
+          enabled: _metaEnabledMap[comp.id] !== false, // default ON
+        };
+      }),
+    };
+  });
 
-    const heading = document.createElement('h3');
-    heading.className = 'sd-meta-config-group-title';
-    heading.textContent = groupName;
-    section.appendChild(heading);
-
-    const grid = document.createElement('div');
-    grid.className = 'sd-meta-config-grid';
-
-    components.forEach(function (comp) {
-      const isEnabled = _metaEnabledMap[comp.id] !== false; // default ON
-      const card = document.createElement('label');
-      card.className = 'sd-meta-config-card' + (isEnabled ? ' sd-meta-config-card--on' : '');
-      card.htmlFor = 'meta-toggle-' + comp.id;
-
-      card.innerHTML =
-        '<div class="sd-meta-config-card-left">' +
-          '<div class="sd-meta-config-icon"><span class="material-symbols-outlined" aria-hidden="true">' + comp.icon + '</span></div>' +
-          '<div class="sd-meta-config-info"><strong>' + comp.label + '</strong><span>' + comp.hint + '</span></div>' +
-        '</div>' +
-        '<div class="sd-meta-config-toggle">' +
-          '<input type="checkbox" id="meta-toggle-' + comp.id + '" data-comp-id="' + comp.id + '"' + (isEnabled ? ' checked' : '') + '>' +
-          '<span class="sd-meta-toggle-track"><span class="sd-meta-toggle-thumb"></span></span>' +
-        '</div>';
-
-      card.querySelector('input').addEventListener('change', function (e) {
-        card.classList.toggle('sd-meta-config-card--on', e.target.checked);
-      });
-
-      grid.appendChild(card);
-    });
-
-    section.appendChild(grid);
-    panel.appendChild(section);
+  renderToggleCardGroups(panel, {
+    ariaLabel: 'Metadata configuration',
+    idPrefix: 'meta-toggle-',
+    groups,
+    onToggle: function (item, enabled) {
+      // Keep in-memory state in sync so other admin modules can reuse the map.
+      if (!_metaEnabledMap) _metaEnabledMap = {};
+      _metaEnabledMap[item.id] = enabled;
+    },
   });
 }
 
@@ -3273,6 +3461,9 @@ els.topbarSignIn.addEventListener('click', function () {
 // (Users land here via direct URL / refresh, where the topbar button can be missed.)
 try {
   if (els.signInWallSlot && els.signInWallSlot.childElementCount === 0) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sd-admin-authwall-actions';
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'sd-admin-authwall-signin';
@@ -3280,7 +3471,27 @@ try {
     btn.addEventListener('click', function () {
       try { els.topbarSignIn.click(); } catch (_) {}
     });
-    els.signInWallSlot.appendChild(btn);
+    wrap.appendChild(btn);
+
+    // Localhost-only: allow admin UX work without Google auth setup.
+    try {
+      const h = String(location && location.hostname || '');
+      const isLocal = h === 'localhost' || h === '127.0.0.1';
+      if (isLocal) {
+        const localBtn = document.createElement('button');
+        localBtn.type = 'button';
+        localBtn.className = 'sd-admin-authwall-local';
+        localBtn.textContent = 'Continue locally';
+        localBtn.addEventListener('click', function () {
+          startAdminSession('local-admin-preview').catch(function (err) {
+            handleAdminLoadError(err);
+          });
+        });
+        wrap.appendChild(localBtn);
+      }
+    } catch (_) {}
+
+    els.signInWallSlot.appendChild(wrap);
   }
 } catch (_) {}
 
@@ -3552,19 +3763,31 @@ document.querySelectorAll('.sd-policy-rule-card').forEach(function (card) {
     renderPolicyRuleCards();
   });
 });
-els.toggleLibraryBtn.addEventListener('click', function () {
-  setArticleLibraryCollapsed(!els.workspace.classList.contains('sd-admin-workspace-library-collapsed'));
-});
-try {
-  setSidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1');
-} catch (_e) { /* ignore */ }
-if (els.toggleSidebarBtn) {
-  els.toggleSidebarBtn.addEventListener('click', function (event) {
-    event.stopPropagation();
-    const isCollapsed = !!els.shell?.classList.contains('sd-admin-shell--sidebar-collapsed');
-    setSidebarCollapsed(!isCollapsed);
+if (els.toggleLibraryBtn) {
+  els.toggleLibraryBtn.addEventListener('click', function () {
+    setArticleLibraryCollapsed(!els.workspace.classList.contains('sd-admin-workspace-library-collapsed'));
   });
 }
+// Rail is permanently narrow — no expand/collapse on desktop
+
+if (els.mobileSidebarBtn) {
+  els.mobileSidebarBtn.addEventListener('click', function () {
+    if (els.adminNav && els.adminNav.classList.contains('sd-admin-nav--open')) {
+      closeMobileNav();
+    } else {
+      openMobileNav();
+    }
+  });
+}
+
+if (els.sidebarScrim) {
+  els.sidebarScrim.addEventListener('click', closeMobileNav);
+}
+
+// Close mobile drawer when a module is selected on mobile
+els.modules.addEventListener('click', function () {
+  if (isMobileNavMode()) closeMobileNav();
+}, true);
 els.togglePolicyInfoBtn.addEventListener('click', function () {
   setContactPolicyInfoCollapsed(!els.policyWorkspace.classList.contains('sd-admin-policy-info-collapsed'));
 });
@@ -3638,16 +3861,17 @@ els.confirmPublishBtn.addEventListener('click', function () {
       setSectionStatus(els.systemStatus, err.message, 'error');
     });
 });
-els.newBtn.addEventListener('click', function () {
-  selectedId = '';
-  fillForm(null);
-  // Show both Article Details and Article Body together.
-  els.detailsForm.hidden = false;
-  els.sectionBuilder.hidden = false;
-  setDetailsStatus('', '');
-  els.title.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  els.title.focus();
-});
+if (els.newBtn) {
+  els.newBtn.addEventListener('click', function () {
+    selectedId = '';
+    fillForm(null);
+    els.detailsForm.hidden = false;
+    els.sectionBuilder.hidden = false;
+    setDetailsStatus('', '');
+    els.title.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    els.title.focus();
+  });
+}
 els.signOut.addEventListener('click', function () {
   signOutAdmin();
 });
