@@ -22,6 +22,16 @@ function requireEnv(name) {
   return value;
 }
 
+function normalizeOriginUrl(value, fallback) {
+  const raw = String(value || '').trim();
+  if (!raw) return fallback;
+  try {
+    return new URL(raw).origin;
+  } catch (_) {
+    return fallback;
+  }
+}
+
 const config = {
   server: {
     port: parseInt(process.env.PORT || '8080', 10),
@@ -140,7 +150,7 @@ const config = {
     priceMonthly:  process.env.STRIPE_PRICE_MONTHLY || '',
     priceYearly:   process.env.STRIPE_PRICE_YEARLY || '',
     // Public URL of the site (used for success/cancel redirects).
-    siteUrl:       process.env.SITE_URL || 'http://localhost:8080',
+    siteUrl:       normalizeOriginUrl(process.env.SITE_URL, 'http://localhost:8080'),
   },
 
   internal: {

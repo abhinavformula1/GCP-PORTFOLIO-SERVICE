@@ -23,6 +23,28 @@ const billing = require('../services/billing');
 
 const router = express.Router();
 
+function resolveBaseUrlFromRequest(req) {
+  const protoRaw = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const hostRaw = req.headers['x-forwarded-host'] || req.get('host') || '';
+  const proto = String(Array.isArray(protoRaw) ? protoRaw[0] : protoRaw).split(',')[0].trim() || 'http';
+  const host = String(Array.isArray(hostRaw) ? hostRaw[0] : hostRaw).split(',')[0].trim();
+
+  const candidate = host ? `${proto}://${host}` : '';
+  try {
+    const u = new URL(candidate);
+    return u.origin.replace(/\/$/, '');
+  } catch (_) {
+    // Fall back to SITE_URL when host headers are missing/untrusted (rare).
+    const fallback = String(config.stripe.siteUrl || '').trim();
+    try {
+      const u = new URL(fallback);
+      return u.origin.replace(/\/$/, '');
+    } catch (__) {
+      return 'http://localhost:8080';
+    }
+  }
+}
+
 function isSafeDevRuntime() {
   // Only expose diagnostics locally / non-production.
   // Cloud Run sets K_SERVICE; treat that as production-like even if NODE_ENV misconfigured.
@@ -108,7 +130,7 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
     const name = String(req.user?.name || '').trim();
     if (!uid) throw new AppError('Missing user id.', 401, 'UNAUTHORIZED');
 
-    const siteUrl = String(config.stripe.siteUrl || '').replace(/\/$/, '');
+    const siteUrl = resolveBaseUrlFromRequest(req);
     const successUrl = `${siteUrl}/?billing=success`;
     const cancelUrl = `${siteUrl}/?billing=cancel`;
 
@@ -140,7 +162,8 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
       // Stripe UI-mode is versioned. Newer versions use `embedded_page`, older use `embedded`.
       ui_mode: wantsEmbedded ? 'embedded_page' : undefined,
       return_url: wantsEmbedded ? embeddedReturnUrl(siteUrl) : undefined,
-      allow_promotion_codes: true,
+      // Keep promo codes out of the UX; we removed promo flows from the product.
+      allow_promotion_codes: false,
       discounts,
       subscription_data: {
         metadata: {
@@ -167,7 +190,7 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
         session = await stripe.checkout.sessions.create({
           ...sessionParams,
           ui_mode: 'embedded',
-          return_url: embeddedReturnUrl,
+          return_url: embeddedReturnUrl(siteUrl),
         });
       } else {
         throw err;
@@ -202,7 +225,7 @@ router.post('/billing/checkout-session-guest', validateEmbeddedCheckout, async (
     if (!priceId) throw new AppError('Missing Stripe price id. Set STRIPE_PRICE_MONTHLY (and optionally STRIPE_PRICE_YEARLY).', 503, 'STRIPE_PRICE_NOT_CONFIGURED');
 
     const stripe = getStripe();
-    const siteUrl = String(config.stripe.siteUrl || '').replace(/\/$/, '');
+    const siteUrl = resolveBaseUrlFromRequest(req);
 
     let discounts = undefined;
     if (coupon) {
@@ -218,7 +241,7 @@ router.post('/billing/checkout-session-guest', validateEmbeddedCheckout, async (
       line_items: [{ price: priceId, quantity: 1 }],
       ui_mode: 'embedded_page',
       return_url: embeddedReturnUrl(siteUrl),
-      allow_promotion_codes: true,
+      allow_promotion_codes: false,
       discounts,
       subscription_data: {
         metadata: { guest: '1' },
@@ -264,7 +287,7 @@ router.post('/billing/checkout-session-guest-redirect', validateCheckout, async 
     if (!priceId) throw new AppError('Missing Stripe price id. Set STRIPE_PRICE_MONTHLY (and optionally STRIPE_PRICE_YEARLY).', 503, 'STRIPE_PRICE_NOT_CONFIGURED');
 
     const stripe = getStripe();
-    const siteUrl = String(config.stripe.siteUrl || '').replace(/\/$/, '');
+    const siteUrl = resolveBaseUrlFromRequest(req);
     const successUrl = `${siteUrl}/?billing=success`;
     const cancelUrl = `${siteUrl}/?billing=cancel`;
 
@@ -282,7 +305,7 @@ router.post('/billing/checkout-session-guest-redirect', validateCheckout, async 
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      allow_promotion_codes: true,
+      allow_promotion_codes: false,
       discounts,
       subscription_data: { metadata: { guest: '1' } },
       metadata: { guest: '1' },
@@ -367,7 +390,7 @@ router.post('/billing/portal-session', requireAuth, async (req, res, next) => {
     const customerId = await billing.getStripeCustomerIdForUser(uid);
     if (!customerId) throw new AppError('No Stripe customer found for this user yet.', 404, 'STRIPE_CUSTOMER_NOT_FOUND');
 
-    const siteUrl = String(config.stripe.siteUrl || '').replace(/\/$/, '');
+    const siteUrl = resolveBaseUrlFromRequest(req);
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${siteUrl}/`,
