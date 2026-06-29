@@ -51,6 +51,8 @@ import {
   openContactInfo, closeContactInfo, initContactInfo,
 } from './ui/contact.js';
 import { GOOGLE_CLIENT_ID } from './core/config.js';
+import { openBillingAccountDialog } from './ui/billing-account.js';
+import { openBillingCheckoutModal } from './ui/billing-checkout.js';
 import {
   openAssistant, closeAssistant, forceCloseAssistant,
   minimiseAssistant, restartAssistant, resumeAssistant,
@@ -344,29 +346,35 @@ import '/assets/ui/loader.js';
       signIn: showWelcomeOverlayWithGsi,
       manageBilling: function () {
         closeUserMenu();
-        // Always available for signed-in subscribers via avatar menu.
-        if (!googleCredential) {
-          showWelcomeOverlayWithGsi();
-          return;
-        }
-        fetch('/api/billing/portal-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
-          credentials: 'same-origin',
-          body: JSON.stringify({}),
-        })
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (data) {
-            const url = data && data.url ? String(data.url) : '';
-            if (!url) return;
+        openBillingAccountDialog({
+          profile: siteProfile,
+          showWelcomeOverlay: showWelcomeOverlayWithGsi,
+          openPortal: async function () {
+            if (!googleCredential) return false;
+            const resp = await fetch('/api/billing/portal-session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleCredential },
+              credentials: 'same-origin',
+              body: JSON.stringify({}),
+            });
+            const data = await resp.json().catch(function () { return null; });
+            if (!resp.ok || !data || !data.url) return false;
+            const url = String(data.url);
             try {
               const win = window.open(url, '_blank', 'noopener');
               if (!win) location.href = url;
             } catch (_) {
               location.href = url;
             }
-          })
-          .catch(function () {});
+            return true;
+          },
+          openCheckout: async function () {
+            await openBillingCheckoutModal({
+              plan: 'monthly',
+              openContactInfo: openContactInfo,
+            });
+          },
+        });
       },
     },
   });
@@ -387,6 +395,15 @@ import '/assets/ui/loader.js';
 
   function refreshAdminNav() {
     setAdminNavVisible(false);
+    // Local-dev UX: always show the Admin entry point on localhost.
+    // The admin UI + APIs still enforce requireAdmin server-side.
+    try {
+      const h = String(location && location.hostname || '');
+      if (h === 'localhost' || h === '127.0.0.1') {
+        setAdminNavVisible(true);
+        return;
+      }
+    } catch (_) {}
     fetch('/api/local-preview')
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {

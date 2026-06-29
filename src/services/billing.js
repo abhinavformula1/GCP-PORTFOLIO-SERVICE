@@ -235,6 +235,12 @@ async function getUserSubscriptionEntitlement(uid) {
     currentPeriodEnd: d.currentPeriodEnd || null,
     cancelAtPeriodEnd: d.cancelAtPeriodEnd === true,
     promo: promoActive ? { until: promoUntil, code: d.promoCode || null } : null,
+    // Optional display fields for UX (safe to expose).
+    planNickname: d.planNickname || null,
+    amount: Number(d.amount || 0) || 0,
+    currency: d.currency || null,
+    interval: d.interval || null,
+    intervalCount: Number(d.intervalCount || 1) || 1,
   };
 }
 

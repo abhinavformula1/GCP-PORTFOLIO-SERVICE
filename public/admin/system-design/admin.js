@@ -154,6 +154,7 @@ const els = {
   userName:        document.getElementById('adminUserName'),
   dropdown:        document.getElementById('adminTopbarDropdown'),
   signOut:         document.getElementById('adminSignOut'),
+  signInWallSlot:  document.getElementById('topbarSignInBtnWall'),
   welcomeGoogle:   document.getElementById('welcomeGoogleBtn'),
   welcomeClose:    document.getElementById('welcomeCloseBtn'),
   welcomeGuest:    document.getElementById('welcomeGuestBtn'),
@@ -658,8 +659,25 @@ function handleAdminLoadError(err) {
   els.metadataConfigWorkspace.hidden = true;
   els.sponsorshipsWorkspace.hidden = true;
   if (err?.status === 401 || err?.status === 403) {
+    const attempted = (function () {
+      try {
+        const p = profileFromCredential(credential || '');
+        return String(p && p.email || '').trim();
+      } catch (_) {
+        return '';
+      }
+    })();
     resetAdminSession();
-    setStatus(null);
+    if (err?.status === 403) {
+      setStatus(
+        (attempted
+          ? ('Signed in as ' + attempted + ', but this account is not allowed to access the admin CMS. Sign in with the email configured in ADMIN_ALLOWED_EMAILS.')
+          : 'This account is not allowed to access the admin CMS. Sign in with the email configured in ADMIN_ALLOWED_EMAILS.'),
+        'error'
+      );
+    } else {
+      setStatus('Your session expired. Please sign in again.', 'warning');
+    }
     if (els.authWall) els.authWall.hidden = false;
     return;
   }
@@ -3250,6 +3268,21 @@ els.topbarSignIn.addEventListener('click', function () {
   });
   setStatus('', 'info');
 });
+
+// Make the auth-wall CTA behave identically to the topbar Sign in.
+// (Users land here via direct URL / refresh, where the topbar button can be missed.)
+try {
+  if (els.signInWallSlot && els.signInWallSlot.childElementCount === 0) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sd-admin-authwall-signin';
+    btn.textContent = 'Sign in';
+    btn.addEventListener('click', function () {
+      try { els.topbarSignIn.click(); } catch (_) {}
+    });
+    els.signInWallSlot.appendChild(btn);
+  }
+} catch (_) {}
 
 els.avatarBtn.addEventListener('click', function () {
   els.dropdown.toggleAttribute('hidden');

@@ -347,6 +347,24 @@
   color: var(--text-secondary);
 }
 
+.sd-admin-authwall-signin {
+  margin-top: 10px;
+  background: var(--brand-blue);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(1, 52, 122, 0.22);
+}
+.sd-admin-authwall-signin:hover {
+  filter: brightness(1.03);
+}
+.sd-admin-authwall-signin:active {
+  filter: brightness(0.98);
+}
+
 .sd-admin-workspace,
 .sd-admin-editor,
 .sd-admin-editor-shell,
