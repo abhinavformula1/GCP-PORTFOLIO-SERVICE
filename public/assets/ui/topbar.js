@@ -151,7 +151,6 @@ export function updateTopbarUser(p) {
   if (!el) return;
 
   const signedIn = !!(p && p.type !== 'guest' && p.picture);
-  const subActive = !!(p && p.subscription && p.subscription.active);
 
   if (signedIn) {
     photo.src = p.picture;
@@ -160,8 +159,7 @@ export function updateTopbarUser(p) {
     el.removeAttribute('hidden');
     if (signInEl) signInEl.setAttribute('hidden', '');
     if (billing) {
-      if (subActive) billing.removeAttribute('hidden');
-      else billing.setAttribute('hidden', '');
+      billing.removeAttribute('hidden');
     }
   } else {
     el.setAttribute('hidden', '');
