@@ -441,6 +441,59 @@ md-text-button:not(:defined) { visibility: hidden; }
   }
 }
 
+/* ── Billing success / receipt modal (Apple/Tesla-style) ─────────────────── */
+.billing-success-dialog {
+  --md-dialog-container-color: var(--md-sys-color-surface-container-high);
+  --md-dialog-container-shape: 18px;
+  --md-dialog-headline-size: 16px;
+  --md-dialog-headline-weight: 800;
+  width: min(560px, 94vw);
+  max-width: calc(100vw - 16px);
+}
+.billing-success-dialog::part(container) {
+  width: min(560px, 94vw);
+}
+.billing-success-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.billing-success-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.billing-success-body {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding-top: 2px;
+}
+.billing-success-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--md-sys-color-success) 18%, transparent);
+  color: color-mix(in srgb, var(--md-sys-color-success) 90%, #fff 10%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.billing-success-icon .material-symbols-outlined { font-size: 22px; }
+.billing-success-copy {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.billing-success-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 /* Ensure M3 dialogs (welcome/sign-in) sit above all app overlays. */
 md-dialog {
   position: fixed;
