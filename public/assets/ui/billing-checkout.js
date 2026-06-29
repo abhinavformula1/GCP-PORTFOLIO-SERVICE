@@ -12,6 +12,7 @@ let _stripePublishableKey = null;
 let _embeddedCheckout = null;
 let _stripeDialog = null;
 let _billingSupportDialog = null;
+let _billingSuccessDialog = null;
 
 async function getStripePublishableKey() {
   if (_stripePublishableKey !== null) return _stripePublishableKey;
@@ -99,6 +100,94 @@ function ensureBillingSupportDialog(openContactInfo) {
 
   _billingSupportDialog = dlg;
   return dlg;
+}
+
+function ensureBillingSuccessDialog() {
+  if (_billingSuccessDialog && _billingSuccessDialog.isConnected) return _billingSuccessDialog;
+
+  const dlg = document.createElement('md-dialog');
+  dlg.className = 'billing-success-dialog';
+  dlg.id = 'billingSuccessDialog';
+  dlg.innerHTML = `
+    <div slot="headline" class="billing-success-head">
+      <span class="billing-success-title" id="billingSuccessTitle">Subscription updated</span>
+      <button type="button" class="stripe-checkout-close" aria-label="Close">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+    <div slot="content" class="billing-success-body">
+      <div class="billing-success-icon" aria-hidden="true">
+        <span class="material-symbols-outlined">verified</span>
+      </div>
+      <p class="billing-success-copy" id="billingSuccessCopy"></p>
+    </div>
+    <div slot="actions" class="billing-success-actions">
+      <md-text-button id="billingSuccessSecondaryBtn" hidden></md-text-button>
+      <md-filled-button id="billingSuccessPrimaryBtn">Continue</md-filled-button>
+    </div>
+  `;
+  document.body.appendChild(dlg);
+
+  const closeBtn = dlg.querySelector('.stripe-checkout-close');
+  if (closeBtn) closeBtn.addEventListener('click', function () {
+    try { if (typeof dlg.close === 'function') dlg.close(); } catch (_) {}
+  });
+
+  _billingSuccessDialog = dlg;
+  return dlg;
+}
+
+function showBillingSuccess(state, deps) {
+  const dlg = ensureBillingSuccessDialog();
+  const title = dlg.querySelector('#billingSuccessTitle');
+  const copy = dlg.querySelector('#billingSuccessCopy');
+  const primary = dlg.querySelector('#billingSuccessPrimaryBtn');
+  const secondary = dlg.querySelector('#billingSuccessSecondaryBtn');
+
+  const safeState = String(state || '').trim();
+
+  let titleText = 'Subscription updated';
+  let copyText = 'You’re all set.';
+  let primaryText = 'Continue';
+  let secondaryText = '';
+  let showSecondary = false;
+
+  if (safeState === 'payment_received') {
+    titleText = 'Payment received';
+    copyText = 'Sign in to link this subscription to your account and unlock premium articles on this device.';
+    primaryText = 'Sign in';
+    secondaryText = 'Not now';
+    showSecondary = true;
+  } else if (safeState === 'activated') {
+    titleText = 'Thanks for subscribing';
+    copyText = 'Premium is now unlocked. You can continue reading immediately.';
+    primaryText = 'Continue reading';
+  }
+
+  if (title) title.textContent = titleText;
+  if (copy) copy.textContent = copyText;
+
+  if (secondary) {
+    secondary.textContent = secondaryText || '';
+    secondary.hidden = !showSecondary;
+    secondary.onclick = showSecondary ? function () {
+      try { if (typeof dlg.close === 'function') dlg.close(); } catch (_) {}
+    } : null;
+  }
+
+  if (primary) {
+    primary.textContent = primaryText;
+    primary.onclick = function () {
+      try { if (typeof dlg.close === 'function') dlg.close(); } catch (_) {}
+      if (safeState === 'payment_received') {
+        const showWelcomeOverlay = deps && deps.showWelcomeOverlay;
+        if (typeof showWelcomeOverlay === 'function') showWelcomeOverlay();
+      }
+    };
+  }
+
+  if (typeof dlg.show === 'function') dlg.show();
+  else dlg.removeAttribute('hidden');
 }
 
 function showBillingSupport(message, deps) {
@@ -213,6 +302,7 @@ export async function claimCheckoutSession(sessionId, deps) {
   if (!token) {
     try { sessionStorage.setItem('pending_claim_session_id', String(sessionId || '')); } catch (_) {}
     if (typeof showWelcomeOverlay === 'function') showWelcomeOverlay();
+    showBillingSuccess('payment_received', deps);
     showToast('Sign in to unlock your purchase.', { kind: 'warning', duration: 6000 });
     return false;
   }
@@ -231,6 +321,7 @@ export async function claimCheckoutSession(sessionId, deps) {
   }
 
   showToast('Subscription activated. Premium is now unlocked.', { kind: 'success', duration: 6000 });
+  showBillingSuccess('activated', deps);
   try { sessionStorage.removeItem('pending_claim_session_id'); } catch (_) {}
   return true;
 }
@@ -256,6 +347,7 @@ export function initBillingClaimFlow(deps) {
       const clean = location.pathname + (qs.toString() ? '?' + qs.toString() : '');
       history.replaceState({}, '', clean);
 
+      showBillingSuccess('payment_received', deps);
       showToast('Payment received. Sign in to unlock premium on this account.', { kind: 'success', duration: 8000 });
       const cred = typeof getCredential === 'function' ? getCredential() : null;
       if (cred) {
