@@ -470,6 +470,7 @@ import '/assets/ui/loader.js';
           // gets contact.canSeePhone === false and the masked placeholder
           // remains in place.
           profile.contact = data.contact || null;
+          profile.subscription = data.subscription || null;
           applyContactPolicy(profile.contact);
         }
         saveSiteProfile(profile);
@@ -517,6 +518,7 @@ import '/assets/ui/loader.js';
           visitCount:  data.visitCount || 1,
           lastSeenAt:  data.lastSeenAt || null,
           contact:     data.contact || null,
+          subscription: data.subscription || null,
         };
         saveSiteProfile(profile);
         applyContactPolicy(profile.contact);
