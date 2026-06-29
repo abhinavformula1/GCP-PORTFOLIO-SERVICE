@@ -26,7 +26,7 @@
  */
 
 import { currentLang } from '../core/i18n.js';
-import { googleCredential, siteProfile } from '../core/state.js';
+import { googleCredential, siteProfile, setSiteProfile } from '../core/state.js';
 import { blocksToHtml } from './sdblocks.js';
 import { iconCardsHtml } from './iconcards.js';
 import { mountSponsorSlot } from './sponsorship.js';
@@ -50,6 +50,7 @@ let _btn         = null;
 let _topicFilter = '';
 let _cmsTopics   = null;
 let _cmsLoadStarted = false;
+let _cmsLoading = false;
 let _cmsLoaded   = false;
 let _tierConfig  = null;
 let _userToggledSidebar = false;
@@ -632,8 +633,11 @@ async function loadTierConfig() {
 }
 
 async function loadCmsTopics() {
-  if (_cmsLoadStarted) return;
-  _cmsLoadStarted = true;
+  const force = arguments && arguments[0] && arguments[0].force === true;
+  if (_cmsLoading) return;
+  if (_cmsLoadStarted && !force) return;
+  _cmsLoading = true;
+  if (!_cmsLoadStarted) _cmsLoadStarted = true;
   try {
     const token = await authTokenOrNull();
     const [articlesResp] = await Promise.all([
@@ -652,8 +656,33 @@ async function loadCmsTopics() {
     console.warn('[system-design] content load failed:', err.message);
   } finally {
     _cmsLoaded = true;
+    _cmsLoading = false;
     rerenderSystemDesignView();
   }
+}
+
+async function refreshSessionProfile() {
+  try {
+    if (!googleCredential) return;
+    const resp = await fetch('/api/session/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: String(googleCredential) }),
+      credentials: 'same-origin',
+    });
+    const data = await resp.json().catch(function () { return null; });
+    if (!resp.ok || !data || !data.success) return;
+
+    const merged = Object.assign({}, (siteProfile && typeof siteProfile === 'object') ? siteProfile : {}, {
+      sub: data.sub,
+      name: data.name || '',
+      email: data.email || '',
+      picture: data.picture || null,
+      contact: data.contact || null,
+      subscription: data.subscription || null,
+    });
+    setSiteProfile(merged);
+  } catch (_) {}
 }
 
 // ── DOM construction (lazy, idempotent) ──────────────────────────────────────
@@ -1420,8 +1449,29 @@ export function initSystemDesign() {
     showWelcomeOverlay: function () {
       if (typeof window.showWelcomeOverlay === 'function') window.showWelcomeOverlay();
     },
+    openBillingPortal: async function () {
+      const token = await authTokenOrNull();
+      if (!token) return false;
+      const resp = await fetch('/api/billing/portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+      });
+      const data = await resp.json().catch(function () { return null; });
+      if (!resp.ok || !data || !data.url) return false;
+      try {
+        const win = window.open(String(data.url), '_blank', 'noopener');
+        if (!win) location.href = String(data.url);
+      } catch (_) {
+        location.href = String(data.url);
+      }
+      return true;
+    },
     onClaimed: function () {
-      loadCmsTopics();
+      refreshSessionProfile().finally(function () {
+        loadCmsTopics({ force: true });
+      });
       handleRoute();
     },
   });

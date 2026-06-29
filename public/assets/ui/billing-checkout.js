@@ -151,6 +151,7 @@ function showBillingSuccess(state, deps) {
   let primaryText = 'Continue';
   let secondaryText = '';
   let showSecondary = false;
+  let secondaryAction = null;
 
   if (safeState === 'payment_received') {
     titleText = 'Payment received';
@@ -158,10 +159,16 @@ function showBillingSuccess(state, deps) {
     primaryText = 'Sign in';
     secondaryText = 'Not now';
     showSecondary = true;
+    secondaryAction = function () {};
   } else if (safeState === 'activated') {
     titleText = 'Thanks for subscribing';
     copyText = 'Premium is now unlocked. You can continue reading immediately.';
     primaryText = 'Continue reading';
+    if (deps && typeof deps.openBillingPortal === 'function') {
+      secondaryText = 'Manage billing';
+      showSecondary = true;
+      secondaryAction = function () { deps.openBillingPortal(); };
+    }
   }
 
   if (title) title.textContent = titleText;
@@ -172,6 +179,7 @@ function showBillingSuccess(state, deps) {
     secondary.hidden = !showSecondary;
     secondary.onclick = showSecondary ? function () {
       try { if (typeof dlg.close === 'function') dlg.close(); } catch (_) {}
+      try { if (typeof secondaryAction === 'function') secondaryAction(); } catch (_) {}
     } : null;
   }
 
@@ -347,14 +355,14 @@ export function initBillingClaimFlow(deps) {
       const clean = location.pathname + (qs.toString() ? '?' + qs.toString() : '');
       history.replaceState({}, '', clean);
 
-      showBillingSuccess('payment_received', deps);
-      showToast('Payment received. Sign in to unlock premium on this account.', { kind: 'success', duration: 8000 });
       const cred = typeof getCredential === 'function' ? getCredential() : null;
       if (cred) {
         claimCheckoutSession(sessionId, deps).then(function (ok) {
           if (ok && typeof onClaimed === 'function') onClaimed();
         }).catch(function () {});
       } else if (typeof showWelcomeOverlay === 'function') {
+        showBillingSuccess('payment_received', deps);
+        showToast('Payment received. Sign in to unlock premium on this account.', { kind: 'success', duration: 8000 });
         showWelcomeOverlay();
       }
     }
