@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
-  <link rel="stylesheet" href="/assets/style.css?v=2026-06-29-header-hamburger-1">
-  <link rel="stylesheet" href="./styles.css?v=2026-06-30-home-left">
+  <link rel="stylesheet" href="/assets/style.css?v=2026-07-01-atlas-fab-v1">
+  <link rel="stylesheet" href="./styles.css?v=2026-07-01-atlas-fab-v1">
   <!-- Hide icon ligature text until Material Symbols font is ready (anti-FOUC) -->
   <style>.material-symbols-outlined{visibility:hidden}.fonts-loaded .material-symbols-outlined{visibility:visible}</style>
   <script>
@@ -65,6 +65,13 @@
     <div class="sd-admin-nav-scrim" id="sidebarScrim" aria-hidden="true"></div>
 
     <aside class="sd-admin-nav" id="adminNav" aria-label="Admin navigation">
+      <!-- Mobile drawer header: hidden on desktop, shown inside the open drawer on mobile -->
+      <div class="sd-admin-nav-mobile-header">
+        <span class="sd-admin-nav-mobile-title">Menu</span>
+        <button type="button" class="sd-admin-nav-close-btn" id="mobileNavCloseBtn" aria-label="Close navigation">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
       <div class="sd-admin-nav-brand" style="display:none" aria-hidden="true"></div>
 
 
@@ -148,7 +155,7 @@
       </nav>
     </aside>
 
-    <!-- ── Sub-panel: secondary navigation per module (Gamma-style) ───────── -->
+    <!-- ── Sub-panel: secondary navigation per module ───────── -->
     <aside class="sd-admin-subpanel" id="adminSubpanel" aria-label="Module navigation">
 
       <!-- Articles / Content -->
@@ -158,21 +165,21 @@
           <span>Content</span>
         </div>
         <nav class="sd-subpanel-nav">
-          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="all">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="all" onclick="window._setArticleFilter('all')">
             <span class="material-symbols-outlined" aria-hidden="true">list</span>All Articles
           </button>
-          <button type="button" class="sd-subpanel-item" data-subpanel-action="drafts">
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="drafts" onclick="window._setArticleFilter('drafts')">
             <span class="material-symbols-outlined" aria-hidden="true">draft</span>Drafts
           </button>
-          <button type="button" class="sd-subpanel-item" data-subpanel-action="published">
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="published" onclick="window._setArticleFilter('published')">
             <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Published
           </button>
-          <button type="button" class="sd-subpanel-item" data-subpanel-action="archived">
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="archived" onclick="window._setArticleFilter('archived')">
             <span class="material-symbols-outlined" aria-hidden="true">archive</span>Archived
           </button>
         </nav>
         <div class="sd-subpanel-divider"></div>
-        <button type="button" class="sd-subpanel-new-btn" data-subpanel-action="new">
+        <button type="button" id="newArticleBtn" class="sd-subpanel-new-btn" data-subpanel-action="new" onclick="window._newArticle && window._newArticle()">
           <span class="material-symbols-outlined" aria-hidden="true">add</span>New Article
         </button>
       </div>
@@ -373,6 +380,15 @@
         </nav>
       </div>
 
+      <!-- Collapse button — always visible at the very bottom of the sub-panel -->
+      <div class="sd-subpanel-footer">
+        <button type="button" class="sd-subpanel-collapse-btn" id="subpanelCollapseBtn"
+          onclick="document.body.classList.remove('sd-subpanel-open')" aria-label="Collapse panel">
+          <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+          Collapse
+        </button>
+      </div>
+
     </aside>
 
     <div class="sd-admin-main">
@@ -395,9 +411,10 @@
 
       <section class="sd-admin-editor-shell">
         <section class="sd-admin-editor">
-          <div class="sd-admin-editor-head">
+          <div class="sd-admin-editor-head" hidden>
             <div>
               <h2>Write the story</h2>
+              <p class="sd-admin-editor-subtitle">Craft, structure, and publish impactful architecture content.</p>
             </div>
             <div class="sd-admin-editor-controls">
               <input id="articleStatus" type="hidden" value="Draft">
@@ -414,11 +431,53 @@
             </div>
           </div>
 
+          <!-- Article list view — shown when user browses articles via filter buttons -->
+          <section id="articleListMain" class="sd-article-list-main" hidden>
+
+            <!-- Toolbar: action row -->
+            <div class="sd-list-action-row">
+              <button type="button" id="newArticleBtnInline" class="sd-list-new-btn" onclick="window._newArticle && window._newArticle()">
+                <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                <span>New Article</span>
+              </button>
+            </div>
+
+            <!-- Toolbar: filter tabs + count + view toggle -->
+            <div class="sd-list-filter-row">
+              <div class="sd-list-filter-tabs" role="tablist" aria-label="Filter articles">
+                <button type="button" role="tab" class="sd-list-filter-tab sd-list-filter-tab-active" data-filter="all"
+                  aria-selected="true" onclick="window._setArticleFilter && window._setArticleFilter('all')">All</button>
+                <button type="button" role="tab" class="sd-list-filter-tab" data-filter="drafts"
+                  aria-selected="false" onclick="window._setArticleFilter && window._setArticleFilter('drafts')">Drafts</button>
+                <button type="button" role="tab" class="sd-list-filter-tab" data-filter="published"
+                  aria-selected="false" onclick="window._setArticleFilter && window._setArticleFilter('published')">Published</button>
+                <button type="button" role="tab" class="sd-list-filter-tab" data-filter="archived"
+                  aria-selected="false" onclick="window._setArticleFilter && window._setArticleFilter('archived')">Archived</button>
+              </div>
+              <div class="sd-list-filter-right">
+                <span class="sd-article-list-count" id="articleListCount"></span>
+                <div class="sd-view-toggle" role="group" aria-label="View mode">
+                  <button type="button" id="viewToggleGrid" class="sd-view-toggle-btn sd-view-toggle-active" aria-pressed="true" title="Grid view" onclick="window._setArticleView && window._setArticleView('grid')">
+                    <span class="material-symbols-outlined">grid_view</span>
+                    <span>Grid</span>
+                  </button>
+                  <button type="button" id="viewToggleList" class="sd-view-toggle-btn" aria-pressed="false" title="List view" onclick="window._setArticleView && window._setArticleView('list')">
+                    <span class="material-symbols-outlined">view_list</span>
+                    <span>List</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div id="articleList" class="sd-content-article-list"></div>
+          </section>
+
           <div class="sd-admin-primary-fields">
             <section class="sd-authoring-card sd-article-details-card">
               <div id="articleDetailsBanner" class="composer-status" hidden></div>
               <div class="sd-authoring-card-head sd-article-details-head">
-                <div>
+                <img id="articleCardThumb" class="sd-details-head-thumb" src="" alt="Article thumbnail" hidden>
+                <div class="sd-article-details-meta">
                   <h3 id="articleDetailsTitle">Untitled article</h3>
                   <p id="articleDetailsSubtitle">No subtitle yet.</p>
                   <div id="articleDetailsTags" class="sd-article-details-tags"></div>
@@ -507,6 +566,10 @@
               </div>
               <div id="articleSections" class="sd-composer-host"></div>
               <textarea id="articleBody" hidden></textarea>
+              <div class="sd-section-builder-footer">
+                <span id="articleWordCount" class="sd-word-count"></span>
+                <span id="articleSaveStatusFooter" class="sd-save-status-footer"></span>
+              </div>
             </section>
           </div>
 
@@ -1124,11 +1187,9 @@
     </div>
   </main>
 
-  <div id="sharedFooter"></div>
-
   <div id="sharedAtlasShell"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./admin.js?v=2026-06-30-home-left"></script>
+  <script type="module" src="./admin.js?v=2026-07-01-edit-cancel-delete-v1"></script>
 </body>
 </html>

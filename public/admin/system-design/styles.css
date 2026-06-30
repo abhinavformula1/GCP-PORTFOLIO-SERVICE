@@ -137,7 +137,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   GAMMA-STYLE SIDEBAR — permanent narrow rail, icon + short label, no expand
+   SIDEBAR — permanent narrow rail, icon + short label, no expand
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
   --sd-nav-rail: 60px;   /* permanent icon-only rail */
@@ -148,8 +148,11 @@
 .sd-admin-shell--sidebar {
   display: block;
   margin-left: var(--sd-nav-rail);
+  /* Definite width so children with overflow-x: auto have a reference */
+  width: calc(100vw - var(--sd-nav-rail));
   padding: 22px 28px 80px;
   padding-top: calc(var(--sd-topbar-h) + 22px);
+  box-sizing: border-box;
 }
 @media (min-width: 1680px) {
   .sd-admin-shell, .sd-admin-shell--sidebar { max-width: none; }
@@ -240,7 +243,7 @@
 .sd-admin-module:focus-visible {
   outline: none; box-shadow: 0 0 0 2px var(--sd-state-focus);
 }
-/* Active: Gamma tinted chip */
+/* Active: tinted chip */
 .sd-admin-module-active {
   background: var(--md-sys-color-secondary-container,
     color-mix(in srgb, var(--md-sys-color-primary) 14%, var(--surface)));
@@ -267,7 +270,7 @@
 .sd-admin-module::after { content: none; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   GAMMA-STYLE SUB-PANEL — secondary navigation panel to the right of rail
+   SUB-PANEL — secondary navigation panel to the right of rail
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
   --sd-subpanel-w: 240px;
@@ -299,7 +302,9 @@ body.sd-subpanel-open .sd-admin-subpanel {
 /* Main content shifts right when sub-panel is open */
 body.sd-subpanel-open .sd-admin-shell--sidebar {
   margin-left: calc(var(--sd-nav-rail) + var(--sd-subpanel-w));
-  transition: margin-left 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  width: calc(100vw - var(--sd-nav-rail) - var(--sd-subpanel-w));
+  transition: margin-left 220ms cubic-bezier(0.4, 0, 0.2, 1),
+              width       220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Pane visibility — only the active pane shows */
@@ -407,6 +412,465 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   font-size: 18px;
 }
 
+/* Sub-panel footer with Collapse button */
+.sd-subpanel-footer {
+  margin-top: auto;
+  padding: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  flex-shrink: 0;
+}
+.sd-subpanel-collapse-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.sd-subpanel-collapse-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 7%, transparent);
+  color: var(--text, inherit);
+}
+.sd-subpanel-collapse-btn .material-symbols-outlined {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* Article list inside the sub-panel */
+.sd-subpanel-article-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 4px 8px;
+}
+.sd-subpanel-article-list md-list {
+  --md-list-item-label-text-font: inherit;
+  padding: 0;
+}
+.sd-subpanel-article-list .sd-admin-li {
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+.sd-subpanel-article-list .sd-admin-li-active,
+.sd-subpanel-article-list md-list-item.sd-admin-li-active {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+}
+.sd-subpanel-article-list .sd-admin-li-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.sd-subpanel-article-list .sd-admin-li-overline {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.sd-subpanel-article-list .sd-admin-chip {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+}
+.sd-subpanel-article-list .sd-admin-li-subtitle,
+.sd-subpanel-article-list .sd-admin-li-meta {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+.sd-subpanel-article-list .sd-admin-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.sd-subpanel-article-list .sd-admin-empty strong {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+/* ── Article list in main workspace area ──────────────────────────────── */
+.sd-article-list-main {
+  padding: 0 0 24px;
+}
+
+/* ── Article list toolbar ─────────────────────────────────── */
+
+/* Action row: New Article button */
+.sd-list-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.sd-list-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  border: none;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms, box-shadow 120ms;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.sd-list-new-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.sd-list-new-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 88%, var(--md-sys-color-on-primary));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+}
+
+/* Filter row: tabs (left) + count + view toggle (right) */
+.sd-list-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--sd-outline-soft);
+  margin-bottom: 16px;
+}
+
+/* Filter tabs */
+.sd-list-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sd-list-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+  white-space: nowrap;
+}
+
+.sd-list-filter-tab:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+  color: var(--text);
+}
+
+.sd-list-filter-tab.sd-list-filter-tab-active {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+  color: var(--md-sys-color-primary);
+  font-weight: 700;
+}
+
+/* Right side of filter row: count + view toggle */
+.sd-list-filter-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.sd-article-list-count {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* View toggle (Grid / List) */
+.sd-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.sd-view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+  line-height: 1;
+}
+
+.sd-view-toggle-btn .material-symbols-outlined {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sd-view-toggle-btn:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+}
+
+.sd-view-toggle-btn.sd-view-toggle-active {
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Grid view (default): visual cards ──────────────────────────── */
+.sd-content-article-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  padding: 4px 2px;
+  align-items: stretch;
+}
+
+/* ── List view: uses reusable DataTable ─────────────────────────────── */
+.sd-content-article-list.sd-list-view {
+  display: block;
+  grid-template-columns: unset;
+}
+
+/* Make DataTable rows look clickable */
+.sd-articles-table tbody tr {
+  cursor: pointer;
+  transition: background 100ms;
+}
+
+.sd-articles-table tbody tr:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 5%, transparent);
+}
+
+.sd-articles-table tbody tr:has(.sd-articles-table-title-active) {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+}
+
+.sd-articles-table-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 500px;
+}
+
+.sd-articles-table-title-active {
+  color: var(--md-sys-color-primary);
+}
+
+/* ── Article card ────────────────────────────────────────── */
+.sd-article-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--sd-outline-soft);
+  background: var(--md-sys-color-surface);
+  cursor: pointer;
+  transition: box-shadow 140ms, border-color 140ms, transform 140ms;
+  min-width: 0;
+}
+
+.sd-article-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-color: color-mix(in srgb, var(--md-sys-color-primary) 35%, transparent);
+  transform: translateY(-2px);
+}
+
+.sd-article-card-active {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--md-sys-color-primary) 20%, transparent);
+}
+
+/* Thumbnail — full-width banner at the top of the card */
+.sd-article-card-thumb {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  border-radius: 11px 11px 0 0;  /* match card radius */
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* Single neutral gradient for all cards — status badge is the differentiator */
+.sd-article-card-thumb-system-design,
+.sd-article-card-thumb-architecture,
+.sd-article-card-thumb-case-study {
+  background: linear-gradient(145deg, #e8eeff 0%, #d4dfff 50%, #dce8ff 100%);
+}
+
+/* Faux content lines — simulate a doc preview */
+.sd-article-card-thumb::before {
+  content: '';
+  position: absolute;
+  bottom: 28px;
+  left: 16px;
+  right: 16px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.1);
+}
+.sd-article-card-thumb::after {
+  content: '';
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 40px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.sd-article-card-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Large watermark letter (bottom-right of thumb) */
+.sd-article-card-thumb-letter {
+  position: absolute;
+  bottom: -8px;
+  right: 12px;
+  font-size: 6rem;
+  font-weight: 800;
+  color: rgba(0, 0, 0, 0.08);
+  user-select: none;
+  line-height: 1;
+  letter-spacing: -3px;
+}
+
+/* Status badge overlaid top-left */
+.sd-article-card-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+
+/* Card body */
+.sd-article-card-body {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.sd-article-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* Reserve space for exactly 2 lines so all cards are the same height */
+  min-height: calc(0.95rem * 1.45 * 2);
+}
+
+.sd-article-card-type {
+  font-size: 0.73rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Card footer */
+.sd-article-card-footer {
+  padding: 8px 16px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--sd-outline-soft);
+  margin-top: 4px;
+}
+
+.sd-article-card-footer .sd-article-card-meta {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-article-card-footer .sd-article-card-more {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.sd-article-card-meta {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+/* "..." more button */
+.sd-article-card-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  line-height: 1;
+  transition: background 100ms, color 100ms;
+  flex-shrink: 0;
+}
+.sd-article-card-more:hover {
+  background: var(--md-sys-color-surface-container);
+  color: var(--text);
+}
+
+/* Empty state in grid */
+.sd-content-article-list .sd-admin-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 32px;
+  text-align: center;
+  border: 1.5px dashed var(--sd-outline-soft);
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+.sd-content-article-list .sd-admin-empty strong {
+  font-size: 1rem;
+  color: var(--text);
+}
+
 /* ── Topbar: fixed full-width header above sidebar + content ──────────── */
 .topbar.sd-admin-topbar {
   position: fixed;
@@ -426,6 +890,7 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   margin-right: 4px;
 }
 
+
 /* ── Scrim (mobile) ─────────────────────────────────────────────────────── */
 .sd-admin-nav-scrim {
   display: none;
@@ -442,6 +907,11 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 .sd-admin-nav-scrim.sd-nav-scrim--visible {
   opacity: 1;
   pointer-events: all;
+}
+
+/* ── Mobile drawer header (close button row) — hidden on desktop ─────── */
+.sd-admin-nav-mobile-header {
+  display: none;
 }
 
 /* ── Mobile topbar trigger ──────────────────────────────────────────────── */
@@ -474,14 +944,52 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 }
 
 /* ── Mobile: full-height overlay drawer ────────────────────────────────── */
-@media (max-width: 980px) {
-  /* Reset fixed-rail layout on mobile */
+@media (max-width: 600px) {
+  /* Content takes full viewport — rail + sub-panel are overlays */
   .sd-admin-shell--sidebar {
     margin-left: 0 !important;
+    width: 100% !important;
     padding: calc(var(--sd-topbar-h) + 14px) 16px 70px;
     max-width: none;
+    box-sizing: border-box;
+  }
+  body.sd-subpanel-open .sd-admin-shell--sidebar,
+  body.sd-mobile-nav-open .sd-admin-shell--sidebar {
+    margin-left: 0 !important;
+    width: 100% !important;
   }
 
+  /* Rail: hidden by default, slides in as NARROW overlay (same 60px as desktop) */
+  .sd-admin-nav {
+    width: var(--sd-nav-rail) !important;  /* stays narrow — reuse desktop rail */
+    top: var(--sd-topbar-h);
+    transform: translateX(-110%);
+    z-index: 200;
+    transition: transform 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sd-admin-nav--open {
+    transform: translateX(0);
+    box-shadow: 2px 0 24px rgba(0, 0, 0, 0.18);
+  }
+
+  /* Sub-panel: hidden by default on mobile */
+  .sd-admin-subpanel,
+  body.sd-subpanel-open .sd-admin-subpanel {
+    display: none !important;
+    transform: none !important;
+  }
+  /* Show sub-panel beside the rail when mobile nav is open.
+     sd-mobile-nav-open is added to body by openMobileNav().
+     Placed AFTER the hide rules so same-specificity cascade wins. */
+  body.sd-mobile-nav-open .sd-admin-subpanel {
+    display: flex !important;
+    transform: translateX(0) !important;
+    top: var(--sd-topbar-h);
+    left: var(--sd-nav-rail);
+    z-index: 190;
+  }
+
+  /* Mobile topbar: show hamburger button */
   .sd-admin-mobile-topbar {
     display: flex;
     align-items: center;
@@ -489,56 +997,14 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
     margin-bottom: 14px;
   }
 
+  /* Scrim behind the overlay */
   .sd-admin-nav-scrim {
     display: block;
   }
 
-  /* Drawer: slides in from left, below topbar on mobile */
-  .sd-admin-nav {
-    width: 280px !important;
-    max-width: calc(100vw - 48px);
-    top: var(--sd-topbar-h);
-    bottom: 0;
-    z-index: 200;
-    transform: translateX(-110%);
-    transition: transform 260ms cubic-bezier(0.4, 0, 0.2, 1),
-                width 0ms; /* no width animation on mobile */
-  }
-
-  .sd-admin-nav--open {
-    transform: translateX(0);
-    box-shadow: 4px 0 40px rgba(0, 0, 0, 0.2);
-  }
-
-  /* Open drawer: show full expanded layout (logo + text + full labels) */
-  .sd-admin-nav--open .sd-admin-nav-brand {
-    justify-content: flex-start !important;
-    gap: 10px !important;
-    padding: 14px 14px 12px !important;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent) !important;
-  }
-  .sd-admin-nav--open .sd-admin-nav-brand-text { display: block !important; }
-  .sd-admin-nav--open .sd-admin-nav-expand-btn { display: none !important; }
-  .sd-admin-nav--open .sd-admin-modules {
-    align-items: stretch !important;
-    padding: 8px 10px 16px !important;
-  }
-  .sd-admin-nav--open .sd-nav-section { display: contents !important; }
-  .sd-admin-nav--open .sd-nav-section-label { display: none !important; }
-  .sd-admin-nav--open .sd-admin-module {
-    flex-direction: row !important;
-    width: 100% !important; min-height: 40px !important;
-    padding: 0 12px !important; gap: 10px !important;
-    border-radius: 999px !important;
-    font-size: 0.875rem !important; font-weight: 600 !important;
-    align-items: center !important;
-  }
-  .sd-admin-nav--open .sd-admin-module-short { display: none !important; }
-  .sd-admin-nav--open .sd-admin-module-label { display: block !important; }
-  .sd-admin-nav--open .sd-admin-module-icon { font-size: 20px !important; flex: 0 0 20px !important; }
-
-  .sd-admin-nav-collapse {
-    display: none;
+  /* Mobile drawer header and close button — not needed (scrim closes overlay) */
+  .sd-admin-nav-mobile-header {
+    display: none !important;
   }
 }
 
@@ -625,15 +1091,11 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 }
 
 .sd-admin-topbar .topbar-inner {
-  max-width: 1840px;
+  max-width: none;
+  margin: 0;
+  padding: 0 16px;
   align-items: center;
   gap: 14px;
-}
-
-@media (min-width: 1680px) {
-  .sd-admin-topbar .topbar-inner {
-    max-width: none;
-  }
 }
 
 .sd-admin-auth {
@@ -645,34 +1107,50 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 }
 
 .sd-admin-topbar .topbar-avatar-btn {
-  /* Match the public site avatar sizing + shape. */
   position: relative;
   width: auto;
   height: auto;
   border: 0;
   border-radius: 0;
   background: transparent;
+  gap: 8px;
 }
 
+/* Show initials circle when no real photo is loaded */
 .sd-admin-topbar .topbar-avatar-btn::before {
-  /* Public topbar shows the photo only; keep admin consistent. */
-  display: none;
+  content: attr(data-initials);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.02em;
 }
 
+/* When a real Google photo is present, hide the initials and show the photo */
 .sd-admin-topbar .topbar-avatar-btn[data-has-photo="true"]::before {
   display: none;
 }
 
+/* Hide the img (and its broken-image alt text) when no real photo is loaded */
 .sd-admin-topbar .topbar-user-photo {
-  display: block;
-  width: 40px;
-  height: 40px;
+  display: none;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   object-fit: cover;
   opacity: 1;
 }
 
 .sd-admin-topbar .topbar-avatar-btn[data-has-photo="true"] .topbar-user-photo {
+  display: block;
   opacity: 1;
 }
 
@@ -818,7 +1296,7 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 
 .sd-admin-workspace {
   display: grid;
-  grid-template-columns: 330px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   padding: 18px;
   margin-top: 10px;
@@ -999,7 +1477,8 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
 }
 
 .sd-admin-editor-head h2 {
@@ -1298,6 +1777,7 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 .sd-article-settings {
   display: grid;
   gap: 18px;
+  min-width: 0; /* prevent grid blowout so inner tables can scroll */
 }
 
 .sd-article-settings[hidden] {
@@ -2813,7 +3293,7 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 
 .sd-admin-workspace {
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   padding: 0;
   margin-top: 0;
@@ -3082,16 +3562,21 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+
+/* Heading block (h2 + subtitle) — grows to fill; never shrinks below 200px */
+.sd-admin-editor-head > div:first-child {
+  flex: 1 0 200px;
 }
 
 .sd-admin-editor-controls {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
   gap: 12px;
-  min-width: 0;
 }
 
 .sd-admin-editor-actions {
@@ -3168,8 +3653,24 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 }
 
 .sd-article-details-head {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.sd-details-head-thumb {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.sd-article-details-meta {
+  flex: 1;
+  min-width: 0;
 }
 
 .sd-article-details-head h3 {
@@ -3182,6 +3683,42 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   margin: 0;
   color: var(--text-secondary);
   line-height: 1.45;
+}
+
+/* Subtitle under "Write the story" */
+.sd-admin-editor-subtitle {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Word count + save status footer */
+.sd-section-builder-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
+
+.sd-word-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.sd-save-status-footer {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sd-save-status-footer[data-kind="saved"] {
+  color: #198038;
 }
 
 /* Editor header subtitle should remain visible (detail context). */
@@ -3543,7 +4080,9 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 }
 
 .sd-section-ribbon-remove:hover,
-.sd-section-ribbon-remove:focus-visible {
+.sd-section-ribbon-remove:focus-visible,
+.sd-section-ribbon-btn-delete:hover,
+.sd-section-ribbon-btn-delete:focus-visible {
   background: var(--md-sys-color-error-container);
   color: var(--md-sys-color-on-error-container);
 }
@@ -3564,13 +4103,30 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   box-shadow: none;
 }
 
-/* Section editors: keep the toolbar docked at the bottom of each card, always visible. */
+/* Section editors: toolbar pinned above the writing surface, always visible, single-row + scrollable. */
 .composer-inline .composer-toolbar {
+  order: 1;
   position: static;
   bottom: auto;
-  margin: 0 12px 12px;
+  margin: 0;
+  padding: 5px 8px;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid var(--sd-outline-soft);
+  border-bottom: none;
   box-shadow: none;
   background: var(--md-sys-color-surface-container-highest);
+  backdrop-filter: none;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.composer-inline .composer-toolbar::-webkit-scrollbar {
+  display: none;
+}
+.composer-inline .composer-surface {
+  order: 2;
+  border-radius: 0 0 16px 16px;
+  border-top: none;
 }
 
 /* ── Composer: one write-first surface + contextual bottom toolbar ────────── */
@@ -3654,6 +4210,34 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 .composer-spacer {
   flex: 1;
   min-width: 8px;
+}
+
+/* Paragraph style dropdown in the composer toolbar */
+/* Use double-class selector so specificity (0,2,0) beats .sd-admin-editor select (0,2,1 → actually 0,1,1) */
+select.composer-para-select,
+.composer-para-select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 100px;
+  max-width: 140px;
+  height: 30px;
+  padding: 0 6px 0 8px;
+  border: 1px solid var(--sd-outline-soft);
+  border-radius: 6px;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  /* .sd-admin-editor select (specificity 0,1,1) sets font-size:inherit — override it */
+  font-size: 13px !important;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms;
+}
+select.composer-para-select:hover,
+select.composer-para-select:focus,
+.composer-para-select:hover,
+.composer-para-select:focus {
+  border-color: var(--md-sys-color-primary);
 }
 
 .composer-tool {
@@ -5205,8 +5789,60 @@ col.sd-tbl-action-col { width: 56px; }
   display: none;
 }
 
+/* ── Section actions ⋮ menu ─────────────────────────────────────────────── */
+.sd-section-actions-wrap {
+  position: relative;
+}
+
+.sd-section-actions-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 500;
+  min-width: 148px;
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--sd-outline-soft);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
 .sd-section-actions-menu[hidden] {
   display: none;
+}
+
+.sd-section-action-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-align: left;
+}
+.sd-section-action-item .material-symbols-outlined {
+  font-size: 18px;
+}
+.sd-section-action-item:hover,
+.sd-section-action-item:focus-visible {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  outline: none;
+}
+.sd-section-action-delete {
+  color: var(--md-sys-color-error, #b3261e);
+}
+.sd-section-action-delete:hover,
+.sd-section-action-delete:focus-visible {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
 }
 
 .sd-admin-page .reco-actions-trigger:hover,
@@ -5316,6 +5952,13 @@ col.sd-tbl-action-col { width: 56px; }
 .sd-preview-empty {
   margin: 0;
   color: var(--md-sys-color-on-surface-variant);
+}
+
+/* md-dialog web components render a shadow-DOM scrim even when closed, which
+   intercepts pointer events and blocks UI behind them. Disable that. */
+md-dialog:not([open]) {
+  pointer-events: none;
+  display: none;
 }
 
 .sd-publish-dialog {
@@ -5924,6 +6567,7 @@ col.sd-tbl-action-col { width: 56px; }
 .sd-analytics-panel {
   display: grid;
   gap: 14px;
+  min-width: 0; /* prevent grid blowout so inner tables can scroll */
 }
 
 .sd-analytics-grid {
@@ -6318,21 +6962,30 @@ col.sd-tbl-action-col { width: 56px; }
   flex: 0 0 auto;
 }
 
+/* Mount div for dynamically rendered DataTable — must have min-width:0 so
+   it doesn't blow out its grid/flex parent when the inner table has a
+   large min-width. */
+.sd-dt-mount {
+  min-width: 0;
+}
+
 .sd-analytics-table-wrap {
   width: 100%;
   overflow-x: auto;
   padding-bottom: 6px;
+  /* Border + radius live here, NOT on the table, so position:sticky on td
+     can correctly reference this div as its scroll container. */
+  border: 1px solid var(--border);
+  border-radius: 12px;
 }
 
 .sd-dt-value {
   min-width: 0;
 }
 
-/* ── Subscriptions table polish ─────────────────────────────────────────── */
+/* ── Subscriptions table ─────────────────────────────────────────────────── */
 .sd-subs-table {
-  table-layout: fixed;
-  /* Allow sticky Actions column to escape table clipping. */
-  overflow: visible;
+  min-width: 910px; /* override analytics 1120px; matches sum of column widths */
 }
 
 .sd-subs-table th,
@@ -6578,9 +7231,9 @@ col.sd-tbl-action-col { width: 56px; }
   min-width: 1120px;
   border-collapse: separate;
   border-spacing: 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
+  /* Border + radius moved to .sd-analytics-table-wrap so that overflow:hidden
+     is NOT set on the <table> element — setting overflow:hidden on a table
+     breaks position:sticky on its descendant th/td cells. */
   background: var(--surface);
   table-layout: fixed;
 }
@@ -6600,6 +7253,17 @@ col.sd-tbl-action-col { width: 56px; }
 .sd-analytics-table th:nth-child(5) { width: 86px; }
 .sd-analytics-table th:nth-child(6) { width: 74px; }
 /* 7th column (Top pages) takes remaining width */
+
+/* Subscriptions table — placed AFTER .sd-analytics-table rules so cascade
+   order ensures these widths win (same specificity, later = wins). */
+.sd-subs-table th:nth-child(1) { width: 200px; } /* Subscriber  */
+.sd-subs-table th:nth-child(2) { width:  80px; } /* Status      */
+.sd-subs-table th:nth-child(3) { width: 100px; } /* Plan        */
+.sd-subs-table th:nth-child(4) { width:  88px; } /* Billing interval */
+.sd-subs-table th:nth-child(5) { width:  88px; } /* Amount      */
+.sd-subs-table th:nth-child(6) { width: 150px; } /* Current period — was 74px, caused text overlap */
+.sd-subs-table th:nth-child(7) { width: 134px; } /* Renews on   */
+.sd-subs-table th:nth-child(8) { width:  70px; } /* Actions     */
 
 .sd-analytics-table thead th {
   text-align: left;
