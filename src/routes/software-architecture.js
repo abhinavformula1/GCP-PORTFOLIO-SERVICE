@@ -278,7 +278,12 @@ router.get('/system-design/articles', optionalAuth, async (req, res) => {
       const out = hasAccess ? a : sanitisePremiumArticle(a);
       return Object.assign({}, out, { hasAccess });
     });
-    res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+    // User-specific access flags must not be served from a shared CDN cache.
+    if (uid) {
+      res.set('Cache-Control', 'private, no-store');
+    } else {
+      res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+    }
     return res.status(200).json({ success: true, articles: safe });
   } catch (err) {
     console.warn('[system-design] Firestore list failed:', err.message);
@@ -316,7 +321,8 @@ router.get('/system-design/articles/:id', optionalAuth, async (req, res) => {
       const entitlement = uid ? await billing.getUserSubscriptionEntitlement(uid) : { active: false };
       const hasAccess = forceLocked ? false : (config.admin.localPreview ? true : !!entitlement.active);
       const out = hasAccess ? article : sanitisePremiumArticle(article);
-      res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+      // User-specific access must not be shared across CDN cache keys.
+      res.set('Cache-Control', uid ? 'private, no-store' : 'public, max-age=60, s-maxage=300');
       return res.status(200).json({ success: true, article: Object.assign({}, out, { hasAccess }) });
     }
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
