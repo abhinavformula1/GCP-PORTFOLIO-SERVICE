@@ -11,12 +11,13 @@ import { createEl, materialIcon } from './dom.js';
 
 function renderAtlasLauncher(handlers) {
   const teaserCta = createEl('button', { className: 'chat-teaser-cta', text: "Let's talk" });
-  const fab = createEl('md-fab', {
+  const fab = createEl('button', {
     id: 'chatFab',
-    variant: 'primary',
+    type: 'button',
+    className: 'chat-fab-btn',
     'aria-label': 'Open assistant',
   }, [
-    materialIcon('chat', { id: 'chatFabIcon', slot: 'icon' }),
+    materialIcon('chat', { id: 'chatFabIcon' }),
   ]);
 
   if (typeof handlers?.openAssistant === 'function') {

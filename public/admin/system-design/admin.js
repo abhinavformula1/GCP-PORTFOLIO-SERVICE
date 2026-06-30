@@ -11,7 +11,6 @@ import {
 import { initTheme } from '../../assets/core/theme.js';
 import { hideWelcomeOverlay, showWelcomeOverlay } from '../../assets/ui/welcome.js';
 import { renderAppHeader } from '../../assets/ui/app-header.js?v=2026-06-29-nav-align-1';
-import { renderTechFooter } from '../../assets/ui/footer.js';
 import { renderAtlasShell } from '../../assets/ui/atlas-shell.js';
 import {
   closeAssistant,
@@ -29,6 +28,7 @@ import {
 import { createComposer } from '../../assets/ui/composer.js';
 import { COMPONENT_REGISTRY, enabledBlockTypes } from '../../assets/ui/component-registry.js';
 import { renderDataTable } from '../../assets/ui/datatable.js';
+import { createArticleCard, contentTypeLabel as cardContentTypeLabel } from '../../assets/ui/article-card.js';
 import { renderKpiCards } from '../../assets/ui/kpi-cards.js';
 import { renderToggleCardGroups } from '../../assets/ui/toggle-cards.js';
 import { showToast } from '../../assets/ui/toast.js';
@@ -39,6 +39,8 @@ const ADMIN_HANDOFF_KEY = 'portfolio_admin_handoff';
 let credential = readAdminHandoffCredential() || googleCredential || '';
 let articles = [];
 let selectedId = '';
+let currentArticleFilter = 'all'; // all | drafts | published | archived
+let currentArticleView = localStorage.getItem('sd-article-view') || 'grid'; // grid | list
 let currentThumbnailUrl = '';
 let contactPolicyState = null;
 let adminAvatarObjectUrl = '';
@@ -122,12 +124,8 @@ function autoCleanupRemovedMedia(articleId, removedNames) {
 // Public filtering uses contentType (content type pills) + tags (domains). Categories are
 // intentionally removed to avoid a third, redundant taxonomy.
 
-function contentTypeLabel(value) {
-  const v = String(value || '').trim();
-  if (v === 'architecture') return 'Architecture Notes';
-  if (v === 'case-study') return 'Case Studies';
-  return 'System Design';
-}
+// contentTypeLabel is imported from /assets/ui/article-card.js
+const contentTypeLabel = cardContentTypeLabel;
 
 renderAppHeader('#sharedTopbar', {
   mode: 'admin',
@@ -148,10 +146,8 @@ renderAppHeader('#sharedTopbar', {
     photoAlt: 'Signed-in admin profile photo',
   },
 });
-renderTechFooter('#sharedFooter', {
-  className: 'sponsors-footer',
-  i18n: false,
-});
+
+// Footer is intentionally omitted on the admin page — no brand attribution needed here.
 
 const els = {
   topbarSignIn:    document.getElementById('adminTopbarSignInBtn'),
@@ -248,6 +244,7 @@ const els = {
   testPolicyBtn:   document.getElementById('testContactPolicyBtn'),
   savePolicyBtn:   document.getElementById('saveContactPolicyBtn'),
   list:            document.getElementById('articleList'),
+  listMain:        document.getElementById('articleListMain'),
   toggleLibraryBtn: document.getElementById('toggleArticleLibraryBtn'),
   totalCount:      document.getElementById('articleTotalCount'),
   publishedCount:  document.getElementById('articlePublishedCount'),
@@ -266,6 +263,8 @@ const els = {
   detailsBanner:   document.getElementById('articleDetailsBanner'),
   detailsActionsBtn: document.getElementById('articleDetailsActionsBtn'),
   detailsActionsMenu: document.getElementById('articleDetailsActionsMenu'),
+  detailsHead:     document.querySelector('.sd-article-details-head'),
+  editorHead:      document.querySelector('.sd-admin-editor-head'),
   editDetailsBtn:  document.getElementById('editArticleDetailsBtn'),
   title:           document.getElementById('articleTitle'),
   subtitle:        document.getElementById('articleSubtitle'),
@@ -312,10 +311,11 @@ const els = {
 };
 
 
-// Mobile drawer helpers
+// Mobile drawer helpers — reuses the same narrow rail + sub-panel as desktop
 function openMobileNav() {
   if (!els.adminNav || !els.sidebarScrim) return;
   els.adminNav.classList.add('sd-admin-nav--open');
+  document.body.classList.add('sd-mobile-nav-open');
   els.sidebarScrim.classList.add('sd-nav-scrim--visible');
   if (els.mobileSidebarBtn) els.mobileSidebarBtn.setAttribute('aria-expanded', 'true');
   document.body.style.overflow = 'hidden';
@@ -324,13 +324,14 @@ function openMobileNav() {
 function closeMobileNav() {
   if (!els.adminNav || !els.sidebarScrim) return;
   els.adminNav.classList.remove('sd-admin-nav--open');
+  document.body.classList.remove('sd-mobile-nav-open');
   els.sidebarScrim.classList.remove('sd-nav-scrim--visible');
   if (els.mobileSidebarBtn) els.mobileSidebarBtn.setAttribute('aria-expanded', 'false');
   document.body.style.overflow = '';
 }
 
 function isMobileNavMode() {
-  return window.matchMedia('(max-width: 980px)').matches;
+  return window.matchMedia('(max-width: 600px)').matches;
 }
 
 function setStatus(message, kind) {
@@ -803,13 +804,20 @@ function setActiveModule(moduleName) {
     btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
   });
 
-  // Sub-panel: activate matching pane and open the panel
+  // Sub-panel: activate matching pane.
+  // Only open sub-panel on desktop (> 980px); on mobile it is hidden and
+  // navigation happens through the hamburger drawer.
   const subpanel = document.getElementById('adminSubpanel');
   if (subpanel) {
     subpanel.querySelectorAll('.sd-subpanel-pane').forEach(function (pane) {
       pane.classList.toggle('sd-subpanel-pane-active', pane.dataset.subpanel === moduleName);
     });
-    document.body.classList.add('sd-subpanel-open');
+    if (window.innerWidth > 600) {
+      // Desktop: push content right, sub-panel always visible
+      document.body.classList.add('sd-subpanel-open');
+    }
+    // Mobile: sub-panel visibility is controlled by sd-mobile-nav-open (set in openMobileNav).
+    // Pane activation above already ensures the right content shows when rail is open.
   }
 }
 
@@ -1086,61 +1094,59 @@ function buildSectionCard(section, index) {
   down.disabled = index === articleSections.length - 1;
   down.addEventListener('click', function () { moveSection(section, 1); });
 
-  // Section actions (kebab menu) — avoids one-click delete accidents.
-  const actionsWrap = document.createElement('div');
-  // Reuse the recommendation kebab menu styling for consistency.
-  actionsWrap.className = 'reco-actions sd-section-actions';
+  // ⋮ actions menu — keeps the Delete action tucked away to prevent accidents.
+  const moreBtn = document.createElement('button');
+  moreBtn.type = 'button';
+  moreBtn.className = 'sd-section-ribbon-btn sd-section-actions-trigger';
+  moreBtn.title = 'Section actions';
+  moreBtn.setAttribute('aria-label', 'Section actions');
+  moreBtn.setAttribute('aria-haspopup', 'menu');
+  moreBtn.setAttribute('aria-expanded', 'false');
+  moreBtn.appendChild(makeIcon('more_vert'));
 
-  const actionsBtn = document.createElement('button');
-  actionsBtn.type = 'button';
-  actionsBtn.className = 'reco-actions-trigger sd-section-actions-trigger';
-  actionsBtn.title = 'Section actions';
-  actionsBtn.setAttribute('aria-label', 'Section actions');
-  actionsBtn.setAttribute('aria-haspopup', 'menu');
-  actionsBtn.setAttribute('aria-expanded', 'false');
-  actionsBtn.appendChild(makeIcon('more_vert'));
+  const actionsMenu = document.createElement('div');
+  actionsMenu.className = 'sd-section-actions-menu';
+  actionsMenu.hidden = true;
+  actionsMenu.setAttribute('role', 'menu');
 
-  const menu = document.createElement('div');
-  menu.className = 'reco-actions-menu sd-section-actions-menu';
-  menu.hidden = true;
-  menu.setAttribute('role', 'menu');
-
-  const del = document.createElement('button');
-  del.type = 'button';
-  del.className = 'reco-action-item reco-action-item-destructive';
-  del.setAttribute('role', 'menuitem');
-  del.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span><span>Delete</span>';
-  del.addEventListener('click', function () {
+  const deleteItem = document.createElement('button');
+  deleteItem.type = 'button';
+  deleteItem.className = 'sd-section-action-item sd-section-action-delete';
+  deleteItem.setAttribute('role', 'menuitem');
+  deleteItem.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span>' +
+    '<span>Delete</span>';
+  deleteItem.addEventListener('click', function () {
     closeSectionActionMenus();
-    if (!confirm('Delete this section? This cannot be undone.')) return;
+    const label = section.type ? '"' + section.type + '"' : 'this section';
+    if (!confirm('Delete ' + label + '?\nThis cannot be undone.')) return;
     deleteSection(section);
   });
 
-  menu.appendChild(del);
+  actionsMenu.appendChild(deleteItem);
 
-  actionsBtn.addEventListener('click', function (event) {
-    event.stopPropagation();
-    const willOpen = menu.hidden;
+  moreBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    const isOpen = actionsMenu.hidden === false;
     closeSectionActionMenus();
-    closeArticleDetailsMenu();
-    closePolicyRuleMenus();
-    menu.hidden = !willOpen;
-    actionsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    if (!isOpen) {
+      actionsMenu.hidden = false;
+      moreBtn.setAttribute('aria-expanded', 'true');
+    }
   });
-  menu.addEventListener('click', function (event) { event.stopPropagation(); });
 
-  actionsWrap.append(actionsBtn, menu);
+  const moreWrap = document.createElement('div');
+  moreWrap.className = 'sd-section-actions-wrap';
+  moreWrap.append(moreBtn, actionsMenu);
 
-  controls.append(up, down, actionsWrap);
+  controls.append(up, down, moreWrap);
   ribbon.append(number, select, controls);
 
   const composer = createComposer({
     tools: ['format', 'structure', 'insert', 'ai'],
-    toolbarMode: 'inline',
-    // Drafts should be frictionless (always editable). Published articles must be
-    // explicitly unlocked via "Edit" to avoid accidental republish behavior.
-    editToggle: !!(els.statusField && els.statusField.value === 'Published'),
-    startEditing: (els.statusField && els.statusField.value === 'Published') ? (section.startEditing === true) : true,
+    // Always show Edit / Cancel / Save so authors can explicitly lock/unlock
+    // each section regardless of article status.
+    editToggle: true,
+    startEditing: section.startEditing === true,
     onBeginEdit: function () {
       section._baselineType = section.type || '';
     },
@@ -1210,6 +1216,7 @@ function renderSectionEditors() {
   articleSections.forEach(function (section, index) {
     els.sections.appendChild(buildSectionCard(section, index));
   });
+  updateWordCount();
 }
 
 function addSection(type) {
@@ -1261,6 +1268,40 @@ function renderArticleDetails() {
     chip.textContent = tag;
     els.detailsTags.appendChild(chip);
   });
+  // Show thumbnail in card header when one exists
+  const cardThumb = document.getElementById('articleCardThumb');
+  if (cardThumb) {
+    if (currentThumbnailUrl) {
+      cardThumb.src = currentThumbnailUrl;
+      cardThumb.hidden = false;
+    } else {
+      cardThumb.src = '';
+      cardThumb.hidden = true;
+    }
+  }
+}
+
+function updateWordCount() {
+  const el = document.getElementById('articleWordCount');
+  if (!el) return;
+  let text = '';
+  articleSections.forEach(function (s) {
+    if (s.blocks) {
+      s.blocks.forEach(function (b) {
+        text += ' ' + String(b.html || b.text || '').replace(/<[^>]+>/g, ' ');
+      });
+    }
+    text += ' ' + String(s.html || s.text || '').replace(/<[^>]+>/g, ' ');
+  });
+  const count = text.trim().split(/\s+/).filter(Boolean).length;
+  el.textContent = count > 0 ? count + ' words' : '';
+}
+
+function setFooterSaveStatus(message, kind) {
+  const el = document.getElementById('articleSaveStatusFooter');
+  if (!el) return;
+  el.textContent = message;
+  el.dataset.kind = kind || '';
 }
 
 function closeSectionActionMenus() {
@@ -1292,6 +1333,7 @@ function updateWorkflowChrome(status) {
 
 function markDirty() {
   updateWorkflowChrome(els.statusField.value, '');
+  updateWordCount();
   scheduleDraftAutosave();
 }
 
@@ -1314,13 +1356,23 @@ function scheduleDraftAutosave() {
   // Avoid silently publishing. Published articles must go through the explicit
   // publish flow; drafts can autosave freely.
   if ((article.status || '').toLowerCase() === 'published') return;
-  if (!canAutosaveArticle(article)) return;
+  if (!canAutosaveArticle(article)) {
+    setFooterSaveStatus('', '');
+    return;
+  }
+  setFooterSaveStatus('Saving…', '');
   autosaveTimer = setTimeout(function () {
     autosaveTimer = 0;
     saveArticleWithStatus(article.status || 'Draft', { silent: true }).catch(function () {
       setSectionStatus(els.systemStatus, 'Autosave failed.', 'error');
     });
   }, 1200);
+}
+
+// Toggle details form and card-preview header as exclusive views.
+function showDetailsForm(show) {
+  els.detailsForm.hidden = !show;
+  if (els.detailsHead) els.detailsHead.hidden = !!show;
 }
 
 function fillForm(article) {
@@ -1349,7 +1401,9 @@ function fillForm(article) {
   els.tags.value = Array.isArray(item.tags) ? item.tags.join(', ') : '';
   currentThumbnailUrl = item.thumbnail || '';
   setThumbPreview(currentThumbnailUrl);
-  els.detailsForm.hidden = true;
+  if (els.listMain) els.listMain.hidden = true;
+  if (els.editorHead) els.editorHead.hidden = false;
+  showDetailsForm(false);
   els.sectionBuilder.hidden = false;
   renderArticleDetails();
   let blocks = cloneBlocks(item.blocks);
@@ -1374,79 +1428,128 @@ function updateArticleStats() {
   if (els.draftCount) els.draftCount.textContent = String(drafts);
 }
 
+// createArticleCard is imported from /assets/ui/article-card.js (SOLID module).
+// Admin-specific wrapper: binds the onClick to fillForm so call sites stay clean.
+function articleCardForAdmin(article) {
+  return createArticleCard(article, {
+    isActive: article.id === selectedId,
+    onClick:  function (a) { fillForm(a); },
+  });
+}
+
 function renderList() {
   if (!els.list) return;
   els.list.textContent = '';
   updateArticleStats();
-  if (!articles.length) {
+
+  // Apply status filter from sub-panel selection.
+  const statusMap = { drafts: 'Draft', published: 'Published', archived: 'Archived' };
+  const filterStatus = statusMap[currentArticleFilter] || null;
+  const filtered = filterStatus
+    ? articles.filter(function (a) { return (a.status || 'Draft') === filterStatus; })
+    : articles;
+
+  // Keep sub-panel active state in sync.
+  document.querySelectorAll('.sd-subpanel-pane[data-subpanel="system-design"] .sd-subpanel-item').forEach(function (btn) {
+    btn.classList.toggle('sd-subpanel-item-active', btn.dataset.subpanelAction === currentArticleFilter);
+  });
+
+  // Update article count label
+  const countEl = document.getElementById('articleListCount');
+  if (countEl) {
+    countEl.textContent = filtered.length + ' article' + (filtered.length !== 1 ? 's' : '');
+  }
+
+  // Apply view class
+  els.list.classList.toggle('sd-list-view', currentArticleView === 'list');
+
+  if (!filtered.length) {
     const empty = document.createElement('div');
     empty.className = 'sd-admin-empty';
     const title = document.createElement('strong');
-    title.textContent = 'No articles yet.';
+    title.textContent = filterStatus ? 'No ' + filterStatus.toLowerCase() + ' articles.' : 'No articles yet.';
     const hint = document.createElement('span');
-    hint.textContent = 'Start with a new draft or import the seed articles.';
+    hint.textContent = filterStatus ? 'Change the filter above to see other articles.' : 'Start with a new draft or import the seed articles.';
     empty.append(title, hint);
     els.list.appendChild(empty);
     return;
   }
-  const list = document.createElement('md-list');
-  list.className = 'sd-admin-md-list';
-  articles.forEach(function (article) {
-    const en = article.en || {};
-    const rawType = String(article.contentType || 'system-design').trim().toLowerCase();
-    const normalizedType = (rawType === 'architecture' || rawType === 'case-study' || rawType === 'system-design')
-      ? rawType
-      : 'system-design';
 
-    const item = document.createElement('md-list-item');
-    item.setAttribute('type', 'button');
-    item.className = 'sd-admin-li';
-    item.dataset.id = article.id;
-    item.dataset.contentType = normalizedType;
-    if (article.id === selectedId) {
-      item.setAttribute('checked', '');
-      item.classList.add('sd-admin-li-active');
-    }
-
-    const overline = document.createElement('div');
-    overline.slot = 'overline';
-    overline.className = 'sd-admin-li-overline';
-    const status = document.createElement('span');
-    status.className = 'sd-admin-chip';
-    status.dataset.kind = 'status';
-    status.dataset.status = article.status || 'Draft';
-    status.textContent = article.status || 'Draft';
-    const typeChip = document.createElement('span');
-    typeChip.className = 'sd-admin-chip sd-admin-chip-muted';
-    typeChip.dataset.kind = 'type';
-    typeChip.dataset.type = normalizedType;
-    typeChip.textContent = contentTypeLabel(normalizedType);
-    overline.append(status, typeChip);
-
-    const headline = document.createElement('div');
-    headline.slot = 'headline';
-    headline.className = 'sd-admin-li-title';
-    headline.textContent = en.title || article.id;
-
-    const supporting = document.createElement('div');
-    supporting.slot = 'supporting-text';
-    supporting.className = 'sd-admin-li-support';
-    const subtitle = document.createElement('div');
-    subtitle.className = 'sd-admin-li-subtitle';
-    subtitle.textContent = en.subtitle || '';
-    const meta = document.createElement('div');
-    meta.className = 'sd-admin-li-meta';
-    meta.textContent = (article.readMinutes ? article.readMinutes + ' min read · ' : '') + 'Order ' + (article.order || 100);
-    supporting.append(subtitle, meta);
-
-    item.append(overline, headline, supporting);
-    item.addEventListener('click', function () {
-      const picked = articles.find(function (it) { return it.id === item.dataset.id; });
-      fillForm(picked);
+  if (currentArticleView === 'list') {
+    // ── List view: reusable DataTable component ───────────────────────
+    const tableRows = filtered.map(function (article) {
+      const en = article.en || {};
+      const rawType = String(article.contentType || 'system-design').trim().toLowerCase();
+      const normalizedType = (rawType === 'architecture' || rawType === 'case-study' || rawType === 'system-design')
+        ? rawType : 'system-design';
+      return Object.assign({}, article, {
+        _id: article.id,
+        _title: en.title || article.id,
+        _status: article.status || 'Draft',
+        _type: normalizedType,
+        _typeLabel: contentTypeLabel(normalizedType),
+        _meta: (article.readMinutes ? article.readMinutes + ' min read · ' : '') + 'Order ' + (article.order || 100),
+        _active: article.id === selectedId,
+      });
     });
-    list.appendChild(item);
-  });
-  els.list.appendChild(list);
+
+    renderDataTable(els.list, {
+      ariaLabel: 'Articles',
+      tableClassName: 'sd-articles-table',
+      responsive: true,
+      emptyText: 'No articles match this filter.',
+      rows: tableRows,
+      columns: [
+        {
+          key: 'status',
+          header: 'Status',
+          width: 110,
+          renderHtml: function (r) {
+            return '<span class="sd-admin-chip" data-status="' + safeText(r._status) + '">' + safeText(r._status) + '</span>';
+          },
+        },
+        {
+          key: 'type',
+          header: 'Type',
+          width: 160,
+          renderHtml: function (r) {
+            return '<span class="sd-admin-chip sd-admin-chip-muted" data-type="' + safeText(r._type) + '">' + safeText(r._typeLabel) + '</span>';
+          },
+        },
+        {
+          key: 'title',
+          header: 'Title',
+          renderHtml: function (r) {
+            return '<span class="sd-articles-table-title' + (r._active ? ' sd-articles-table-title-active' : '') + '">' + safeText(r._title) + '</span>';
+          },
+        },
+        {
+          key: 'meta',
+          header: 'Read time / Order',
+          align: 'right',
+          renderText: function (r) { return r._meta; },
+        },
+      ],
+    });
+
+    // Add row-click delegation — open article editor on row click
+    const tbody = els.list.querySelector('tbody');
+    if (tbody) {
+      tbody.addEventListener('click', function (e) {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const idx = Array.from(tbody.querySelectorAll('tr')).indexOf(tr);
+        if (idx >= 0 && tableRows[idx]) {
+          fillForm(articles.find(function (a) { return a.id === tableRows[idx]._id; }));
+        }
+      });
+    }
+  } else {
+    // ── Grid view: visual cards ───────────────────────────
+    filtered.forEach(function (article) {
+      els.list.appendChild(articleCardForAdmin(article));
+    });
+  }
 }
 
 function createArticleSettingsField(labelText, field, value, type) {
@@ -2100,6 +2203,7 @@ function paintSubscriptions() {
 
   // Table (reusable DataTable)
   const tableMount = document.createElement('div');
+  tableMount.className = 'sd-dt-mount';
   els.subscriptionsPanel.appendChild(tableMount);
 
   const tableRows = rows.slice(0, 200).map(function (r) {
@@ -2134,7 +2238,6 @@ function paintSubscriptions() {
   renderDataTable(tableMount, {
     ariaLabel: 'Subscriptions',
     tableClassName: 'sd-subs-table',
-    minWidth: 1180,
     responsive: true,
     emptyText: 'No subscriptions yet.',
     rows: tableRows,
@@ -2142,55 +2245,40 @@ function paintSubscriptions() {
       {
         key: 'subscriber',
         header: 'Subscriber',
-        width: 380,
         renderHtml: function (r) {
-          return (
-            '<div class="sd-subs-subscriber-top">' +
-              '<strong class="sd-subs-name">' + safeText(r._name || r._email || r.uid || '—') + '</strong>' +
-            '</div>' +
-            '<div class="sd-subs-subscriber-sub">' +
-              '<span>' + safeText(r._email || 'No email available') + '</span>' +
-              '<span class="sd-subs-dot">·</span>' +
-              '<span class="sd-subs-muted">' + safeText(r.uid || '') + '</span>' +
-            '</div>'
-          );
+          return '<strong class="sd-subs-name">' + safeText(r._name || r._email || r.uid || '—') + '</strong>' +
+            '<div class="sd-subs-muted">' + safeText(r._email || '') + '</div>';
         },
       },
       {
         key: 'status',
         header: 'Status',
-        width: 110,
         renderHtml: function (r) {
-          return '<div class="sd-subs-statuscell">' +
-            '<span class="sd-subs-status sd-subs-status-' + safeText(r._status) + '">' + safeText(r._status) + '</span>' +
-          '</div>';
+          return '<span class="sd-subs-status sd-subs-status-' + safeText(r._status) + '">' + safeText(r._status) + '</span>';
         },
       },
-      { key: 'plan', header: 'Plan', width: 160, renderText: function (r) { return r._plan; } },
-      { key: 'interval', header: 'Billing interval', width: 140, renderText: function (r) { return r._intervalLabel; } },
-      { key: 'amount', header: 'Amount', width: 120, align: 'right', renderText: function (r) { return r._amountLabel; } },
+      { key: 'plan',     header: 'Plan',             renderText: function (r) { return r._plan; } },
+      { key: 'interval', header: 'Billing interval', renderText: function (r) { return r._intervalLabel; } },
+      { key: 'amount',   header: 'Amount', align: 'right', renderText: function (r) { return r._amountLabel; } },
       {
         key: 'period',
         header: 'Current period',
-        width: 200,
         renderHtml: function (r) {
           return '<div>' + safeText(r._periodLabel) + '</div>' +
-            (r._daysLeft ? ('<div class="sd-subs-muted">' + safeText(r._daysLeft) + '</div>') : '');
+            (r._daysLeft ? '<div class="sd-subs-muted">' + safeText(r._daysLeft) + '</div>' : '');
         },
       },
       {
         key: 'renews',
         header: 'Renews on',
-        width: 170,
         renderHtml: function (r) {
           return '<div>' + safeText(r._renewDate || '—') + '</div>' +
-            (r._renewMeta ? ('<div class="sd-subs-muted">' + safeText(r._renewMeta) + '</div>') : '');
+            (r._renewMeta ? '<div class="sd-subs-muted">' + safeText(r._renewMeta) + '</div>' : '');
         },
       },
       {
         key: 'actions',
         header: 'Actions',
-        width: 90,
         align: 'right',
         renderHtml: function (r) {
           return (
@@ -2199,7 +2287,7 @@ function paintSubscriptions() {
               ' data-email="' + safeText(r._email || '') + '"' +
               ' data-customer="' + safeText(r._customerId || '') + '"' +
               ' data-subscription="' + safeText(r._subId || '') + '"' +
-            '><span aria-hidden="true">⋯</span></button>'
+            '><span class="material-symbols-outlined" aria-hidden="true">more_horiz</span></button>'
           );
         },
       },
@@ -2367,7 +2455,7 @@ function paintMediaAudit() {
     mediaAuditView.visibleCount = filtered.length;
   }
 
-  // KPI cards (Palantir/Google admin style)
+  // KPI cards
   const kpis = document.createElement('div');
   kpis.className = 'sd-media-kpis';
   const metrics = computeMediaMetrics(objects);
@@ -3299,9 +3387,17 @@ async function loadArticles() {
   if (els.authWall) els.authWall.hidden = true;
   setStatus('', 'info');
   renderList();
-  fillForm(articles[0] || null);
   await loadContactPolicy();
   setActiveModule('system-design');
+  // Apply saved view preference to toggle buttons before rendering the list.
+  window._setArticleView(currentArticleView);
+  // Set default view last so nothing overrides it.
+  // With articles: show the list. Without: start new-article state.
+  if (articles.length > 0) {
+    window._setArticleFilter('all');
+  } else {
+    fillForm(null);
+  }
 }
 
 async function saveArticleWithStatus(status, opts) {
@@ -3339,12 +3435,13 @@ async function saveArticleWithStatus(status, opts) {
     renderList();
   } else {
     fillForm(saved);
-    els.detailsForm.hidden = true;
+    showDetailsForm(false);
   }
   const done = status === 'Published'
     ? 'Published version ' + data.version + '.'
     : status + ' saved to Firestore.';
   updateWorkflowChrome(saved.status, options.silent ? 'Auto-saved to Firestore' : (status === 'Published' ? 'Published just now' : 'Saved just now'), 'saved');
+  setFooterSaveStatus(status === 'Published' ? 'Published just now ✓' : 'Saved just now ✓', 'saved');
   if (!options.silent) setSectionStatus(els.systemStatus, done, 'success');
 }
 
@@ -3593,7 +3690,7 @@ els.detailsActionsBtn.addEventListener('click', function (event) {
 els.detailsActionsMenu.addEventListener('click', function (event) { event.stopPropagation(); });
 els.editDetailsBtn.addEventListener('click', function () {
   closeArticleDetailsMenu();
-  els.detailsForm.hidden = false;
+  showDetailsForm(true);
   setDetailsStatus('', '');
   els.title.focus();
 });
@@ -3726,7 +3823,7 @@ els.saveDetailsBtn.addEventListener('click', async function () {
     renderArticleDetails();
     setDetailsStatus((saved.status || 'Draft') + ' saved to Firestore.', 'success');
     setTimeout(function () {
-      els.detailsForm.hidden = true;
+      showDetailsForm(false);   // collapse form, restore card preview
       setDetailsStatus('', '');
     }, 1200);
   } catch (err) {
@@ -3780,6 +3877,12 @@ if (els.mobileSidebarBtn) {
   });
 }
 
+// Close button inside the drawer
+const mobileNavCloseBtn = document.getElementById('mobileNavCloseBtn');
+if (mobileNavCloseBtn) {
+  mobileNavCloseBtn.addEventListener('click', closeMobileNav);
+}
+
 if (els.sidebarScrim) {
   els.sidebarScrim.addEventListener('click', closeMobileNav);
 }
@@ -3788,9 +3891,11 @@ if (els.sidebarScrim) {
 els.modules.addEventListener('click', function () {
   if (isMobileNavMode()) closeMobileNav();
 }, true);
-els.togglePolicyInfoBtn.addEventListener('click', function () {
-  setContactPolicyInfoCollapsed(!els.policyWorkspace.classList.contains('sd-admin-policy-info-collapsed'));
-});
+if (els.togglePolicyInfoBtn) {
+  els.togglePolicyInfoBtn.addEventListener('click', function () {
+    setContactPolicyInfoCollapsed(!els.policyWorkspace.classList.contains('sd-admin-policy-info-collapsed'));
+  });
+}
 els.addSectionBtn.addEventListener('click', function (event) {
   event.stopPropagation();
   addSection('');
@@ -3861,16 +3966,54 @@ els.confirmPublishBtn.addEventListener('click', function () {
       setSectionStatus(els.systemStatus, err.message, 'error');
     });
 });
-if (els.newBtn) {
-  els.newBtn.addEventListener('click', function () {
-    selectedId = '';
-    fillForm(null);
-    els.detailsForm.hidden = false;
-    els.sectionBuilder.hidden = false;
-    setDetailsStatus('', '');
-    els.title.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    els.title.focus();
+// Sub-panel filter buttons: All Articles / Drafts / Published / Archived.
+// Exposed globally so inline onclick attributes in HTML can call through to
+// module-scoped state without crossing the module isolation boundary.
+window._setArticleFilter = function (filter) {
+  currentArticleFilter = filter || 'all';
+  selectedId = '';
+  if (els.listMain) els.listMain.hidden = false;
+  // Hide all editing UI — list and editor are mutually exclusive
+  if (els.editorHead) els.editorHead.hidden = true;
+  els.detailsForm.hidden = true;
+  if (els.detailsHead) els.detailsHead.hidden = true;
+  if (els.sectionBuilder) els.sectionBuilder.hidden = true;
+  // Sync inline filter tabs active state
+  document.querySelectorAll('.sd-list-filter-tab').forEach(function (btn) {
+    const active = btn.dataset.filter === currentArticleFilter;
+    btn.classList.toggle('sd-list-filter-tab-active', active);
+    btn.setAttribute('aria-selected', String(active));
   });
+  renderList();
+};
+
+// Article view toggle: grid | list
+window._setArticleView = function (view) {
+  currentArticleView = view === 'list' ? 'list' : 'grid';
+  localStorage.setItem('sd-article-view', currentArticleView);
+  // Update toggle button states
+  const gridBtn = document.getElementById('viewToggleGrid');
+  const listBtn = document.getElementById('viewToggleList');
+  if (gridBtn) {
+    gridBtn.classList.toggle('sd-view-toggle-active', currentArticleView === 'grid');
+    gridBtn.setAttribute('aria-pressed', String(currentArticleView === 'grid'));
+  }
+  if (listBtn) {
+    listBtn.classList.toggle('sd-view-toggle-active', currentArticleView === 'list');
+    listBtn.setAttribute('aria-pressed', String(currentArticleView === 'list'));
+  }
+  renderList();
+};
+
+window._newArticle = function () {
+  selectedId = '';
+  currentArticleFilter = 'all';
+  fillForm(null);            // hides list, shows card preview, hides form
+  setDetailsStatus('', '');
+  renderList();
+};
+if (els.newBtn) {
+  els.newBtn.addEventListener('click', window._newArticle);
 }
 els.signOut.addEventListener('click', function () {
   signOutAdmin();

@@ -517,7 +517,7 @@ function renderLandingMain() {
   // Content type tabs (primary navigation, like previous UX)
   html += '<div class="sd-content-tabs-row">';
   html += '<nav class="sd-content-tabs" role="tablist">';
-  // Apple-grade: no explicit "All" chip. Only show real types; clicking the
+  // Clean UX: no explicit "All" chip. Only show real types; clicking the
   // active chip again toggles back to "all types".
   CONTENT_TABS.filter(function (t) { return t.id !== 'all'; }).forEach(function (tab) {
     const active = _activeContentTab === tab.id ? ' sd-tab-active' : '';
@@ -719,7 +719,7 @@ function ensureDom() {
   _sdDetail.className = 'sd-detail';
   _sdDetail.setAttribute('hidden', '');
 
-  // Apple-grade principle: no UI that collapses itself. Sidebar collapse is user-driven.
+  // No UI that collapses itself. Sidebar collapse is user-driven.
 
   body.appendChild(_sdAside);
   body.appendChild(_sdDetail);

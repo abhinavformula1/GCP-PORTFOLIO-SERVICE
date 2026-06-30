@@ -448,7 +448,7 @@ md-text-button:not(:defined) { visibility: hidden; }
   }
 }
 
-/* ── Billing success / receipt modal (Apple/Tesla-style) ─────────────────── */
+/* ── Billing success / receipt modal ─────────────────── */
 .billing-success-dialog {
   --md-dialog-container-color: var(--md-sys-color-surface-container-high);
   --md-dialog-container-shape: 18px;
@@ -3738,6 +3738,39 @@ figure.sd-image-block figcaption {
   line-height: 0;
 }
 
+/* Custom Atlas FAB button — native button replaces md-fab for reliable sizing */
+.chat-fab-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  background: var(--md-sys-color-surface-container-highest, #fff);
+  color: var(--md-sys-color-primary, #0070D2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18), 0 1px 4px rgba(0, 0, 0, 0.10);
+  transition: box-shadow 180ms, transform 140ms;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-fab-btn:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+.chat-fab-btn:active {
+  transform: translateY(0) scale(0.96);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+.chat-fab-btn .material-symbols-outlined {
+  font-size: 28px;
+  line-height: 1;
+  user-select: none;
+  color: var(--md-sys-color-primary, #1565C0);
+  pointer-events: none;
+}
+
 /* "online" ping animation, positioned over the FAB */
 .chat-fab-ping {
   position: absolute;
@@ -5615,7 +5648,7 @@ figure.sd-image-block figcaption {
 /* ══════════════════════════════════════════════════════════════════════════
    Print / PDF stylesheet
    Target: Chrome "Print…" → "Save as PDF"
-   Goal:   A clean, designed document — indistinguishable from a Stripe or
+   Goal:   A clean, designed document —
            Google engineering design note.
    ══════════════════════════════════════════════════════════════════════════ */
 

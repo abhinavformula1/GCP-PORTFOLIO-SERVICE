@@ -630,25 +630,91 @@ export function createComposer(options) {
   }
 
   if (tools.includes('format')) {
+    // Paragraph style dropdown (Paragraph / Heading 1 / Heading 2 / Heading 3)
+    const paraSelect = document.createElement('select');
+    paraSelect.className = 'composer-para-select';
+    paraSelect.setAttribute('aria-label', 'Paragraph style');
+    paraSelect.title = 'Paragraph style';
+    [
+      { value: 'p',  label: 'Paragraph' },
+      { value: 'h2', label: 'Heading 1' },
+      { value: 'h3', label: 'Heading 2' },
+      { value: 'h4', label: 'Heading 3' },
+    ].forEach(function (opt) {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      paraSelect.appendChild(o);
+    });
+    paraSelect.addEventListener('change', function () {
+      surface.focus();
+      document.execCommand('formatBlock', false, paraSelect.value);
+      refreshActiveStates();
+      emitChange();
+    });
+    // Keep the dropdown in sync with current block type on selection change.
+    surface.addEventListener('keyup', refreshParaSelect);
+    surface.addEventListener('mouseup', refreshParaSelect);
+    function refreshParaSelect() {
+      const sel = window.getSelection();
+      if (!sel || !sel.anchorNode) return;
+      let node = sel.anchorNode;
+      while (node && node !== surface) {
+        if (node.nodeType === 1) {
+          const t = node.tagName.toLowerCase();
+          if (['p', 'h2', 'h3', 'h4'].includes(t)) {
+            paraSelect.value = t;
+            return;
+          }
+        }
+        node = node.parentNode;
+      }
+      paraSelect.value = 'p';
+    }
+    if (toolbar.childElementCount) toolbar.appendChild(divider());
+    toolbar.appendChild(paraSelect);
+
     const bold = makeButton({ icon: 'format_bold', label: 'Bold', showLabel: false, title: 'Bold' });
     const italic = makeButton({ icon: 'format_italic', label: 'Italic', showLabel: false, title: 'Italic' });
+    const underline = makeButton({ icon: 'format_underlined', label: 'Underline', showLabel: false, title: 'Underline' });
     const code = makeButton({ icon: 'code', label: 'Code', showLabel: false, title: 'Inline code' });
+    const link = makeButton({ icon: 'link', label: 'Link', showLabel: false, title: 'Insert link' });
     bold.addEventListener('click', function () { exec('bold'); });
     italic.addEventListener('click', function () { exec('italic'); });
+    underline.addEventListener('click', function () { exec('underline'); });
     code.addEventListener('click', function () { wrapInlineCode(); });
+    link.addEventListener('click', function () {
+      const sel = window.getSelection();
+      const existingLink = sel && sel.anchorNode ? sel.anchorNode.closest && sel.anchorNode.closest('a') : null;
+      if (existingLink) {
+        document.execCommand('unlink');
+        refreshActiveStates();
+        emitChange();
+        return;
+      }
+       
+      const url = window.prompt('Enter URL:', 'https://');
+      if (url && url !== 'https://') {
+        exec('createLink', url);
+      }
+    });
     stateButtons.push({ button: bold, kind: 'command', command: 'bold' });
     stateButtons.push({ button: italic, kind: 'command', command: 'italic' });
-    addGroup([bold, italic, code]);
+    stateButtons.push({ button: underline, kind: 'command', command: 'underline' });
+    addGroup([bold, italic, underline, code, link]);
   }
 
   if (tools.includes('structure')) {
     const heading = makeButton({ icon: 'title', label: 'Heading', showLabel: false, title: 'Heading' });
     const bullets = makeButton({ icon: 'format_list_bulleted', label: 'Bullets', showLabel: false, title: 'Bullet list' });
+    const numbered = makeButton({ icon: 'format_list_numbered', label: 'Numbered', showLabel: false, title: 'Numbered list' });
     heading.addEventListener('click', function () { toggleBlock('h3'); });
     bullets.addEventListener('click', function () { exec('insertUnorderedList'); });
+    numbered.addEventListener('click', function () { exec('insertOrderedList'); });
     stateButtons.push({ button: heading, kind: 'block', tag: 'h3' });
     stateButtons.push({ button: bullets, kind: 'command', command: 'insertUnorderedList' });
-    addGroup([heading, bullets]);
+    stateButtons.push({ button: numbered, kind: 'command', command: 'insertOrderedList' });
+    addGroup([heading, bullets, numbered]);
   }
 
   if (tools.includes('insert')) {
