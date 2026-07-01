@@ -4741,6 +4741,25 @@ figure.sd-image-block figcaption {
 /* Trademark / nominative-fair-use note. Quiet by design — it's there for
    legal hygiene, not to be read every time. Kept centered + narrow so it
    doesn't compete with the tech-stack row above. */
+.footer-social {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 16px 0 4px;
+}
+.footer-social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footer-social-link:hover { color: var(--text, #111); }
+.footer-social-link .material-symbols-outlined { font-size: 15px; }
+
 .sponsors-disclaimer {
   max-width: 720px;
   margin: 12px auto 0;
