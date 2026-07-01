@@ -280,6 +280,31 @@ async function getSubscriptionsOverview() {
 async function getUserSubscriptionEntitlement(uid) {
   const id = String(uid || '').trim();
   if (!id) return { active: false, status: 'guest' };
+
+  // Manual override: if an admin has explicitly set tierSource='manual' on the
+  // user record, that takes precedence over whatever Stripe says.
+  try {
+    const userSnap = await firestore.getDb().collection('users').doc(id).get();
+    if (userSnap.exists) {
+      const u = userSnap.data() || {};
+      if (String(u.tierSource || '') === 'manual') {
+        const manualActive = String(u.tier || '') === 'premium';
+        return {
+          active: manualActive,
+          status: manualActive ? 'active' : 'free',
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+          promo: null,
+          planNickname: 'Manual override',
+          amount: 0,
+          currency: null,
+          interval: null,
+          intervalCount: 1,
+        };
+      }
+    }
+  } catch (_) { /* non-fatal — fall through to Stripe check */ }
+
   const snap = await firestore.getDb().collection(BILLING_USERS_COLLECTION).doc(id).get();
   if (!snap.exists) return { active: false, status: 'none' };
   const d = snap.data() || {};
