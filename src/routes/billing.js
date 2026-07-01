@@ -152,10 +152,20 @@ router.post('/billing/checkout-session', requireAuth, validateCheckout, async (r
 
     const uiMode = String(req.body.uiMode || 'redirect').trim();
     const wantsEmbedded = uiMode === 'embedded';
+
+    // Reuse existing Stripe customer when one is already linked to this uid.
+    // Without this, every checkout attempt creates a duplicate customer record.
+    let existingCustomerId = null;
+    try {
+      existingCustomerId = await billing.getStripeCustomerIdForUser(uid);
+    } catch (_) {}
+
     const sessionParams = {
       mode: 'subscription',
       client_reference_id: uid,
-      customer_email: email || undefined,
+      ...(existingCustomerId
+        ? { customer: existingCustomerId }
+        : { customer_email: email || undefined }),
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: wantsEmbedded ? undefined : successUrl,
       cancel_url: wantsEmbedded ? undefined : cancelUrl,
