@@ -72,22 +72,27 @@ export function contentTypeLabel(type) {
 /**
  * Build and return a single article card DOM node.
  *
- * @param {Object}   article              - Article data object (Firestore shape)
- * @param {Object}   [opts]               - Options
- * @param {boolean}  [opts.isActive=false] - Highlights the card as selected
- * @param {Function} [opts.onClick]        - (article) => void   — card click
+ * @param {Object}   article               - Article data object (Firestore shape)
+ * @param {Object}   [opts]                - Options
+ * @param {boolean}  [opts.isActive=false]  - Highlights the card as selected
+ * @param {Function} [opts.onClick]         - (article) => void — card click
+ * @param {boolean}  [opts.showBadge=true]  - Show/hide the status badge overlay
+ * @param {boolean}  [opts.showOrder=true]  - Include "Order N" in the meta footer
+ * @param {number}   [opts.lastVisited]     - Unix timestamp of last visit; shows "Viewed X ago"
+ * @param {boolean}  [opts.isPremium]       - Show lock indicator in footer
  * @returns {HTMLDivElement}
  */
 export function createArticleCard(article, opts = {}) {
-  const { isActive = false, onClick } = opts;
+  const { isActive = false, onClick, showBadge = true, showOrder = true, lastVisited, isPremium } = opts;
 
   const en            = article.en || {};
   const type          = normaliseContentType(article.contentType);
   const status        = article.status || 'Draft';
   const titleText     = en.title || article.id || 'Untitled';
   const firstLetter   = titleText.charAt(0).toUpperCase();
-  const metaText      = (article.readMinutes ? article.readMinutes + ' min · ' : '') +
-                        'Order ' + (article.order || 100);
+  const readPart      = article.readMinutes ? article.readMinutes + ' min' : '';
+  const orderPart     = showOrder ? 'Order ' + (article.order || 100) : '';
+  const metaText      = [readPart, orderPart].filter(Boolean).join(' · ');
 
   // ── Card wrapper ──────────────────────────────────────────────────────
   const card = document.createElement('div');
@@ -112,12 +117,26 @@ export function createArticleCard(article, opts = {}) {
     thumb.appendChild(letter);
   }
 
-  const badge           = document.createElement('span');
-  badge.className       = 'sd-article-card-badge sd-admin-chip';
-  badge.dataset.kind    = 'status';
-  badge.dataset.status  = status;
-  badge.textContent     = status;
-  thumb.appendChild(badge);
+  if (showBadge) {
+    const badge           = document.createElement('span');
+    badge.className       = 'sd-article-card-badge sd-admin-chip';
+    badge.dataset.kind    = 'status';
+    badge.dataset.status  = status;
+    badge.textContent     = status;
+    thumb.appendChild(badge);
+  }
+
+  // Premium lock — top-right corner of thumbnail
+  if (isPremium) {
+    const lockChip = document.createElement('span');
+    lockChip.className = 'sd-article-card-premium-chip';
+    lockChip.setAttribute('aria-label', 'Premium');
+    const lockIcon = document.createElement('span');
+    lockIcon.className = 'material-symbols-outlined';
+    lockIcon.textContent = 'lock';
+    lockChip.appendChild(lockIcon);
+    thumb.appendChild(lockChip);
+  }
 
   // ── Body ──────────────────────────────────────────────────────────────
   const body = document.createElement('div');
@@ -143,8 +162,27 @@ export function createArticleCard(article, opts = {}) {
 
   footer.append(meta);
 
+  // ── "Viewed X ago" strip — full-width bar at very bottom ─────────────
+  let viewedStrip = null;
+  if (lastVisited) {
+    const diff = Date.now() - lastVisited;
+    const mins = Math.floor(diff / 60000);
+    let rel = 'Just now';
+    if (mins >= 1 && mins < 60) rel = mins + ' min ago';
+    else if (mins >= 60 && mins < 1440) rel = Math.floor(mins / 60) + ' hr ago';
+    else if (mins >= 1440 && mins < 10080) rel = Math.floor(mins / 1440) + 'd ago';
+    else if (mins >= 10080) rel = Math.floor(mins / 10080) + 'wk ago';
+    viewedStrip = document.createElement('div');
+    viewedStrip.className = 'sd-article-card-viewed-strip';
+    const eyeIcon = document.createElement('span');
+    eyeIcon.className = 'material-symbols-outlined';
+    eyeIcon.textContent = 'visibility';
+    viewedStrip.append(eyeIcon, document.createTextNode('Viewed ' + rel));
+  }
+
   // ── Assemble + wire click ─────────────────────────────────────────────
   card.append(thumb, body, footer);
+  if (viewedStrip) card.append(viewedStrip);
 
   if (typeof onClick === 'function') {
     card.addEventListener('click', function () { onClick(article); });
