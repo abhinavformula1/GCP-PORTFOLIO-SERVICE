@@ -112,6 +112,23 @@ async function upsertStripeSubscription(subscription) {
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
 
+  // Sync users/{uid}.tier from Stripe — but only when there is no manual override.
+  // A manual override is indicated by tierSource === 'manual' on the user record.
+  // This lets admins gift or revoke access independently of Stripe billing.
+  try {
+    const userSnap = await firestore.getDb().collection('users').doc(uid).get();
+    const userData = userSnap.exists ? (userSnap.data() || {}) : {};
+    if (String(userData.tierSource || '') !== 'manual') {
+      const userTier = (status === 'active' || status === 'trialing') ? 'premium' : 'free';
+      await firestore.getDb().collection('users').doc(uid).set(
+        { tier: userTier, tierSource: 'stripe', tierUpdatedAt: FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+    }
+  } catch (tierErr) {
+    console.warn('[billing] Failed to sync users.tier for uid', uid, tierErr.message);
+  }
+
   await firestore.getDb().collection(BILLING_EVENTS_COLLECTION).doc().set({
     type: 'subscription_' + status,
     uid,

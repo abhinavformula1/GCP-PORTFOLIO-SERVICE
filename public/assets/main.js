@@ -45,6 +45,7 @@ import {
   showWelcomeOverlay, hideWelcomeOverlay,
   showWelcomeToast,   closeWelcomeToast,
 } from './ui/welcome.js';
+import { showToast } from './ui/toast.js';
 import { openHireMe, closeHireMe, initHireMe } from './ui/hireme.js';
 import { openReferMe, closeReferMe, initRefer } from './refer/refer.js';
 import {
@@ -365,9 +366,11 @@ import '/assets/ui/loader.js';
               const url = String(data.url);
               try {
                 const win = window.open(url, '_blank', 'noopener');
-                if (!win) location.href = url;
+                // Do NOT fall back to location.href — that navigates the current page.
+                // If the popup was blocked, guide the user instead.
+                if (!win) showToast('Popup blocked — allow popups for this site, then try again.', { kind: 'info', duration: 6000 });
               } catch (_) {
-                location.href = url;
+                showToast('Could not open billing portal. Please allow popups and try again.', { kind: 'error', duration: 6000 });
               }
               return true;
             },

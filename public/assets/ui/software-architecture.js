@@ -1386,10 +1386,10 @@ function renderTopicDetail() {
     if (!url) return;
     try {
       const win = window.open(url, '_blank', 'noopener');
-      // Popup blockers often return null/undefined without throwing.
-      if (!win) location.href = url;
+      // Never fall back to location.href for _blank — that navigates the current page.
+      if (!win) showToast('Popup blocked — allow popups for this site, then try again.', { kind: 'info', duration: 6000 });
     } catch (_) {
-      location.href = url;
+      showToast('Could not open the page. Please allow popups and try again.', { kind: 'error', duration: 6000 });
     }
   }
 
@@ -1706,9 +1706,9 @@ export function initSystemDesign() {
       if (!resp.ok || !data || !data.url) return false;
       try {
         const win = window.open(String(data.url), '_blank', 'noopener');
-        if (!win) location.href = String(data.url);
+        if (!win) showToast('Popup blocked — allow popups for this site, then try again.', { kind: 'info', duration: 6000 });
       } catch (_) {
-        location.href = String(data.url);
+        showToast('Could not open billing portal. Please allow popups and try again.', { kind: 'error', duration: 6000 });
       }
       return true;
     },
