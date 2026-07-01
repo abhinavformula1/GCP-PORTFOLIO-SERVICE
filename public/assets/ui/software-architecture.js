@@ -621,6 +621,7 @@ function renderLandingMain() {
   restoreListFilters();
   const topics = getTopics();
   const filtered = filterArticles(topics, _activeContentTab, _activeDomain);
+  const subActive = !!(siteProfile && siteProfile.subscription && siteProfile.subscription.active);
 
   // ── Header + toolbar ─────────────────────────────────────────────────────
   let html = '<section class="sd-list-view sd-sa-list">';
@@ -685,7 +686,7 @@ function renderLandingMain() {
         _typeLabel: contentTypeLabel(type),
         _meta: t.readMinutes ? t.readMinutes + ' min read' : '',
         _premium: t.tier === 'premium',
-        _locked: t.tier === 'premium' && t.hasAccess === false,
+        _locked: t.tier === 'premium' && !subActive && t.hasAccess === false,
         _visited: listVisits[t.id] || null,
         _topic: t,
       };
@@ -769,7 +770,7 @@ function renderLandingMain() {
           showBadge: false,
           showOrder: false,
           lastVisited: visits[t.id] || null,
-          isPremium: t.tier === 'premium',
+          isPremium: t.tier === 'premium' && !subActive,
           onClick: function () {
             navigate(PATH_PREFIX + '/' + t.id + (forceLockedEnabled() ? '?forceLocked=1' : ''));
             handleRoute();
