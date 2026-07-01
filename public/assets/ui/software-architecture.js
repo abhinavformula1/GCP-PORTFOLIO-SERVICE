@@ -32,6 +32,8 @@ import { iconCardsHtml } from './iconcards.js';
 import { mountSponsorSlot } from './sponsorship.js';
 import { showToast } from './toast.js';
 import { openBillingCheckoutModal, initBillingClaimFlow } from './billing-checkout.js';
+import { createArticleCard, contentTypeLabel } from './article-card.js';
+import { renderDataTable } from './datatable.js';
 
 // ── Topic catalogue ──────────────────────────────────────────────────────────
 //
@@ -57,6 +59,42 @@ let _userToggledSidebar = false;
 
 const SIDEBAR_COLLAPSE_KEY = 'sd_topics_collapsed';
 const LIST_FILTERS_KEY = 'sd_list_filters_v1';
+const PUB_VIEW_KEY = 'sd_pub_view';
+const ARTICLE_VISITS_KEY = 'sd_article_visits';
+
+function recordArticleVisit(id) {
+  if (!id) return;
+  try {
+    const visits = JSON.parse(localStorage.getItem(ARTICLE_VISITS_KEY) || '{}');
+    visits[id] = Date.now();
+    localStorage.setItem(ARTICLE_VISITS_KEY, JSON.stringify(visits));
+  } catch (_) {}
+}
+
+function getArticleVisits() {
+  try { return JSON.parse(localStorage.getItem(ARTICLE_VISITS_KEY) || '{}'); } catch (_) { return {}; }
+}
+
+function relativeTime(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return mins + ' min ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + ' hr ago';
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days + ' day' + (days !== 1 ? 's' : '') + ' ago';
+  const wks = Math.floor(days / 7);
+  if (wks < 5) return wks + ' wk ago';
+  return Math.floor(days / 30) + ' mo ago';
+}
+
+let _pubArticleView = (function () {
+  try { return localStorage.getItem(PUB_VIEW_KEY) || 'grid'; } catch (_) { return 'grid'; }
+}());
+
+let _topicsExpanded = false; // "show all" toggle for low-count domain tags
 
 let _localPreviewEnabled = null;
 function closeWelcomeOverlayIfOpen() {
@@ -411,42 +449,101 @@ function renderSidebar(mode) {
   const published = topics.filter(function (t) { return t && !t.stub; });
   const domains = getArticleDomains(published);
   const isDetail = mode === 'detail';
+  const isFr = currentLang === 'fr';
+
+  // Split domains: primary (≥2 articles) always visible; secondary (=1) behind toggle
+  const primaryDomains = domains.filter(function (d) { return d && d.count >= 2; });
+  const secondaryDomains = domains.filter(function (d) { return d && d.count === 1; });
+
+  const typeCounts = {};
+  CONTENT_TABS.forEach(function (t) {
+    if (t.id === 'all') return;
+    typeCounts[t.id] = published.filter(function (a) { return getContentType(a) === t.id; }).length;
+  });
 
   let html = '<div class="sd-sa-sidebar' + (isDetail ? ' sd-sa-sidebar--detail' : '') + '">';
 
   // Search
   html += '<label class="sd-topic-search sd-sa-search">';
   html += '<span class="material-symbols-outlined" aria-hidden="true">search</span>';
-  html += '<input type="search" value="' + escapeHtml(isDetail ? _topicFilter : '') + '" placeholder="' + escapeHtml(currentLang === 'fr' ? 'Rechercher…' : 'Search articles…') + '" aria-label="' + escapeHtml(currentLang === 'fr' ? 'Rechercher des articles' : 'Search articles') + '">';
+  html += '<input type="search" value="' + escapeHtml(isDetail ? _topicFilter : '') + '"';
+  html += ' placeholder="' + escapeHtml(isFr ? 'Rechercher…' : 'Search articles…') + '"';
+  html += ' aria-label="' + escapeHtml(isFr ? 'Rechercher des articles' : 'Search articles') + '">';
   html += '</label>';
 
-  // Topics
+  // ── BY TYPE section ──────────────────────────────────────────────────────
   html += '<div class="sd-sa-section">';
+  html += '<div class="sd-sa-section-label">' + escapeHtml(isFr ? 'PAR TYPE' : 'BY TYPE') + '</div>';
   html += '<nav class="sd-sa-nav" role="list">';
-  const allTopicsActive = _activeDomain === 'all' ? ' sd-domain-active' : '';
-  html += '<button type="button" class="sd-domain-item' + allTopicsActive + '" data-filter-kind="domain" data-filter-id="all" title="' + escapeHtml(currentLang === 'fr' ? 'Tous' : 'All') + '">';
+
+  const allActive = (_activeContentTab === 'all' && _activeDomain === 'all') ? ' sd-domain-active' : '';
+  html += '<button type="button" class="sd-domain-item' + allActive + '" data-filter-kind="type" data-filter-id="all">';
   html += '<span class="material-symbols-outlined" aria-hidden="true">apps</span>';
-  html += '<span class="sd-domain-label">' + escapeHtml(currentLang === 'fr' ? 'Tous' : 'All') + '</span>';
+  html += '<span class="sd-domain-label">' + escapeHtml(isFr ? 'Tous les articles' : 'All Articles') + '</span>';
   html += '<span class="sd-domain-count">' + published.length + '</span>';
   html += '</button>';
-  domains.forEach(function (d) {
-    if (!d || d.count === 0) return;
-    const active = _activeDomain === d.name ? ' sd-domain-active' : '';
-    const icon = DOMAIN_ICONS[d.name] || 'label';
-    html += '<button type="button" class="sd-domain-item' + active + '" data-filter-kind="domain" data-filter-id="' + escapeHtml(d.name) + '" title="' + escapeHtml(d.name) + '">';
-    html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
-    html += '<span class="sd-domain-label">' + escapeHtml(d.name) + '</span>';
-    html += '<span class="sd-domain-count">' + d.count + '</span>';
+
+  CONTENT_TABS.forEach(function (tab) {
+    if (tab.id === 'all') return;
+    const count = typeCounts[tab.id] || 0;
+    const active = (_activeContentTab === tab.id && _activeDomain === 'all') ? ' sd-domain-active' : '';
+    const muted = !count ? ' sd-domain-item-empty' : '';
+    html += '<button type="button" class="sd-domain-item' + active + muted + '" data-filter-kind="type" data-filter-id="' + tab.id + '"' + (!count ? ' disabled' : '') + '>';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">' + tab.icon + '</span>';
+    html += '<span class="sd-domain-label">' + escapeHtml(tab.label) + '</span>';
+    html += '<span class="sd-domain-count">' + count + '</span>';
     html += '</button>';
   });
+
   html += '</nav>';
   html += '</div>';
+
+  // ── BY TOPIC section ─────────────────────────────────────────────────────
+  if (primaryDomains.length || secondaryDomains.length) {
+    html += '<div class="sd-sa-section-divider" role="separator"></div>';
+    html += '<div class="sd-sa-section">';
+    html += '<div class="sd-sa-section-label">' + escapeHtml(isFr ? 'PAR SUJET' : 'BY TOPIC') + '</div>';
+    html += '<nav class="sd-sa-nav" role="list">';
+
+    primaryDomains.forEach(function (d) {
+      const active = _activeDomain === d.name ? ' sd-domain-active' : '';
+      const icon = DOMAIN_ICONS[d.name] || 'label';
+      html += '<button type="button" class="sd-domain-item' + active + '" data-filter-kind="domain" data-filter-id="' + escapeHtml(d.name) + '" title="' + escapeHtml(d.name) + '">';
+      html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
+      html += '<span class="sd-domain-label">' + escapeHtml(d.name) + '</span>';
+      html += '<span class="sd-domain-count">' + d.count + '</span>';
+      html += '</button>';
+    });
+
+    if (secondaryDomains.length) {
+      secondaryDomains.forEach(function (d) {
+        const active = _activeDomain === d.name ? ' sd-domain-active' : '';
+        const icon = DOMAIN_ICONS[d.name] || 'label';
+        html += '<button type="button" class="sd-domain-item sd-domain-secondary' + (_topicsExpanded ? '' : ' sd-domain-secondary-hidden') + active + '"';
+        html += ' data-filter-kind="domain" data-filter-id="' + escapeHtml(d.name) + '" title="' + escapeHtml(d.name) + '">';
+        html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
+        html += '<span class="sd-domain-label">' + escapeHtml(d.name) + '</span>';
+        html += '<span class="sd-domain-count">' + d.count + '</span>';
+        html += '</button>';
+      });
+
+      html += '<button type="button" class="sd-sa-topics-more" id="topicsMoreBtn">';
+      html += '<span class="material-symbols-outlined" aria-hidden="true">' + (_topicsExpanded ? 'expand_less' : 'expand_more') + '</span>';
+      html += '<span>' + (_topicsExpanded
+        ? escapeHtml(isFr ? 'Réduire' : 'Show less')
+        : ('+ ' + secondaryDomains.length + ' ' + escapeHtml(isFr ? 'de plus' : 'more'))) + '</span>';
+      html += '</button>';
+    }
+
+    html += '</nav>';
+    html += '</div>';
+  }
 
   // Footer collapse control
   html += '<div class="sd-sa-footer">';
   html += '<button type="button" class="sd-sa-collapse" aria-label="Collapse sidebar" title="Collapse sidebar">';
   html += '<span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>';
-  html += '<span class="sd-sa-collapse-label">' + escapeHtml(currentLang === 'fr' ? 'Réduire' : 'Collapse') + '</span>';
+  html += '<span class="sd-sa-collapse-label">' + escapeHtml(isFr ? 'Réduire' : 'Collapse') + '</span>';
   html += '</button>';
   html += '</div>';
 
@@ -462,25 +559,37 @@ function renderSidebar(mode) {
     });
   }
 
-  // Wire up topic filters
+  // Wire up type filters — selecting a type clears domain
+  _sdAside.querySelectorAll('[data-filter-kind="type"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      _activeContentTab = btn.getAttribute('data-filter-id') || 'all';
+      _activeDomain = 'all';
+      _topicFilter = '';
+      persistListFilters();
+      if (isDetail) { navigate(PATH_PREFIX); handleRoute(); return; }
+      renderLandingRoute();
+    });
+  });
+
+  // Wire up domain filters — selecting a domain clears type
   _sdAside.querySelectorAll('[data-filter-kind="domain"]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       _activeDomain = btn.getAttribute('data-filter-id') || 'all';
+      _activeContentTab = 'all';
       persistListFilters();
-      if (_activeDomain === 'all') {
-        // Apps / 9-dot = "show me everything": reset and return to library list.
-        _activeContentTab = 'all';
-        _topicFilter = '';
-        if (isDetail) {
-          navigate(PATH_PREFIX);
-          handleRoute();
-          return;
-        }
-      }
       if (isDetail) renderSidebar('detail');
       else renderLandingRoute();
     });
   });
+
+  // Wire up "+ N more" toggle
+  const moreBtn = _sdAside.querySelector('#topicsMoreBtn');
+  if (moreBtn) {
+    moreBtn.addEventListener('click', function () {
+      _topicsExpanded = !_topicsExpanded;
+      renderSidebar(mode);
+    });
+  }
 
   // Collapse control
   const collapseBtn = _sdAside.querySelector('.sd-sa-collapse');
@@ -502,100 +611,203 @@ function renderSidebar(mode) {
   }
 }
 
+function _normContentType(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  return (v === 'architecture' || v === 'case-study' || v === 'system-design') ? v : 'system-design';
+}
+
 function renderLandingMain() {
   if (!_sdDetail) return;
   restoreListFilters();
   const topics = getTopics();
   const filtered = filterArticles(topics, _activeContentTab, _activeDomain);
 
+  // ── Header + toolbar ─────────────────────────────────────────────────────
   let html = '<section class="sd-list-view sd-sa-list">';
-
-  // Header
   html += '<header class="sd-list-header">';
   html += '<h1 class="sd-list-title">' + escapeHtml(uiText('pageTitle')) + '</h1>';
   html += '<p class="sd-list-subtitle">' + escapeHtml(uiText('pageSubtitle')) + '</p>';
-  // Content type tabs (primary navigation, like previous UX)
-  html += '<div class="sd-content-tabs-row">';
-  html += '<nav class="sd-content-tabs" role="tablist">';
-  // Clean UX: no explicit "All" chip. Only show real types; clicking the
-  // active chip again toggles back to "all types".
-  CONTENT_TABS.filter(function (t) { return t.id !== 'all'; }).forEach(function (tab) {
-    const active = _activeContentTab === tab.id ? ' sd-tab-active' : '';
-    const label = tab.label;
-    html += '<button type="button" class="sd-content-tab' + active + '" data-tab="' + tab.id + '" role="tab" aria-selected="' + (_activeContentTab === tab.id) + '">';
+  // Toolbar: type chips (left) + view toggle (right)
+  html += '<div class="sd-sa-toolbar">';
+  html += '<div class="sd-type-chips" role="group" aria-label="Filter by type">';
+  // "All Articles" chip — clears type filter
+  const allChipActive = (_activeContentTab === 'all' && _activeDomain === 'all') ? ' sd-type-chip-active' : '';
+  html += '<button type="button" class="sd-type-chip' + allChipActive + '" data-tab="all">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">apps</span>';
+  html += escapeHtml(currentLang === 'fr' ? 'Tous' : 'All Articles');
+  html += '</button>';
+  CONTENT_TABS.forEach(function (tab) {
+    if (tab.id === 'all') return;
+    const active = _activeContentTab === tab.id ? ' sd-type-chip-active' : '';
+    html += '<button type="button" class="sd-type-chip' + active + '" data-tab="' + tab.id + '">';
     html += '<span class="material-symbols-outlined" aria-hidden="true">' + tab.icon + '</span>';
-    html += '<span>' + escapeHtml(label) + '</span>';
+    html += escapeHtml(tab.label);
     html += '</button>';
   });
-  html += '</nav>';
-  const canClear = !(_activeContentTab === 'all' && _activeDomain === 'all');
-  html += '<button type="button" class="sd-clear-filters' + (canClear ? '' : ' sd-clear-filters-hidden') + '" aria-label="Clear filters">Clear</button>';
+  html += '</div>';
+  html += '<div class="sd-pub-view-toggle" role="group" aria-label="View mode">';
+  html += '<button type="button" id="pubViewGrid" class="sd-pub-view-btn' + (_pubArticleView === 'grid' ? ' sd-pub-view-btn-active' : '') + '" aria-pressed="' + (_pubArticleView === 'grid') + '" title="Grid view">';
+  html += '<span class="material-symbols-outlined">grid_view</span></button>';
+  html += '<button type="button" id="pubViewList" class="sd-pub-view-btn' + (_pubArticleView === 'list' ? ' sd-pub-view-btn-active' : '') + '" aria-pressed="' + (_pubArticleView === 'list') + '" title="List view">';
+  html += '<span class="material-symbols-outlined">view_list</span></button>';
+  html += '</div>';
   html += '</div>';
   html += '</header>';
-
-  // Articles
-  html += '<div class="sd-article-list">';
-  if (filtered.length) {
-    filtered.forEach(function (t) {
-      const loc = localeOf(t);
-      const eyebrow = getContentTypeEyebrow(t);
-      const premiumClass = t.tier === 'premium' ? ' sd-card-premium' : '';
-      html += '<article class="sd-article-card' + premiumClass + '" data-topic-id="' + t.id + '">';
-      html += '<div class="sd-card-thumb"><span class="material-symbols-outlined">' + (t.icon || 'article') + '</span></div>';
-      html += '<div class="sd-card-content">';
-      html += '<div class="sd-card-eyebrow">' + escapeHtml(eyebrow) + '</div>';
-      html += '<h2 class="sd-card-title">' + escapeHtml(loc.title) + '</h2>';
-      html += '<p class="sd-card-subtitle">' + escapeHtml(loc.subtitle) + '</p>';
-      if (t.tags && t.tags.length) {
-        html += '<div class="sd-card-tags">';
-        t.tags.slice(0, 4).forEach(function (tag) { html += '<span class="sd-card-tag">' + escapeHtml(tag) + '</span>'; });
-        html += '</div>';
-      }
-      html += '</div>';
-      html += '<div class="sd-card-meta">';
-      if (t.readMinutes) html += '<span class="sd-card-read"><span class="material-symbols-outlined">schedule</span>' + t.readMinutes + ' ' + uiText('minRead') + '</span>';
-      html += '</div>';
-      html += '<div class="sd-card-arrow"><span class="material-symbols-outlined">arrow_forward</span></div>';
-      if (t.tier === 'premium' && t.hasAccess === false) html += '<span class="material-symbols-outlined sd-card-lock" aria-label="Locked">lock</span>';
-      html += '</article>';
-    });
-  } else {
-    html += _cmsLoaded
-      ? '<p class="sd-list-empty">' + escapeHtml(uiText('noResults')) + '</p>'
-      : '<div class="sd-list-empty sd-list-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
-  }
-  html += '</div>';
+  // Article container — populated via DOM below
+  html += '<div class="sd-article-list-mount"></div>';
   html += '</section>';
 
   _sdDetail.innerHTML = html;
 
-  // Tabs
-  _sdDetail.querySelectorAll('.sd-content-tab').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      const next = tab.getAttribute('data-tab') || 'all';
-      // Toggle-off pattern: clicking an already-selected type clears back to "all"
-      _activeContentTab = (_activeContentTab === next) ? 'all' : next;
-      persistListFilters();
-      renderLandingRoute();
+  // ── Populate article area using createArticleCard / renderDataTable ───────
+  const mount = _sdDetail.querySelector('.sd-article-list-mount');
+
+  if (!filtered.length) {
+    const emptyEl = document.createElement('p');
+    emptyEl.className = 'sd-list-empty';
+    emptyEl.textContent = _cmsLoaded ? uiText('noResults') : '';
+    if (!_cmsLoaded) {
+      emptyEl.className = 'sd-list-empty sd-list-loading';
+      emptyEl.innerHTML = '<sd-loader size="sm" label="' + escapeHtml(uiText('loading')) + '"></sd-loader>';
+    }
+    mount.appendChild(emptyEl);
+  } else if (_pubArticleView === 'list') {
+    // ── List view: DataTable ────────────────────────────────────────────
+    mount.className = 'sd-article-list-mount sd-pub-list-view';
+    const listVisits = getArticleVisits();
+    const rows = filtered.map(function (t) {
+      const loc = localeOf(t);
+      const type = _normContentType(t.contentType);
+      return {
+        _id: t.id,
+        _title: loc.title || t.id,
+        _type: type,
+        _typeLabel: contentTypeLabel(type),
+        _meta: t.readMinutes ? t.readMinutes + ' min read' : '',
+        _premium: t.tier === 'premium',
+        _locked: t.tier === 'premium' && t.hasAccess === false,
+        _visited: listVisits[t.id] || null,
+        _topic: t,
+      };
     });
-  });
-  // Clear resets both dimensions (type + topic)
-  const clearBtn = _sdDetail.querySelector('.sd-clear-filters');
-  if (clearBtn) {
-    clearBtn.addEventListener('click', function () {
-      _activeContentTab = 'all';
-      _activeDomain = 'all';
-      persistListFilters();
-      renderLandingRoute();
+
+    renderDataTable(mount, {
+      ariaLabel: 'Articles',
+      tableClassName: 'sd-pub-articles-table',
+      responsive: true,
+      emptyText: uiText('noResults'),
+      rows: rows,
+      columns: [
+        {
+          key: 'type',
+          header: 'Type',
+          width: 160,
+          renderHtml: function (r) {
+            return '<span class="sd-pub-chip" data-type="' + escapeHtml(r._type) + '">' + escapeHtml(r._typeLabel) + '</span>';
+          },
+        },
+        {
+          key: 'title',
+          header: 'Title',
+          renderHtml: function (r) {
+            let html = '<span class="sd-pub-articles-table-title">' + escapeHtml(r._title) + '</span>';
+            if (r._premium) html += ' <span class="sd-pub-list-lock" title="Premium"><span class="material-symbols-outlined">lock</span></span>';
+            if (r._visited) html += '<span class="sd-pub-list-viewed"><span class="material-symbols-outlined">visibility</span>' + escapeHtml(relativeTime(r._visited)) + '</span>';
+            return html;
+          },
+        },
+        {
+          key: 'meta',
+          header: 'Read time',
+          align: 'right',
+          renderText: function (r) { return r._meta; },
+        },
+        {
+          key: 'tier',
+          header: 'Tier',
+          width: 90,
+          align: 'right',
+          renderHtml: function (r) {
+            return r._premium
+              ? '<span class="sd-pub-tier-badge sd-pub-tier-premium"><span class="material-symbols-outlined">lock</span>Premium</span>'
+              : '<span class="sd-pub-tier-badge sd-pub-tier-free">Free</span>';
+          },
+        },
+      ],
     });
+
+    const tbody = mount.querySelector('tbody');
+    if (tbody) {
+      tbody.addEventListener('click', function (e) {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const idx = Array.from(tbody.querySelectorAll('tr')).indexOf(tr);
+        if (idx >= 0 && rows[idx]) {
+          navigate(PATH_PREFIX + '/' + rows[idx]._id + (forceLockedEnabled() ? '?forceLocked=1' : ''));
+          handleRoute();
+        }
+      });
+    }
+  } else {
+    // ── Grid view: createArticleCard ────────────────────────────────────
+    const grid = document.createElement('div');
+    grid.className = 'sd-pub-article-grid';
+    const visits = getArticleVisits();
+    filtered.forEach(function (t) {
+      const loc = localeOf(t);
+      const card = createArticleCard(
+        {
+          id: t.id,
+          en: { title: loc.title, subtitle: loc.subtitle },
+          contentType: t.contentType,
+          status: 'Published',
+          thumbnail: t.thumbnail || null,
+          readMinutes: t.readMinutes,
+          order: null,
+        },
+        {
+          showBadge: false,
+          showOrder: false,
+          lastVisited: visits[t.id] || null,
+          isPremium: t.tier === 'premium',
+          onClick: function () {
+            navigate(PATH_PREFIX + '/' + t.id + (forceLockedEnabled() ? '?forceLocked=1' : ''));
+            handleRoute();
+          },
+        }
+      );
+      grid.appendChild(card);
+    });
+    mount.appendChild(grid);
   }
 
-  _sdDetail.querySelectorAll('.sd-article-card').forEach(function (card) {
-    card.addEventListener('click', function () {
-      navigate(PATH_PREFIX + '/' + card.getAttribute('data-topic-id') + (forceLockedEnabled() ? '?forceLocked=1' : ''));
-      handleRoute();
+  // ── Wire up type chips ────────────────────────────────────────────────────
+  _sdDetail.querySelectorAll('.sd-type-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      const next = chip.getAttribute('data-tab') || 'all';
+      if (next === 'all') {
+        _activeContentTab = 'all';
+        _activeDomain = 'all';
+      } else {
+        // Toggle-off: clicking active chip resets to "all"
+        _activeContentTab = (_activeContentTab === next) ? 'all' : next;
+        _activeDomain = 'all';
+      }
+      persistListFilters();
+      renderLandingRoute();
     });
   });
+
+  // ── Wire up view-toggle ───────────────────────────────────────────────────
+  const gridBtn = _sdDetail.querySelector('#pubViewGrid');
+  const listBtn = _sdDetail.querySelector('#pubViewList');
+  function applyViewToggle(view) {
+    _pubArticleView = view;
+    try { localStorage.setItem(PUB_VIEW_KEY, view); } catch (_) {}
+    renderLandingMain();
+  }
+  if (gridBtn) gridBtn.addEventListener('click', function () { applyViewToggle('grid'); });
+  if (listBtn) listBtn.addEventListener('click', function () { applyViewToggle('list'); });
 }
 
 function renderLandingRoute() {
@@ -1061,7 +1273,28 @@ function renderTopicDetail() {
     return;
   }
   const loc = localeOf(topic);
-  let html = '<article class="sd-article">';
+  // Detail header: back arrow + content-type chips + article title
+  let html = '<nav class="sd-article-breadcrumb" aria-label="Breadcrumb">';
+  // Row 1: back arrow + chips
+  html += '<div class="sd-article-breadcrumb-row">';
+  html += '<div class="sd-type-chips sd-detail-chips" role="group" aria-label="Filter by type">';
+  const allActive = (_activeContentTab === 'all' && _activeDomain === 'all') ? ' sd-type-chip-active' : '';
+  html += '<button type="button" class="sd-type-chip' + allActive + '" data-tab="all">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">apps</span>';
+  html += escapeHtml(currentLang === 'fr' ? 'Tous' : 'All Articles');
+  html += '</button>';
+  CONTENT_TABS.forEach(function (tab) {
+    if (tab.id === 'all') return;
+    const active = _activeContentTab === tab.id ? ' sd-type-chip-active' : '';
+    html += '<button type="button" class="sd-type-chip' + active + '" data-tab="' + tab.id + '">';
+    html += '<span class="material-symbols-outlined" aria-hidden="true">' + tab.icon + '</span>';
+    html += escapeHtml(tab.label);
+    html += '</button>';
+  });
+  html += '</div>';
+  html += '</div>';
+  html += '</nav>';
+  html += '<article class="sd-article">';
   html += '<header class="sd-article-head">';
   html += '<h2 class="sd-article-title">' + escapeHtml(loc.title) + '</h2>';
   if (loc.subtitle) {
@@ -1132,6 +1365,16 @@ function renderTopicDetail() {
   // Sponsor slot placeholder — mounted asynchronously below
   html += '<div class="sd-sponsor-slot-placeholder" data-placement="article-footer"></div>';
   _sdDetail.innerHTML = html;
+
+  _sdDetail.querySelectorAll('.sd-detail-chips .sd-type-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      _activeContentTab = chip.getAttribute('data-tab') || 'all';
+      _activeDomain = 'all';
+      persistListFilters();
+      navigate(PATH_PREFIX);
+      handleRoute();
+    });
+  });
 
   const exportBtn = _sdDetail.querySelector('.sd-export-btn');
   if (exportBtn) exportBtn.addEventListener('click', exportCurrentTopicPdf);
@@ -1397,6 +1640,7 @@ function handleRoute() {
   const topics = getTopics();
   if (!topicById(id) && topics.length) id = topics[0].id;
   _activeTopic = id;
+  recordArticleVisit(id);
   _userToggledSidebar = false;
   applyArticleMeta(topicById(id));
   setView('sysdesign');
@@ -1477,6 +1721,10 @@ export function initSystemDesign() {
   });
 
   window.addEventListener('popstate', handleRoute);
+  // Refresh visit badges when the page is restored from bfcache (browser back/forward).
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted && !_activeTopic) renderLandingMain();
+  });
   const observer = new MutationObserver(function () {
     renderTopicList();
     highlightActiveTopic();
