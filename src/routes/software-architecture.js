@@ -202,6 +202,9 @@ router.put('/admin/system-design/seo-config', requireAdmin, [
   body('sitemapEnabled').isBoolean().withMessage('sitemapEnabled must be a boolean.'),
   body('robotsNoindex').isBoolean().withMessage('robotsNoindex must be a boolean.'),
   body('hreflangFrEnabled').isBoolean().withMessage('hreflangFrEnabled must be a boolean.'),
+  body('llmsTxtEnabled').isBoolean().withMessage('llmsTxtEnabled must be a boolean.'),
+  body('aiCrawlersAllowed').isBoolean().withMessage('aiCrawlersAllowed must be a boolean.'),
+  body('eeatSignalsEnabled').isBoolean().withMessage('eeatSignalsEnabled must be a boolean.'),
 ], async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });

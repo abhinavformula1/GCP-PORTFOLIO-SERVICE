@@ -879,15 +879,31 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   height: var(--sd-topbar-h);
 }
 
-/* Home link: far left of the topbar, auth controls push to the right */
+/* Home link: sits directly above the 60px icon rail — must start at x=0 */
+.sd-admin-topbar {
+  padding-left: 0;
+}
+
 .sd-admin-topbar .topbar-inner {
   justify-content: flex-start;
+  padding-left: 0 !important;
 }
 
 .sd-admin-topbar .topbar-back {
   order: -1;
-  margin-left: 0;
-  margin-right: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: var(--sd-nav-rail);
+  min-width: var(--sd-nav-rail);
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
 }
 
 
@@ -2870,7 +2886,7 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 .sd-seo-config-panel {
   display: grid;
   gap: 24px;
-  max-width: 720px;
+  padding: 24px 0;
 }
 
 .sd-seo-group {

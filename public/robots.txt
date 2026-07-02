@@ -4,4 +4,23 @@ Disallow: /api/
 Disallow: /print/
 Disallow: /admin/
 
+# AI search crawlers — explicitly allowed for GEO / Perplexity Publishers Program
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Googlebot-Extended
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
 Sitemap: https://portfolio-service-647206478056.asia-southeast1.run.app/sitemap.xml

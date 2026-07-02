@@ -199,6 +199,7 @@ const LEGACY_PREFIX = '/system-design';
 // SEO config in Firestore. Falls back to the Cloud Run URL if the API is unreachable.
 let SITE_BASE = 'https://portfolio-service-647206478056.asia-southeast1.run.app';
 let _seoJsonLdEnabled = true;
+let _seoEeatEnabled   = true;
 
 async function loadSeoConfig() {
   try {
@@ -210,7 +211,8 @@ async function loadSeoConfig() {
     const data = await resp.json();
     const cfg  = data.config || {};
     if (cfg.siteUrl)         SITE_BASE          = cfg.siteUrl.replace(/\/$/, '');
-    if (cfg.jsonLdEnabled === false) _seoJsonLdEnabled = false;
+    if (cfg.jsonLdEnabled === false)    _seoJsonLdEnabled = false;
+    if (cfg.eeatSignalsEnabled === false) _seoEeatEnabled = false;
     // Apply noindex if admin turned it on
     if (cfg.robotsNoindex) {
       let el = document.querySelector('meta[name="robots"]');
@@ -346,6 +348,18 @@ function applyArticleMeta(topic) {
     'dateModified': topic.updatedAt ? new Date(topic.updatedAt).toISOString() : undefined,
     'inLanguage': 'en',
   });
+
+  // E-E-A-T citation meta tags — used by Perplexity, ChatGPT, Google SGE to
+  // attribute authorship and boost credibility signals in AI-generated answers.
+  if (_seoEeatEnabled) {
+    setMeta('citation_author', 'Abhinav Kumar');
+    setMeta('citation_title', loc.title || topic.id);
+    if (topic.updatedAt) {
+      setMeta('citation_publication_date', new Date(topic.updatedAt).toISOString().slice(0, 10));
+    }
+    setMeta('citation_journal_title', 'Abhinav Kumar — Software Architecture');
+    setMeta('citation_fulltext_html_url', url);
+  }
 }
 
 function resetMeta() {
@@ -359,6 +373,12 @@ function resetMeta() {
   setMeta('twitter:description', _defaultDesc);
   setCanonical(SITE_BASE + '/');
   removeJsonLd('sd-article-jsonld');
+  // Remove E-E-A-T citation tags when navigating away from an article
+  ['citation_author', 'citation_title', 'citation_publication_date',
+   'citation_journal_title', 'citation_fulltext_html_url'].forEach(function (name) {
+    const el = document.querySelector('meta[name="' + name + '"]');
+    if (el) el.remove();
+  });
 }
 
 function getTopics() {
