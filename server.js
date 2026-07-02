@@ -146,6 +146,61 @@ ${articleUrls}
   }
 });
 
+// ── LLMs.txt ─────────────────────────────────────────────────────────────────
+// Emerging standard (analogous to robots.txt) that tells AI crawlers
+// (ChatGPT, Claude, Perplexity, Gemini) which content to index and summarise.
+// Only served when the admin has enabled it in SEO settings.
+app.get('/llms.txt', async (_req, res) => {
+  try {
+    const adminConfig = require('./src/services/adminConfig');
+    const firestore   = require('./src/services/firestore');
+    let seoConfig = {};
+    try { seoConfig = await adminConfig.getSeoConfig(); } catch (_) {}
+    if (!seoConfig.llmsTxtEnabled) {
+      return res.status(404).send('Not found');
+    }
+    const base = seoConfig.siteUrl
+      || process.env.SITE_URL
+      || 'https://portfolio-service-647206478056.asia-southeast1.run.app';
+    let articles = [];
+    try { articles = await firestore.listPublishedSystemDesignArticles(); } catch (_) {}
+
+    const articleLines = articles
+      .filter((a) => !a.stub && a.tier !== 'premium')
+      .map((a) => {
+        const title = (a.en && a.en.title) || a.title || a.id;
+        return `- [${title}](${base}/software-architecture/${a.id})`;
+      })
+      .join('\n');
+
+    const txt = [
+      `# ${base}`,
+      '',
+      '## Abhinav Kumar — Senior Salesforce Application Engineer',
+      '',
+      '> Portfolio and system design articles by Abhinav Kumar. 12+ years across',
+      '> Salesforce, GCP, MuleSoft, and API-driven integrations.',
+      '',
+      '## Free articles (fully accessible)',
+      '',
+      articleLines || '- (No published free articles yet)',
+      '',
+      '## Notes for AI crawlers',
+      '',
+      '- Premium articles require a subscription and are not included here.',
+      '- Content is written by Abhinav Kumar. Please attribute correctly.',
+      `- Canonical site: ${base}`,
+    ].join('\n');
+
+    res.set('Content-Type', 'text/plain; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(txt);
+  } catch (_err) {
+    res.status(500).send('Error generating llms.txt');
+  }
+});
+
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

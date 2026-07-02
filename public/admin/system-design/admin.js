@@ -224,6 +224,9 @@ const els = {
   seoRobotsNoindex: document.getElementById('seoRobotsNoindex'),
   seoDescCharCount: document.getElementById('seoDescCharCount'),
   seoAdsensePublisherId: document.getElementById('seoAdsensePublisherId'),
+  seoLlmsTxtEnabled: document.getElementById('seoLlmsTxtEnabled'),
+  seoAiCrawlersAllowed: document.getElementById('seoAiCrawlersAllowed'),
+  seoEeatSignalsEnabled: document.getElementById('seoEeatSignalsEnabled'),
   seoSerpUrl: document.getElementById('seoSerpUrl'),
   seoSerpTitle: document.getElementById('seoSerpTitle'),
   seoSerpDesc: document.getElementById('seoSerpDesc'),
@@ -263,6 +266,7 @@ const els = {
   detailsBanner:   document.getElementById('articleDetailsBanner'),
   detailsActionsBtn: document.getElementById('articleDetailsActionsBtn'),
   detailsActionsMenu: document.getElementById('articleDetailsActionsMenu'),
+  detailsCard:     document.getElementById('articleDetailsCard'),
   detailsHead:     document.querySelector('.sd-article-details-head'),
   editorHead:      document.querySelector('.sd-admin-editor-head'),
   editDetailsBtn:  document.getElementById('editArticleDetailsBtn'),
@@ -1402,6 +1406,7 @@ function fillForm(article) {
   currentThumbnailUrl = item.thumbnail || '';
   setThumbPreview(currentThumbnailUrl);
   if (els.listMain) els.listMain.hidden = true;
+  if (els.detailsCard) els.detailsCard.hidden = false;
   if (els.editorHead) els.editorHead.hidden = false;
   showDetailsForm(false);
   els.sectionBuilder.hidden = false;
@@ -3183,6 +3188,9 @@ async function renderSeoConfig() {
     els.seoSitemap.checked            = _seoConfig.sitemapEnabled     !== false;
     els.seoHreflangFr.checked         = !!_seoConfig.hreflangFrEnabled;
     els.seoRobotsNoindex.checked      = !!_seoConfig.robotsNoindex;
+    els.seoLlmsTxtEnabled.checked     = !!_seoConfig.llmsTxtEnabled;
+    els.seoAiCrawlersAllowed.checked  = _seoConfig.aiCrawlersAllowed !== false;
+    els.seoEeatSignalsEnabled.checked = _seoConfig.eeatSignalsEnabled !== false;
     updateSerpPreview();
     setSectionStatus(els.seoConfigStatus, '', '');
   } catch (err) {
@@ -3195,14 +3203,17 @@ async function saveSeoConfig() {
   els.saveSeoConfigBtn.disabled = true;
   try {
     const payload = {
-      siteUrl:            els.seoSiteUrl.value.trim(),
-      siteDescription:    els.seoSiteDescription.value.trim(),
-      ogImageUrl:         els.seoOgImageUrl.value.trim(),
-      adsensePublisherId: els.seoAdsensePublisherId.value.trim(),
-      jsonLdEnabled:      els.seoJsonLd.checked,
-      sitemapEnabled:     els.seoSitemap.checked,
-      hreflangFrEnabled:  els.seoHreflangFr.checked,
-      robotsNoindex:      els.seoRobotsNoindex.checked,
+      siteUrl:             els.seoSiteUrl.value.trim(),
+      siteDescription:     els.seoSiteDescription.value.trim(),
+      ogImageUrl:          els.seoOgImageUrl.value.trim(),
+      adsensePublisherId:  els.seoAdsensePublisherId.value.trim(),
+      jsonLdEnabled:       els.seoJsonLd.checked,
+      sitemapEnabled:      els.seoSitemap.checked,
+      hreflangFrEnabled:   els.seoHreflangFr.checked,
+      robotsNoindex:       els.seoRobotsNoindex.checked,
+      llmsTxtEnabled:      els.seoLlmsTxtEnabled.checked,
+      aiCrawlersAllowed:   els.seoAiCrawlersAllowed.checked,
+      eeatSignalsEnabled:  els.seoEeatSignalsEnabled.checked,
     };
     await authedJson('/api/admin/system-design/seo-config', { method: 'PUT', body: JSON.stringify(payload) });
     _seoConfig = payload;
@@ -3974,6 +3985,7 @@ window._setArticleFilter = function (filter) {
   selectedId = '';
   if (els.listMain) els.listMain.hidden = false;
   // Hide all editing UI — list and editor are mutually exclusive
+  if (els.detailsCard) els.detailsCard.hidden = true;
   if (els.editorHead) els.editorHead.hidden = true;
   els.detailsForm.hidden = true;
   if (els.detailsHead) els.detailsHead.hidden = true;

@@ -473,7 +473,7 @@
           </section>
 
           <div class="sd-admin-primary-fields">
-            <section class="sd-authoring-card sd-article-details-card">
+            <section id="articleDetailsCard" class="sd-authoring-card sd-article-details-card">
               <div id="articleDetailsBanner" class="composer-status" hidden></div>
               <div class="sd-authoring-card-head sd-article-details-head">
                 <img id="articleCardThumb" class="sd-details-head-thumb" src="" alt="Article thumbnail" hidden>
@@ -986,6 +986,48 @@
               </div>
               <label class="sd-toggle-switch" aria-label="Enable global noindex">
                 <input type="checkbox" id="seoRobotsNoindex" />
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- GEO / AI Search Engines -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">AI Search Engines (GEO)</h3>
+          <p class="sd-seo-group-desc">Generative Engine Optimisation — control how ChatGPT, Perplexity, Google SGE, Claude and Bing Copilot discover, crawl, and cite your content. These settings are the fastest-growing discovery channel in 2025–26.</p>
+          <div class="sd-seo-toggles">
+
+            <div class="sd-seo-toggle-row">
+              <div class="sd-seo-toggle-info">
+                <strong>LLMs.txt</strong>
+                <span>Serves <code>/llms.txt</code> — the emerging standard (like <code>robots.txt</code> for AI crawlers) that tells ChatGPT, Claude, and Perplexity what content to index and summarise. Increases citation probability in AI-generated answers.</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Enable LLMs.txt">
+                <input type="checkbox" id="seoLlmsTxtEnabled" />
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="sd-seo-toggle-row">
+              <div class="sd-seo-toggle-info">
+                <strong>Allow AI Crawlers (GPTBot, ClaudeBot, PerplexityBot)</strong>
+                <span>When enabled, <code>robots.txt</code> explicitly allows <code>GPTBot</code>, <code>ClaudeBot</code>, <code>PerplexityBot</code>, and <code>anthropic-ai</code>. Disabling blocks them, which prevents AI engines from using your content in answers.</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Allow AI crawlers">
+                <input type="checkbox" id="seoAiCrawlersAllowed" />
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="sd-seo-toggle-row">
+              <div class="sd-seo-toggle-info">
+                <strong>E-E-A-T Author Signals</strong>
+                <span>Adds <code>citation_author</code>, <code>citation_title</code>, and <code>citation_publication_date</code> meta tags to every article page. These are the signals Google SGE, Perplexity, and ChatGPT use to attribute authorship and boost credibility (Experience, Expertise, Authoritativeness, Trustworthiness).</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Enable E-E-A-T signals">
+                <input type="checkbox" id="seoEeatSignalsEnabled" />
                 <span class="sd-toggle-slider"></span>
               </label>
             </div>
