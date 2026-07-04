@@ -19,7 +19,10 @@ const contactPolicy = require('../services/contactPolicy');
 const sponsorships = require('../services/sponsorships');
 const localPreviewContent = require('../services/localPreviewContent');
 const { indexArticle, removeArticleChunks } = require('../services/rag');
-const { generateChatResponse } = require('../services/gemini');
+const { evaluateRetrieval }                 = require('../services/rag/evaluate');
+const { GOLDEN_SET }                        = require('../services/rag/goldenSet');
+const googleAuth                            = require('../services/googleAuth');
+const { generateChatResponse }              = require('../services/gemini');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -632,6 +635,70 @@ router.put('/admin/atlas/config', requireAdmin, [
     });
     return res.status(200).json({ success: true });
   } catch (err) { return next(err); }
+});
+
+// ── RAG Evaluation SSE endpoint ─────────────────────────────────────────────
+//
+// GET /api/admin/atlas/rag-eval?token=<idToken>
+//
+// EventSource cannot send custom headers so we accept the Bearer token as a
+// query parameter and validate it here.  The stream sends three event types:
+//
+//   progress  { index, total, question, hit, rank }  — after each question
+//   result    { metrics, details }                   — final summary
+//   done      {}                                     — signals stream end
+//   error     { message }                            — on failure
+//
+router.get('/admin/atlas/rag-eval', async (req, res) => {
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  try {
+    if (!config.admin.localPreview) {
+      const token = String(req.query.token || '');
+      if (!token) {
+        res.status(401).json({ success: false, error: 'Missing token.' });
+        return;
+      }
+      const user  = await googleAuth.verifyIdToken(token);
+      const email = String(user?.email || '').toLowerCase();
+      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
+        res.status(403).json({ success: false, error: 'Admin access not allowed.' });
+        return;
+      }
+    }
+  } catch (_authErr) {
+    res.status(401).json({ success: false, error: 'Invalid or expired token.' });
+    return;
+  }
+
+  // ── SSE headers ───────────────────────────────────────────────────────────
+  res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+  res.flushHeaders();
+
+  const send = (eventName, data) => {
+    res.write(`event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const k = Math.max(1, Math.min(Number(req.query.k) || 5, 20));
+
+  try {
+    const { metrics, details } = await evaluateRetrieval(GOLDEN_SET, {
+      k,
+      delayMs: 300,
+      onProgress({ index, total, question, hit, rank }) {
+        send('progress', { index, total, question, hit, rank });
+      },
+    });
+
+    send('result', { metrics, details });
+  } catch (err) {
+    send('error', { message: err.message || 'Evaluation failed.' });
+  } finally {
+    send('done', {});
+    res.end();
+  }
 });
 
 module.exports = router;

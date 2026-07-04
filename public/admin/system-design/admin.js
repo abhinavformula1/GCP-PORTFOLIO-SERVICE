@@ -208,6 +208,9 @@ const els = {
   atlasBudgetCapInr: document.getElementById('atlasBudgetCapInr'),
   atlasRagEnabled: document.getElementById('atlasRagEnabled'),
   atlasRagTopK: document.getElementById('atlasRagTopK'),
+  atlasObservabilityWorkspace: document.getElementById('atlasObservabilityWorkspace'),
+  atlasObservabilityStatus: document.getElementById('atlasObservabilityStatus'),
+  runRagEvalBtn: document.getElementById('runRagEvalBtn'),
   analyticsWorkspace: document.getElementById('analyticsWorkspace'),
   analyticsMonth: document.getElementById('analyticsMonth'),
   refreshAnalyticsBtn: document.getElementById('refreshAnalyticsBtn'),
@@ -783,10 +786,11 @@ function setActiveModule(moduleName) {
   const isMeta     = moduleName === 'metadata-config';
   const isSponsor  = moduleName === 'sponsorships';
   const isSeo      = moduleName === 'seo-config';
-  const isAtlas    = moduleName === 'atlas-settings';
-  const isAnalytics = moduleName === 'analytics';
-  const isSubs = moduleName === 'subscriptions';
-  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas || isAnalytics || isSubs;
+  const isAtlas         = moduleName === 'atlas-settings';
+  const isObservability = moduleName === 'atlas-observability';
+  const isAnalytics     = moduleName === 'analytics';
+  const isSubs          = moduleName === 'subscriptions';
+  els.workspace.hidden = isPolicy || isSettings || isMedia || isTier || isMeta || isSponsor || isSeo || isAtlas || isObservability || isAnalytics || isSubs;
   els.policyWorkspace.hidden = !isPolicy;
   els.articleSettingsWorkspace.hidden = !isSettings;
   if (els.mediaWorkspace) els.mediaWorkspace.hidden = !isMedia;
@@ -795,19 +799,22 @@ function setActiveModule(moduleName) {
   els.sponsorshipsWorkspace.hidden = !isSponsor;
   els.seoConfigWorkspace.hidden = !isSeo;
   els.atlasSettingsWorkspace.hidden = !isAtlas;
+  if (els.atlasObservabilityWorkspace) els.atlasObservabilityWorkspace.hidden = !isObservability;
   if (els.analyticsWorkspace) els.analyticsWorkspace.hidden = !isAnalytics;
   if (els.subscriptionsWorkspace) els.subscriptionsWorkspace.hidden = !isSubs;
-  if (isSettings) renderArticleSettings();
-  if (isMedia)    renderMediaLibrary();
-  if (isTier)     renderTierSettings();
-  if (isMeta)     renderMetadataConfig();
-  if (isSponsor)  renderSponsorships();
-  if (isSeo)      renderSeoConfig();
-  if (isAtlas)    renderAtlasConfig();
-  if (isAnalytics) renderAnalytics();
-  if (isSubs) renderSubscriptions();
+  if (isSettings)     renderArticleSettings();
+  if (isMedia)        renderMediaLibrary();
+  if (isTier)         renderTierSettings();
+  if (isMeta)         renderMetadataConfig();
+  if (isSponsor)      renderSponsorships();
+  if (isSeo)          renderSeoConfig();
+  if (isAtlas)        renderAtlasConfig();
+  if (isAnalytics)    renderAnalytics();
+  if (isSubs)         renderSubscriptions();
+  // atlas-observability is a sub-module of atlas-settings; keep atlas-settings nav item highlighted.
+  const moduleKey = moduleName === 'atlas-observability' ? 'atlas-settings' : moduleName;
   els.modules.querySelectorAll('.sd-admin-module').forEach(function (btn) {
-    btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleName);
+    btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleKey);
   });
 
   // Sub-panel: activate matching pane.
@@ -815,9 +822,24 @@ function setActiveModule(moduleName) {
   // navigation happens through the hamburger drawer.
   const subpanel = document.getElementById('adminSubpanel');
   if (subpanel) {
+    // atlas-observability shares the atlas-settings sub-panel pane.
+    const subpanelKey = moduleName === 'atlas-observability' ? 'atlas-settings' : moduleName;
     subpanel.querySelectorAll('.sd-subpanel-pane').forEach(function (pane) {
-      pane.classList.toggle('sd-subpanel-pane-active', pane.dataset.subpanel === moduleName);
+      pane.classList.toggle('sd-subpanel-pane-active', pane.dataset.subpanel === subpanelKey);
     });
+    // Highlight the correct atlas sub-panel nav item.
+    if (moduleName === 'atlas-settings' || moduleName === 'atlas-observability') {
+      const atlasPane = subpanel.querySelector('.sd-subpanel-pane[data-subpanel="atlas-settings"]');
+      if (atlasPane) {
+        atlasPane.querySelectorAll('.sd-subpanel-item').forEach(function (item) {
+          const action = item.dataset.subpanelAction;
+          const active = moduleName === 'atlas-observability'
+            ? action === 'observability'
+            : action === 'config';
+          item.classList.toggle('sd-subpanel-item-active', active);
+        });
+      }
+    }
     if (window.innerWidth > 600) {
       // Desktop: push content right, sub-panel always visible
       document.body.classList.add('sd-subpanel-open');
@@ -3312,6 +3334,143 @@ async function saveAtlasConfig() {
   }
 }
 
+// ── AI Observability ─────────────────────────────────────────────────────────
+
+let _ragEvalSource = null; // active EventSource
+
+function _setObsElement(id, prop, val) {
+  const el = document.getElementById(id);
+  if (el) el[prop] = val;
+}
+
+function _showObsSection(id, show) {
+  const el = document.getElementById(id);
+  if (el) el.hidden = !show;
+}
+
+function renderObservabilityMetrics(metrics) {
+  _setObsElement('ragRecallValue',    'textContent', (metrics.recallAtK    * 100).toFixed(1) + ' %');
+  _setObsElement('ragPrecisionValue', 'textContent', (metrics.precisionAtK * 100).toFixed(1) + ' %');
+  _setObsElement('ragMrrValue',       'textContent', metrics.mrr.toFixed(3));
+  _setObsElement('ragTotalValue',     'textContent', String(metrics.total));
+  _setObsElement('ragRecallSub',      'textContent', 'target ≥ 80 %');
+  _setObsElement('ragPrecisionSub',   'textContent', 'of all retrieved slots');
+  _setObsElement('ragMrrSub',         'textContent', 'target ≥ 0.70');
+  _setObsElement('ragHitsSub',        'textContent', metrics.hits + ' hits');
+
+  const badge = document.getElementById('ragGateBadge');
+  if (badge) {
+    const pass = metrics.recallAtK >= 0.80 && metrics.mrr >= 0.70;
+    badge.textContent = pass
+      ? '✓ PASS — Recall@K ≥ 80 % and MRR ≥ 0.70. RAG is ready to enable in AI Config.'
+      : '✗ NOT YET — Recall@K or MRR below threshold. Index more content or tune chunking before enabling.';
+    badge.className = 'sd-observability-gate sd-observability-gate--' + (pass ? 'pass' : 'fail');
+    badge.hidden = false;
+  }
+
+  _showObsSection('ragMetricsRow', true);
+}
+
+function renderObservabilityDetail(details) {
+  const tbody = document.getElementById('ragDetailBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  details.forEach(function (row) {
+    const tr = document.createElement('tr');
+    tr.className = row.hit ? 'sd-obs-row-hit' : 'sd-obs-row-miss';
+    tr.innerHTML = [
+      '<td>' + row.index + '</td>',
+      '<td class="sd-obs-question">' + escapeHtml(row.question) + '</td>',
+      '<td class="sd-obs-article">' + escapeHtml(row.expectedArticleId) + '</td>',
+      '<td>' + (row.hit ? '<span class="sd-obs-badge sd-obs-badge--hit">Hit</span>' : '<span class="sd-obs-badge sd-obs-badge--miss">Miss</span>') + '</td>',
+      '<td>' + (row.rank != null ? String(row.rank) : '—') + '</td>',
+    ].join('');
+    tbody.appendChild(tr);
+  });
+  _showObsSection('ragDetailWrap', true);
+}
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function startRagEval() {
+  if (_ragEvalSource) {
+    _ragEvalSource.close();
+    _ragEvalSource = null;
+  }
+
+  setSectionStatus(els.atlasObservabilityStatus, '', '');
+  _showObsSection('ragProgressWrap', true);
+  _showObsSection('ragMetricsRow', false);
+  _showObsSection('ragGateBadge', false);
+  _showObsSection('ragDetailWrap', false);
+  _setObsElement('ragProgressBar',  'style', 'width:0%');
+  _setObsElement('ragProgressLabel', 'textContent', 'Connecting to evaluation service…');
+  els.runRagEvalBtn.disabled = true;
+
+  const url = '/api/admin/atlas/rag-eval?token=' + encodeURIComponent(credential || '');
+  const source = new EventSource(url);
+  _ragEvalSource = source;
+
+  source.addEventListener('progress', function (evt) {
+    try {
+      const data = JSON.parse(evt.data);
+      const pct  = Math.round((data.index / data.total) * 100);
+      _setObsElement('ragProgressBar',  'style',       'width:' + pct + '%');
+      _setObsElement('ragProgressLabel', 'textContent',
+        'Question ' + data.index + ' / ' + data.total + ': ' +
+        (data.hit ? '✓' : '✗') + ' ' + data.question.slice(0, 80));
+    } catch (_) {}
+  });
+
+  source.addEventListener('result', function (evt) {
+    try {
+      const data = JSON.parse(evt.data);
+      renderObservabilityMetrics(data.metrics);
+      if (data.details) renderObservabilityDetail(data.details);
+      _setObsElement('ragProgressBar', 'style', 'width:100%');
+      _setObsElement('ragProgressLabel', 'textContent', 'Evaluation complete.');
+    } catch (_) {}
+  });
+
+  source.addEventListener('error', function (evt) {
+    let msg = 'Evaluation failed.';
+    try { msg = JSON.parse(evt.data).message || msg; } catch (_) {}
+    setSectionStatus(els.atlasObservabilityStatus, msg, 'error');
+    _setObsElement('ragProgressLabel', 'textContent', 'Error — see status above.');
+  });
+
+  source.onopen = function () {
+    _setObsElement('ragProgressLabel', 'textContent', 'Starting evaluation…');
+  };
+
+  source.onerror = function () {
+    if (source.readyState === EventSource.CLOSED) {
+      source.close();
+      _ragEvalSource = null;
+      els.runRagEvalBtn.disabled = false;
+    }
+  };
+
+  // Fallback: close source when stream ends naturally.
+  source.addEventListener('done', function () {
+    source.close();
+    _ragEvalSource = null;
+    els.runRagEvalBtn.disabled = false;
+    _showObsSection('ragProgressWrap', false);
+  });
+}
+
+// Exposed globally so atlas sub-panel nav items can call it.
+window._setAtlasSubModule = function (moduleName) {
+  setActiveModule(moduleName);
+};
+
 function renderPreview() {
   const article = articleFromForm();
   updateWorkflowChrome(article.status);
@@ -3680,6 +3839,9 @@ els.saveSeoConfigBtn.addEventListener('click', function () {
 els.saveAtlasConfigBtn.addEventListener('click', function () {
   saveAtlasConfig().catch(function (err) { setSectionStatus(els.atlasConfigStatus, err.message, 'error'); });
 });
+if (els.runRagEvalBtn) {
+  els.runRagEvalBtn.addEventListener('click', startRagEval);
+}
 els.seoSiteUrl.addEventListener('input', updateSerpPreview);
 els.seoSiteDescription.addEventListener('input', updateSerpPreview);
 document.addEventListener('click', function () {
