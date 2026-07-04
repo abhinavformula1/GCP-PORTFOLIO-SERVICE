@@ -3430,7 +3430,9 @@ function renderObservabilityNotice() {
 function loadEvalHistory() {
   if (!els.ragHistoryBody) return;
   const token = credential || '';
-  fetch('/api/admin/atlas/rag-eval/history?limit=10&token=' + encodeURIComponent(token))
+  fetch('/api/admin/atlas/rag-eval/history?limit=10', {
+    headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+  })
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (data.success) renderEvalHistory(data.runs);
