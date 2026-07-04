@@ -18,11 +18,36 @@ const billing = require('../services/billing');
 const contactPolicy = require('../services/contactPolicy');
 const sponsorships = require('../services/sponsorships');
 const localPreviewContent = require('../services/localPreviewContent');
+const { indexArticle, removeArticleChunks } = require('../services/rag');
 const { generateChatResponse } = require('../services/gemini');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
 const BODY_MAX_LEN = 60000;
+
+/**
+ * Fire-and-forget RAG indexing after an article save.
+ *
+ * Rules:
+ *   Published  → index (create / refresh chunks)
+ *   Everything else (Draft, Retired, Coming soon) → remove chunks
+ *
+ * Never blocks the HTTP response. Failures are logged and swallowed so a
+ * Gemini embedding outage never prevents an admin from saving an article.
+ */
+function triggerRagIndexing(article) {
+  if (!article || !article.id) return;
+  const isPublished = String(article.status || '').toLowerCase() === 'published';
+  if (isPublished) {
+    indexArticle(article).catch((err) =>
+      console.warn('[rag] background indexArticle failed:', article.id, err.message)
+    );
+  } else {
+    removeArticleChunks(article.id).catch((err) =>
+      console.warn('[rag] background removeArticleChunks failed:', article.id, err.message)
+    );
+  }
+}
 
 function isLocalDev() {
   return config.server.env !== 'production' && !process.env.K_SERVICE;
@@ -504,8 +529,14 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
     });
     if (previousId && previousId !== result.id) {
       await firestore.deleteSystemDesignArticle(previousId);
+      // Old article ID is gone — remove its orphan chunks too.
+      removeArticleChunks(previousId).catch((err) =>
+        console.warn('[rag] removeArticleChunks (id-change) failed:', previousId, err.message)
+      );
     }
     const saved = await firestore.getSystemDesignArticle(result.id);
+    // Index or de-index in the background — never blocks the save response.
+    triggerRagIndexing(saved);
     return res.status(200).json({ success: true, article: saved, version: result.version });
   } catch (err) {
     return next(err);
