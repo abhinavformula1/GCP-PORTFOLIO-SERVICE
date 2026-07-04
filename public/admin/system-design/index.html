@@ -292,14 +292,17 @@
           <span>Atlas AI</span>
         </div>
         <nav class="sd-subpanel-nav">
-          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="config">
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="config" onclick="window._setAtlasSubModule('atlas-settings')">
             <span class="material-symbols-outlined" aria-hidden="true">settings_suggest</span>AI Config
           </button>
-          <button type="button" class="sd-subpanel-item" data-subpanel-action="prompts">
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="prompts" onclick="window._setAtlasSubModule('atlas-settings')">
             <span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>Prompts
           </button>
-          <button type="button" class="sd-subpanel-item" data-subpanel-action="training">
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="training" onclick="window._setAtlasSubModule('atlas-settings')">
             <span class="material-symbols-outlined" aria-hidden="true">model_training</span>Training Data
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="observability" onclick="window._setAtlasSubModule('atlas-observability')">
+            <span class="material-symbols-outlined" aria-hidden="true">monitor_heart</span>AI Observability
           </button>
         </nav>
       </div>
@@ -1204,6 +1207,103 @@
             <input id="atlasBudgetCapInr" type="number" min="0" step="10" placeholder="100" />
           </label>
           <p class="sd-seo-field-hint" style="margin-top:4px">Current month usage is shown in the Atlas chat widget for signed-in visitors.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- AI Observability workspace -->
+    <section id="atlasObservabilityWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Atlas AI</div>
+          <h2>AI Observability</h2>
+          <p>Measure retrieval quality before trusting RAG in production. Run the golden-set evaluation to see Recall@K, Precision@K, and MRR across your published articles.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <button type="button" id="runRagEvalBtn" class="sd-admin-primary">
+            <span class="material-symbols-outlined" aria-hidden="true">play_circle</span> Run Evaluation
+          </button>
+        </div>
+      </div>
+      <div id="atlasObservabilityStatus" class="sd-admin-section-status"></div>
+
+      <div class="sd-atlas-config-panel">
+
+        <!-- Key metrics row -->
+        <div class="sd-observability-metrics-row" id="ragMetricsRow" hidden>
+          <div class="sd-observability-metric-card">
+            <div class="sd-observability-metric-label">Recall@K</div>
+            <div class="sd-observability-metric-value" id="ragRecallValue">—</div>
+            <div class="sd-observability-metric-sub" id="ragRecallSub"></div>
+          </div>
+          <div class="sd-observability-metric-card">
+            <div class="sd-observability-metric-label">Precision@K</div>
+            <div class="sd-observability-metric-value" id="ragPrecisionValue">—</div>
+            <div class="sd-observability-metric-sub" id="ragPrecisionSub"></div>
+          </div>
+          <div class="sd-observability-metric-card">
+            <div class="sd-observability-metric-label">MRR</div>
+            <div class="sd-observability-metric-value" id="ragMrrValue">—</div>
+            <div class="sd-observability-metric-sub" id="ragMrrSub"></div>
+          </div>
+          <div class="sd-observability-metric-card">
+            <div class="sd-observability-metric-label">Questions</div>
+            <div class="sd-observability-metric-value" id="ragTotalValue">—</div>
+            <div class="sd-observability-metric-sub" id="ragHitsSub"></div>
+          </div>
+        </div>
+
+        <!-- Pass / fail gate -->
+        <div id="ragGateBadge" class="sd-observability-gate" hidden></div>
+
+        <!-- Progress bar (shown while running) -->
+        <div id="ragProgressWrap" class="sd-seo-group" hidden>
+          <h3 class="sd-seo-group-title">Evaluation in Progress</h3>
+          <p class="sd-seo-group-desc" id="ragProgressLabel">Initialising…</p>
+          <div class="sd-observability-progress-track">
+            <div class="sd-observability-progress-bar" id="ragProgressBar" style="width:0%"></div>
+          </div>
+          <p class="sd-seo-field-hint" id="ragProgressNote">Each question is embedded and matched against the Firestore vector index. This takes ~1–2 minutes for 50 questions.</p>
+        </div>
+
+        <!-- Per-question detail table -->
+        <div id="ragDetailWrap" class="sd-seo-group" hidden>
+          <h3 class="sd-seo-group-title">Per-Question Results</h3>
+          <p class="sd-seo-group-desc">Green = right article was in top-K. Red = miss.</p>
+          <div class="sd-observability-table-wrap">
+            <table class="sd-observability-table" id="ragDetailTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Question</th>
+                  <th>Expected Article</th>
+                  <th>Hit?</th>
+                  <th>Rank</th>
+                </tr>
+              </thead>
+              <tbody id="ragDetailBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Explainer card -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">What these metrics mean</h3>
+          <div class="sd-observability-explainer">
+            <div class="sd-observability-explainer-item">
+              <strong>Recall@K</strong>
+              <span>Of all questions, what fraction had the right article in the top-K results? Target ≥ 80 % before enabling RAG in production. A miss here means the LLM never sees the correct information — no prompt can fix a retrieval failure.</span>
+            </div>
+            <div class="sd-observability-explainer-item">
+              <strong>Precision@K</strong>
+              <span>Of all K slots retrieved across all questions, what fraction were actually relevant? Low precision means you are filling the context window with noise.</span>
+            </div>
+            <div class="sd-observability-explainer-item">
+              <strong>MRR (Mean Reciprocal Rank)</strong>
+              <span>Rewards finding the right chunk at rank 1 more than rank 5. A value near 1.0 means the answer is almost always the very first result. Above 0.7 is production-ready.</span>
+            </div>
+          </div>
         </div>
 
       </div>
