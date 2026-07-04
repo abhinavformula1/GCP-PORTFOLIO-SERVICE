@@ -206,6 +206,8 @@ const els = {
   atlasModelRows: document.getElementById('atlasModelRows'),
   atlasModelSelectorVisible: document.getElementById('atlasModelSelectorVisible'),
   atlasBudgetCapInr: document.getElementById('atlasBudgetCapInr'),
+  atlasRagEnabled: document.getElementById('atlasRagEnabled'),
+  atlasRagTopK: document.getElementById('atlasRagTopK'),
   analyticsWorkspace: document.getElementById('analyticsWorkspace'),
   analyticsMonth: document.getElementById('analyticsMonth'),
   refreshAnalyticsBtn: document.getElementById('refreshAnalyticsBtn'),
@@ -3270,6 +3272,8 @@ async function renderAtlasConfig() {
 
     els.atlasModelSelectorVisible.checked = _atlasConfig.modelSelectorVisible !== false;
     els.atlasBudgetCapInr.value = typeof _atlasConfig.budgetCapInr === 'number' ? _atlasConfig.budgetCapInr : 100;
+    els.atlasRagEnabled.checked = _atlasConfig.ragEnabled === true;
+    els.atlasRagTopK.value = typeof _atlasConfig.ragTopK === 'number' ? _atlasConfig.ragTopK : 5;
     setSectionStatus(els.atlasConfigStatus, '', '');
   } catch (err) {
     setSectionStatus(els.atlasConfigStatus, 'Failed to load Atlas config: ' + err.message, 'error');
@@ -3295,6 +3299,8 @@ async function saveAtlasConfig() {
       defaultModel,
       budgetCapInr:         Number(els.atlasBudgetCapInr.value) || 0,
       modelSelectorVisible: els.atlasModelSelectorVisible.checked,
+      ragEnabled:           els.atlasRagEnabled.checked,
+      ragTopK:              Number(els.atlasRagTopK.value) || 5,
     };
     await authedJson('/api/admin/atlas/config', { method: 'PUT', body: JSON.stringify(payload) });
     _atlasConfig = payload;

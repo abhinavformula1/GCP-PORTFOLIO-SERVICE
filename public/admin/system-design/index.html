@@ -1172,6 +1172,29 @@
           </div>
         </div>
 
+        <!-- RAG Mode -->
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">RAG Mode</h3>
+          <p class="sd-seo-group-desc">When enabled, Atlas retrieves relevant chunks from your published articles before answering — grounding responses in your actual content. When disabled, Atlas uses prompt-grounded static context (current behaviour).</p>
+          <div class="sd-seo-toggles">
+            <div class="sd-seo-toggle-row">
+              <div class="sd-seo-toggle-info">
+                <strong>Enable RAG for Atlas</strong>
+                <span>Retrieve article chunks at query time. Keep off until the knowledge base is indexed.</span>
+              </div>
+              <label class="sd-toggle-switch" aria-label="Enable RAG for Atlas">
+                <input type="checkbox" id="atlasRagEnabled">
+                <span class="sd-toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <label class="sd-seo-field" style="margin-top:12px">
+            <span>Top-K chunks per query</span>
+            <input id="atlasRagTopK" type="number" min="1" max="20" step="1" placeholder="5" style="width:80px" />
+          </label>
+          <p class="sd-seo-field-hint" style="margin-top:4px">Number of article chunks retrieved per visitor question. Start with 5. Increase if answers feel incomplete.</p>
+        </div>
+
         <!-- Budget cap -->
         <div class="sd-seo-group">
           <h3 class="sd-seo-group-title">Monthly Budget Cap</h3>

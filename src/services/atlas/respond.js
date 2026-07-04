@@ -90,6 +90,11 @@ function normaliseModel(model) {
  * length, builds a clean history. Throws on bad input. Both ask() and
  * askStream() are thin wrappers around this + a Gemini call, so this
  * keeps the validation logic in one place.
+ *
+ * DIP note: callers may pass an optional `systemPrompt` override
+ * (e.g. an RAG-augmented prompt built by the orchestrator).  When absent,
+ * the default persona prompt is used.  This module never imports the RAG
+ * layer — the dependency flows inward, not upward.
  */
 function prepareCall(args) {
   const message = (args && typeof args.message === 'string') ? args.message.trim() : '';
@@ -102,8 +107,13 @@ function prepareCall(args) {
   const history = truncateHistory(
     ((args && args.history) || []).map(normaliseTurn).filter(Boolean)
   );
+  // Accept an externally-supplied systemPrompt (e.g. RAG-augmented prompt).
+  // Fall back to the static persona prompt when none is provided.
+  const systemPrompt = (args && typeof args.systemPrompt === 'string' && args.systemPrompt.trim())
+    ? args.systemPrompt
+    : SYSTEM_PROMPT;
   return {
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     history,
     userMessage: message,
     model: normaliseModel(args && args.model),

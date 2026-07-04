@@ -41,6 +41,7 @@ const {
 } = require('../services/atlas/respond');
 const firestore           = require('../services/firestore');
 const adminConfig         = require('../services/adminConfig');
+const { buildRagContext } = require('../services/rag');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -158,6 +159,32 @@ async function readCachedAnswer(cacheRef) {
   }
 }
 
+/**
+ * When RAG mode is enabled in admin config, build an augmented system prompt
+ * by retrieving the top-K most relevant article chunks for the user's message.
+ *
+ * D(ependency Inversion): the route depends on `buildRagContext()` from the
+ * orchestrator abstraction — never on embedText / ragStore directly.
+ *
+ * Returns the base SYSTEM_PROMPT unchanged when RAG is disabled or fails.
+ *
+ * @param {string} userMessage
+ * @returns {Promise<string|undefined>}  Augmented prompt, or undefined to use default.
+ */
+async function maybeGetRagSystemPrompt(userMessage) {
+  try {
+    const cfg = await adminConfig.getAtlasConfig();
+    if (!cfg.ragEnabled) return undefined;
+    return await buildRagContext(userMessage, {
+      topK:             cfg.ragTopK || 5,
+      baseSystemPrompt: require('../services/atlas/persona').SYSTEM_PROMPT,
+    });
+  } catch (err) {
+    console.warn('[atlas/rag] failed to build RAG context, using base prompt:', err.message);
+    return undefined;
+  }
+}
+
 async function saveCachedAnswer(cacheRef, { model, answer }) {
   if (!cacheRef || !answer) return;
   try {
@@ -225,7 +252,8 @@ router.post('/atlas/ask',
         });
       }
 
-      const { answer, usage } = await ask({ message, history, model });
+      const systemPrompt = await maybeGetRagSystemPrompt(message);
+      const { answer, usage } = await ask({ message, history, model, systemPrompt });
 
       // Fire-and-forget persistence — we already have the answer; the
       // user shouldn't wait on Firestore to see it.
@@ -297,7 +325,8 @@ router.post('/atlas/stream',
         return undefined;
       }
 
-      for await (const evt of askStream({ message, history, model })) {
+      const systemPrompt = await maybeGetRagSystemPrompt(message);
+      for await (const evt of askStream({ message, history, model, systemPrompt })) {
         if (aborted) break;
         if (evt.kind === 'chunk') {
           send({ chunk: evt.text });
