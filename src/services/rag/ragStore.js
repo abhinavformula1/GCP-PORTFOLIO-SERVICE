@@ -146,7 +146,8 @@ async function findNearestChunks(queryVector, topK) {
       queryVector:     new VectorValue(queryVector),
       limit:           k,
       distanceMeasure: DISTANCE_MEASURE,
-    });
+    })
+    .get();
 
   return snap.docs.map((doc) => {
     const d = doc.data() || {};
