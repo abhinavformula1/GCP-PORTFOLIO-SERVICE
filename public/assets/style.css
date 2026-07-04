@@ -1983,15 +1983,6 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
   position: relative;
 }
 
-.timeline .job:not(:last-child)::after {
-  content: '';
-  display: block;
-  width: 1px;
-  height: 16px;
-  background: var(--border);
-  margin-left: 0;
-  margin-top: 0;
-}
 
 /* ══════════════════════════════════════════════════════════
    SYSTEM DESIGN VIEW — master/detail topic browser

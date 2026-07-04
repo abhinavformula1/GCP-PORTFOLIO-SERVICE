@@ -16,21 +16,16 @@
   <!-- ── Open Graph (LinkedIn, WhatsApp, Slack, Facebook) ─────────────────── -->
   <meta property="og:type"        content="profile" />
   <meta property="og:site_name"   content="Abhinav Kumar" />
-  <meta property="og:title"       content="Abhinav Kumar — Senior Salesforce Application Engineer" />
-  <meta property="og:description" content="12+ years in Salesforce, GCP, MuleSoft and API integrations. Explore system design articles on auth, security, and enterprise architecture." />
+  <meta property="og:title"       content="Abhinav Kumar | Enterprise Salesforce, GenAI &amp; Software Architecture" />
+  <meta property="og:description" content="Production RAG applications, Salesforce architecture, Google Cloud, system design, and engineering portfolio. 12+ years building enterprise systems." />
   <meta property="og:url"         content="https://portfolio-service-647206478056.asia-southeast1.run.app/" />
-  <meta property="og:image"       content="https://portfolio-service-647206478056.asia-southeast1.run.app/assets/og-card.png" />
-  <meta property="og:image:width"  content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt"   content="Abhinav Kumar — Senior Salesforce Application Engineer portfolio" />
   <meta property="profile:first_name" content="Abhinav" />
   <meta property="profile:last_name"  content="Kumar" />
 
   <!-- ── Twitter / X Card ─────────────────────────────────────────────────── -->
   <meta name="twitter:card"        content="summary_large_image" />
-  <meta name="twitter:title"       content="Abhinav Kumar — Senior Salesforce Application Engineer" />
-  <meta name="twitter:description" content="12+ years in Salesforce, GCP, MuleSoft. System design deep-dives on auth, security, and architecture." />
-  <meta name="twitter:image"       content="https://portfolio-service-647206478056.asia-southeast1.run.app/assets/og-card.png" />
+  <meta name="twitter:title"       content="Abhinav Kumar | Enterprise Salesforce, GenAI &amp; Software Architecture" />
+  <meta name="twitter:description" content="Production RAG applications, Salesforce architecture, Google Cloud, system design, and engineering portfolio." />
 
   <!-- ── Structured data — Person + ProfilePage (AEO / AI Engines) ────────── -->
   <script type="application/ld+json">
@@ -174,7 +169,7 @@
     <header class="header">
       <div>
         <div class="header-name">Abhinav Kumar</div>
-        <div class="header-title" data-i18n="headerTitle">Senior Salesforce Application Engineer</div>
+        <div class="header-title" data-i18n="headerTitle">Senior Salesforce &amp; GenAI Application Engineer</div>
         <!-- ── Verification + contact strip ──
              Pattern: identity / verification chips stay inline (LinkedIn
              and Trailblazer are scanned-once social-proof signals), and
@@ -236,20 +231,33 @@
         <div class="section">
           <div class="section-title" data-i18n="aboutMe">About Me</div>
           <p class="about-text" data-i18n-html="about1">
-            Senior Salesforce Application Engineer with 12+ years of
-            experience across Salesforce development, architecture, and DevOps, building scalable enterprise
-            applications using Apex, Lightning Web Components, and API-driven integrations.
+            Senior Application Engineer with 12+ years of experience building scalable enterprise systems across
+            Salesforce and GCP, with hands-on production experience designing and deploying GenAI systems —
+            including RAG pipelines, LLM evaluation frameworks, and AI observability tooling.
           </p>
           <br />
           <p class="about-text" data-i18n="about2">
-            Experienced across Sales Cloud, Service Cloud, Experience Cloud, and Salesforce Communications Cloud, with
-            deep expertise in CPQ, Contract Lifecycle Management, and Order Management.
+            Deep expertise in Salesforce (Apex, LWC, CPQ, Communications Cloud) combined with end-to-end GenAI
+            engineering on Google Cloud — from chunking and vector search to retrieval evaluation and cost controls.
           </p>
         </div>
 
         <!-- Skills -->
         <div class="section">
           <div class="section-title" data-i18n="skills">Skills</div>
+
+          <div class="skill-group">
+            <div class="skill-group-label">GenAI &amp; AI Engineering</div>
+            <div class="tags">
+              <span class="tag">RAG Pipeline</span>
+              <span class="tag">LLM Evaluation</span>
+              <span class="tag">Vector Search</span>
+              <span class="tag">Prompt Engineering</span>
+              <span class="tag">Recall@K / MRR</span>
+              <span class="tag">AI Observability</span>
+              <span class="tag">Gemini API</span>
+            </div>
+          </div>
 
           <div class="skill-group">
             <div class="skill-group-label" data-i18n="skillCore">Salesforce Core</div>
@@ -311,7 +319,6 @@
               <span class="tag">Copado</span>
               <span class="tag">GitHub Actions</span>
               <span class="tag">Cursor AI</span>
-              <span class="tag">PMD</span>
               <span class="tag">SonarCloud</span>
             </div>
           </div>
@@ -369,8 +376,9 @@
           </div>
 
           <div class="cert-group">
-            <div class="cert-group-title">Anthropic</div>
-            <div class="cert-item"><span class="cert-dot"></span>Claude Code in Action</div>
+            <div class="cert-group-title">AI &amp; GenAI</div>
+            <div class="cert-item"><span class="cert-dot"></span>Anthropic — Claude Code in Action</div>
+            <div class="cert-item"><span class="cert-dot"></span>Anthropic — Introduction to Model Context Protocol (MCP)</div>
           </div>
         </div>
 
@@ -433,6 +441,12 @@
         <!-- Projects -->
         <div class="section">
           <div class="section-title" data-i18n="keyProjects">Key Projects</div>
+
+          <div class="project">
+            <div class="project-tag">GenAI · RAG · GCP</div>
+            <div class="project-title">Atlas — Production RAG Agent &amp; AI Observability</div>
+            <ul class="job-bullets" data-i18n-list="proj0"></ul>
+          </div>
 
           <div class="project">
             <div class="project-tag">Communications Cloud · OM</div>
@@ -585,10 +599,10 @@
       <md-text-button type="button" onclick="window.closeResumePreview && window.closeResumePreview()">
         <span data-i18n="resumePreviewClose">Close</span>
       </md-text-button>
-      <md-filled-button class="resume-preview-download" type="button"
+      <md-filled-button class="resume-preview-download header-nav-download" type="button"
         onclick="window.downloadResumePdf && window.downloadResumePdf()">
         <span class="material-symbols-outlined" slot="icon" aria-hidden="true">download</span>
-        <span data-i18n="resumePreviewDownload">Download PDF</span>
+        <span data-i18n="resumePreviewDownload">Resume</span>
       </md-filled-button>
     </div>
   </md-dialog>

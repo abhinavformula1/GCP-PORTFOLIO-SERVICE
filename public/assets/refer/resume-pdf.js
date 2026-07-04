@@ -105,6 +105,7 @@ function getResumeData() {
     contact:  {
       email:       'abhinavformula1@gmail.com',
       phone:       '+91-9527506880',
+      portfolio:   'portfolio-service-647206478056.asia-southeast1.run.app',
       linkedin:    'linkedin.com/in/abhinavformula1',
       trailblazer: 'trailblazer.me/id/abhinavformula1',
       location:    'Bengaluru, India',
@@ -265,6 +266,7 @@ function renderResumePdf(jsPDF, data) {
   } else if (c.phone) {
     rLink(c.phone, rY, 'tel:' + c.phone.replace(/[^+\d]/g, ''), { size: 10 }); rY += 13;
   }
+  if (c.portfolio)   { rLink(c.portfolio,   rY, 'https://' + c.portfolio,   { size: 10, color: BLUE }); rY += 13; }
   if (c.linkedin)    { rLink(c.linkedin,    rY, 'https://' + c.linkedin,    { size: 10, color: BLUE }); rY += 13; }
   if (c.trailblazer) { rLink(c.trailblazer, rY, 'https://' + c.trailblazer, { size: 10, color: BLUE }); rY += 13; }
   if (c.location)    { rText(c.location,    rY, { bold: true, size: 10 });                              rY += 13; }
@@ -548,7 +550,7 @@ let _currentBlobUrl  = null;
 // Filename mirrors the canonical, ATS-passing reference resume so a
 // recruiter who searches their inbox/downloads for either spelling
 // finds the same document.
-const _currentFilename = 'Abhinav_Kumar_Senior_Salesforce_Application_Engineer.pdf';
+const _currentFilename = 'Abhinav_Kumar_Senior_Salesforce_GenAI_Application_Engineer.pdf';
 
 function whenMdDialogReady(cb) {
   if (customElements.get('md-dialog')) { cb(); return; }
