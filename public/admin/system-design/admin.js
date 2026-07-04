@@ -210,7 +210,6 @@ const els = {
   atlasRagTopK: document.getElementById('atlasRagTopK'),
   atlasObservabilityWorkspace: document.getElementById('atlasObservabilityWorkspace'),
   atlasObservabilityStatus: document.getElementById('atlasObservabilityStatus'),
-  ragStateNotice: document.getElementById('ragStateNotice'),
   runRagEvalBtn: document.getElementById('runRagEvalBtn'),
   analyticsWorkspace: document.getElementById('analyticsWorkspace'),
   analyticsMonth: document.getElementById('analyticsMonth'),
@@ -3401,25 +3400,13 @@ function escapeHtml(str) {
 }
 
 function renderObservabilityNotice() {
-  const notice = els.ragStateNotice;
-  if (!notice) return;
+  // Silently enable/disable the button based on RAG state — no toast on page load.
+  // The toast fires only when the user actually clicks the button (in startRagEval).
   const enabled = _atlasConfig && _atlasConfig.ragEnabled;
-  if (enabled) {
-    notice.innerHTML =
-      '<span class="sd-obs-notice-dot sd-obs-notice-dot--on"></span>' +
-      '<span>RAG is <strong>enabled</strong>. The knowledge base is active — evaluation results will be meaningful.</span>';
-    notice.className = 'sd-observability-notice sd-observability-notice--on';
-  } else {
-    notice.innerHTML =
-      '<span class="sd-obs-notice-dot sd-obs-notice-dot--off"></span>' +
-      '<span>RAG is <strong>disabled</strong>. ' +
-      'Enable it in <button type="button" class="sd-obs-notice-link" onclick="window._setAtlasSubModule(\'atlas-settings\')">AI Config → RAG Mode</button>' +
-      ', then run <code>node scripts/rag-backfill.js</code> to index your articles before evaluating.</span>';
-    notice.className = 'sd-observability-notice sd-observability-notice--off';
+  if (els.runRagEvalBtn) {
+    els.runRagEvalBtn.disabled = !enabled;
+    els.runRagEvalBtn.title = enabled ? '' : 'Enable RAG in AI Config → RAG Mode first.';
   }
-  notice.hidden = false;
-  // Disable the Run Evaluation button when RAG is off.
-  if (els.runRagEvalBtn) els.runRagEvalBtn.disabled = !enabled;
 }
 
 function startRagEval() {
@@ -3427,12 +3414,7 @@ function startRagEval() {
   // Without indexed chunks every question will be a miss — the results are
   // meaningless and just waste Gemini embedding quota.
   if (!_atlasConfig || !_atlasConfig.ragEnabled) {
-    setSectionStatus(
-      els.atlasObservabilityStatus,
-      'RAG is currently disabled. Go to AI Config → RAG Mode, enable "Enable RAG for Atlas" and run ' +
-      'the backfill script (node scripts/rag-backfill.js) to index your articles first.',
-      'error'
-    );
+    showToast('RAG is disabled. Enable it in AI Config → RAG Mode before running evaluation.', { kind: 'warning', duration: 0 });
     return;
   }
 
