@@ -692,12 +692,83 @@ router.get('/admin/atlas/rag-eval', async (req, res) => {
       },
     });
 
+    // ── Persist run to Firestore for audit history ─────────────────────────
+    try {
+      const hits  = details.filter(d => d.hit).length;
+      const total = details.length;
+      await firestore.getDb().collection('ragEvalRuns').add({
+        ranAt:     new Date(),
+        k,
+        metrics,
+        hits,
+        misses:    total - hits,
+        total,
+        passRate:  total > 0 ? Math.round((hits / total) * 100) : 0,
+        passed:    metrics.recall >= 0.8,
+        details,
+      });
+    } catch (saveErr) {
+      // Non-fatal — log but don't fail the SSE stream.
+      console.error('[rag-eval] failed to save run history:', saveErr.message);
+    }
+
     send('result', { metrics, details });
   } catch (err) {
     send('error', { message: err.message || 'Evaluation failed.' });
   } finally {
     send('done', {});
     res.end();
+  }
+});
+
+// ── RAG Evaluation History ────────────────────────────────────────────────
+//
+// GET /api/admin/atlas/rag-eval/history
+// Returns the last N evaluation runs ordered by most recent first.
+//
+router.get('/admin/atlas/rag-eval/history', async (req, res) => {
+  try {
+    if (!config.admin.localPreview) {
+      const auth  = String(req.headers.authorization || '');
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : String(req.query.token || '');
+      if (!token) { res.status(401).json({ success: false, error: 'Missing token.' }); return; }
+      const user  = await googleAuth.verifyIdToken(token);
+      const email = String(user?.email || '').toLowerCase();
+      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
+        res.status(403).json({ success: false, error: 'Admin access not allowed.' }); return;
+      }
+    }
+  } catch (_) {
+    res.status(401).json({ success: false, error: 'Invalid or expired token.' }); return;
+  }
+
+  const limit = Math.max(1, Math.min(Number(req.query.limit) || 10, 50));
+
+  try {
+    const snap = await firestore.getDb()
+      .collection('ragEvalRuns')
+      .orderBy('ranAt', 'desc')
+      .limit(limit)
+      .get();
+
+    const runs = snap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        id:       doc.id,
+        ranAt:    d.ranAt?.toDate?.()?.toISOString() || null,
+        k:        d.k,
+        metrics:  d.metrics,
+        hits:     d.hits,
+        misses:   d.misses,
+        total:    d.total,
+        passRate: d.passRate,
+        passed:   d.passed,
+      };
+    });
+
+    res.json({ success: true, runs });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
