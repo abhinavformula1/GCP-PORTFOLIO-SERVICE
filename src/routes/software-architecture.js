@@ -585,6 +585,8 @@ router.put('/admin/atlas/config', requireAdmin, [
   body('defaultModel').isString().notEmpty().withMessage('defaultModel is required.'),
   body('budgetCapInr').isFloat({ min: 0 }).withMessage('budgetCapInr must be a non-negative number.'),
   body('modelSelectorVisible').isBoolean().withMessage('modelSelectorVisible must be a boolean.'),
+  body('ragEnabled').optional().isBoolean().withMessage('ragEnabled must be a boolean.'),
+  body('ragTopK').optional().isInt({ min: 1, max: 20 }).withMessage('ragTopK must be between 1 and 20.'),
 ], async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
@@ -594,6 +596,8 @@ router.put('/admin/atlas/config', requireAdmin, [
       defaultModel:         req.body.defaultModel,
       budgetCapInr:         Number(req.body.budgetCapInr),
       modelSelectorVisible: req.body.modelSelectorVisible,
+      ragEnabled:           req.body.ragEnabled === true || req.body.ragEnabled === 'true',
+      ragTopK:              req.body.ragTopK ? Number(req.body.ragTopK) : 5,
     });
     return res.status(200).json({ success: true });
   } catch (err) { return next(err); }

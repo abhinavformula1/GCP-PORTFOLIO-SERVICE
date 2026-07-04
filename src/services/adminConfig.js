@@ -92,6 +92,8 @@ const DEFAULT_ATLAS_CONFIG = {
   defaultModel:         'flash-lite',
   budgetCapInr:         100,
   modelSelectorVisible: true,
+  ragEnabled:           false,
+  ragTopK:              5,
 };
 
 async function getAtlasConfig() {
@@ -103,6 +105,8 @@ async function getAtlasConfig() {
     defaultModel:         String(d.defaultModel         || DEFAULT_ATLAS_CONFIG.defaultModel),
     budgetCapInr:         typeof d.budgetCapInr === 'number' ? d.budgetCapInr : DEFAULT_ATLAS_CONFIG.budgetCapInr,
     modelSelectorVisible: d.modelSelectorVisible !== false,
+    ragEnabled:           d.ragEnabled === true,
+    ragTopK:              typeof d.ragTopK === 'number' ? d.ragTopK : DEFAULT_ATLAS_CONFIG.ragTopK,
   };
 }
 
@@ -112,6 +116,8 @@ async function upsertAtlasConfig(cfg) {
     defaultModel:         String(cfg.defaultModel         || DEFAULT_ATLAS_CONFIG.defaultModel),
     budgetCapInr:         typeof cfg.budgetCapInr === 'number' ? cfg.budgetCapInr : DEFAULT_ATLAS_CONFIG.budgetCapInr,
     modelSelectorVisible: cfg.modelSelectorVisible !== false,
+    ragEnabled:           cfg.ragEnabled === true,
+    ragTopK:              typeof cfg.ragTopK === 'number' ? cfg.ragTopK : DEFAULT_ATLAS_CONFIG.ragTopK,
     updatedAt:            FieldValue.serverTimestamp(),
   });
 }

@@ -28,6 +28,20 @@
         { "fieldPath": "status",      "order": "ASCENDING"  },
         { "fieldPath": "submittedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "//": "Powers RAG vector search — findNearestChunks() in src/services/rag/ragStore.js. Firestore requires an explicit vector index on the embedding field before findNearest() is usable in production. Deploy: firebase deploy --only firestore:indexes",
+      "collectionGroup": "rag_chunks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "embedding",
+          "vectorConfig": {
+            "dimension": 768,
+            "flat": {}
+          }
+        }
+      ]
     }
   ],
 
