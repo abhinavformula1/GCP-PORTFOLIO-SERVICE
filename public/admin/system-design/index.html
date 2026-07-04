@@ -1272,11 +1272,36 @@
                   <th>#</th>
                   <th>Question</th>
                   <th>Expected Article</th>
+                  <th>Top Retrieved</th>
                   <th>Hit?</th>
                   <th>Rank</th>
                 </tr>
               </thead>
               <tbody id="ragDetailBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Run History -->
+        <div class="sd-seo-group" id="ragHistoryWrap" hidden>
+          <h3 class="sd-seo-group-title">Run History</h3>
+          <p class="sd-seo-group-desc">Each time you click "Run Evaluation" the result is saved. Use this to spot regressions after re-indexing or config changes.</p>
+          <div class="sd-observability-table-wrap">
+            <table class="sd-observability-table sd-observability-history-table" id="ragHistoryTable">
+              <thead>
+                <tr>
+                  <th>Run</th>
+                  <th>Date &amp; Time</th>
+                  <th>Recall@K</th>
+                  <th>Precision@K</th>
+                  <th>MRR</th>
+                  <th>Pass / Total</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="ragHistoryBody">
+                <tr><td colspan="7" class="sd-observability-empty">No runs recorded yet.</td></tr>
+              </tbody>
             </table>
           </div>
         </div>

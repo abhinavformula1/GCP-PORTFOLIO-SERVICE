@@ -210,6 +210,8 @@ const els = {
   atlasRagTopK: document.getElementById('atlasRagTopK'),
   atlasObservabilityWorkspace: document.getElementById('atlasObservabilityWorkspace'),
   atlasObservabilityStatus: document.getElementById('atlasObservabilityStatus'),
+  ragHistoryWrap: document.getElementById('ragHistoryWrap'),
+  ragHistoryBody: document.getElementById('ragHistoryBody'),
   runRagEvalBtn: document.getElementById('runRagEvalBtn'),
   analyticsWorkspace: document.getElementById('analyticsWorkspace'),
   analyticsMonth: document.getElementById('analyticsMonth'),
@@ -3379,10 +3381,25 @@ function renderObservabilityDetail(details) {
   details.forEach(function (row) {
     const tr = document.createElement('tr');
     tr.className = row.hit ? 'sd-obs-row-hit' : 'sd-obs-row-miss';
+
+    // Show what was actually retrieved — helps diagnose ID mismatches or empty results.
+    let retrievedCell;
+    if (row.error) {
+      retrievedCell = '<span class="sd-obs-error" title="' + escapeHtml(row.error) + '">⚠ error</span>';
+    } else if (row.retrievedArticles && row.retrievedArticles.length > 0) {
+      retrievedCell = row.retrievedArticles
+        .slice(0, 3)
+        .map(function (id) { return '<span class="sd-obs-retrieved' + (id === row.expectedArticleId ? ' sd-obs-retrieved--match' : '') + '">' + escapeHtml(id) + '</span>'; })
+        .join('');
+    } else {
+      retrievedCell = '<span class="sd-obs-none">none</span>';
+    }
+
     tr.innerHTML = [
       '<td>' + row.index + '</td>',
       '<td class="sd-obs-question">' + escapeHtml(row.question) + '</td>',
       '<td class="sd-obs-article">' + escapeHtml(row.expectedArticleId) + '</td>',
+      '<td class="sd-obs-retrieved-cell">' + retrievedCell + '</td>',
       '<td>' + (row.hit ? '<span class="sd-obs-badge sd-obs-badge--hit">Hit</span>' : '<span class="sd-obs-badge sd-obs-badge--miss">Miss</span>') + '</td>',
       '<td>' + (row.rank != null ? String(row.rank) : '—') + '</td>',
     ].join('');
@@ -3407,6 +3424,50 @@ function renderObservabilityNotice() {
     els.runRagEvalBtn.disabled = !enabled;
     els.runRagEvalBtn.title = enabled ? '' : 'Enable RAG in AI Config → RAG Mode first.';
   }
+  loadEvalHistory();
+}
+
+function loadEvalHistory() {
+  if (!els.ragHistoryBody) return;
+  const token = credential || '';
+  fetch('/api/admin/atlas/rag-eval/history?limit=10&token=' + encodeURIComponent(token))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.success) renderEvalHistory(data.runs);
+    })
+    .catch(function () {});
+}
+
+function renderEvalHistory(runs) {
+  if (!els.ragHistoryBody || !els.ragHistoryWrap) return;
+  if (!runs || runs.length === 0) {
+    els.ragHistoryBody.innerHTML = '<tr><td colspan="7" class="sd-observability-empty">No runs recorded yet.</td></tr>';
+    els.ragHistoryWrap.hidden = false;
+    return;
+  }
+
+  const rows = runs.map(function (run, i) {
+    const dt    = run.ranAt ? new Date(run.ranAt).toLocaleString() : '—';
+    const recall    = run.metrics?.recall    != null ? (run.metrics.recall    * 100).toFixed(1) + '%' : '—';
+    const precision = run.metrics?.precision != null ? (run.metrics.precision * 100).toFixed(1) + '%' : '—';
+    const mrr       = run.metrics?.mrr       != null ? run.metrics.mrr.toFixed(3) : '—';
+    const passFail  = run.passed
+      ? '<span class="sd-obs-badge sd-obs-badge-pass">PASS</span>'
+      : '<span class="sd-obs-badge sd-obs-badge-fail">FAIL</span>';
+    const runNum = runs.length - i;
+    return '<tr>' +
+      '<td>#' + runNum + '</td>' +
+      '<td>' + escapeHtml(dt) + '</td>' +
+      '<td>' + recall + '</td>' +
+      '<td>' + precision + '</td>' +
+      '<td>' + mrr + '</td>' +
+      '<td>' + (run.hits || 0) + ' / ' + (run.total || 0) + '</td>' +
+      '<td>' + passFail + '</td>' +
+      '</tr>';
+  }).join('');
+
+  els.ragHistoryBody.innerHTML = rows;
+  els.ragHistoryWrap.hidden = false;
 }
 
 function startRagEval() {
@@ -3454,6 +3515,8 @@ function startRagEval() {
       if (data.details) renderObservabilityDetail(data.details);
       _setObsElement('ragProgressBar', 'style', 'width:100%');
       _setObsElement('ragProgressLabel', 'textContent', 'Evaluation complete.');
+      // Refresh history table so the new run appears immediately.
+      setTimeout(loadEvalHistory, 1500);
     } catch (_) {}
   });
 
