@@ -17,7 +17,7 @@
 const config = require('../../config');
 
 const EMBED_API_BASE   = 'https://generativelanguage.googleapis.com/v1beta/models';
-const EMBED_MODEL      = 'text-embedding-004';
+const EMBED_MODEL      = 'gemini-embedding-001';
 const EMBED_TIMEOUT_MS = 10_000;
 const MAX_TEXT_CHARS   = 8_000; // stay well within the 2 048-token model limit
 
@@ -55,8 +55,11 @@ async function embedText(text) {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          model:   `models/${EMBED_MODEL}`,
-          content: { parts: [{ text: safeText }] },
+          model:             `models/${EMBED_MODEL}`,
+          content:           { parts: [{ text: safeText }] },
+          // Reduce from 3072 → 768 dims — stays well within Firestore's
+          // 2048-dimension limit while retaining high semantic quality.
+          outputDimensionality: 768,
         }),
         signal: controller.signal,
       }

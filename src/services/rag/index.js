@@ -91,7 +91,7 @@ async function buildRagContext(userMessage, { topK = 5, baseSystemPrompt }) {
  *
  * @returns {Promise<{ indexed: number }>}  Number of chunks written.
  */
-async function indexArticle(article) {
+async function indexArticle(article, { chunkDelayMs = 0 } = {}) {
   const chunks = chunkArticle(article);
   if (chunks.length === 0) return { indexed: 0 };
 
@@ -101,6 +101,9 @@ async function indexArticle(article) {
   for (const chunk of chunks) {
     const embedding = await embedText(chunk.text);
     chunksWithEmbeddings.push({ ...chunk, embedding });
+    if (chunkDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, chunkDelayMs));
+    }
   }
 
   await saveChunks(chunksWithEmbeddings);
