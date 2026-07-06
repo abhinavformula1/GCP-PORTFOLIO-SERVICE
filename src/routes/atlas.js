@@ -160,28 +160,52 @@ async function readCachedAnswer(cacheRef) {
 }
 
 /**
- * When RAG mode is enabled in admin config, build an augmented system prompt
- * by retrieving the top-K most relevant article chunks for the user's message.
+ * Load the full Atlas config and derive per-request generation parameters.
  *
- * D(ependency Inversion): the route depends on `buildRagContext()` from the
- * orchestrator abstraction — never on embedText / ragStore directly.
- *
- * Returns the base SYSTEM_PROMPT unchanged when RAG is disabled or fails.
+ * S — single responsibility: reads config + builds the two objects the
+ *     route needs (systemPrompt override, generationConfig). Nothing else.
+ * D — depends on adminConfig abstraction, never on Firestore directly.
  *
  * @param {string} userMessage
- * @returns {Promise<string|undefined>}  Augmented prompt, or undefined to use default.
+ * @returns {Promise<{ systemPrompt: string|undefined, generationConfig: object }>}
  */
-async function maybeGetRagSystemPrompt(userMessage) {
+async function buildAtlasCallConfig(userMessage) {
   try {
     const cfg = await adminConfig.getAtlasConfig();
-    if (!cfg.ragEnabled) return undefined;
-    return await buildRagContext(userMessage, {
-      topK:             cfg.ragTopK || 5,
-      baseSystemPrompt: require('../services/atlas/persona').SYSTEM_PROMPT,
-    });
+
+    // Generation config — read from Firestore, falls back to gemini.js defaults
+    // when fields are absent (so removing a Firestore key doesn't break chat).
+    const generationConfig = {};
+    if (typeof cfg.temperature    === 'number') generationConfig.temperature    = cfg.temperature;
+    if (typeof cfg.topP           === 'number') generationConfig.topP           = cfg.topP;
+    if (typeof cfg.maxOutputTokens=== 'number') generationConfig.maxOutputTokens= cfg.maxOutputTokens;
+
+    // Custom system prompt — if admin has set one, use it as the base.
+    const basePrompt = (cfg.systemPrompt && cfg.systemPrompt.trim())
+      ? cfg.systemPrompt
+      : require('../services/atlas/persona').SYSTEM_PROMPT;
+
+    // RAG augmentation — only when enabled and knowledge base is indexed.
+    let systemPrompt;
+    if (cfg.ragEnabled) {
+      try {
+        systemPrompt = await buildRagContext(userMessage, {
+          topK:             cfg.ragTopK || 5,
+          baseSystemPrompt: basePrompt,
+        });
+      } catch (ragErr) {
+        console.warn('[atlas/rag] RAG context failed, falling back to base prompt:', ragErr.message);
+        systemPrompt = basePrompt;
+      }
+    } else {
+      // Only override the default persona when admin has set a custom prompt.
+      systemPrompt = cfg.systemPrompt && cfg.systemPrompt.trim() ? basePrompt : undefined;
+    }
+
+    return { systemPrompt, generationConfig };
   } catch (err) {
-    console.warn('[atlas/rag] failed to build RAG context, using base prompt:', err.message);
-    return undefined;
+    console.warn('[atlas] buildAtlasCallConfig failed, using defaults:', err.message);
+    return { systemPrompt: undefined, generationConfig: {} };
   }
 }
 
@@ -252,8 +276,8 @@ router.post('/atlas/ask',
         });
       }
 
-      const systemPrompt = await maybeGetRagSystemPrompt(message);
-      const { answer, usage } = await ask({ message, history, model, systemPrompt });
+      const { systemPrompt, generationConfig } = await buildAtlasCallConfig(message);
+      const { answer, usage } = await ask({ message, history, model, systemPrompt, generationConfig });
 
       // Fire-and-forget persistence — we already have the answer; the
       // user shouldn't wait on Firestore to see it.
@@ -325,8 +349,8 @@ router.post('/atlas/stream',
         return undefined;
       }
 
-      const systemPrompt = await maybeGetRagSystemPrompt(message);
-      for await (const evt of askStream({ message, history, model, systemPrompt })) {
+      const { systemPrompt, generationConfig } = await buildAtlasCallConfig(message);
+      for await (const evt of askStream({ message, history, model, systemPrompt, generationConfig })) {
         if (aborted) break;
         if (evt.kind === 'chunk') {
           send({ chunk: evt.text });

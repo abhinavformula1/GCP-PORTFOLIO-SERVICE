@@ -20,6 +20,7 @@ function safeText(value) {
  * @property {string=} icon - Material Symbol name
  * @property {string=} iconVariant - maps to `sd-kpi-icon--<variant>`
  * @property {string=} trend - e.g. "↗ 0% vs last 30 days"
+ * @property {string=} cardVariant - appended as `sd-kpi-card--<variant>` (e.g. 'pass', 'fail')
  */
 
 /**
@@ -39,7 +40,8 @@ export function renderKpiCards(mount, opts) {
 
   cards.forEach(function (c) {
     const card = document.createElement('div');
-    card.className = 'sd-kpi-card';
+    const cardVar = String(c && c.cardVariant || '').trim();
+    card.className = 'sd-kpi-card' + (cardVar ? (' sd-kpi-card--' + cardVar) : '');
 
     const head = document.createElement('div');
     head.className = 'sd-kpi-head';

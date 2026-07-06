@@ -605,6 +605,39 @@ router.delete('/admin/sponsorships/:id', requireAdmin, async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
+// ── System health (AI Monitoring dashboard) ──────────────────────────────────
+router.get('/admin/system/health', requireAdmin, async (_req, res) => {
+  const mem   = process.memoryUsage();
+  const heapUsedMb  = +(mem.heapUsed  / 1024 / 1024).toFixed(1);
+  const heapTotalMb = +(mem.heapTotal / 1024 / 1024).toFixed(1);
+  return res.status(200).json({
+    success: true,
+    infrastructure: {
+      uptimeSeconds: Math.floor(process.uptime()),
+      nodeVersion:   process.version,
+      environment:   process.env.NODE_ENV || 'development',
+      heapUsedMb,
+      heapTotalMb,
+      platform:      process.platform,
+    },
+    resources: {
+      heapPct: heapTotalMb > 0 ? +(heapUsedMb / heapTotalMb * 100).toFixed(1) : 0,
+      memPct:  null,
+      cpuPct:  null,
+    },
+    performance: {
+      totalRequests:  null,
+      avgResponseMs:  null,
+      reqPerMin:      null,
+    },
+    services:     [],
+    dependencies: [],
+    alerts:       [],
+    incidents:    [],
+    history:      [],
+  });
+});
+
 // ── Atlas config (admin read/write) ──────────────────────────────────────────
 router.get('/admin/atlas/config', requireAdmin, async (_req, res, next) => {
   try {
@@ -617,21 +650,104 @@ router.put('/admin/atlas/config', requireAdmin, [
   body('enabledModels').isArray({ min: 1 }).withMessage('enabledModels must be a non-empty array.'),
   body('enabledModels.*').isString().notEmpty(),
   body('defaultModel').isString().notEmpty().withMessage('defaultModel is required.'),
-  body('budgetCapInr').isFloat({ min: 0 }).withMessage('budgetCapInr must be a non-negative number.'),
   body('modelSelectorVisible').isBoolean().withMessage('modelSelectorVisible must be a boolean.'),
-  body('ragEnabled').optional().isBoolean().withMessage('ragEnabled must be a boolean.'),
-  body('ragTopK').optional().isInt({ min: 1, max: 20 }).withMessage('ragTopK must be between 1 and 20.'),
+  // LLM
+  body('temperature').optional().isFloat({ min: 0, max: 2 }),
+  body('topP').optional().isFloat({ min: 0, max: 1 }),
+  body('maxOutputTokens').optional().isInt({ min: 100, max: 8192 }),
+  body('streamingEnabled').optional().isBoolean(),
+  // Embedding
+  body('embeddingBatchSize').optional().isInt({ min: 1, max: 50 }),
+  // Chunking
+  body('chunkSize').optional().isInt({ min: 500, max: 8000 }),
+  body('chunkOverlap').optional().isInt({ min: 0, max: 1000 }),
+  body('splitterType').optional().isIn(['recursive', 'markdown']),
+  // Retrieval
+  body('ragEnabled').optional().isBoolean(),
+  body('ragTopK').optional().isInt({ min: 1, max: 20 }),
+  body('hybridSearchEnabled').optional().isBoolean(),
+  body('rerankerEnabled').optional().isBoolean(),
+  body('similarityThreshold').optional().isFloat({ min: 0, max: 1 }),
+  // Prompt
+  body('guardrailsEnabled').optional().isBoolean(),
+  body('conversationMemoryTurns').optional().isInt({ min: 0, max: 20 }),
+  // Routing
+  body('routingStrategy').optional().isIn(['default', 'rule-based', 'classifier']),
+  // Evaluation
+  body('recallThreshold').optional().isFloat({ min: 0, max: 1 }),
+  body('faithfulnessThreshold').optional().isFloat({ min: 0, max: 1 }),
+  // Observability
+  body('tracingEnabled').optional().isBoolean(),
+  body('capturePrompts').optional().isBoolean(),
+  body('captureChunks').optional().isBoolean(),
+  body('captureTokens').optional().isBoolean(),
+  // Cost
+  body('budgetCapInr').optional().isFloat({ min: 0 }),
+  body('dailyBudgetCapInr').optional().isFloat({ min: 0 }),
+  body('tokenLimitPerQuery').optional().isInt({ min: 100, max: 8192 }),
+  body('budgetAlertThreshold').optional().isFloat({ min: 0, max: 1 }),
+  // Security
+  body('piiRedactionEnabled').optional().isBoolean(),
+  body('promptInjectionDetection').optional().isBoolean(),
+  body('rateLimitPerMinute').optional().isInt({ min: 1, max: 600 }),
+  body('contentModerationEnabled').optional().isBoolean(),
 ], async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
   try {
+    const b = req.body;
+    const toBool = (v) => v === true || v === 'true';
     await adminConfig.upsertAtlasConfig({
-      enabledModels:        req.body.enabledModels,
-      defaultModel:         req.body.defaultModel,
-      budgetCapInr:         Number(req.body.budgetCapInr),
-      modelSelectorVisible: req.body.modelSelectorVisible,
-      ragEnabled:           req.body.ragEnabled === true || req.body.ragEnabled === 'true',
-      ragTopK:              req.body.ragTopK ? Number(req.body.ragTopK) : 5,
+      // LLM
+      enabledModels:            b.enabledModels,
+      defaultModel:             b.defaultModel,
+      fallbackModel:            typeof b.fallbackModel === 'string' ? b.fallbackModel : '',
+      temperature:              b.temperature          != null ? Number(b.temperature)          : undefined,
+      topP:                     b.topP                 != null ? Number(b.topP)                 : undefined,
+      maxOutputTokens:          b.maxOutputTokens      != null ? Number(b.maxOutputTokens)      : undefined,
+      streamingEnabled:         b.streamingEnabled     != null ? toBool(b.streamingEnabled)     : undefined,
+      // Embedding
+      embeddingModel:           b.embeddingModel,
+      embeddingDimensions:      b.embeddingDimensions  != null ? Number(b.embeddingDimensions)  : undefined,
+      distanceMetric:           b.distanceMetric,
+      embeddingBatchSize:       b.embeddingBatchSize   != null ? Number(b.embeddingBatchSize)   : undefined,
+      // Chunking
+      chunkSize:                b.chunkSize            != null ? Number(b.chunkSize)            : undefined,
+      chunkOverlap:             b.chunkOverlap         != null ? Number(b.chunkOverlap)         : undefined,
+      splitterType:             b.splitterType,
+      // Retrieval
+      ragEnabled:               toBool(b.ragEnabled),
+      ragTopK:                  b.ragTopK              != null ? Number(b.ragTopK)              : undefined,
+      hybridSearchEnabled:      b.hybridSearchEnabled  != null ? toBool(b.hybridSearchEnabled)  : undefined,
+      rerankerEnabled:          b.rerankerEnabled      != null ? toBool(b.rerankerEnabled)      : undefined,
+      similarityThreshold:      b.similarityThreshold  != null ? Number(b.similarityThreshold)  : undefined,
+      // Prompt
+      systemPrompt:             typeof b.systemPrompt === 'string' ? b.systemPrompt : undefined,
+      guardrailsEnabled:        b.guardrailsEnabled    != null ? toBool(b.guardrailsEnabled)    : undefined,
+      conversationMemoryTurns:  b.conversationMemoryTurns != null ? Number(b.conversationMemoryTurns) : undefined,
+      // Routing
+      routingStrategy:          b.routingStrategy,
+      routingFallbackModel:     b.routingFallbackModel,
+      // Evaluation
+      recallThreshold:          b.recallThreshold      != null ? Number(b.recallThreshold)      : undefined,
+      faithfulnessThreshold:    b.faithfulnessThreshold != null ? Number(b.faithfulnessThreshold) : undefined,
+      // Observability
+      tracingEnabled:           b.tracingEnabled       != null ? toBool(b.tracingEnabled)       : undefined,
+      capturePrompts:           b.capturePrompts       != null ? toBool(b.capturePrompts)       : undefined,
+      captureChunks:            b.captureChunks        != null ? toBool(b.captureChunks)        : undefined,
+      captureTokens:            b.captureTokens        != null ? toBool(b.captureTokens)        : undefined,
+      // Cost
+      budgetCapInr:             b.budgetCapInr         != null ? Number(b.budgetCapInr)         : undefined,
+      dailyBudgetCapInr:        b.dailyBudgetCapInr    != null ? Number(b.dailyBudgetCapInr)    : undefined,
+      tokenLimitPerQuery:       b.tokenLimitPerQuery   != null ? Number(b.tokenLimitPerQuery)   : undefined,
+      budgetAlertThreshold:     b.budgetAlertThreshold != null ? Number(b.budgetAlertThreshold) : undefined,
+      // Security
+      piiRedactionEnabled:      b.piiRedactionEnabled       != null ? toBool(b.piiRedactionEnabled)       : undefined,
+      promptInjectionDetection: b.promptInjectionDetection  != null ? toBool(b.promptInjectionDetection)  : undefined,
+      rateLimitPerMinute:       b.rateLimitPerMinute        != null ? Number(b.rateLimitPerMinute)        : undefined,
+      contentModerationEnabled: b.contentModerationEnabled  != null ? toBool(b.contentModerationEnabled)  : undefined,
+      // UI
+      modelSelectorVisible:     toBool(b.modelSelectorVisible),
     });
     return res.status(200).json({ success: true });
   } catch (err) { return next(err); }

@@ -1959,7 +1959,10 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   border-radius: 16px;
   background: var(--surface);
   padding: 14px;
+  transition: border-color 0.2s;
 }
+.sd-kpi-card--pass { border-color: #22c55e; background: color-mix(in srgb, #22c55e 6%, var(--surface)); }
+.sd-kpi-card--fail { border-color: #ef4444; background: color-mix(in srgb, #ef4444 6%, var(--surface)); }
 .sd-kpi-head {
   display: flex;
   align-items: center;
@@ -1995,6 +1998,18 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
 .sd-kpi-icon--arr {
   background: color-mix(in srgb, #f59e0b 14%, transparent);
   color: #f59e0b;
+}
+.sd-kpi-icon--danger {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #ef4444;
+}
+.sd-kpi-icon--info {
+  background: color-mix(in srgb, #06b6d4 12%, transparent);
+  color: #06b6d4;
+}
+.sd-kpi-icon--neutral {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--muted);
 }
 .sd-kpi-value {
   margin-top: 10px;
@@ -7622,4 +7637,998 @@ md-dialog:not([open]) {
   .sd-observability-metrics-row {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* ── AI Configuration Accordion ─────────────────────────────────────────── */
+
+.sd-ai-accordion {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.sd-ai-accordion-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  list-style: none;
+  user-select: none;
+  color: var(--text);
+  background: var(--surface);
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+
+.sd-ai-accordion-title::-webkit-details-marker { display: none; }
+
+.sd-ai-accordion[open] .sd-ai-accordion-title {
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+.sd-ai-accordion-title .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--primary);
+  opacity: 0.85;
+}
+
+.sd-ai-accordion-body {
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Multi-column field rows */
+.sd-ai-field-row {
+  display: grid;
+  gap: 14px;
+}
+
+.sd-ai-field-row-2 { grid-template-columns: 1fr 1fr; }
+.sd-ai-field-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.sd-ai-hint {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Radio group */
+.sd-ai-radio-group {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sd-ai-radio-group legend {
+  font-weight: 600;
+  font-size: 0.87rem;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.sd-ai-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+/* Threshold badge row (Evaluation page) */
+.sd-ai-threshold-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.sd-ai-threshold-badge .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--primary);
+}
+
+/* ── System Monitoring Cards ─────────────────────────────────────────────── */
+
+.sd-monitoring-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.sd-monitoring-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.sd-monitoring-card .material-symbols-outlined {
+  font-size: 28px;
+  color: var(--primary);
+  opacity: 0.8;
+}
+
+.sd-monitoring-card > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sd-monitoring-card strong {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.sd-monitoring-card span {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Budget progress bars */
+.sd-monitoring-budget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.sd-monitoring-budget-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 120px;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.sd-monitoring-progress-track {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary) 15%, var(--border));
+  overflow: hidden;
+}
+
+.sd-monitoring-progress-bar {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--primary);
+  transition: width 0.4s ease;
+}
+
+/* ── System Monitoring ───────────────────────────────────────────────────────
+   ① Infra  ② Service Health  ③ Resource  ④ App Perf
+   ⑤ Deps   ⑥ Alerts          ⑦ History                                       */
+
+/* ② Service Health --------------------------------------------------------- */
+.sd-mon-services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.sd-mon-service-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: border-color 0.2s;
+}
+.sd-mon-service-card--healthy  { border-color: #22c55e; }
+.sd-mon-service-card--degraded { border-color: #f59e0b; }
+.sd-mon-service-card--down     { border-color: #ef4444; }
+.sd-mon-service-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.sd-mon-service-icon { font-size: 20px; color: var(--primary); }
+.sd-mon-service-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.sd-mon-service-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sd-mon-service-badge--healthy  { background: color-mix(in srgb,#22c55e 15%,transparent); color:#16a34a; }
+.sd-mon-service-badge--degraded { background: color-mix(in srgb,#f59e0b 15%,transparent); color:#b45309; }
+.sd-mon-service-badge--down     { background: color-mix(in srgb,#ef4444 15%,transparent); color:#dc2626; }
+.sd-mon-service-badge--unknown  { background: color-mix(in srgb,var(--muted) 15%,transparent); color:var(--muted); }
+.sd-mon-service-detail {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 14px 10px;
+  margin: 0;
+}
+
+/* ③ Resource Utilization --------------------------------------------------- */
+.sd-mon-resource-list { display: flex; flex-direction: column; gap: 10px; }
+.sd-mon-resource-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 120px;
+  align-items: center;
+  gap: 12px;
+}
+.sd-mon-resource-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.sd-mon-resource-track {
+  height: 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--border));
+  overflow: hidden;
+}
+.sd-mon-resource-bar {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--primary);
+  transition: width 0.4s ease, background 0.3s;
+}
+.sd-mon-resource-bar--warn    { background: #f59e0b; }
+.sd-mon-resource-bar--danger  { background: #ef4444; }
+.sd-mon-resource-bar--cost    { background: color-mix(in srgb,#22c55e 80%,var(--primary)); }
+.sd-mon-resource-value        { font-size: 12px; font-weight: 600; color: var(--text); }
+
+/* ⑤ External Dependencies badge ------------------------------------------- */
+.sd-mon-dep-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.sd-mon-dep-badge--healthy  { background: color-mix(in srgb,#22c55e 15%,transparent); color:#16a34a; }
+.sd-mon-dep-badge--degraded { background: color-mix(in srgb,#f59e0b 15%,transparent); color:#b45309; }
+.sd-mon-dep-badge--down     { background: color-mix(in srgb,#ef4444 15%,transparent); color:#dc2626; }
+.sd-mon-dep-badge--unknown  { background: color-mix(in srgb,var(--muted) 15%,transparent); color:var(--muted); }
+
+/* ⑥ Alerts & Incidents ----------------------------------------------------- */
+.sd-mon-alerts-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.sd-mon-alert-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--muted);
+}
+.sd-mon-alert-count-badge--warn { background: color-mix(in srgb,#ef4444 12%,transparent); color:#dc2626; }
+.sd-mon-alert-count-badge--ok   { background: color-mix(in srgb,#22c55e 12%,transparent); color:#16a34a; }
+.sd-mon-ack-btn { font-size: 12px; }
+
+.sd-mon-alerts-list { display: flex; flex-direction: column; gap: 8px; }
+.sd-mon-alert-card {
+  border-left: 4px solid var(--border);
+  border-radius: 0 8px 8px 0;
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  background: var(--surface);
+}
+.sd-mon-alert-card--critical { border-left-color: #dc2626; }
+.sd-mon-alert-card--error    { border-left-color: #ef4444; }
+.sd-mon-alert-card--warning  { border-left-color: #f59e0b; }
+.sd-mon-alert-card--info     { border-left-color: var(--primary); }
+.sd-mon-alert-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sd-mon-alert-header .material-symbols-outlined { font-size: 18px; }
+.sd-mon-alert-card--critical .material-symbols-outlined,
+.sd-mon-alert-card--error    .material-symbols-outlined { color: #ef4444; }
+.sd-mon-alert-card--warning  .material-symbols-outlined { color: #f59e0b; }
+.sd-mon-alert-card--info     .material-symbols-outlined { color: var(--primary); }
+.sd-mon-alert-title { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.sd-mon-alert-sev   { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+.sd-mon-alert-time  { font-size: 11px; color: var(--muted); }
+.sd-mon-alert-desc  { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+
+.sd-mon-sev-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.sd-mon-sev-chip--critical { background:color-mix(in srgb,#dc2626 15%,transparent); color:#dc2626; }
+.sd-mon-sev-chip--error    { background:color-mix(in srgb,#ef4444 15%,transparent); color:#ef4444; }
+.sd-mon-sev-chip--warning  { background:color-mix(in srgb,#f59e0b 15%,transparent); color:#b45309; }
+.sd-mon-sev-chip--info     { background:color-mix(in srgb,var(--primary) 15%,transparent); color:var(--primary); }
+
+/* ⑦ Historical Metrics ----------------------------------------------------- */
+.sd-mon-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.sd-mon-hist-chart {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+.sd-mon-hist-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+.sd-mon-hist-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 70px;
+}
+.sd-mon-hist-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  cursor: default;
+}
+.sd-mon-hist-bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  min-height: 3px;
+  transition: height 0.4s ease;
+}
+.sd-mon-hist-label {
+  font-size: 9px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── AI Observability ────────────────────────────────────────────────────────
+   ① Summary  ② Traces  ③ Detail  ④ Prompt Timeline  ⑤ Chunks
+   ⑥ Routing  ⑦ Token/Cost  ⑧ Latency  ⑨ Feedback                           */
+
+/* ① Observability Summary -------------------------------------------------- */
+.sd-obs-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.sd-obs-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.sd-obs-summary-icon { font-size: 26px; color: var(--primary); flex-shrink: 0; }
+.sd-obs-summary-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sd-obs-summary-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.sd-obs-summary-value { font-size: 20px; font-weight: 700; color: var(--text); }
+
+/* ② Request Traces --------------------------------------------------------- */
+.sd-obs-traces-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.sd-obs-search-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}
+.sd-obs-search-input:focus { outline: none; border-color: var(--primary); }
+
+.sd-obs-filter-select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.sd-obs-trace-row:hover { background: color-mix(in srgb, var(--primary) 4%, transparent); }
+.sd-obs-trace-row--active { background: color-mix(in srgb, var(--primary) 8%, transparent) !important; }
+
+.sd-obs-mode-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--muted) 15%, transparent);
+  color: var(--muted);
+}
+.sd-obs-mode-chip--rag {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+.sd-obs-monospace { font-family: monospace; font-size: 12px; }
+
+/* ③ Trace Details ---------------------------------------------------------- */
+.sd-obs-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.sd-obs-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.sd-obs-detail-field--wide { grid-column: 1 / -1; }
+.sd-obs-detail-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.sd-obs-detail-value { font-size: 13px; font-weight: 600; color: var(--text); word-break: break-all; }
+
+.sd-obs-close-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px;
+  border-radius: 4px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+.sd-obs-close-btn:hover { color: var(--text); }
+.sd-obs-close-btn .material-symbols-outlined { font-size: 20px; }
+
+/* ④ Prompt Timeline -------------------------------------------------------- */
+.sd-obs-prompt-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sd-obs-timeline-msg {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.sd-obs-timeline-msg--system { border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
+.sd-obs-timeline-msg--model  { border-color: color-mix(in srgb, #22c55e 30%, var(--border)); }
+.sd-obs-timeline-role {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.sd-obs-timeline-role .material-symbols-outlined { font-size: 16px; color: var(--primary); }
+.sd-obs-timeline-text {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+/* ⑤ Retrieved Chunks ------------------------------------------------------- */
+.sd-obs-chunks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sd-obs-chunk-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.sd-obs-chunk-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.sd-obs-chunk-rank {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.sd-obs-chunk-article { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; }
+.sd-obs-chunk-score   { font-size: 11px; color: var(--muted); margin-left: auto; }
+.sd-obs-chunk-text    {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.6;
+  background: var(--surface);
+}
+
+/* ⑥ Model Routing ---------------------------------------------------------- */
+.sd-obs-routing-grid { display: flex; flex-direction: column; gap: 8px; }
+.sd-obs-routing-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 140px;
+  align-items: center;
+  gap: 12px;
+}
+.sd-obs-routing-model { font-size: 13px; font-weight: 600; color: var(--text); }
+.sd-obs-routing-bar-wrap {
+  height: 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--border));
+  overflow: hidden;
+}
+.sd-obs-routing-bar {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--primary);
+  transition: width 0.4s ease;
+}
+.sd-obs-routing-count { font-size: 12px; color: var(--muted); text-align: right; }
+
+/* ⑦ Token & Cost Analytics ------------------------------------------------- */
+.sd-obs-token-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.sd-obs-token-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: center;
+}
+.sd-obs-token-stat-card .material-symbols-outlined { font-size: 24px; color: var(--primary); }
+.sd-obs-token-stat-card strong { font-size: 20px; font-weight: 700; color: var(--text); }
+.sd-obs-token-stat-card span   { font-size: 11px; color: var(--muted); }
+
+.sd-obs-cost-bar-list { display: flex; flex-direction: column; gap: 6px; }
+.sd-obs-cost-bar-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  align-items: center;
+  gap: 10px;
+}
+.sd-obs-cost-bar-label { font-size: 12px; color: var(--muted); }
+.sd-obs-cost-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--border));
+  overflow: hidden;
+}
+.sd-obs-cost-bar {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--primary);
+  transition: width 0.4s ease;
+}
+.sd-obs-cost-bar-value { font-size: 12px; color: var(--text); text-align: right; font-weight: 600; }
+
+/* ⑧ Latency Breakdown ------------------------------------------------------ */
+.sd-obs-latency-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.sd-obs-latency-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+.sd-obs-latency-stage {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.sd-obs-latency-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sd-obs-latency-stats > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.sd-obs-latency-stats > div strong { font-size: 14px; font-weight: 700; color: var(--text); }
+.sd-obs-latency-label { font-size: 11px; color: var(--muted); }
+
+/* ⑨ User Feedback ---------------------------------------------------------- */
+.sd-obs-feedback-summary {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.sd-obs-feedback-kpi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  flex: 1;
+  min-width: 140px;
+}
+.sd-obs-feedback-kpi .material-symbols-outlined { font-size: 24px; color: var(--primary); }
+.sd-obs-feedback-kpi strong { font-size: 20px; font-weight: 700; color: var(--text); }
+.sd-obs-feedback-kpi span:last-child { font-size: 12px; color: var(--muted); }
+.sd-obs-rating-up   { color: #22c55e; font-size: 18px; vertical-align: middle; }
+.sd-obs-rating-down { color: #ef4444; font-size: 18px; vertical-align: middle; }
+
+/* ── AI Evaluation ───────────────────────────────────────────────────────────
+   ② Run modes ④ Golden dataset ⑤–⑥ tables (① summary + ③ metrics → renderKpiCards) */
+
+/* ② Run modes ------------------------------------------------------------- */
+.sd-eval-run-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.sd-eval-run-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 18px 14px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.sd-eval-run-mode:has(input:checked) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+.sd-eval-run-mode input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+.sd-eval-run-mode .material-symbols-outlined { font-size: 28px; color: var(--primary); }
+.sd-eval-run-mode-label { font-weight: 600; font-size: 13px; color: var(--text); }
+.sd-eval-run-mode-desc  { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.sd-eval-run-mode-badge {
+  position: absolute;
+  top: -1px; right: -1px;
+  background: var(--accent, #1d64d8);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 0 10px 0 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+.sd-eval-run-mode { position: relative; }
+
+.sd-eval-run-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sd-eval-threshold-chips {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sd-eval-threshold-chips strong { color: var(--text); }
+
+/* Progress bar */
+.sd-eval-progress-wrap {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sd-eval-progress-track {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary) 15%, var(--border));
+  overflow: hidden;
+}
+.sd-eval-progress-bar {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+.sd-eval-progress-label { font-size: 12px; color: var(--muted); }
+
+/* ④ Golden Dataset --------------------------------------------------------- */
+.sd-eval-dataset-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.sd-eval-dataset-toolbar-left  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sd-eval-dataset-toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sd-eval-dataset-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.sd-eval-dataset-search-icon {
+  position: absolute;
+  left: 10px;
+  font-size: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.sd-eval-dataset-search {
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  padding: 0 12px 0 34px;
+  width: 200px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sd-eval-dataset-search:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+.sd-eval-dataset-filter-btn { gap: 4px; }
+
+/* ── Toolbar button overrides (primary = blue, secondary = outlined) ───────── */
+.sd-eval-dataset-toolbar .sd-admin-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  background: var(--accent);
+  color: #fff;
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.sd-eval-dataset-toolbar .sd-admin-primary:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  border-color: color-mix(in srgb, var(--accent) 85%, #000);
+}
+.sd-eval-dataset-toolbar .sd-admin-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sd-eval-dataset-toolbar .sd-admin-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Golden Dataset empty state ─────────────────────────────────────────── */
+.sd-eval-dataset-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  color: var(--muted);
+}
+.sd-eval-dataset-empty .material-symbols-outlined {
+  font-size: 48px;
+  color: color-mix(in srgb, var(--muted) 40%, transparent);
+}
+.sd-eval-dataset-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.sd-eval-dataset-empty-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+.sd-eval-dataset-wrap {
+  overflow-x: auto;
+}
+.sd-eval-dataset-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sd-eval-dataset-table th {
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--surface-alt, #f8f8fa);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sd-eval-dataset-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.sd-eval-golden-input {
+  width: 100%;
+  min-width: 140px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+}
+.sd-eval-golden-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.sd-eval-golden-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.sd-eval-golden-remove:hover { color: #ef4444; }
+.sd-eval-golden-remove .material-symbols-outlined { font-size: 18px; }
+.sd-eval-optional { font-size: 10px; font-weight: 400; color: var(--muted); }
+
+/* Mode chip in history */
+.sd-eval-mode-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+}
+
+/* Fix badge class names to match new JS output */
+.sd-obs-badge--pass {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #16a34a;
+}
+.sd-obs-badge--fail {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+  color: #dc2626;
+}
+
+/* Section title icon alignment */
+.sd-seo-group-title .material-symbols-outlined {
+  font-size: 18px;
+  vertical-align: middle;
+  margin-right: 4px;
+  color: var(--primary);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .sd-ai-field-row-3        { grid-template-columns: 1fr 1fr; }
+  .sd-monitoring-cards      { grid-template-columns: 1fr 1fr; }
+  .sd-eval-run-modes        { grid-template-columns: 1fr 1fr; }
+  .sd-obs-summary-grid      { grid-template-columns: 1fr 1fr; }
+  .sd-obs-token-stats       { grid-template-columns: 1fr 1fr; }
+  .sd-obs-latency-grid      { grid-template-columns: 1fr 1fr; }
+  .sd-obs-routing-row       { grid-template-columns: 140px 1fr 100px; }
+  .sd-mon-services-grid     { grid-template-columns: 1fr 1fr; }
+  .sd-mon-resource-row      { grid-template-columns: 120px 1fr 90px; }
+  /* sd-kpi-cards responsive handled by kpi-cards CSS */
+}
+
+@media (max-width: 600px) {
+  .sd-ai-field-row-2,
+  .sd-ai-field-row-3        { grid-template-columns: 1fr; }
+  .sd-monitoring-cards      { grid-template-columns: 1fr 1fr; }
+  .sd-monitoring-budget-row { grid-template-columns: 64px 1fr; }
+  .sd-monitoring-budget-row span:last-child { grid-column: 1 / -1; }
+  .sd-eval-run-modes        { grid-template-columns: 1fr; }
+  .sd-obs-summary-grid      { grid-template-columns: 1fr 1fr; }
+  .sd-obs-token-stats       { grid-template-columns: 1fr 1fr; }
+  .sd-obs-latency-grid      { grid-template-columns: 1fr 1fr; }
+  .sd-obs-routing-row       { grid-template-columns: 1fr; }
+  .sd-obs-routing-count     { text-align: left; }
+  .sd-mon-services-grid     { grid-template-columns: 1fr; }
+  .sd-mon-resource-row      { grid-template-columns: 100px 1fr 70px; }
+  .sd-mon-history-grid      { grid-template-columns: 1fr; }
 }
