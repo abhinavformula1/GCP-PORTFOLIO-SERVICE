@@ -8439,6 +8439,34 @@ md-dialog:not([open]) {
   gap: 16px;
   flex-wrap: wrap;
 }
+/* Same filled-pill family as the Golden Dataset toolbar's primary button,
+   sized up slightly since this is the section's main CTA. */
+.sd-eval-run-actions .sd-admin-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 18px;
+  background: var(--accent);
+  color: #fff;
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.sd-eval-run-actions .sd-admin-primary .material-symbols-outlined {
+  font-size: 18px;
+}
+.sd-eval-run-actions .sd-admin-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  border-color: color-mix(in srgb, var(--accent) 85%, #000);
+}
+.sd-eval-run-actions .sd-admin-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .sd-eval-threshold-chips {
   font-size: 12px;
   color: var(--muted);

@@ -820,7 +820,7 @@ router.get('/admin/atlas/rag-eval', async (req, res) => {
         misses:    total - hits,
         total,
         passRate:  total > 0 ? Math.round((hits / total) * 100) : 0,
-        passed:    metrics.recall >= 0.8,
+        passed:    metrics.recallAtK >= 0.8,
         details,
       });
     } catch (saveErr) {
@@ -883,6 +883,37 @@ router.get('/admin/atlas/rag-eval/history', async (req, res) => {
     });
 
     res.json({ success: true, runs });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── RAG Evaluation History — delete a run ─────────────────────────────────
+//
+// DELETE /api/admin/atlas/rag-eval/history/:id
+//
+router.delete('/admin/atlas/rag-eval/history/:id', async (req, res) => {
+  try {
+    if (!config.admin.localPreview) {
+      const auth  = String(req.headers.authorization || '');
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : String(req.query.token || '');
+      if (!token) { res.status(401).json({ success: false, error: 'Missing token.' }); return; }
+      const user  = await googleAuth.verifyIdToken(token);
+      const email = String(user?.email || '').toLowerCase();
+      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
+        res.status(403).json({ success: false, error: 'Admin access not allowed.' }); return;
+      }
+    }
+  } catch (_) {
+    res.status(401).json({ success: false, error: 'Invalid or expired token.' }); return;
+  }
+
+  const id = String(req.params.id || '');
+  if (!id) { res.status(400).json({ success: false, error: 'Missing run id.' }); return; }
+
+  try {
+    await firestore.getDb().collection('ragEvalRuns').doc(id).delete();
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

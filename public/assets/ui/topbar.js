@@ -59,9 +59,13 @@ function renderUserMenu(ids, handlers) {
       alt: ids.photoAlt || 'Signed-in user profile photo',
     }),
   ]);
-  if (typeof handlers?.toggleUserMenu === 'function') {
-    avatarButton.addEventListener('click', handlers.toggleUserMenu);
-  }
+  // Callers can override with their own handlers.toggleUserMenu; otherwise
+  // default to this module's own toggle/close, bound to *this* render's
+  // dropdown id (not the 'topbarDropdown' default — admin uses a custom id).
+  const onToggle = typeof handlers?.toggleUserMenu === 'function'
+    ? handlers.toggleUserMenu
+    : function () { toggleUserMenu(ids.dropdown); };
+  avatarButton.addEventListener('click', onToggle);
 
   const signOutAttrs = { className: 'topbar-signout', text: 'Sign out' };
   if (ids.signOutBtn) signOutAttrs.id = ids.signOutBtn;
@@ -171,20 +175,21 @@ export function updateTopbarUser(p) {
   }
 }
 
-export function toggleUserMenu() {
-  const dd = document.getElementById('topbarDropdown');
+export function toggleUserMenu(dropdownId) {
+  const id = dropdownId || 'topbarDropdown';
+  const dd = document.getElementById(id);
   if (!dd) return;
   if (dd.hasAttribute('hidden')) {
     dd.removeAttribute('hidden');
     setTimeout(function () {
-      document.addEventListener('click', closeUserMenu, { once: true });
+      document.addEventListener('click', function () { closeUserMenu(id); }, { once: true });
     }, 0);
   } else {
     dd.setAttribute('hidden', '');
   }
 }
 
-export function closeUserMenu() {
-  const dd = document.getElementById('topbarDropdown');
+export function closeUserMenu(dropdownId) {
+  const dd = document.getElementById(dropdownId || 'topbarDropdown');
   if (dd) dd.setAttribute('hidden', '');
 }
