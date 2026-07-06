@@ -55,17 +55,13 @@ app.get(/^\/system-design(\/.*)?$/, (req, res) => {
   res.redirect(301, target);
 });
 
-// ── Admin route alias ─────────────────────────────────────────────────────────
-// Admin UI lives under /admin/system-design historically. Expose the same UI at
-// /admin/software-architecture for consistency, while keeping the old URL.
-// NOTE: this MUST be registered before express.static(public/) otherwise the
-// legacy /admin/system-design folder will be served directly and this redirect
-// will never run.
+// ── Admin route ───────────────────────────────────────────────────────────────
+// Legacy /admin/system-design URLs still work via a 301 redirect.
 app.get(/^\/admin\/system-design(\/.*)?$/, (req, res) => {
   const target = req.originalUrl.replace(/^\/admin\/system-design/, '/admin/software-architecture');
-  res.redirect(302, target);
+  res.redirect(301, target);
 });
-app.use('/admin/software-architecture', express.static(path.join(__dirname, 'public', 'admin', 'system-design')));
+app.use('/admin/software-architecture', express.static(path.join(__dirname, 'public', 'admin', 'software-architecture')));
 
 // ── Static assets (everything in public/ is served automatically) ─────────────
 app.use(express.static(path.join(__dirname, 'public')));

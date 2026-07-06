@@ -88,37 +88,185 @@ async function upsertSeoConfig(cfg) {
 const ATLAS_CONFIG_DOC = 'atlasConfig';
 
 const DEFAULT_ATLAS_CONFIG = {
-  enabledModels:        ['flash-lite', 'flash'],
-  defaultModel:         'flash-lite',
-  budgetCapInr:         100,
-  modelSelectorVisible: true,
-  ragEnabled:           false,
-  ragTopK:              5,
+  // ── 1. LLM Configuration ────────────────────────────────────────────────
+  enabledModels:            ['flash-lite', 'flash'],
+  defaultModel:             'flash-lite',
+  fallbackModel:            '',
+  temperature:              0.35,
+  topP:                     0.85,
+  maxOutputTokens:          900,
+  streamingEnabled:         true,
+
+  // ── 2. Embedding Configuration ──────────────────────────────────────────
+  embeddingModel:           'text-embedding-004',
+  embeddingDimensions:      768,
+  distanceMetric:           'COSINE',
+  embeddingBatchSize:       5,
+
+  // ── 3. Chunking Strategy ─────────────────────────────────────────────────
+  chunkSize:                4000,
+  chunkOverlap:             200,
+  splitterType:             'recursive',       // recursive | markdown
+
+  // ── 4. Retrieval Configuration ───────────────────────────────────────────
+  ragEnabled:               false,
+  ragTopK:                  5,
+  hybridSearchEnabled:      false,
+  rerankerEnabled:          false,
+  similarityThreshold:      0.0,
+
+  // ── 5. Prompt Configuration ──────────────────────────────────────────────
+  systemPrompt:             '',
+  guardrailsEnabled:        false,
+  conversationMemoryTurns:  5,
+
+  // ── 6. Model Routing ─────────────────────────────────────────────────────
+  routingStrategy:          'default',         // default | rule-based | classifier
+  routingFallbackModel:     'flash-lite',
+
+  // ── 7. Evaluation Configuration ──────────────────────────────────────────
+  recallThreshold:          0.80,
+  faithfulnessThreshold:    0.70,
+
+  // ── 8. Observability Configuration ───────────────────────────────────────
+  tracingEnabled:           false,
+  capturePrompts:           false,
+  captureChunks:            false,
+  captureTokens:            true,
+
+  // ── 9. Cost Controls ─────────────────────────────────────────────────────
+  budgetCapInr:             100,
+  dailyBudgetCapInr:        0,
+  tokenLimitPerQuery:       1000,
+  budgetAlertThreshold:     0.8,
+
+  // ── 10. Security ─────────────────────────────────────────────────────────
+  piiRedactionEnabled:      false,
+  promptInjectionDetection: false,
+  rateLimitPerMinute:       20,
+  contentModerationEnabled: false,
+
+  // ── UI ───────────────────────────────────────────────────────────────────
+  modelSelectorVisible:     true,
 };
+
+function _num(val, def)  { return typeof val === 'number' ? val : def; }
+function _bool(val, def) { return typeof val === 'boolean' ? val : def; }
+function _str(val, def)  { return typeof val === 'string' && val ? val : def; }
 
 async function getAtlasConfig() {
   const snap = await firestore.getDb().collection(CONFIG_COLLECTION).doc(ATLAS_CONFIG_DOC).get();
   if (!snap.exists) return { ...DEFAULT_ATLAS_CONFIG };
   const d = snap.data() || {};
+  const D = DEFAULT_ATLAS_CONFIG;
   return {
-    enabledModels:        Array.isArray(d.enabledModels) ? d.enabledModels : DEFAULT_ATLAS_CONFIG.enabledModels,
-    defaultModel:         String(d.defaultModel         || DEFAULT_ATLAS_CONFIG.defaultModel),
-    budgetCapInr:         typeof d.budgetCapInr === 'number' ? d.budgetCapInr : DEFAULT_ATLAS_CONFIG.budgetCapInr,
-    modelSelectorVisible: d.modelSelectorVisible !== false,
-    ragEnabled:           d.ragEnabled === true,
-    ragTopK:              typeof d.ragTopK === 'number' ? d.ragTopK : DEFAULT_ATLAS_CONFIG.ragTopK,
+    // LLM
+    enabledModels:            Array.isArray(d.enabledModels) ? d.enabledModels : D.enabledModels,
+    defaultModel:             _str(d.defaultModel,             D.defaultModel),
+    fallbackModel:            typeof d.fallbackModel === 'string' ? d.fallbackModel : D.fallbackModel,
+    temperature:              _num(d.temperature,              D.temperature),
+    topP:                     _num(d.topP,                     D.topP),
+    maxOutputTokens:          _num(d.maxOutputTokens,          D.maxOutputTokens),
+    streamingEnabled:         _bool(d.streamingEnabled,        D.streamingEnabled),
+    // Embedding
+    embeddingModel:           _str(d.embeddingModel,           D.embeddingModel),
+    embeddingDimensions:      _num(d.embeddingDimensions,      D.embeddingDimensions),
+    distanceMetric:           _str(d.distanceMetric,           D.distanceMetric),
+    embeddingBatchSize:       _num(d.embeddingBatchSize,       D.embeddingBatchSize),
+    // Chunking
+    chunkSize:                _num(d.chunkSize,                D.chunkSize),
+    chunkOverlap:             _num(d.chunkOverlap,             D.chunkOverlap),
+    splitterType:             _str(d.splitterType,             D.splitterType),
+    // Retrieval
+    ragEnabled:               d.ragEnabled === true,
+    ragTopK:                  _num(d.ragTopK,                  D.ragTopK),
+    hybridSearchEnabled:      _bool(d.hybridSearchEnabled,     D.hybridSearchEnabled),
+    rerankerEnabled:          _bool(d.rerankerEnabled,         D.rerankerEnabled),
+    similarityThreshold:      _num(d.similarityThreshold,      D.similarityThreshold),
+    // Prompt
+    systemPrompt:             typeof d.systemPrompt === 'string' ? d.systemPrompt : D.systemPrompt,
+    guardrailsEnabled:        _bool(d.guardrailsEnabled,       D.guardrailsEnabled),
+    conversationMemoryTurns:  _num(d.conversationMemoryTurns,  D.conversationMemoryTurns),
+    // Routing
+    routingStrategy:          _str(d.routingStrategy,          D.routingStrategy),
+    routingFallbackModel:     _str(d.routingFallbackModel,     D.routingFallbackModel),
+    // Evaluation
+    recallThreshold:          _num(d.recallThreshold,          D.recallThreshold),
+    faithfulnessThreshold:    _num(d.faithfulnessThreshold,    D.faithfulnessThreshold),
+    // Observability
+    tracingEnabled:           _bool(d.tracingEnabled,          D.tracingEnabled),
+    capturePrompts:           _bool(d.capturePrompts,          D.capturePrompts),
+    captureChunks:            _bool(d.captureChunks,           D.captureChunks),
+    captureTokens:            _bool(d.captureTokens,           D.captureTokens),
+    // Cost
+    budgetCapInr:             _num(d.budgetCapInr,             D.budgetCapInr),
+    dailyBudgetCapInr:        _num(d.dailyBudgetCapInr,        D.dailyBudgetCapInr),
+    tokenLimitPerQuery:       _num(d.tokenLimitPerQuery,       D.tokenLimitPerQuery),
+    budgetAlertThreshold:     _num(d.budgetAlertThreshold,     D.budgetAlertThreshold),
+    // Security
+    piiRedactionEnabled:      _bool(d.piiRedactionEnabled,     D.piiRedactionEnabled),
+    promptInjectionDetection: _bool(d.promptInjectionDetection,D.promptInjectionDetection),
+    rateLimitPerMinute:       _num(d.rateLimitPerMinute,       D.rateLimitPerMinute),
+    contentModerationEnabled: _bool(d.contentModerationEnabled,D.contentModerationEnabled),
+    // UI
+    modelSelectorVisible:     d.modelSelectorVisible !== false,
   };
 }
 
 async function upsertAtlasConfig(cfg) {
+  const D = DEFAULT_ATLAS_CONFIG;
   await firestore.getDb().collection(CONFIG_COLLECTION).doc(ATLAS_CONFIG_DOC).set({
-    enabledModels:        Array.isArray(cfg.enabledModels) ? cfg.enabledModels : DEFAULT_ATLAS_CONFIG.enabledModels,
-    defaultModel:         String(cfg.defaultModel         || DEFAULT_ATLAS_CONFIG.defaultModel),
-    budgetCapInr:         typeof cfg.budgetCapInr === 'number' ? cfg.budgetCapInr : DEFAULT_ATLAS_CONFIG.budgetCapInr,
-    modelSelectorVisible: cfg.modelSelectorVisible !== false,
-    ragEnabled:           cfg.ragEnabled === true,
-    ragTopK:              typeof cfg.ragTopK === 'number' ? cfg.ragTopK : DEFAULT_ATLAS_CONFIG.ragTopK,
-    updatedAt:            FieldValue.serverTimestamp(),
+    // LLM
+    enabledModels:            Array.isArray(cfg.enabledModels) ? cfg.enabledModels : D.enabledModels,
+    defaultModel:             _str(cfg.defaultModel,             D.defaultModel),
+    fallbackModel:            typeof cfg.fallbackModel === 'string' ? cfg.fallbackModel : D.fallbackModel,
+    temperature:              _num(cfg.temperature,              D.temperature),
+    topP:                     _num(cfg.topP,                     D.topP),
+    maxOutputTokens:          _num(cfg.maxOutputTokens,          D.maxOutputTokens),
+    streamingEnabled:         _bool(cfg.streamingEnabled,        D.streamingEnabled),
+    // Embedding
+    embeddingModel:           _str(cfg.embeddingModel,           D.embeddingModel),
+    embeddingDimensions:      _num(cfg.embeddingDimensions,      D.embeddingDimensions),
+    distanceMetric:           _str(cfg.distanceMetric,           D.distanceMetric),
+    embeddingBatchSize:       _num(cfg.embeddingBatchSize,       D.embeddingBatchSize),
+    // Chunking
+    chunkSize:                _num(cfg.chunkSize,                D.chunkSize),
+    chunkOverlap:             _num(cfg.chunkOverlap,             D.chunkOverlap),
+    splitterType:             _str(cfg.splitterType,             D.splitterType),
+    // Retrieval
+    ragEnabled:               cfg.ragEnabled === true,
+    ragTopK:                  _num(cfg.ragTopK,                  D.ragTopK),
+    hybridSearchEnabled:      _bool(cfg.hybridSearchEnabled,     D.hybridSearchEnabled),
+    rerankerEnabled:          _bool(cfg.rerankerEnabled,         D.rerankerEnabled),
+    similarityThreshold:      _num(cfg.similarityThreshold,      D.similarityThreshold),
+    // Prompt
+    systemPrompt:             typeof cfg.systemPrompt === 'string' ? cfg.systemPrompt : D.systemPrompt,
+    guardrailsEnabled:        _bool(cfg.guardrailsEnabled,       D.guardrailsEnabled),
+    conversationMemoryTurns:  _num(cfg.conversationMemoryTurns,  D.conversationMemoryTurns),
+    // Routing
+    routingStrategy:          _str(cfg.routingStrategy,          D.routingStrategy),
+    routingFallbackModel:     _str(cfg.routingFallbackModel,     D.routingFallbackModel),
+    // Evaluation
+    recallThreshold:          _num(cfg.recallThreshold,          D.recallThreshold),
+    faithfulnessThreshold:    _num(cfg.faithfulnessThreshold,    D.faithfulnessThreshold),
+    // Observability
+    tracingEnabled:           _bool(cfg.tracingEnabled,          D.tracingEnabled),
+    capturePrompts:           _bool(cfg.capturePrompts,          D.capturePrompts),
+    captureChunks:            _bool(cfg.captureChunks,           D.captureChunks),
+    captureTokens:            _bool(cfg.captureTokens,           D.captureTokens),
+    // Cost
+    budgetCapInr:             _num(cfg.budgetCapInr,             D.budgetCapInr),
+    dailyBudgetCapInr:        _num(cfg.dailyBudgetCapInr,        D.dailyBudgetCapInr),
+    tokenLimitPerQuery:       _num(cfg.tokenLimitPerQuery,       D.tokenLimitPerQuery),
+    budgetAlertThreshold:     _num(cfg.budgetAlertThreshold,     D.budgetAlertThreshold),
+    // Security
+    piiRedactionEnabled:      _bool(cfg.piiRedactionEnabled,     D.piiRedactionEnabled),
+    promptInjectionDetection: _bool(cfg.promptInjectionDetection,D.promptInjectionDetection),
+    rateLimitPerMinute:       _num(cfg.rateLimitPerMinute,       D.rateLimitPerMinute),
+    contentModerationEnabled: _bool(cfg.contentModerationEnabled,D.contentModerationEnabled),
+    // UI
+    modelSelectorVisible:     cfg.modelSelectorVisible !== false,
+    updatedAt:                FieldValue.serverTimestamp(),
   });
 }
 

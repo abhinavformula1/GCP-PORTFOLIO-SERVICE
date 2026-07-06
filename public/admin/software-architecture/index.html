@@ -292,11 +292,17 @@
           <span>Atlas AI</span>
         </div>
         <nav class="sd-subpanel-nav">
-          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="config" onclick="window._setAtlasSubModule('atlas-settings')">
-            <span class="material-symbols-outlined" aria-hidden="true">settings_suggest</span>AI Config
+          <button type="button" class="sd-subpanel-item sd-subpanel-item-active" data-subpanel-action="ai-config" onclick="window._setAtlasSubModule('atlas-ai-config')">
+            <span class="material-symbols-outlined" aria-hidden="true">tune</span>AI Configuration
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="evaluation" onclick="window._setAtlasSubModule('atlas-evaluation')">
+            <span class="material-symbols-outlined" aria-hidden="true">science</span>AI Evaluation
           </button>
           <button type="button" class="sd-subpanel-item" data-subpanel-action="observability" onclick="window._setAtlasSubModule('atlas-observability')">
             <span class="material-symbols-outlined" aria-hidden="true">monitor_heart</span>AI Observability
+          </button>
+          <button type="button" class="sd-subpanel-item" data-subpanel-action="monitoring" onclick="window._setAtlasSubModule('atlas-monitoring')">
+            <span class="material-symbols-outlined" aria-hidden="true">bar_chart_4_bars</span>AI Monitoring
           </button>
         </nav>
       </div>
@@ -1128,12 +1134,13 @@
     </md-dialog>
 
     <!-- Atlas AI settings workspace -->
-    <section id="atlasSettingsWorkspace" class="sd-article-settings" hidden>
+    <!-- AI Configuration workspace — 10 accordion sections -->
+    <section id="atlasAiConfigWorkspace" class="sd-article-settings" hidden>
       <div class="sd-article-settings-head">
         <div>
-          <div class="sd-admin-section-kicker">Chat assistant</div>
-          <h2>Atlas AI Settings</h2>
-          <p>Control which Gemini models power Atlas, set the default, and cap monthly spend. Changes take effect on the next chat session.</p>
+          <div class="sd-admin-section-kicker">Atlas AI</div>
+          <h2>AI Configuration</h2>
+          <p>Tune every layer of the Atlas AI pipeline — models, embeddings, chunking, retrieval, prompts, routing, evaluation thresholds, observability, cost controls, and security.</p>
         </div>
         <div class="sd-article-settings-actions">
           <button type="button" id="saveAtlasConfigBtn" class="sd-admin-primary">
@@ -1145,63 +1152,352 @@
 
       <div class="sd-atlas-config-panel">
 
-        <!-- Model toggles -->
-        <div class="sd-seo-group">
-          <h3 class="sd-seo-group-title">Available Models</h3>
-          <p class="sd-seo-group-desc">Enable the models visitors can choose from. At least one model must stay enabled. The default model is used when the visitor has not picked one.</p>
-          <div id="atlasModelRows" class="sd-atlas-model-rows"></div>
-        </div>
-
-        <!-- Model selector visibility -->
-        <div class="sd-seo-group">
-          <h3 class="sd-seo-group-title">Model Picker</h3>
-          <div class="sd-seo-toggles">
-            <div class="sd-seo-toggle-row">
-              <div class="sd-seo-toggle-info">
-                <strong>Show model picker in chat</strong>
-                <span>Let visitors switch between Fast &amp; More detailed. Hide to keep the UI minimal.</span>
+        <!-- ① LLM Configuration -->
+        <details class="sd-ai-accordion" open>
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">psychology</span>
+            1. LLM Configuration
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Models available to visitors, generation parameters, and streaming behaviour. Changes take effect on the next chat session.</p>
+            <div id="atlasModelRows" class="sd-atlas-model-rows"></div>
+            <div class="sd-ai-field-row">
+              <label class="sd-seo-field">
+                <span>Fallback Model</span>
+                <select id="atlasFallbackModel">
+                  <option value="">None</option>
+                  <option value="flash-lite">Gemini 2.5 Flash-Lite</option>
+                  <option value="flash">Gemini 2.5 Flash</option>
+                </select>
+              </label>
+            </div>
+            <div class="sd-ai-field-row sd-ai-field-row-3">
+              <label class="sd-seo-field">
+                <span>Temperature <span class="sd-ai-hint">(0 – 2)</span></span>
+                <input id="atlasTemperature" type="number" min="0" max="2" step="0.05" placeholder="0.35" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Top-P <span class="sd-ai-hint">(0 – 1)</span></span>
+                <input id="atlasTopP" type="number" min="0" max="1" step="0.05" placeholder="0.85" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Max Tokens <span class="sd-ai-hint">(100 – 8192)</span></span>
+                <input id="atlasMaxOutputTokens" type="number" min="100" max="8192" step="50" placeholder="900" />
+              </label>
+            </div>
+            <div class="sd-seo-toggles">
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info">
+                  <strong>Streaming</strong>
+                  <span>Stream tokens progressively. Disable for simpler single-shot responses.</span>
+                </div>
+                <label class="sd-toggle-switch" aria-label="Enable streaming">
+                  <input type="checkbox" id="atlasStreamingEnabled">
+                  <span class="sd-toggle-slider"></span>
+                </label>
               </div>
-              <label class="sd-toggle-switch" aria-label="Show model picker">
-                <input type="checkbox" id="atlasModelSelectorVisible">
-                <span class="sd-toggle-slider"></span>
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info">
+                  <strong>Show model picker in chat</strong>
+                  <span>Let visitors switch between Fast &amp; More detailed.</span>
+                </div>
+                <label class="sd-toggle-switch" aria-label="Show model picker">
+                  <input type="checkbox" id="atlasModelSelectorVisible">
+                  <span class="sd-toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- ② Embedding Configuration -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">hub</span>
+            2. Embedding Configuration
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Controls the model and parameters used when converting article chunks and user queries into vectors. Re-index articles after changing these.</p>
+            <div class="sd-ai-field-row sd-ai-field-row-2">
+              <label class="sd-seo-field">
+                <span>Embedding Model</span>
+                <select id="atlasEmbeddingModel">
+                  <option value="text-embedding-004">text-embedding-004 (recommended)</option>
+                  <option value="gemini-embedding-001">gemini-embedding-001</option>
+                </select>
+              </label>
+              <label class="sd-seo-field">
+                <span>Dimensions <span class="sd-ai-hint">(read-only)</span></span>
+                <input id="atlasEmbeddingDimensions" type="number" readonly placeholder="768" />
+              </label>
+            </div>
+            <div class="sd-ai-field-row sd-ai-field-row-2">
+              <label class="sd-seo-field">
+                <span>Distance Metric</span>
+                <select id="atlasDistanceMetric">
+                  <option value="COSINE">COSINE (recommended for text)</option>
+                  <option value="EUCLIDEAN">EUCLIDEAN</option>
+                  <option value="DOT_PRODUCT">DOT_PRODUCT</option>
+                </select>
+              </label>
+              <label class="sd-seo-field">
+                <span>Batch Size <span class="sd-ai-hint">(1 – 50)</span></span>
+                <input id="atlasEmbeddingBatchSize" type="number" min="1" max="50" step="1" placeholder="5" />
               </label>
             </div>
           </div>
-        </div>
+        </details>
 
-        <!-- RAG Mode -->
-        <div class="sd-seo-group">
-          <h3 class="sd-seo-group-title">RAG Mode</h3>
-          <p class="sd-seo-group-desc">When enabled, Atlas retrieves relevant chunks from your published articles before answering — grounding responses in your actual content. When disabled, Atlas uses prompt-grounded static context (current behaviour).</p>
-          <div class="sd-seo-toggles">
-            <div class="sd-seo-toggle-row">
-              <div class="sd-seo-toggle-info">
-                <strong>Enable RAG for Atlas</strong>
-                <span>Retrieve article chunks at query time. Keep off until the knowledge base is indexed.</span>
+        <!-- ③ Chunking Strategy -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">splitscreen</span>
+            3. Chunking Strategy
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">How articles are split into chunks before embedding. Smaller chunks = more precise retrieval. Larger = more context per chunk. Re-run the backfill after changing.</p>
+            <div class="sd-ai-field-row sd-ai-field-row-2">
+              <label class="sd-seo-field">
+                <span>Chunk Size <span class="sd-ai-hint">(characters, 500 – 8000)</span></span>
+                <input id="atlasChunkSize" type="number" min="500" max="8000" step="100" placeholder="4000" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Chunk Overlap <span class="sd-ai-hint">(characters, 0 – 1000)</span></span>
+                <input id="atlasChunkOverlap" type="number" min="0" max="1000" step="50" placeholder="200" />
+              </label>
+            </div>
+            <fieldset class="sd-ai-radio-group">
+              <legend>Splitter Type</legend>
+              <label class="sd-ai-radio"><input type="radio" name="atlasSplitterType" value="recursive" id="atlasSplitterRecursive" /> Recursive (paragraph → sentence → word)</label>
+              <label class="sd-ai-radio"><input type="radio" name="atlasSplitterType" value="markdown"  id="atlasSplitterMarkdown"  /> Markdown (header-aware, respects # structure)</label>
+            </fieldset>
+          </div>
+        </details>
+
+        <!-- ④ Retrieval Configuration -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">manage_search</span>
+            4. Retrieval Configuration
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Controls how the vector store is queried at chat time. RAG must be enabled and articles indexed before these take effect.</p>
+            <div class="sd-seo-toggles">
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info">
+                  <strong>Enable RAG for Atlas</strong>
+                  <span>Retrieve article chunks at query time. Keep off until the knowledge base is indexed.</span>
+                </div>
+                <label class="sd-toggle-switch" aria-label="Enable RAG">
+                  <input type="checkbox" id="atlasRagEnabled">
+                  <span class="sd-toggle-slider"></span>
+                </label>
               </div>
-              <label class="sd-toggle-switch" aria-label="Enable RAG for Atlas">
-                <input type="checkbox" id="atlasRagEnabled">
-                <span class="sd-toggle-slider"></span>
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info">
+                  <strong>Hybrid Search</strong>
+                  <span>Combine vector search with keyword BM25 scoring for better recall on rare terms.</span>
+                </div>
+                <label class="sd-toggle-switch" aria-label="Hybrid search">
+                  <input type="checkbox" id="atlasHybridSearch">
+                  <span class="sd-toggle-slider"></span>
+                </label>
+              </div>
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info">
+                  <strong>Reranker</strong>
+                  <span>Run a cross-encoder over the top-K results to reorder by relevance before injecting into the prompt.</span>
+                </div>
+                <label class="sd-toggle-switch" aria-label="Reranker">
+                  <input type="checkbox" id="atlasReranker">
+                  <span class="sd-toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="sd-ai-field-row sd-ai-field-row-2">
+              <label class="sd-seo-field">
+                <span>Top-K chunks per query <span class="sd-ai-hint">(1 – 20)</span></span>
+                <input id="atlasRagTopK" type="number" min="1" max="20" step="1" placeholder="5" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Similarity Threshold <span class="sd-ai-hint">(0.0 – 1.0, 0 = off)</span></span>
+                <input id="atlasSimilarityThreshold" type="number" min="0" max="1" step="0.05" placeholder="0.0" />
               </label>
             </div>
           </div>
-          <label class="sd-seo-field" style="margin-top:12px">
-            <span>Top-K chunks per query</span>
-            <input id="atlasRagTopK" type="number" min="1" max="20" step="1" placeholder="5" style="width:80px" />
-          </label>
-          <p class="sd-seo-field-hint" style="margin-top:4px">Number of article chunks retrieved per visitor question. Start with 5. Increase if answers feel incomplete.</p>
-        </div>
+        </details>
 
-        <!-- Budget cap -->
-        <div class="sd-seo-group">
-          <h3 class="sd-seo-group-title">Monthly Budget Cap</h3>
-          <p class="sd-seo-group-desc">Aggregate spend limit across all visitors. Atlas stops accepting new questions once the cap is hit. Set to 0 for unlimited.</p>
-          <label class="sd-seo-field sd-atlas-budget-field">
-            <span>Cap (₹ / month)</span>
-            <input id="atlasBudgetCapInr" type="number" min="0" step="10" placeholder="100" />
-          </label>
-          <p class="sd-seo-field-hint" style="margin-top:4px">Current month usage is shown in the Atlas chat widget for signed-in visitors.</p>
-        </div>
+        <!-- ⑤ Prompt Configuration -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
+            5. Prompt Configuration
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Override the default Atlas persona prompt and configure guardrails. Leave blank to use the built-in persona.</p>
+            <label class="sd-seo-field">
+              <span>System Prompt</span>
+              <textarea id="atlasSystemPrompt" rows="6" placeholder="Leave blank to use the default Atlas persona prompt..."></textarea>
+            </label>
+            <p class="sd-seo-field-hint">This replaces the built-in persona when non-empty. RAG context is still injected above it when RAG is enabled.</p>
+            <div class="sd-ai-field-row sd-ai-field-row-2" style="margin-top:16px">
+              <label class="sd-seo-field">
+                <span>Conversation Memory <span class="sd-ai-hint">(turns, 0 – 20)</span></span>
+                <input id="atlasConversationMemory" type="number" min="0" max="20" step="1" placeholder="5" />
+              </label>
+            </div>
+            <div class="sd-seo-toggles" style="margin-top:16px">
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info">
+                  <strong>Guardrails</strong>
+                  <span>Reject off-topic or adversarial inputs before they reach the LLM.</span>
+                </div>
+                <label class="sd-toggle-switch" aria-label="Guardrails">
+                  <input type="checkbox" id="atlasGuardrails">
+                  <span class="sd-toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- ⑥ Model Routing -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">alt_route</span>
+            6. Model Routing
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Route different query types to different models to optimise cost vs quality. Default sends all queries to the selected default model.</p>
+            <label class="sd-seo-field">
+              <span>Routing Strategy</span>
+              <select id="atlasRoutingStrategy">
+                <option value="default">Default — always use default model</option>
+                <option value="rule-based">Rule-Based — keyword/intent rules</option>
+                <option value="classifier">LLM Classifier — route by predicted task type</option>
+              </select>
+            </label>
+            <label class="sd-seo-field" style="margin-top:12px">
+              <span>Fallback Model</span>
+              <select id="atlasRoutingFallbackModel">
+                <option value="flash-lite">Gemini 2.5 Flash-Lite (cheaper)</option>
+                <option value="flash">Gemini 2.5 Flash (smarter)</option>
+              </select>
+            </label>
+            <p class="sd-seo-field-hint">Used when the primary model is unavailable or rate-limited.</p>
+          </div>
+        </details>
+
+        <!-- ⑦ Evaluation Configuration -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">rule</span>
+            7. Evaluation Configuration
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Thresholds used by the AI Evaluation page to determine PASS / FAIL. Adjust as your knowledge base matures.</p>
+            <div class="sd-ai-field-row sd-ai-field-row-2">
+              <label class="sd-seo-field">
+                <span>Recall@K Threshold <span class="sd-ai-hint">(0.0 – 1.0)</span></span>
+                <input id="atlasRecallThreshold" type="number" min="0" max="1" step="0.05" placeholder="0.80" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Faithfulness Threshold <span class="sd-ai-hint">(MRR, 0.0 – 1.0)</span></span>
+                <input id="atlasFaithfulnessThreshold" type="number" min="0" max="1" step="0.05" placeholder="0.70" />
+              </label>
+            </div>
+            <p class="sd-seo-field-hint">Current defaults: Recall ≥ 80%, MRR ≥ 0.70. These values are read by the evaluation runner at the start of each run.</p>
+          </div>
+        </details>
+
+        <!-- ⑧ Observability Configuration -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            8. Observability Configuration
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Control what is captured per request. Enabling prompt/chunk capture increases Firestore storage. Tokens are always counted for billing.</p>
+            <div class="sd-seo-toggles">
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info"><strong>Enable Tracing</strong><span>Write a trace document per request with latency breakdown.</span></div>
+                <label class="sd-toggle-switch" aria-label="Enable tracing"><input type="checkbox" id="atlasTracingEnabled"><span class="sd-toggle-slider"></span></label>
+              </div>
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info"><strong>Capture Prompts</strong><span>Store the full system + user prompt per request.</span></div>
+                <label class="sd-toggle-switch" aria-label="Capture prompts"><input type="checkbox" id="atlasCapturePrompts"><span class="sd-toggle-slider"></span></label>
+              </div>
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info"><strong>Capture Retrieved Chunks</strong><span>Store the top-K chunk IDs and scores per RAG request.</span></div>
+                <label class="sd-toggle-switch" aria-label="Capture chunks"><input type="checkbox" id="atlasCaptureChunks"><span class="sd-toggle-slider"></span></label>
+              </div>
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info"><strong>Capture Tokens</strong><span>Count input/output tokens and estimated cost per request. Recommended on.</span></div>
+                <label class="sd-toggle-switch" aria-label="Capture tokens"><input type="checkbox" id="atlasCaptureTokens"><span class="sd-toggle-slider"></span></label>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- ⑨ Cost Controls -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">payments</span>
+            9. Cost Controls
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Atlas stops accepting new questions once a budget cap is hit. Set to 0 to disable that cap. Token limit prevents a single malicious query from consuming disproportionate quota.</p>
+            <div class="sd-ai-field-row sd-ai-field-row-2">
+              <label class="sd-seo-field">
+                <span>Monthly Budget Cap <span class="sd-ai-hint">(₹, 0 = unlimited)</span></span>
+                <input id="atlasBudgetCapInr" type="number" min="0" step="10" placeholder="100" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Daily Budget Cap <span class="sd-ai-hint">(₹, 0 = unlimited)</span></span>
+                <input id="atlasDailyBudgetCapInr" type="number" min="0" step="5" placeholder="0" />
+              </label>
+            </div>
+            <div class="sd-ai-field-row sd-ai-field-row-2">
+              <label class="sd-seo-field">
+                <span>Max Tokens per Query <span class="sd-ai-hint">(100 – 8192)</span></span>
+                <input id="atlasTokenLimitPerQuery" type="number" min="100" max="8192" step="100" placeholder="1000" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Budget Alert Threshold <span class="sd-ai-hint">(0.0 – 1.0, e.g. 0.8 = 80%)</span></span>
+                <input id="atlasBudgetAlertThreshold" type="number" min="0" max="1" step="0.05" placeholder="0.8" />
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <!-- ⑩ Security -->
+        <details class="sd-ai-accordion">
+          <summary class="sd-ai-accordion-title">
+            <span class="material-symbols-outlined" aria-hidden="true">security</span>
+            10. Security
+          </summary>
+          <div class="sd-ai-accordion-body">
+            <p class="sd-seo-group-desc">Protect the pipeline from abuse. Rate limiting applies per authenticated user. Content moderation uses Gemini's safety filters.</p>
+            <div class="sd-seo-toggles">
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info"><strong>PII Redaction</strong><span>Strip personally identifiable information from user messages before sending to the LLM.</span></div>
+                <label class="sd-toggle-switch" aria-label="PII Redaction"><input type="checkbox" id="atlasPiiRedaction"><span class="sd-toggle-slider"></span></label>
+              </div>
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info"><strong>Prompt Injection Detection</strong><span>Detect and block attempts to override the system prompt via user messages.</span></div>
+                <label class="sd-toggle-switch" aria-label="Injection detection"><input type="checkbox" id="atlasInjectionDetection"><span class="sd-toggle-slider"></span></label>
+              </div>
+              <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info"><strong>Content Moderation</strong><span>Apply Gemini safety filters before returning responses to visitors.</span></div>
+                <label class="sd-toggle-switch" aria-label="Content moderation"><input type="checkbox" id="atlasContentModeration"><span class="sd-toggle-slider"></span></label>
+              </div>
+            </div>
+            <label class="sd-seo-field" style="margin-top:16px">
+              <span>Rate Limit <span class="sd-ai-hint">(requests / minute per user, 1 – 600)</span></span>
+              <input id="atlasRateLimitPerMinute" type="number" min="1" max="600" step="1" placeholder="20" />
+            </label>
+          </div>
+        </details>
 
       </div>
     </section>
@@ -1212,120 +1508,502 @@
         <div>
           <div class="sd-admin-section-kicker">Atlas AI</div>
           <h2>AI Observability</h2>
-          <p>Measure retrieval quality before trusting RAG in production. Run the golden-set evaluation to see Recall@K, Precision@K, and MRR across your published articles.</p>
+          <p>End-to-end visibility into every Atlas request — traces, prompts, retrieved chunks, model routing decisions, latency, cost, and user feedback.</p>
         </div>
         <div class="sd-article-settings-actions">
-          <button type="button" id="runRagEvalBtn" class="sd-admin-primary">
-            <span class="material-symbols-outlined" aria-hidden="true">play_circle</span> Run Evaluation
+          <button type="button" id="obsRefreshBtn" class="sd-admin-secondary">
+            <span class="material-symbols-outlined" aria-hidden="true">refresh</span> Refresh
           </button>
         </div>
       </div>
       <div id="atlasObservabilityStatus" class="sd-admin-section-status"></div>
 
-      <div class="sd-atlas-config-panel">
-
-        <!-- Key metrics row -->
-        <div class="sd-observability-metrics-row" id="ragMetricsRow" hidden>
-          <div class="sd-observability-metric-card">
-            <div class="sd-observability-metric-label">Recall@K</div>
-            <div class="sd-observability-metric-value" id="ragRecallValue">—</div>
-            <div class="sd-observability-metric-sub" id="ragRecallSub"></div>
-          </div>
-          <div class="sd-observability-metric-card">
-            <div class="sd-observability-metric-label">Precision@K</div>
-            <div class="sd-observability-metric-value" id="ragPrecisionValue">—</div>
-            <div class="sd-observability-metric-sub" id="ragPrecisionSub"></div>
-          </div>
-          <div class="sd-observability-metric-card">
-            <div class="sd-observability-metric-label">MRR</div>
-            <div class="sd-observability-metric-value" id="ragMrrValue">—</div>
-            <div class="sd-observability-metric-sub" id="ragMrrSub"></div>
-          </div>
-          <div class="sd-observability-metric-card">
-            <div class="sd-observability-metric-label">Questions</div>
-            <div class="sd-observability-metric-value" id="ragTotalValue">—</div>
-            <div class="sd-observability-metric-sub" id="ragHitsSub"></div>
-          </div>
-        </div>
-
-        <!-- Pass / fail gate -->
-        <div id="ragGateBadge" class="sd-observability-gate" hidden></div>
-
-        <!-- Progress bar (shown while running) -->
-        <div id="ragProgressWrap" class="sd-seo-group" hidden>
-          <h3 class="sd-seo-group-title">Evaluation in Progress</h3>
-          <p class="sd-seo-group-desc" id="ragProgressLabel">Initialising…</p>
-          <div class="sd-observability-progress-track">
-            <div class="sd-observability-progress-bar" id="ragProgressBar" style="width:0%"></div>
-          </div>
-          <p class="sd-seo-field-hint" id="ragProgressNote">Each question is embedded and matched against the Firestore vector index. This takes ~1–2 minutes for 50 questions.</p>
-        </div>
-
-        <!-- Per-question detail table -->
-        <div id="ragDetailWrap" class="sd-seo-group" hidden>
-          <h3 class="sd-seo-group-title">Per-Question Results</h3>
-          <p class="sd-seo-group-desc">Green = right article was in top-K. Red = miss.</p>
-          <div class="sd-observability-table-wrap">
-            <table class="sd-observability-table" id="ragDetailTable">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Question</th>
-                  <th>Expected Article</th>
-                  <th>Top Retrieved</th>
-                  <th>Hit?</th>
-                  <th>Rank</th>
-                </tr>
-              </thead>
-              <tbody id="ragDetailBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Run History -->
-        <div class="sd-seo-group" id="ragHistoryWrap" hidden>
-          <h3 class="sd-seo-group-title">Run History</h3>
-          <p class="sd-seo-group-desc">Each time you click "Run Evaluation" the result is saved. Use this to spot regressions after re-indexing or config changes.</p>
-          <div class="sd-observability-table-wrap">
-            <table class="sd-observability-table sd-observability-history-table" id="ragHistoryTable">
-              <thead>
-                <tr>
-                  <th>Run</th>
-                  <th>Date &amp; Time</th>
-                  <th>Recall@K</th>
-                  <th>Precision@K</th>
-                  <th>MRR</th>
-                  <th>Pass / Total</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="ragHistoryBody">
-                <tr><td colspan="7" class="sd-observability-empty">No runs recorded yet.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Explainer card -->
-        <div class="sd-seo-group">
-          <h3 class="sd-seo-group-title">What these metrics mean</h3>
-          <div class="sd-observability-explainer">
-            <div class="sd-observability-explainer-item">
-              <strong>Recall@K</strong>
-              <span>Of all questions, what fraction had the right article in the top-K results? Target ≥ 80 % before enabling RAG in production. A miss here means the LLM never sees the correct information — no prompt can fix a retrieval failure.</span>
+      <!-- ① Observability Summary ─────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+          Observability Summary
+        </h3>
+        <div class="sd-obs-summary-grid">
+          <div class="sd-obs-summary-card">
+            <span class="material-symbols-outlined sd-obs-summary-icon" aria-hidden="true">account_tree</span>
+            <div class="sd-obs-summary-body">
+              <span class="sd-obs-summary-label">Tracing</span>
+              <span class="sd-obs-capture-badge" id="obsTracingStatus">—</span>
             </div>
-            <div class="sd-observability-explainer-item">
-              <strong>Precision@K</strong>
-              <span>Of all K slots retrieved across all questions, what fraction were actually relevant? Low precision means you are filling the context window with noise.</span>
+          </div>
+          <div class="sd-obs-summary-card">
+            <span class="material-symbols-outlined sd-obs-summary-icon" aria-hidden="true">chat</span>
+            <div class="sd-obs-summary-body">
+              <span class="sd-obs-summary-label">Prompts</span>
+              <span class="sd-obs-capture-badge" id="obsPromptsStatus">—</span>
             </div>
-            <div class="sd-observability-explainer-item">
-              <strong>MRR (Mean Reciprocal Rank)</strong>
-              <span>Rewards finding the right chunk at rank 1 more than rank 5. A value near 1.0 means the answer is almost always the very first result. Above 0.7 is production-ready.</span>
+          </div>
+          <div class="sd-obs-summary-card">
+            <span class="material-symbols-outlined sd-obs-summary-icon" aria-hidden="true">splitscreen</span>
+            <div class="sd-obs-summary-body">
+              <span class="sd-obs-summary-label">Chunks</span>
+              <span class="sd-obs-capture-badge" id="obsChunksStatus">—</span>
+            </div>
+          </div>
+          <div class="sd-obs-summary-card">
+            <span class="material-symbols-outlined sd-obs-summary-icon" aria-hidden="true">token</span>
+            <div class="sd-obs-summary-body">
+              <span class="sd-obs-summary-label">Tokens</span>
+              <span class="sd-obs-capture-badge" id="obsTokensStatus">—</span>
+            </div>
+          </div>
+          <div class="sd-obs-summary-card">
+            <span class="material-symbols-outlined sd-obs-summary-icon" aria-hidden="true">receipt_long</span>
+            <div class="sd-obs-summary-body">
+              <span class="sd-obs-summary-label">Total Traces</span>
+              <strong class="sd-obs-summary-value" id="obsTotalTraces">—</strong>
+            </div>
+          </div>
+          <div class="sd-obs-summary-card">
+            <span class="material-symbols-outlined sd-obs-summary-icon" aria-hidden="true">schedule</span>
+            <div class="sd-obs-summary-body">
+              <span class="sd-obs-summary-label">Avg Latency</span>
+              <strong class="sd-obs-summary-value" id="obsAvgLatency">—</strong>
+            </div>
+          </div>
+          <div class="sd-obs-summary-card">
+            <span class="material-symbols-outlined sd-obs-summary-icon" aria-hidden="true">error_outline</span>
+            <div class="sd-obs-summary-body">
+              <span class="sd-obs-summary-label">Error Rate</span>
+              <strong class="sd-obs-summary-value" id="obsErrorRate">—</strong>
+            </div>
+          </div>
+          <div class="sd-obs-summary-card">
+            <span class="material-symbols-outlined sd-obs-summary-icon" aria-hidden="true">payments</span>
+            <div class="sd-obs-summary-body">
+              <span class="sd-obs-summary-label">Est. Cost (24 h)</span>
+              <strong class="sd-obs-summary-value" id="obsCost24h">—</strong>
             </div>
           </div>
         </div>
-
       </div>
+
+      <!-- ② Request Traces ────────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">account_tree</span>
+          Request Traces
+        </h3>
+        <p class="sd-seo-group-desc">Last 50 Atlas requests. Click a row to inspect the full trace detail below.</p>
+        <div class="sd-obs-traces-toolbar">
+          <input type="text" id="obsTracesSearch" class="sd-obs-search-input" placeholder="Filter by question, model, session…">
+          <select id="obsTracesFilter" class="sd-obs-filter-select">
+            <option value="all">All status</option>
+            <option value="ok">OK only</option>
+            <option value="error">Errors only</option>
+          </select>
+        </div>
+        <div id="obsTracesMount"></div>
+      </div>
+
+      <!-- ③ Trace Details ─────────────────────────────────────────────────── -->
+      <div class="sd-seo-group" id="obsTraceDetailWrap" hidden>
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">manage_search</span>
+          Trace Details
+          <button type="button" id="obsCloseTraceBtn" class="sd-obs-close-btn" title="Close detail">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        </h3>
+        <div class="sd-obs-detail-grid" id="obsTraceDetailGrid">
+          <!-- injected by JS -->
+        </div>
+      </div>
+
+      <!-- ④ Prompt Timeline ───────────────────────────────────────────────── -->
+      <div class="sd-seo-group" id="obsPromptTimelineWrap" hidden>
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">timeline</span>
+          Prompt Timeline
+        </h3>
+        <p class="sd-seo-group-desc">The exact system prompt and user message sent to the model for the selected trace.</p>
+        <div class="sd-obs-prompt-timeline" id="obsPromptTimeline">
+          <!-- injected by JS -->
+        </div>
+      </div>
+
+      <!-- ⑤ Retrieved Chunks ──────────────────────────────────────────────── -->
+      <div class="sd-seo-group" id="obsChunksWrap" hidden>
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">splitscreen</span>
+          Retrieved Chunks
+        </h3>
+        <p class="sd-seo-group-desc">Chunks injected into the context window for the selected trace, ranked by similarity score.</p>
+        <div class="sd-obs-chunks-list" id="obsChunksList">
+          <!-- injected by JS -->
+        </div>
+      </div>
+
+      <!-- ⑥ Model Routing ─────────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">alt_route</span>
+          Model Routing
+        </h3>
+        <p class="sd-seo-group-desc">Breakdown of requests per model over the last 24 hours.</p>
+        <div class="sd-obs-routing-grid" id="obsRoutingGrid">
+          <p class="sd-observability-empty" id="obsRoutingEmpty">No routing data yet.</p>
+        </div>
+      </div>
+
+      <!-- ⑦ Token & Cost Analytics ────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>
+          Token &amp; Cost Analytics
+        </h3>
+        <p class="sd-seo-group-desc">Aggregated token usage and estimated spend over the last 7 days.</p>
+        <div class="sd-obs-token-stats" id="obsTokenStats">
+          <div class="sd-obs-token-stat-card">
+            <span class="material-symbols-outlined" aria-hidden="true">input</span>
+            <strong id="obsTokenStatsIn">—</strong>
+            <span>Input tokens (7 d)</span>
+          </div>
+          <div class="sd-obs-token-stat-card">
+            <span class="material-symbols-outlined" aria-hidden="true">output</span>
+            <strong id="obsTokenStatsOut">—</strong>
+            <span>Output tokens (7 d)</span>
+          </div>
+          <div class="sd-obs-token-stat-card">
+            <span class="material-symbols-outlined" aria-hidden="true">payments</span>
+            <strong id="obsTokenStatsCost">—</strong>
+            <span>Est. cost (7 d)</span>
+          </div>
+          <div class="sd-obs-token-stat-card">
+            <span class="material-symbols-outlined" aria-hidden="true">functions</span>
+            <strong id="obsTokenStatsAvg">—</strong>
+            <span>Avg tokens / request</span>
+          </div>
+        </div>
+        <div class="sd-obs-cost-bar-list" id="obsCostBarList">
+          <!-- daily cost bars injected by JS -->
+        </div>
+      </div>
+
+      <!-- ⑧ Latency Breakdown ─────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">speed</span>
+          Latency Breakdown
+        </h3>
+        <p class="sd-seo-group-desc">p50 / p95 / p99 latencies across embedding, retrieval, and LLM generation.</p>
+        <div class="sd-obs-latency-grid" id="obsLatencyGrid">
+          <p class="sd-observability-empty" id="obsLatencyEmpty">No latency data yet.</p>
+        </div>
+      </div>
+
+      <!-- ⑨ User Feedback ─────────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">thumb_up</span>
+          User Feedback
+        </h3>
+        <p class="sd-seo-group-desc">Thumbs-up / thumbs-down signals submitted by users alongside each Atlas response.</p>
+        <div class="sd-obs-feedback-summary" id="obsFeedbackSummary">
+          <div class="sd-obs-feedback-kpi">
+            <span class="material-symbols-outlined" aria-hidden="true">thumb_up</span>
+            <strong id="obsFeedbackPositive">—</strong>
+            <span>Positive</span>
+          </div>
+          <div class="sd-obs-feedback-kpi">
+            <span class="material-symbols-outlined" aria-hidden="true">thumb_down</span>
+            <strong id="obsFeedbackNegative">—</strong>
+            <span>Negative</span>
+          </div>
+          <div class="sd-obs-feedback-kpi">
+            <span class="material-symbols-outlined" aria-hidden="true">sentiment_satisfied</span>
+            <strong id="obsFeedbackSatisfaction">—</strong>
+            <span>Satisfaction rate</span>
+          </div>
+        </div>
+        <div id="obsFeedbackMount" hidden></div>
+      </div>
+
+    </section>
+
+    <!-- AI Evaluation workspace -->
+    <section id="atlasEvaluationWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Atlas AI</div>
+          <h2>AI Evaluation</h2>
+          <p>Benchmark retrieval quality against your golden dataset before promoting config changes to production.</p>
+        </div>
+      </div>
+      <div id="atlasEvalStatus" class="sd-admin-section-status"></div>
+
+      <!-- ① Evaluation Summary ─────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">bar_chart_4_bars</span>
+          Evaluation Summary
+        </h3>
+        <div id="evalSummaryMount"></div>
+      </div>
+
+      <!-- ② Run Evaluation ────────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">play_circle</span>
+          Run Evaluation
+        </h3>
+        <p class="sd-seo-group-desc">Choose a run mode, then click <strong>Run</strong>. Results stream live.</p>
+        <div class="sd-eval-run-modes">
+          <label class="sd-eval-run-mode" id="evalModeGolden">
+            <input type="radio" name="evalMode" value="golden" checked>
+            <span class="sd-eval-run-mode-badge">Recommended</span>
+            <span class="material-symbols-outlined" aria-hidden="true">dataset</span>
+            <span class="sd-eval-run-mode-label">Golden Dataset</span>
+            <span class="sd-eval-run-mode-desc">Full benchmark against all golden Q&amp;A pairs</span>
+          </label>
+          <label class="sd-eval-run-mode" id="evalModeSmokeTest">
+            <input type="radio" name="evalMode" value="smoke">
+            <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+            <span class="sd-eval-run-mode-label">Smoke Test</span>
+            <span class="sd-eval-run-mode-desc">Quick 10-question sanity check</span>
+          </label>
+          <label class="sd-eval-run-mode" id="evalModeRegression">
+            <input type="radio" name="evalMode" value="regression">
+            <span class="material-symbols-outlined" aria-hidden="true">history_edu</span>
+            <span class="sd-eval-run-mode-label">Full Regression</span>
+            <span class="sd-eval-run-mode-desc">All cases + faithfulness + hallucination scoring</span>
+          </label>
+        </div>
+        <div class="sd-eval-run-actions">
+          <button type="button" id="runEvalBtn" class="sd-admin-primary" disabled>
+            <span class="material-symbols-outlined" aria-hidden="true">science</span> Run
+          </button>
+          <span class="sd-eval-threshold-chips">
+            Thresholds: Recall@K ≥ <strong id="evalThresholdRecall">80 %</strong>
+            &nbsp;·&nbsp; MRR ≥ <strong id="evalThresholdMrr">0.70</strong>
+          </span>
+        </div>
+        <!-- Progress -->
+        <div id="ragProgressWrap" class="sd-eval-progress-wrap" hidden>
+          <div class="sd-eval-progress-track">
+            <div class="sd-eval-progress-bar" id="ragProgressBar" style="width:0%"></div>
+          </div>
+          <span class="sd-eval-progress-label" id="ragProgressLabel">Starting…</span>
+        </div>
+        <!-- Gate badge -->
+        <div id="ragGateBadge" class="sd-observability-gate" hidden></div>
+      </div>
+
+      <!-- ③ Evaluation Metrics ─────────────────────────────────────────────── -->
+      <div class="sd-seo-group" id="evalMetricsWrap" hidden>
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">monitoring</span>
+          Evaluation Metrics
+        </h3>
+        <div id="evalMetricsMount"></div>
+      </div>
+
+      <!-- ④ Golden Dataset ────────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">menu_book</span>
+          Golden Dataset
+        </h3>
+        <p class="sd-seo-group-desc">The ground-truth Q&amp;A pairs used for evaluation. Each row has a question, expected article ID, and optional expected answer.</p>
+        <div class="sd-eval-dataset-toolbar">
+          <div class="sd-eval-dataset-toolbar-left">
+            <button type="button" id="addGoldenRowBtn" class="sd-admin-primary">
+              <span class="material-symbols-outlined" aria-hidden="true">add</span> Add row
+            </button>
+            <button type="button" id="saveGoldenDatasetBtn" class="sd-admin-secondary">
+              <span class="material-symbols-outlined" aria-hidden="true">save</span> Save dataset
+            </button>
+            <span id="goldenDatasetStatus" class="sd-admin-section-status"></span>
+          </div>
+          <div class="sd-eval-dataset-toolbar-right">
+            <div class="sd-eval-dataset-search-wrap">
+              <span class="material-symbols-outlined sd-eval-dataset-search-icon" aria-hidden="true">search</span>
+              <input type="search" id="goldenDatasetSearch" class="sd-eval-dataset-search" placeholder="Search questions…" aria-label="Search golden dataset">
+            </div>
+            <button type="button" id="goldenDatasetFilterBtn" class="sd-admin-secondary sd-eval-dataset-filter-btn">
+              <span class="material-symbols-outlined" aria-hidden="true">filter_list</span> Filters
+            </button>
+          </div>
+        </div>
+        <div class="sd-eval-dataset-wrap">
+          <table class="sd-eval-dataset-table" id="goldenDatasetTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Question</th>
+                <th>Expected Article ID</th>
+                <th>Expected Answer <span class="sd-eval-optional">(optional)</span></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="goldenDatasetBody">
+              <tr><td colspan="5" class="sd-observability-empty" id="goldenDatasetEmpty">Loading golden dataset…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ⑤ Regression History ─────────────────────────────────────────────── -->
+      <div class="sd-seo-group" id="ragHistoryWrap" hidden>
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">history</span>
+          Regression History
+        </h3>
+        <p class="sd-seo-group-desc">Every run is saved. Use this to spot regressions after re-indexing or config changes.</p>
+        <div id="ragHistoryMount"></div>
+      </div>
+
+      <!-- ⑥ Failed Test Cases ─────────────────────────────────────────────── -->
+      <div class="sd-seo-group" id="ragDetailWrap" hidden>
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">cancel</span>
+          Failed Test Cases
+        </h3>
+        <p class="sd-seo-group-desc">Questions where the expected article was not retrieved in the top-K results.</p>
+        <div id="ragDetailMount"></div>
+      </div>
+    </section>
+
+    <!-- AI Monitoring workspace -->
+    <section id="atlasMonitoringWorkspace" class="sd-article-settings" hidden>
+      <div class="sd-article-settings-head">
+        <div>
+          <div class="sd-admin-section-kicker">Atlas AI</div>
+          <h2>AI Monitoring</h2>
+          <p>Infrastructure health, service status, resource utilization, application performance, and historical trends — all in one place.</p>
+        </div>
+        <div class="sd-article-settings-actions">
+          <button type="button" id="monRefreshBtn" class="sd-admin-secondary">
+            <span class="material-symbols-outlined" aria-hidden="true">refresh</span> Refresh
+          </button>
+        </div>
+      </div>
+      <div id="atlasMonitoringStatus" class="sd-admin-section-status"></div>
+
+      <!-- ① Infrastructure Summary ─────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">dns</span>
+          Infrastructure Summary
+        </h3>
+        <div id="monInfraMount"></div>
+      </div>
+
+      <!-- ② Service Health ────────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">health_and_safety</span>
+          Service Health
+        </h3>
+        <p class="sd-seo-group-desc">Live status of all dependencies. Red = degraded or unreachable.</p>
+        <div class="sd-mon-services-grid" id="monServicesGrid">
+          <!-- service cards injected by JS -->
+          <p class="sd-observability-empty" id="monServicesEmpty">Loading services…</p>
+        </div>
+      </div>
+
+      <!-- ③ Resource Utilization ───────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>
+          Resource Utilization
+        </h3>
+        <div class="sd-mon-resource-list" id="monResourceList">
+          <div class="sd-mon-resource-row">
+            <span class="sd-mon-resource-label">CPU</span>
+            <div class="sd-mon-resource-track">
+              <div class="sd-mon-resource-bar" id="monCpuBar" style="width:0%"></div>
+            </div>
+            <span class="sd-mon-resource-value" id="monCpuPct">—</span>
+          </div>
+          <div class="sd-mon-resource-row">
+            <span class="sd-mon-resource-label">Memory</span>
+            <div class="sd-mon-resource-track">
+              <div class="sd-mon-resource-bar" id="monMemBar" style="width:0%"></div>
+            </div>
+            <span class="sd-mon-resource-value" id="monMemPct">—</span>
+          </div>
+          <div class="sd-mon-resource-row">
+            <span class="sd-mon-resource-label">Heap</span>
+            <div class="sd-mon-resource-track">
+              <div class="sd-mon-resource-bar" id="monHeapBar" style="width:0%"></div>
+            </div>
+            <span class="sd-mon-resource-value" id="monHeapPct">—</span>
+          </div>
+          <div class="sd-mon-resource-row">
+            <span class="sd-mon-resource-label">Budget (monthly)</span>
+            <div class="sd-mon-resource-track">
+              <div class="sd-mon-resource-bar sd-mon-resource-bar--cost" id="monBudgetMonthlyBar" style="width:0%"></div>
+            </div>
+            <span class="sd-mon-resource-value" id="monBudgetMonthlyLabel">—</span>
+          </div>
+          <div class="sd-mon-resource-row">
+            <span class="sd-mon-resource-label">Budget (daily)</span>
+            <div class="sd-mon-resource-track">
+              <div class="sd-mon-resource-bar sd-mon-resource-bar--cost" id="monBudgetDailyBar" style="width:0%"></div>
+            </div>
+            <span class="sd-mon-resource-value" id="monBudgetDailyLabel">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ④ Application Performance ────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">speed</span>
+          Application Performance
+        </h3>
+        <div id="monPerfMount"></div>
+      </div>
+
+      <!-- ⑤ External Dependencies ─────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">hub</span>
+          External Dependencies
+        </h3>
+        <p class="sd-seo-group-desc">Latency and reachability of third-party APIs used by this service.</p>
+        <div id="monDepsMount"></div>
+      </div>
+
+      <!-- ⑥ Alerts & Incidents ─────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>
+          Alerts &amp; Incidents
+        </h3>
+        <div class="sd-mon-alerts-toolbar">
+          <span class="sd-mon-alert-count-badge" id="monActiveAlertCount">0 active</span>
+          <button type="button" id="monAckAllBtn" class="sd-admin-secondary sd-mon-ack-btn" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">done_all</span> Acknowledge all
+          </button>
+        </div>
+        <div class="sd-mon-alerts-list" id="monAlertsList">
+          <p class="sd-observability-empty" id="monAlertsEmpty">No active alerts.</p>
+        </div>
+        <div class="sd-seo-group-desc" style="margin-top:14px">Past incidents</div>
+        <div id="monIncidentsMount"></div>
+      </div>
+
+      <!-- ⑦ Historical Metrics ─────────────────────────────────────────────── -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">history</span>
+          Historical Metrics
+        </h3>
+        <p class="sd-seo-group-desc">7-day trends for requests, errors, Atlas token usage, and estimated cost.</p>
+        <div class="sd-mon-history-grid" id="monHistoryGrid">
+          <!-- trend charts injected by JS -->
+          <p class="sd-observability-empty" id="monHistoryEmpty">No historical data yet.</p>
+        </div>
+      </div>
+
     </section>
 
     <!-- Analytics workspace -->
@@ -1374,6 +2052,6 @@
   <div id="sharedAtlasShell"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./admin.js?v=2026-07-01-edit-cancel-delete-v1"></script>
+  <script type="module" src="./admin.js?v=2026-07-06-ui-upgrade-v1"></script>
 </body>
 </html>

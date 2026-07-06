@@ -112,11 +112,20 @@ function prepareCall(args) {
   const systemPrompt = (args && typeof args.systemPrompt === 'string' && args.systemPrompt.trim())
     ? args.systemPrompt
     : SYSTEM_PROMPT;
+  // Accept a generationConfig override (temperature, topP, maxOutputTokens) from
+  // the route layer, which reads them from the admin Firestore config.
+  // Keeping this in prepareCall (not in ask/askStream) avoids duplicating the
+  // pass-through logic and keeps both wrappers thin.
+  const generationConfig = (args && args.generationConfig && typeof args.generationConfig === 'object')
+    ? args.generationConfig
+    : undefined;
+
   return {
     systemPrompt,
     history,
     userMessage: message,
     model: normaliseModel(args && args.model),
+    generationConfig,
   };
 }
 
