@@ -19,6 +19,12 @@
 
 // ── Primitives ────────────────────────────────────────────────────────────────
 
+/**
+ * Reusable modal dialog — createModal({ id, title, content, actions, width, onClose })
+ * Returns { el, open(), close(), setContent(), setTitle() }
+ */
+export { createModal } from './modal.js';
+
 /** Renders a structured table into a mount element. Options: columns, rows, emptyText, responsive, minWidth */
 export { renderDataTable }       from './datatable.js';
 

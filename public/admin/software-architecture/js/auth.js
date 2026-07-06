@@ -227,7 +227,10 @@ export function handleAdminLoadError(err) {
       setStatus('Your session expired. Please sign in again.', 'warning');
     }
     const authWall = document.getElementById('adminAuthWall');
-    if (authWall) authWall.hidden = false;
+    if (authWall) {
+      authWall.hidden = false;
+      document.body.dataset.authwall = '1';
+    }
     return;
   }
   setStatus(err.message, 'error');
@@ -246,15 +249,56 @@ export function initGoogle(els) {
     use_fedcm_for_prompt:  true,
     use_fedcm_for_button:  true,
   });
-  if (els && els.welcomeGoogle && els.welcomeGoogle.childElementCount === 0) {
-    google.accounts.id.renderButton(els.welcomeGoogle, {
-      theme: 'filled_black', size: 'large', text: 'continue_with', shape: 'rectangular', width: 280,
+  if (els && els.welcomeGoogle) {
+    renderGoogleButtonRobust(els.welcomeGoogle, { text: 'continue_with', shape: 'pill' });
+  }
+  const authWallBtn = document.getElementById('authWallGoogleBtn');
+  if (authWallBtn && authWallBtn.childElementCount === 0) {
+    google.accounts.id.renderButton(authWallBtn, {
+      theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular', width: 280,
     });
   }
   if (state.credential) {
     startAdminSession(state.credential).catch(handleAdminLoadError);
   } else {
     updateAdminChrome(null);
+  }
+}
+
+/**
+ * Google's button takes a fixed pixel width — measure the actual container
+ * so it lines up exactly with sibling buttons instead of a hardcoded guess
+ * that can drift out of sync with the card's padding/max-width (Google
+ * clamps to 200–400px).
+ *
+ * A single requestAnimationFrame right after <md-dialog>.show() isn't
+ * always enough: clientWidth can still read 0 on that frame (the dialog's
+ * open animation hasn't committed layout yet), silently falling back to a
+ * guessed width that leaves the wrapper's own border pill visibly wider
+ * than Google's actual rendered button — a "pill behind the pill" look.
+ * ResizeObserver removes the guesswork: it fires the moment the
+ * container's real box is known, however many frames that takes, and
+ * again if it ever changes (e.g. viewport resize), so the button is
+ * re-rendered at the correct width instead of a stale guess.
+ */
+function renderGoogleButtonRobust(container, opts) {
+  if (container._gsiResizeObserver) return; // already wired up once
+  let lastWidth = 0;
+  const render = function () {
+    const measured = Math.round(container.clientWidth);
+    if (!measured || Math.abs(measured - lastWidth) < 2) return;
+    lastWidth = measured;
+    const width = Math.min(400, Math.max(200, measured));
+    container.innerHTML = '';
+    google.accounts.id.renderButton(container, Object.assign({
+      theme: 'outline', size: 'large', width,
+    }, opts));
+  };
+  if (typeof ResizeObserver === 'function') {
+    container._gsiResizeObserver = new ResizeObserver(render);
+    container._gsiResizeObserver.observe(container);
+  } else {
+    requestAnimationFrame(render);
   }
 }
 

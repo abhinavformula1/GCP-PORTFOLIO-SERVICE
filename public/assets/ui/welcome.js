@@ -23,8 +23,13 @@ export function showWelcomeOverlay(opts) {
   if (!overlay) return;
   const onShown = (opts && opts.onShown) || null;
   function show() {
+    // A defensive hideWelcomeOverlay() call earlier in the page lifecycle
+    // (e.g. before <md-dialog> finished upgrading) may have fallen back to
+    // setAttribute('hidden', '') instead of the native close(). That stale
+    // attribute forces display:none and isn't cleared by show() itself, so
+    // always remove it here regardless of which show path we take below.
+    overlay.removeAttribute('hidden');
     if (typeof overlay.show === 'function') overlay.show();
-    else overlay.removeAttribute('hidden');
     if (typeof onShown === 'function') {
       try { onShown(); } catch (_) {}
     }
