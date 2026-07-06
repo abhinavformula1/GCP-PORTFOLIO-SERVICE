@@ -24,7 +24,7 @@ import { showToast }          from '../../assets/ui/toast.js';
 import '../../assets/ui/loader.js';
 
 // ── Core modules ──────────────────────────────────────────────────────────────
-import { els }                from './js/els.js';
+import { els, refreshTopbarEls } from './js/els.js';
 import { state }              from './js/state.js';
 import {
   registerModuleRenderer, setActiveModule,
@@ -80,6 +80,11 @@ renderAppHeader('#sharedTopbar', {
     photoAlt:          'Signed-in admin profile photo',
   },
 });
+// renderAppHeader() just built the sign-in/avatar/dropdown DOM into
+// #sharedTopbar — els.js resolved those ids to null before this line ran
+// (imports evaluate before this module's own code), so refresh them now
+// that the real nodes exist. Must run before any listener below reads them.
+refreshTopbarEls();
 
 // ── Auth init ─────────────────────────────────────────────────────────────────
 initAuth({

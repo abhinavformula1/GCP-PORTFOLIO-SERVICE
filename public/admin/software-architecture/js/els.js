@@ -4,13 +4,21 @@
  * S — only concerned with resolving IDs to elements at startup.
  * Evaluated once when admin.js imports it (DOM is ready because the script
  * tag is type="module", which defers execution until after HTML parsing).
+ *
+ * Caveat — topbar nodes don't exist yet at that point: `renderAppHeader()`
+ * builds the sign-in/avatar/dropdown DOM at runtime, AFTER this module's
+ * top-level `els` object below has already run its one-shot getElementById
+ * lookups (ES module imports are always evaluated before the importing
+ * module's own code, so admin.js's `renderAppHeader(...)` call can never
+ * run first). Those fields would resolve to permanent `null`s. Callers must
+ * invoke `refreshTopbarEls()` once, right after `renderAppHeader()` runs.
  */
 
 function g(id) { return document.getElementById(id); }
 function q(sel) { return document.querySelector(sel); }
 
 export const els = {
-  // ── Topbar / Auth ────────────────────────────────────────────────────────
+  // ── Topbar / Auth (rendered later by renderAppHeader — see refreshTopbarEls) ─
   topbarSignIn:    g('adminTopbarSignInBtn'),
   topbarUser:      g('adminTopbarUser'),
   avatarBtn:       g('adminAvatarBtn'),
@@ -366,3 +374,25 @@ export const els = {
   subscriptionsStatus:     g('subscriptionsStatus'),
   subscriptionsPanel:      g('subscriptionsPanel'),
 };
+
+/**
+ * Re-resolves the topbar/auth node references above.
+ *
+ * Call once, immediately after `renderAppHeader('#sharedTopbar', ...)` has
+ * run — that's the point those nodes first exist. Everything downstream
+ * (auth.js's `if (els.topbarSignIn) ...` guards, click listeners wired in
+ * admin.js) reads from this same shared `els` object, so mutating it here
+ * in place is enough; no other module needs to know this happened.
+ */
+export function refreshTopbarEls() {
+  Object.assign(els, {
+    topbarSignIn:   g('adminTopbarSignInBtn'),
+    topbarUser:     g('adminTopbarUser'),
+    avatarBtn:      g('adminAvatarBtn'),
+    userPhoto:      g('adminUserPhoto'),
+    userName:       g('adminUserName'),
+    dropdown:       g('adminTopbarDropdown'),
+    signOut:        g('adminSignOut'),
+    signInWallSlot: g('topbarSignInBtnWall'),
+  });
+}

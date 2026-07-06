@@ -20,8 +20,8 @@ const HISTORY_COLS = [
   { header: 'Run',         renderText: function (r, i, all) { return '#' + (all.length - i); } },
   { header: 'Date & Time', renderText: function (r) { return r.ranAt ? new Date(r.ranAt).toLocaleString() : '—'; } },
   { header: 'Mode',        renderHtml: function (r) { return '<span class="sd-eval-mode-chip">' + escapeHtml(_modeLabel(r.mode)) + '</span>'; } },
-  { header: 'Recall@K',    renderText: function (r) { return r.metrics?.recall    != null ? (r.metrics.recall    * 100).toFixed(1) + '%' : '—'; } },
-  { header: 'Precision@K', renderText: function (r) { return r.metrics?.precision != null ? (r.metrics.precision * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Recall@K',    renderText: function (r) { return r.metrics?.recallAtK != null ? (r.metrics.recallAtK * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Precision@K', renderText: function (r) { return r.metrics?.precisionAtK != null ? (r.metrics.precisionAtK * 100).toFixed(1) + '%' : '—'; } },
   { header: 'MRR',         renderText: function (r) { return r.metrics?.mrr       != null ? r.metrics.mrr.toFixed(3) : '—'; } },
   { header: 'Faithfulness',renderText: function (r) { return r.metrics?.faithfulness != null ? (r.metrics.faithfulness * 100).toFixed(1) + '%' : '—'; } },
   { header: 'Pass / Total',renderText: function (r) { return (r.hits || 0) + ' / ' + (r.total || 0); } },
@@ -29,6 +29,11 @@ const HISTORY_COLS = [
     return r.passed
       ? '<span class="sd-obs-badge sd-obs-badge--pass">PASS</span>'
       : '<span class="sd-obs-badge sd-obs-badge--fail">FAIL</span>';
+  }},
+  { header: 'Actions', renderHtml: function (r) {
+    return '<button type="button" class="sd-eval-golden-remove" data-delete-run-id="' + escapeHtml(r.id || '') + '" title="Delete run">' +
+      '<span class="material-symbols-outlined" aria-hidden="true">delete</span>' +
+    '</button>';
   }},
 ];
 
@@ -44,6 +49,11 @@ const FAILED_COLS = [
   }},
   { header: 'Hit?',  renderHtml: function () { return '<span class="sd-obs-badge sd-obs-badge--miss">Miss</span>'; } },
   { header: 'Rank',  renderText: function (r) { return r.rank != null ? String(r.rank) : '—'; } },
+  { header: 'Actions', renderHtml: function (r) {
+    return '<button type="button" class="sd-eval-golden-remove" data-dismiss-row="' + escapeHtml(String(r.index)) + '" title="Dismiss">' +
+      '<span class="material-symbols-outlined" aria-hidden="true">delete</span>' +
+    '</button>';
+  }},
 ];
 
 // ── ① Render / init ───────────────────────────────────────────────────────────
@@ -271,8 +281,10 @@ function _renderHistory(els, runs) {
   if (runs.length) {
     const latest = runs[0];
     if (latest && latest.metrics) {
-      const pass = (latest.metrics.recall || 0) >= 0.80 && (latest.metrics.mrr || 0) >= 0.70;
-      _updateSummary(els, { recallAtK: latest.metrics.recall, mrr: latest.metrics.mrr, hits: latest.hits, total: latest.total }, pass, latest.ranAt);
+      const rT = (atlasConfig && atlasConfig.recallThreshold)       || 0.80;
+      const mT = (atlasConfig && atlasConfig.faithfulnessThreshold) || 0.70;
+      const pass = (latest.metrics.recallAtK || 0) >= rT && (latest.metrics.mrr || 0) >= mT;
+      _updateSummary(els, { recallAtK: latest.metrics.recallAtK, mrr: latest.metrics.mrr, hits: latest.hits, total: latest.total }, pass, latest.ranAt);
     }
   }
   // Pass index into renderText via closure over the array
@@ -284,6 +296,36 @@ function _renderHistory(els, runs) {
   });
   renderDataTable(els.ragHistoryMount, { columns: cols, rows: runs, emptyText: 'No runs recorded yet.' });
   _show(els.ragHistoryWrap, true);
+  _wireHistoryDelete(els);
+}
+
+function _wireHistoryDelete(els) {
+  const mount = els.ragHistoryMount;
+  if (!mount || mount._deleteWired) return;
+  mount._deleteWired = true;
+  mount.addEventListener('click', function (evt) {
+    const btn = evt.target.closest('[data-delete-run-id]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-delete-run-id');
+    if (!id) return;
+    if (!window.confirm('Delete this evaluation run? This cannot be undone.')) return;
+    _deleteEvalRun(els, id, btn);
+  });
+}
+
+function _deleteEvalRun(els, id, btn) {
+  if (btn) btn.disabled = true;
+  const token = state.credential || '';
+  fetch('/api/admin/atlas/rag-eval/history/' + encodeURIComponent(id), {
+    method: 'DELETE',
+    headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.success) { showToast('Run deleted.', { kind: 'success' }); loadEvalHistory(els); }
+      else { showToast(d.error || 'Delete failed.', { kind: 'error' }); if (btn) btn.disabled = false; }
+    })
+    .catch(function (err) { showToast(err.message || 'Delete failed.', { kind: 'error' }); if (btn) btn.disabled = false; });
 }
 
 // ── ⑥ Failed Test Cases — renderDataTable ─────────────────────────────────────
@@ -293,6 +335,19 @@ export function renderFailedCases(els, details) {
   if (!failures.length) { _show(els.ragDetailWrap, false); return; }
   renderDataTable(els.ragDetailMount, { columns: FAILED_COLS, rows: failures, emptyText: 'No failures.' });
   _show(els.ragDetailWrap, true);
+  _wireFailedDismiss(els);
+}
+
+function _wireFailedDismiss(els) {
+  const mount = els.ragDetailMount;
+  if (!mount || mount._dismissWired) return;
+  mount._dismissWired = true;
+  mount.addEventListener('click', function (evt) {
+    const btn = evt.target.closest('[data-dismiss-row]');
+    if (!btn) return;
+    const tr = btn.closest('tr');
+    if (tr) tr.remove();
+  });
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────

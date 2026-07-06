@@ -518,6 +518,12 @@ export function renderList() {
   const els = _els();
   if (!els.list) return;
   els.list.textContent = '';
+  // .sd-content-article-list's base rule is itself a multi-column grid;
+  // .sd-list-view is the modifier that switches it to a stacked single
+  // column (see styles.css). Toggling it here — rather than building two
+  // different DOM shapes below — keeps this function's only job "which
+  // cards, in which order", leaving all layout concerns to CSS.
+  els.list.classList.toggle('sd-list-view', state.currentArticleView === 'list');
   updateArticleStats();
   const statusMap    = { drafts: 'Draft', published: 'Published', archived: 'Archived' };
   const filterStatus = statusMap[state.currentArticleFilter] || null;
@@ -539,14 +545,7 @@ export function renderList() {
     return;
   }
 
-  if (state.currentArticleView === 'list') {
-    filtered.forEach(function (article) { els.list.appendChild(_articleCardForAdmin(article)); });
-  } else {
-    const grid = document.createElement('div');
-    grid.className = 'sd-article-grid';
-    filtered.forEach(function (article) { grid.appendChild(_articleCardForAdmin(article)); });
-    els.list.appendChild(grid);
-  }
+  filtered.forEach(function (article) { els.list.appendChild(_articleCardForAdmin(article)); });
 }
 
 function _articleCardForAdmin(article) {
