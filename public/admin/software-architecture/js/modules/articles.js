@@ -743,7 +743,10 @@ export async function loadArticles() {
   if (els.workspace)els.workspace.hidden = false;
   if (els.signOut)  els.signOut.hidden  = false;
   const authWall = document.getElementById('adminAuthWall');
-  if (authWall) authWall.hidden = true;
+  if (authWall) {
+    authWall.hidden = true;
+    delete document.body.dataset.authwall;
+  }
   setStatus('', 'info');
   renderList();
   await loadContactPolicy(els);

@@ -1024,76 +1024,139 @@ body.sd-subpanel-open .sd-admin-shell--sidebar {
   }
 }
 
+/* ── Auth wall — full-page branded sign-in ───────────────────────────────── */
 .sd-admin-auth-wall {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 80px 24px;
-  text-align: center;
+  padding: 24px 16px;
+  background: var(--bg);
+  overflow-y: auto;
 }
-
 .sd-admin-auth-wall[hidden] { display: none; }
 
-.sd-admin-auth-wall-icon {
-  font-size: 40px;
-  color: var(--text-muted);
+.sd-authwall-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  max-width: 860px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 48px color-mix(in srgb, #000 18%, transparent);
+  border: 1px solid var(--border);
+}
+
+/* ── Left brand panel ────────────────────────────────────────────────────── */
+.sd-authwall-brand {
+  background: linear-gradient(145deg, #0f1b2d 0%, #1a2e4a 100%);
+  padding: 48px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sd-authwall-avatar {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: color-mix(in srgb, #4a9eff 20%, #0f1b2d);
+  border: 2px solid color-mix(in srgb, #4a9eff 40%, transparent);
+  display: grid; place-items: center;
+  font-size: 18px; font-weight: 800;
+  color: #4a9eff;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+.sd-authwall-name {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.sd-authwall-role {
+  margin: 0;
+  font-size: 0.8rem;
+  color: color-mix(in srgb, #fff 55%, transparent);
+  font-weight: 500;
+  line-height: 1.4;
+}
+.sd-authwall-features {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sd-authwall-features li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.825rem;
+  color: color-mix(in srgb, #fff 75%, transparent);
+  font-weight: 500;
+}
+.sd-authwall-features .material-symbols-outlined {
+  font-size: 18px;
+  color: #4a9eff;
+  flex-shrink: 0;
+}
+
+/* ── Right sign-in panel ─────────────────────────────────────────────────── */
+.sd-authwall-signin-panel {
+  background: var(--surface);
+  padding: 48px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+}
+.sd-authwall-lock-icon {
+  font-size: 32px;
+  color: var(--accent);
   margin-bottom: 4px;
 }
-
-.sd-admin-auth-wall-title {
+.sd-authwall-signin-title {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1.4rem;
+  font-weight: 800;
   color: var(--text);
+  letter-spacing: -0.02em;
 }
-
-.sd-admin-auth-wall-sub {
-  margin: 0;
+.sd-authwall-signin-sub {
+  margin: 0 0 8px;
   font-size: 0.875rem;
   color: var(--text-secondary);
+  line-height: 1.6;
 }
-
-.sd-admin-authwall-signin {
-  margin-top: 10px;
-  background: var(--brand-blue);
-  color: #fff;
-  border: 0;
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 10px 30px rgba(1, 52, 122, 0.22);
+.sd-authwall-google-btn-wrap {
+  min-height: 44px;
+  width: 100%;
 }
-.sd-admin-authwall-signin:hover {
-  filter: brightness(1.03);
-}
-.sd-admin-authwall-signin:active {
-  filter: brightness(0.98);
-}
-
-.sd-admin-authwall-actions {
-  margin-top: 6px;
+.sd-authwall-note {
+  margin: 8px 0 0;
   display: flex;
-  gap: 10px;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
 }
-.sd-admin-authwall-local {
-  margin-top: 10px;
-  background: transparent;
-  color: var(--md-sys-color-on-surface);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-weight: 800;
-  cursor: pointer;
+.sd-authwall-note .material-symbols-outlined {
+  font-size: 14px;
+  flex-shrink: 0;
 }
-.sd-admin-authwall-local:hover {
-  border-color: var(--md-sys-color-outline);
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+
+/* Hide the Atlas chat widget while the auth wall is visible */
+body[data-authwall] #chatLauncher { display: none !important; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .sd-authwall-card { grid-template-columns: 1fr; }
+  .sd-authwall-brand { padding: 32px 24px; }
+  .sd-authwall-signin-panel { padding: 32px 24px; }
 }
 
 .sd-admin-workspace,

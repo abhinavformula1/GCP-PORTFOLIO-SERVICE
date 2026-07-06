@@ -168,6 +168,120 @@ md-dialog { margin: auto; }
 /* Hide slotted children of <md-dialog> until the custom element upgrades,
    to prevent the slot content flashing in the light DOM. */
 md-dialog:not(:defined) > * { visibility: hidden; }
+
+/* ── sd-modal — reusable modal shell (modal.js) ──────────────────────────── */
+.sd-modal {
+  --sd-modal-width: 480px;
+  width: min(var(--sd-modal-width), calc(100vw - 32px));
+}
+
+/*
+ * Headline: [icon?] [title+subtitle] [×?]
+ * NOTE: <md-dialog> does not expose padding as CSS custom properties (only
+ * color/font/shape tokens are supported — see material-web dialog docs).
+ * We therefore pad the slotted elements directly instead of relying on
+ * bogus --md-dialog-*-padding variables.
+ */
+.sd-modal-headline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 28px 28px 0;
+  box-sizing: border-box;
+}
+
+/* Circle icon badge */
+.sd-modal-icon-wrap {
+  flex-shrink: 0;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent, #1d64d8) 12%, transparent);
+  display: grid; place-items: center;
+}
+.sd-modal-icon {
+  font-size: 20px;
+  color: var(--accent, #1d64d8);
+}
+
+/* Title + subtitle stacked */
+.sd-modal-title-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sd-modal-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+  line-height: 1.3;
+}
+.sd-modal-subtitle {
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* × close button */
+.sd-modal-close-btn {
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-left: auto;
+}
+.sd-modal-close-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.sd-modal-close-btn .material-symbols-outlined { font-size: 18px; }
+
+.sd-modal-content {
+  padding: 20px 28px 28px;
+  box-sizing: border-box;
+}
+
+.sd-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 28px 28px;
+  box-sizing: border-box;
+}
+
+/* ── sd-btn — lightweight button primitives used inside modals ───────────── */
+.sd-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font: 600 0.875rem/1 inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.sd-btn--outline {
+  background: transparent;
+  border: 1.5px solid var(--border, #d1d5db);
+  color: var(--text, #111);
+}
+.sd-btn--outline:hover {
+  background: color-mix(in srgb, var(--text, #111) 5%, transparent);
+}
+.sd-btn--primary {
+  background: var(--accent, #1d64d8);
+  border: 1.5px solid transparent;
+  color: #fff;
+}
+.sd-btn--primary:hover { filter: brightness(1.07); }
 md-filled-button:not(:defined),
 md-outlined-button:not(:defined),
 md-text-button:not(:defined),
@@ -239,6 +353,8 @@ md-fab:not(:defined) { visibility: hidden; }
 
 /* ── Language picker (globe icon + dialog) ───────────────────────────────── */
 .lang-picker { display: contents; }
+
+/* Globe trigger button */
 .lang-picker-btn {
   --md-outlined-icon-button-container-size: 40px;
   --md-outlined-icon-button-container-shape: 50%;
@@ -246,51 +362,60 @@ md-fab:not(:defined) { visibility: hidden; }
   --md-outlined-icon-button-outline-color: var(--md-sys-color-outline);
   --md-outlined-icon-button-icon-color: var(--md-sys-color-on-surface-variant);
   --md-outlined-icon-button-hover-icon-color: var(--md-sys-color-on-surface);
-  /* keep quiet */
   --md-outlined-icon-button-hover-state-layer-color: transparent;
   --md-outlined-icon-button-pressed-state-layer-color: transparent;
   --md-outlined-icon-button-focus-state-layer-color: transparent;
 }
+
+/* Dialog — MWC width tokens + slot padding */
 .lang-picker-dialog {
   --md-dialog-container-color: var(--md-sys-color-surface);
-  --md-dialog-headline-size: 22px;
-  --md-dialog-supporting-text-size: 14px;
-  min-width: min(920px, 92vw);
-}
-.lang-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px 16px;
-  padding: 6px 2px 2px 2px;
-}
-.lang-picker-option {
-  border: 0;
-  background: transparent;
-  padding: 10px 12px;
-  border-radius: 999px;
-  font: inherit;
-  font-weight: 600;
-  color: var(--md-sys-color-on-surface-variant);
-  cursor: pointer;
-  text-align: center;
-  white-space: nowrap;
-}
-.lang-picker-option[data-selected="true"] {
-  background: color-mix(in srgb, #01347A 16%, transparent);
-  color: #01347A;
-}
-.lang-picker-option:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent); }
-.lang-picker-close {
-  --md-text-button-hover-state-layer-color: transparent;
-  --md-text-button-pressed-state-layer-color: transparent;
+  --sd-modal-width: 760px;
 }
 
-@media (max-width: 860px) {
-  .lang-picker-dialog { min-width: min(720px, 94vw); }
-  .lang-picker-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Pill grid — always exactly 2 equal columns spanning the full width */
+.lang-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 4px 0;
 }
+
+.lang-picker-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 999px;
+  border: 2px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.lang-picker-pill:hover {
+  border-color: #1d64d8;
+  background: rgba(29, 100, 216, 0.05);
+  transform: translateY(-1px);
+}
+.lang-picker-pill--active {
+  border-color: #1d64d8;
+  background: rgba(29, 100, 216, 0.08);
+}
+.lang-picker-pill--active .lang-picker-pill-label { color: #1d64d8; }
+
+.lang-picker-pill-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.2;
+}
+
+/* Responsive */
 @media (max-width: 520px) {
-  .lang-picker-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lang-picker-grid { grid-template-columns: repeat(2, 1fr); }
+  .lang-picker-pill { border-radius: 16px; padding: 10px 16px; }
 }
 /* keep the FOUC guard from earlier — extend it for the new components */
 md-outlined-select:not(:defined),
@@ -298,6 +423,14 @@ md-select-option:not(:defined),
 md-icon-button:not(:defined),
 md-outlined-icon-button:not(:defined),
 md-text-button:not(:defined) { visibility: hidden; }
+
+/*
+ * When MWC isn't loaded the FOUC guard's `.fonts-loaded .material-symbols-outlined { visibility: visible }`
+ * explicitly shows child spans even though their parent is visibility:hidden.
+ * This rule counter-acts that by hiding the slot="selected" icon inside
+ * any unregistered md-outlined-icon-button so both icons never show together.
+ */
+md-outlined-icon-button:not(:defined) > [slot="selected"] { display: none !important; }
 
 /* ── Toast notifications (shared) ─────────────────────────────────────────── */
 .toast-stack {
@@ -4417,86 +4550,151 @@ figure.sd-image-block figcaption {
 }
 
 /* ── Welcome / Login <md-dialog> ─────────────────────────────── */
+/*
+ * <md-dialog> does not support Angular-Material-style
+ * --md-dialog-container-min/max-width tokens — those don't exist in
+ * Google's Material Web. The documented way to size an <md-dialog> is
+ * literal `width` on the host element itself (same trick `.sd-modal`
+ * uses for the reusable modal component).
+ */
 #welcomeOverlay {
   --md-dialog-container-color: var(--md-sys-color-surface-container-high);
-  min-width: 360px;
+  width: min(420px, calc(100vw - 48px));
+  /* <md-dialog>'s default elevation is a single flat shadow token — bump it
+   * to a softer, more layered "lifted card" shadow so the modal reads as
+   * floating above the page instead of just outlined against the scrim. */
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.08),
+    0 16px 40px rgba(0, 0, 0, 0.18);
 }
-/* Inner padding around slotted regions for breathing room. */
-#welcomeOverlay [slot="headline"] { padding: 12px 8px 8px; }
-#welcomeOverlay [slot="content"]  { padding: 8px 8px 16px; }
+/* The native <dialog> backdrop lives in the top layer, outside the
+ * component's shadow DOM, so it's reachable directly — dim + blur the page
+ * behind the card instead of the component's flat scrim color, for a bit
+ * more depth/focus on the dialog itself. */
+#welcomeOverlay::backdrop {
+  background: rgba(15, 18, 25, 0.44);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+/*
+ * <md-dialog> does not expose padding as CSS custom properties (only
+ * color/font/shape tokens are supported) — pad the slotted elements
+ * directly instead. See the sd-modal note above for the same rationale.
+ */
+#welcomeOverlay [slot="headline"] { padding: 32px 32px 0; box-sizing: border-box; }
+#welcomeOverlay [slot="content"]  { padding: 24px 32px 32px; box-sizing: border-box; }
 .welcome-headline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
 }
 .welcome-close {
-  background: transparent;
-  border: 0;
+  display: grid;
+  place-items: center;
+  background: var(--md-sys-color-surface);
+  border: 1.5px solid var(--md-sys-color-outline-variant);
   color: var(--md-sys-color-on-surface-variant);
-  font-size: 22px;
-  line-height: 1;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
-  padding: 4px 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.welcome-close .material-symbols-outlined {
+  font-size: 18px;
+  transition: transform 0.2s ease;
 }
 .welcome-close:hover {
   color: var(--md-sys-color-on-surface);
   background: rgba(255, 255, 255, var(--md-sys-state-hover-opacity));
+  border-color: var(--md-sys-color-outline);
 }
+.welcome-close:hover .material-symbols-outlined { transform: rotate(90deg); }
+.welcome-close:active { transform: scale(0.92); }
 .welcome-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 .welcome-avatar {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: var(--md-sys-color-primary-container);
+  background: color-mix(in srgb, var(--accent, #1d64d8) 14%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 700;
-  color: var(--md-sys-color-on-primary-container);
+  color: var(--accent, #1d64d8);
   flex-shrink: 0;
+  /* Thin accent-tinted ring + soft glow gives the avatar a bit of lift
+   * instead of sitting flat as a plain tinted circle. */
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent, #1d64d8) 10%, transparent),
+    0 2px 8px color-mix(in srgb, var(--accent, #1d64d8) 20%, transparent);
 }
 .welcome-title {
-  font-size: 16px;
+  font-size: 1.3rem;
   font-weight: 700;
   line-height: 1.25;
   color: var(--md-sys-color-on-surface);
   margin: 0;
 }
 .welcome-sub {
-  font-size: 11.5px;
-  line-height: 1.3;
+  font-size: 0.85rem;
+  line-height: 1.35;
   color: var(--md-sys-color-on-surface-variant);
   margin-top: 4px;
 }
 .welcome-content {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 14px;
+  align-items: stretch;
+  gap: 18px;
   padding-top: 4px;
 }
 .welcome-google-wrap {
-  width: 280px; /* matches Google's renderButton({ width: 280 }) */
-  display: flex;
-  justify-content: center;
-  min-height: 44px;
-}
-.welcome-sep {
-  width: 280px;
+  width: 100%;
+  height: 40px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  border-radius: 999px;
+  /* Google's rendered button is a FIXED 40px tall for size:'large' — not
+   * configurable — so this wrap must be exactly 40px too, with no extra
+   * min-height slack, or the ring below sits further out than the real
+   * button and the two pills read as different sizes.
+   *
+   * A real `border` (not box-shadow — box-shadow paints OUTSIDE the
+   * border-box, adding ~1px per side vs. "Maybe later"'s actual border,
+   * which is drawn flush within its declared box) keeps both pills
+   * pixel-identical in outer size.
+   *
+   * -outline (not -outline-variant) is a fairly dark gray (#73777f) —
+   * fine for icon-button rings elsewhere, but at a full 1px opaque
+   * stroke around an all-white pill it reads as near-black, especially
+   * on Retina. -outline-variant is the same soft hairline used for the
+   * close (×) button above. */
+  border: 1px solid var(--md-sys-color-outline-variant, rgba(0, 0, 0, 0.16));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.welcome-google-wrap:hover {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+.welcome-google-wrap:active { transform: translateY(0); }
+.welcome-sep {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   color: var(--md-sys-color-on-surface-variant);
-  font-size: 11px;
+  font-size: 0.8rem;
 }
 .welcome-sep::before,
 .welcome-sep::after {
@@ -4505,21 +4703,59 @@ figure.sd-image-block figcaption {
   height: 1px;
   background: var(--md-sys-color-outline-variant);
 }
-/* "Maybe later" — exact same footprint as the Google sign-in button above. */
+/* "Maybe later" — same neutral border/text treatment as the Google pill
+ * above (same 44px height, same outline weight/color, same dark text)
+ * so the two stack as a matched pair instead of one neutral + one bold
+ * blue button that read as two different button families.
+ *
+ * <md-outlined-button> has NO container-color token — it's transparent
+ * by spec, which let the modal's gray card show through and made this
+ * pill look "unfilled" next to Google's solid white one. There's no
+ * component token for this, but the button's own internal fill is
+ * `background: transparent`, so painting a background directly on the
+ * host element shows through and gives it the same solid white fill. */
 .welcome-guest-btn {
-  width: 280px;
-  --md-outlined-button-container-height: 44px;
+  width: 100%;
+  background-color: var(--md-sys-color-surface, #fff);
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+  /* Must match .welcome-google-wrap's 40px exactly — see note there on
+   * why 40 (not 44) is the only value that lines up pixel-for-pixel with
+   * Google's fixed-height rendered button. */
+  --md-outlined-button-container-height: 40px;
+  --md-outlined-button-container-shape: 999px;
   --md-outlined-button-label-text-color: var(--md-sys-color-on-surface);
-  --md-outlined-button-outline-color: var(--md-sys-color-outline);
-  --md-outlined-button-label-text-weight: 600;
+  --md-outlined-button-icon-color: var(--md-sys-color-on-surface-variant);
+  /* Matches .welcome-google-wrap's border above — -outline-variant, not
+   * -outline, so this pill's border reads as a soft hairline instead of
+   * a near-black stroke against the white fill. */
+  --md-outlined-button-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-button-outline-width: 1px;
+  --md-outlined-button-label-text-weight: 500;
+  --md-outlined-button-label-text-size: 0.9rem;
 }
+.welcome-guest-btn:hover {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+.welcome-guest-btn:active { transform: translateY(0); }
 .welcome-note {
-  width: 280px;
-  font-size: 11px;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
   color: var(--md-sys-color-on-surface-variant);
-  text-align: center;
+  text-align: left;
   margin: 0;
   line-height: 1.5;
+}
+.welcome-note-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent, #1d64d8);
 }
 
 /* ── Close confirmation dialog ───────────────────────────────── */

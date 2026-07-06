@@ -1,12 +1,16 @@
 import { showToast } from './toast.js';
+import { createModal } from './modal.js';
+import { createEl } from './dom.js';
 
-let _dlg = null;
+let _modal = null;
+
+// ── Formatters ────────────────────────────────────────────────────────────────
 
 function money(amountCents, currency) {
   const cur = String(currency || '').toUpperCase();
   const amt = Number(amountCents || 0);
   if (!cur || !amt) return '';
-  const major = (amt / 100);
+  const major = amt / 100;
   try {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(major);
   } catch (_) {
@@ -15,11 +19,10 @@ function money(amountCents, currency) {
 }
 
 function intervalText(sub) {
-  const i = String(sub && sub.interval || '').trim();
-  const c = Number(sub && sub.intervalCount || 1) || 1;
+  const i = String((sub && sub.interval) || '').trim();
+  const c = Number((sub && sub.intervalCount) || 1) || 1;
   if (!i) return '';
-  if (c === 1) return i;
-  return `${c} ${i}${c > 1 ? 's' : ''}`;
+  return c === 1 ? i : `${c} ${i}${c > 1 ? 's' : ''}`;
 }
 
 function dateText(ms) {
@@ -32,71 +35,70 @@ function dateText(ms) {
   }
 }
 
-function ensureDialog() {
-  if (_dlg && _dlg.isConnected) return _dlg;
-  const dlg = document.createElement('md-dialog');
-  dlg.className = 'billing-account-dialog';
-  dlg.id = 'billingAccountDialog';
-  dlg.innerHTML = `
-    <div slot="headline" class="billing-account-head">
-      <span>Billing & subscription</span>
-      <button type="button" class="stripe-checkout-close" aria-label="Close">
-        <span class="material-symbols-outlined" aria-hidden="true">close</span>
-      </button>
-    </div>
-    <div slot="content" class="billing-account-body">
-      <div class="billing-account-kpi">
-        <div class="billing-account-status" id="billingAccountStatus"></div>
-        <div class="billing-account-plan" id="billingAccountPlan"></div>
-        <div class="billing-account-meta" id="billingAccountMeta"></div>
-      </div>
-      <div class="billing-account-hint" id="billingAccountHint"></div>
-    </div>
-    <div slot="actions" class="billing-account-actions">
-      <md-text-button id="billingAccountSecondaryBtn" hidden></md-text-button>
-      <md-filled-button id="billingAccountPrimaryBtn">Manage</md-filled-button>
-    </div>
-  `;
-  document.body.appendChild(dlg);
+// ── Modal bootstrap (lazy, singleton) ────────────────────────────────────────
 
-  const closeBtn = dlg.querySelector('.stripe-checkout-close');
-  if (closeBtn) closeBtn.addEventListener('click', function () {
-    try { if (typeof dlg.close === 'function') dlg.close(); } catch (_) {}
+function ensureModal() {
+  if (_modal && _modal.el.isConnected) return _modal;
+
+  const statusEl  = createEl('div', { id: 'billingAccountStatus',  className: 'billing-account-status' });
+  const planEl    = createEl('div', { id: 'billingAccountPlan',    className: 'billing-account-plan' });
+  const metaEl    = createEl('div', { id: 'billingAccountMeta',    className: 'billing-account-meta' });
+  const hintEl    = createEl('div', { id: 'billingAccountHint',    className: 'billing-account-hint' });
+  const primaryBtn   = createEl('md-filled-button', { id: 'billingAccountPrimaryBtn' }, [
+    createEl('span', { text: 'Manage' }),
+  ]);
+  const secondaryBtn = createEl('md-text-button', { id: 'billingAccountSecondaryBtn', hidden: true });
+
+  const content = createEl('div', { className: 'billing-account-body' }, [
+    createEl('div', { className: 'billing-account-kpi' }, [statusEl, planEl, metaEl]),
+    hintEl,
+  ]);
+
+  _modal = createModal({
+    id:        'billingAccountDialog',
+    className: 'billing-account-dialog',
+    title:     'Billing & subscription',
+    content,
+    actions:   [secondaryBtn, primaryBtn],
   });
 
-  _dlg = dlg;
-  return dlg;
+  document.body.appendChild(_modal.el);
+  return _modal;
 }
 
-export async function openBillingAccountDialog(deps) {
-  const dlg = ensureDialog();
-  const profile = deps && deps.profile ? deps.profile : null;
-  const openPortal = deps && deps.openPortal;
-  const openCheckout = deps && deps.openCheckout;
-  const showWelcomeOverlay = deps && deps.showWelcomeOverlay;
+// ── Public API ────────────────────────────────────────────────────────────────
 
-  const statusEl = dlg.querySelector('#billingAccountStatus');
-  const planEl = dlg.querySelector('#billingAccountPlan');
-  const metaEl = dlg.querySelector('#billingAccountMeta');
-  const hintEl = dlg.querySelector('#billingAccountHint');
-  const primary = dlg.querySelector('#billingAccountPrimaryBtn');
+export async function openBillingAccountDialog(deps) {
+  const modal = ensureModal();
+  const dlg   = modal.el;
+
+  const profile          = (deps && deps.profile)          || null;
+  const openPortal       = (deps && deps.openPortal)       || null;
+  const openCheckout     = (deps && deps.openCheckout)     || null;
+  const showWelcomeOverlay = (deps && deps.showWelcomeOverlay) || null;
+
+  const statusEl  = dlg.querySelector('#billingAccountStatus');
+  const planEl    = dlg.querySelector('#billingAccountPlan');
+  const metaEl    = dlg.querySelector('#billingAccountMeta');
+  const hintEl    = dlg.querySelector('#billingAccountHint');
+  const primary   = dlg.querySelector('#billingAccountPrimaryBtn');
   const secondary = dlg.querySelector('#billingAccountSecondaryBtn');
 
-  const sub = (profile && profile.subscription) ? profile.subscription : null;
+  const sub      = (profile && profile.subscription) || null;
   const signedIn = !!(profile && profile.type !== 'guest' && profile.email);
+  const active   = !!(sub && sub.active);
+  const status   = String((sub && sub.status) || (signedIn ? 'none' : 'guest'));
 
-  const active = !!(sub && sub.active);
-  const status = String(sub && sub.status || (signedIn ? 'none' : 'guest'));
-
+  // ── Populate fields ───────────────────────────────────────────────────────
   let statusLabel = active ? 'Active' : (status === 'trialing' ? 'Trial' : 'Not active');
   if (!signedIn) statusLabel = 'Sign in required';
   if (statusEl) statusEl.textContent = statusLabel;
 
   const planParts = [];
   const price = money(sub && sub.amount, sub && sub.currency);
-  const iv = intervalText(sub);
-  if (price && iv) planParts.push(`${price} / ${iv}`);
-  else if (price) planParts.push(price);
+  const iv    = intervalText(sub);
+  if (price && iv)            planParts.push(`${price} / ${iv}`);
+  else if (price)             planParts.push(price);
   if (sub && sub.planNickname) planParts.unshift(String(sub.planNickname));
   if (planEl) planEl.textContent = planParts.join(' — ') || (active ? 'Premium subscription' : 'No active subscription');
 
@@ -112,6 +114,7 @@ export async function openBillingAccountDialog(deps) {
       : (signedIn ? 'Subscribe to unlock premium articles.' : 'Sign in to manage billing and invoices.');
   }
 
+  // ── Actions ───────────────────────────────────────────────────────────────
   async function doOpenPortalOrFallback() {
     if (!signedIn) {
       if (typeof showWelcomeOverlay === 'function') showWelcomeOverlay();
@@ -129,19 +132,19 @@ export async function openBillingAccountDialog(deps) {
   }
 
   if (secondary) {
-    secondary.hidden = true;
+    secondary.hidden  = true;
     secondary.onclick = null;
   }
 
   if (primary) {
-    primary.textContent = active ? 'Billing & invoices' : (signedIn ? 'Subscribe' : 'Sign in');
+    primary.querySelector('span').textContent = active
+      ? 'Billing & invoices'
+      : (signedIn ? 'Subscribe' : 'Sign in');
     primary.onclick = function () {
-      try { if (typeof dlg.close === 'function') dlg.close(); } catch (_) {}
+      modal.close();
       doOpenPortalOrFallback();
     };
   }
 
-  if (typeof dlg.show === 'function') dlg.show();
-  else dlg.removeAttribute('hidden');
+  modal.open();
 }
-

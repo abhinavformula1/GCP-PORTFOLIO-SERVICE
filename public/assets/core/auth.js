@@ -127,10 +127,47 @@ export function initGoogleSignIn(opts) {
   });
   // Render button in welcome overlay if shown
   const welcomeBtn = document.getElementById('welcomeGoogleBtn');
-  if (welcomeBtn && welcomeBtn.childElementCount === 0) {
+  if (welcomeBtn) renderWelcomeGoogleButton(welcomeBtn);
+}
+
+/**
+ * Google's button takes a fixed pixel width — measure the actual
+ * container so it lines up exactly with the full-width "Maybe later"
+ * button below it, instead of a hardcoded guess that can drift out of
+ * sync with the card's padding/max-width (Google clamps to 200–400px).
+ *
+ * A single requestAnimationFrame after <md-dialog>.show() isn't always
+ * enough: clientWidth can still read 0 on that frame (e.g. the dialog's
+ * open animation hasn't committed layout yet), silently falling back to
+ * a guessed width that leaves this wrapper's border pill visibly wider
+ * than Google's actual rendered button — a "pill behind the pill" look.
+ * ResizeObserver removes the guesswork entirely: it fires the moment the
+ * container's real box is known, however many frames that takes, and
+ * again if it ever changes (e.g. viewport resize), so the button is
+ * re-rendered at the correct width instead of a stale guess.
+ */
+function renderWelcomeGoogleButton(welcomeBtn) {
+  if (welcomeBtn._gsiResizeObserver) return; // already wired up once
+  let lastWidth = 0;
+  const render = function () {
+    const measured = Math.round(welcomeBtn.clientWidth);
+    if (!measured || Math.abs(measured - lastWidth) < 2) return;
+    lastWidth = measured;
+    const width = Math.min(400, Math.max(200, measured));
+    welcomeBtn.innerHTML = '';
+    // 'outline' renders Google's light/white pill (border, colour text, G
+    // logo) — the same look Google itself switches to for a personalised
+    // "Continue as [name]" state, rather than the heavier filled_black
+    // button which reads more like a generic dark CTA.
     google.accounts.id.renderButton(welcomeBtn, {
-      theme: 'filled_black', size: 'large', text: 'continue_with',
-      shape: 'rectangular', width: 280,
+      theme: 'outline', size: 'large', text: 'continue_with',
+      shape: 'pill', width,
     });
+  };
+  if (typeof ResizeObserver === 'function') {
+    welcomeBtn._gsiResizeObserver = new ResizeObserver(render);
+    welcomeBtn._gsiResizeObserver.observe(welcomeBtn);
+  } else {
+    requestAnimationFrame(render);
   }
 }

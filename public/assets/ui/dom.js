@@ -8,6 +8,7 @@
 export function createEl(tag, attrs, children) {
   const el = document.createElement(tag);
   Object.entries(attrs || {}).forEach(function ([key, value]) {
+    if (key === 'checked') { el.checked = !!value; return; }
     if (value === false || value === null || value === undefined) return;
     if (key === 'className') {
       el.className = value;

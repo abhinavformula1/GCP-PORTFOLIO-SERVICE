@@ -1,89 +1,82 @@
 /**
- * Compact language picker: globe icon in header + full-screen-ish dialog.
- *
- * Goal: reduce header width and make future language additions trivial.
+ * Language picker: globe icon header + pill buttons.
+ * Clicking a pill instantly applies the language and closes the modal.
  */
 import { createEl, materialIcon } from './dom.js';
-import { SUPPORTED_LANGUAGES } from '../core/i18n.js';
+import { createModal } from './modal.js';
+import { SUPPORTED_LANGUAGES, currentLang } from '../core/i18n.js';
 
-function whenMdDialogReady(cb) {
-  if (customElements.get('md-dialog')) { cb(); return; }
-  customElements.whenDefined('md-dialog').then(cb);
-}
+// ── Public API ────────────────────────────────────────────────────────────────
 
 export function renderLanguagePicker(ids) {
-  const btn = createEl('md-outlined-icon-button', {
+  // ── Trigger button ──────────────────────────────────────────────────────
+  const triggerBtn = createEl('md-outlined-icon-button', {
     id: ids.btn,
     className: 'lang-picker-btn',
     'aria-label': 'Language',
     title: 'Language',
   }, [materialIcon('language')]);
 
-  const grid = createEl('div', { className: 'lang-picker-grid' }, SUPPORTED_LANGUAGES.map(function (l) {
-    return createEl('button', {
-      type: 'button',
-      className: 'lang-picker-option',
-      'data-lang': l.code,
-      'aria-label': l.label,
-    }, [createEl('span', { text: l.label })]);
-  }));
+  // ── Pill grid (built lazily so currentLang is always fresh) ────────────
+  const grid = createEl('div', { className: 'lang-picker-grid' });
 
-  const dialog = createEl('md-dialog', {
-    id: ids.dialog,
-    className: 'lang-picker-dialog',
-    'aria-label': 'Choose language',
-  }, [
-    createEl('div', { slot: 'headline', className: 'lang-picker-title', text: 'Choose language' }),
-    createEl('div', { slot: 'content' }, [grid]),
-    createEl('div', { slot: 'actions' }, [
-      createEl('md-text-button', { className: 'lang-picker-close', 'aria-label': 'Close' }, [
-        createEl('span', { text: 'Close' }),
-      ]),
-    ]),
-  ]);
+  function buildPills(activeLang) {
+    grid.innerHTML = '';
+    SUPPORTED_LANGUAGES.forEach(function (l) {
+      const isActive = l.code === (activeLang || currentLang || 'en');
+      const pill = createEl('button', {
+        type: 'button',
+        className: 'lang-picker-pill' + (isActive ? ' lang-picker-pill--active' : ''),
+        'data-lang': l.code,
+        'aria-pressed': isActive ? 'true' : 'false',
+      }, [
+        createEl('span', { className: 'lang-picker-pill-label', text: l.label }),
+      ]);
 
-  // Open dialog on click.
-  btn.addEventListener('click', function () {
-    whenMdDialogReady(function () {
-      if (typeof dialog.show === 'function') dialog.show();
-      else dialog.removeAttribute('hidden');
+      pill.addEventListener('click', function () {
+        if (typeof window.setLang === 'function') window.setLang(l.code);
+        modal.close();
+      });
+
+      grid.appendChild(pill);
     });
+  }
+
+  // ── Modal ───────────────────────────────────────────────────────────────
+  const modal = createModal({
+    id:        ids.dialog,
+    className: 'lang-picker-dialog',
+    icon:      'language',
+    title:     'Choose language',
+    subtitle:  'Select your preferred language.',
+    content:   grid,
+    showClose: true,
   });
 
-  // Close action.
-  const closeBtn = dialog.querySelector('.lang-picker-close');
-  if (closeBtn) closeBtn.addEventListener('click', function () {
-    if (typeof dialog.close === 'function') dialog.close();
-    else dialog.setAttribute('hidden', '');
+  // Refresh active pill every time the modal opens.
+  modal.el.addEventListener('open', function () { buildPills(currentLang); });
+  buildPills(currentLang);
+
+  triggerBtn.addEventListener('click', function () {
+    buildPills(currentLang);
+    modal.open();
   });
 
-  // Delegate option picks.
-  grid.addEventListener('click', function (e) {
-    const t = e && e.target;
-    const opt = t && t.closest ? t.closest('.lang-picker-option') : null;
-    if (!opt) return;
-    const lang = opt.getAttribute('data-lang') || 'en';
-    if (typeof window.setLang === 'function') window.setLang(lang);
-    if (typeof dialog.close === 'function') dialog.close();
-    else dialog.setAttribute('hidden', '');
-  });
-
-  return createEl('div', { className: 'lang-picker' }, [btn, dialog]);
+  return createEl('div', { className: 'lang-picker' }, [triggerBtn, modal.el]);
 }
 
 export function updateLanguagePicker(lang, ids) {
-  const dialog = document.getElementById(ids.dialog);
   const btn = document.getElementById(ids.btn);
   if (btn) {
     const match = (SUPPORTED_LANGUAGES || []).find(function (l) { return l.code === lang; });
     btn.title = match ? match.label : 'Language';
   }
+
+  const dialog = document.getElementById(ids.dialog);
   if (!dialog) return;
-  dialog.querySelectorAll('.lang-picker-option').forEach(function (el) {
-    const code = el.getAttribute('data-lang');
-    const selected = code === lang;
-    el.toggleAttribute('data-selected', selected);
-    el.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  dialog.querySelectorAll('.lang-picker-pill').forEach(function (pill) {
+    const active = pill.dataset.lang === lang;
+    pill.classList.toggle('lang-picker-pill--active', active);
+    pill.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 }
-
