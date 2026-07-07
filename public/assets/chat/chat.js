@@ -33,6 +33,7 @@ import { authedFetch }     from '../core/auth.js';
 import { GOOGLE_CLIENT_ID } from '../core/config.js';
 import { renderFreeFormMode, resetAtlasState } from './atlas.js';
 import { createInputRow } from './widgets.js';
+import { showWelcomeOverlay } from '../ui/welcome.js';
 
 /* ═══════════════════════════════════════════════════════════
    GUIDED ASSISTANT — state machine
@@ -482,9 +483,28 @@ function renderAtlasSignInPrompt() {
   const wrap = document.createElement('div');
   wrap.className = 'ga-google-step';
 
-  const googleBtnDiv = document.createElement('div');
-  googleBtnDiv.id = 'googleSignInBtn';
-  googleBtnDiv.className = 'ga-google-btn-wrap';
+  const signInBtn = document.createElement('button');
+  signInBtn.className = 'ga-signin-btn';
+  signInBtn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="18" height="18"><span>Continue with Google</span>';
+  signInBtn.onclick = function () {
+    showWelcomeOverlay({ onShown: function () {
+      if (window.google && window.google.accounts && GOOGLE_CLIENT_ID) {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: function (response) {
+            if (window.handleGoogleSignIn) window.handleGoogleSignIn(response);
+          },
+          auto_select: false,
+        });
+        const container = document.getElementById('welcomeGoogleBtn');
+        if (container) {
+          google.accounts.id.renderButton(container, {
+            theme: 'outline', size: 'large', width: 356, text: 'continue_with',
+          });
+        }
+      }
+    }});
+  };
 
   const sep = document.createElement('div');
   sep.className = 'ga-google-sep';
@@ -495,20 +515,10 @@ function renderAtlasSignInPrompt() {
   backBtn.textContent = 'Back';
   backBtn.onclick = function () { renderModeChooser(); };
 
-  wrap.appendChild(googleBtnDiv);
+  wrap.appendChild(signInBtn);
   wrap.appendChild(sep);
   wrap.appendChild(backBtn);
   area.appendChild(wrap);
-
-  if (window.google && window.google.accounts && GOOGLE_CLIENT_ID) {
-    google.accounts.id.renderButton(googleBtnDiv, {
-      theme: 'filled_black',
-      size: 'large',
-      text: 'continue_with',
-      shape: 'rectangular',
-      width: 260,
-    });
-  }
 }
 
 function renderGoogleStep() {
@@ -520,9 +530,28 @@ function renderGoogleStep() {
   const wrap = document.createElement('div');
   wrap.className = 'ga-google-step';
 
-  const googleBtnDiv = document.createElement('div');
-  googleBtnDiv.id = 'googleSignInBtn';
-  googleBtnDiv.className = 'ga-google-btn-wrap';
+  const signInBtn = document.createElement('button');
+  signInBtn.className = 'ga-signin-btn';
+  signInBtn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="18" height="18"><span>Continue with Google</span>';
+  signInBtn.onclick = function () {
+    showWelcomeOverlay({ onShown: function () {
+      if (window.google && window.google.accounts && GOOGLE_CLIENT_ID) {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: function (response) {
+            if (window.handleGoogleSignIn) window.handleGoogleSignIn(response);
+          },
+          auto_select: false,
+        });
+        const container = document.getElementById('welcomeGoogleBtn');
+        if (container) {
+          google.accounts.id.renderButton(container, {
+            theme: 'outline', size: 'large', width: 356, text: 'continue_with',
+          });
+        }
+      }
+    }});
+  };
 
   const sep = document.createElement('div');
   sep.className = 'ga-google-sep';
@@ -537,20 +566,10 @@ function renderGoogleStep() {
     renderStep();
   };
 
-  wrap.appendChild(googleBtnDiv);
+  wrap.appendChild(signInBtn);
   wrap.appendChild(sep);
   wrap.appendChild(guestBtn);
   area.appendChild(wrap);
-
-  if (window.google && window.google.accounts && GOOGLE_CLIENT_ID) {
-    google.accounts.id.renderButton(googleBtnDiv, {
-      theme: 'filled_black',
-      size: 'large',
-      text: 'continue_with',
-      shape: 'rectangular',
-      width: 260,
-    });
-  }
 }
 
 function renderStep() {

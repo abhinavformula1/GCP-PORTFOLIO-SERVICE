@@ -4887,6 +4887,30 @@ figure.sd-image-block figcaption {
   border-color: var(--accent);
   color: var(--text);
 }
+.ga-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  color: #3c4043;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.ga-signin-btn:hover {
+  background: #f8f9fa;
+  border-color: #c6c9cd;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.ga-signin-btn img {
+  flex-shrink: 0;
+}
 
 /* ── Sponsors Footer ────────────────────────────────────────── */
 .sponsors-footer {

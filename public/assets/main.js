@@ -60,7 +60,7 @@ import {
   toggleChatTeaser,
   resetChatState, applyGoogleProfileToChat,
   initChat,
-} from './chat/chat.js';
+} from './chat/chat.js?v=2026-07-07-reuse-modal';
 import {
   refreshRecommendations, updateRecommendationCta,
   openLeaveRecommendation, closeLeaveRecommendation,
