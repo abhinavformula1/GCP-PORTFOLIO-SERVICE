@@ -104,6 +104,8 @@ initAuth({
       authWall.hidden = false;
       document.body.dataset.authwall = '1';
     }
+    // Re-initialize pricing gate cards (they might not exist if user was logged in initially)
+    window.location.reload();
   },
 });
 
