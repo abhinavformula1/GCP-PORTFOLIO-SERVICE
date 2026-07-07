@@ -19,7 +19,7 @@ import { renderAppHeader }    from '../../assets/ui/app-header.js?v=2026-06-29-n
 import { renderAtlasShell }   from '../../assets/ui/atlas-shell.js';
 import {
   closeAssistant, initChat, minimiseAssistant, openAssistant, restartAssistant, toggleChatTeaser,
-} from '../../assets/chat/chat.js';
+} from '../../assets/chat/chat.js?v=2026-07-07-reuse-modal';
 import { showToast }          from '../../assets/ui/toast.js';
 import '../../assets/ui/loader.js';
 
