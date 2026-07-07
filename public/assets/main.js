@@ -705,6 +705,19 @@ import '/assets/ui/loader.js';
 
   shouldSkipWelcomeOverlayForLocalPreview().then(function (skipped) {
     if (skipped) return;
+
+    // Handle ?signin=1 param from external pages (e.g. /pricing) wanting to open sign-in modal
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceSignIn = urlParams.get('signin') === '1';
+    if (forceSignIn) {
+      // Clean up the URL to avoid re-opening on refresh
+      urlParams.delete('signin');
+      const cleanUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+      window.history.replaceState({}, '', cleanUrl);
+      showWelcomeOverlayWithGsi();
+      return;
+    }
+
     if (googleCredential) {
       restoreSessionFromCredential(googleCredential).then(function (restored) {
         if (!restored && !siteProfile) showWelcomeOverlayWithGsi();

@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
   <link rel="stylesheet" href="/assets/style.css?v=2026-07-06-modal-v18">
-  <link rel="stylesheet" href="./styles.css?v=2026-07-06-authwall-v1">
+  <link rel="stylesheet" href="./styles.css?v=2026-07-07-listview-v5">
   <!-- Hide icon ligature text until Material Symbols font is ready (anti-FOUC) -->
   <style>.material-symbols-outlined{visibility:hidden}.fonts-loaded .material-symbols-outlined{visibility:visible}</style>
   <script>
@@ -410,35 +410,34 @@
       </button>
     </div>
 
+    <!-- ── Pricing gate: shown when unauthenticated ──────────────────────── -->
     <div id="adminAuthWall" class="sd-admin-auth-wall">
-      <div class="sd-authwall-card">
 
-        <!-- ── Left: Brand panel ───────────────────────────────────── -->
-        <div class="sd-authwall-brand">
-          <div class="sd-authwall-avatar" aria-hidden="true">AK</div>
-          <h1 class="sd-authwall-name">Abhinav Kumar</h1>
-          <p class="sd-authwall-role">Senior Salesforce Application Engineer</p>
-          <ul class="sd-authwall-features" aria-label="CMS capabilities">
-            <li><span class="material-symbols-outlined" aria-hidden="true">article</span> Publish &amp; manage articles</li>
-            <li><span class="material-symbols-outlined" aria-hidden="true">smart_toy</span> Configure Atlas AI pipeline</li>
-            <li><span class="material-symbols-outlined" aria-hidden="true">monitoring</span> Evaluation &amp; observability</li>
-            <li><span class="material-symbols-outlined" aria-hidden="true">query_stats</span> Analytics &amp; revenue</li>
-          </ul>
-        </div>
+      <!-- Headline -->
+      <h1 class="sd-gate-headline">Choose what works for you.</h1>
+      <p class="sd-gate-subline">Start free. Upgrade when you need more.</p>
 
-        <!-- ── Right: Sign-in panel ───────────────────────────────── -->
-        <div class="sd-authwall-signin-panel">
-          <span class="material-symbols-outlined sd-authwall-lock-icon" aria-hidden="true">admin_panel_settings</span>
-          <h2 class="sd-authwall-signin-title">Admin CMS</h2>
-          <p class="sd-authwall-signin-sub">Sign in with the Google account associated with this portfolio to continue.</p>
-          <div id="authWallGoogleBtn" class="sd-authwall-google-btn-wrap"></div>
-          <p class="sd-authwall-note">
-            <span class="material-symbols-outlined" aria-hidden="true">shield</span>
-            Admin-only access. Your details are used only to verify identity.
-          </p>
-        </div>
-
+      <!-- Price card mounts — filled by renderPriceCard() in auth.js -->
+      <div class="sd-gate-cards">
+        <div id="gateFreeMt"></div>
+        <div id="gatePremiumMt"></div>
       </div>
+
+      <!-- Footer notes -->
+      <div class="sd-gate-notes">
+        <p>Billed monthly · No credit card required · Cancel anytime</p>
+      </div>
+
+      <!-- Admin sign-in section -->
+      <div class="sd-gate-admin-section">
+        <p class="sd-gate-admin-label">Already have admin access?</p>
+        <div id="authWallGoogleBtn" class="sd-authwall-google-btn-wrap"></div>
+        <p class="sd-authwall-note">
+          <span class="material-symbols-outlined" aria-hidden="true">shield</span>
+          Admin-only access. Your details are used only to verify identity.
+        </p>
+      </div>
+
     </div>
 
     <section id="adminWorkspace" class="sd-admin-workspace" hidden>
@@ -493,11 +492,9 @@
                 <div class="sd-view-toggle" role="group" aria-label="View mode">
                   <button type="button" id="viewToggleGrid" class="sd-view-toggle-btn sd-view-toggle-active" aria-pressed="true" title="Grid view" onclick="window._setArticleView && window._setArticleView('grid')">
                     <span class="material-symbols-outlined">grid_view</span>
-                    <span>Grid</span>
                   </button>
                   <button type="button" id="viewToggleList" class="sd-view-toggle-btn" aria-pressed="false" title="List view" onclick="window._setArticleView && window._setArticleView('list')">
                     <span class="material-symbols-outlined">view_list</span>
-                    <span>List</span>
                   </button>
                 </div>
               </div>

@@ -694,6 +694,12 @@ md-dialog {
   position: fixed;
   z-index: 9999;
 }
+/* Prevent closed dialogs from intercepting pointer events.
+   MWC md-dialog keeps display:block even when closed; without this,
+   the invisible backdrop/scrim can block clicks on elements beneath. */
+md-dialog:not([open]) {
+  pointer-events: none;
+}
 .topbar-label {
   font-size: 11px;
   color: var(--text-muted);
@@ -4886,8 +4892,8 @@ figure.sd-image-block figcaption {
 .sponsors-footer {
   background: var(--surface);
   border-top: 1px solid var(--border);
-  padding: 16px 24px;
-  margin-top: 48px;
+  padding: 10px 24px;
+  margin-top: 12px;
 }
 /* Single centered row: [BUILT WITH] [GCloud logo] [Salesforce logo].
    The label is treated as the first item in the row, so it reads as
@@ -6655,4 +6661,163 @@ figure.sd-image-block figcaption {
     flex-shrink: 0;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Price Card component — shared between /pricing and admin auth gate.
+   Rendered by public/assets/ui/price-card.js
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.pr-card {
+  background: color-mix(in srgb, var(--bg) 92%, #ffffff 8%);
+  border: 1.5px solid color-mix(in srgb, var(--border) 72%, #98a1b3 28%);
+  border-radius: 20px;
+  padding: 24px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.08);
+}
+.pr-card:not(.pr-card--premium) {
+  border-color: color-mix(in srgb, var(--border) 60%, #9aa3b5 40%);
+}
+.pr-card--premium {
+  border-color: color-mix(in srgb, var(--accent) 88%, #0b3f84 12%);
+  border-width: 2.5px;
+  position: relative;
+  padding-top: 36px;
+  background: color-mix(in srgb, var(--bg) 90%, #ffffff 10%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 8px 24px rgba(1, 52, 122, 0.16);
+}
+
+/* "Most popular" badge — floats above the card top edge */
+.pr-popular {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 6px 18px;
+  border-radius: 100px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(1,52,122,0.25);
+}
+
+/* Price block */
+.pr-tier-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+.pr-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.pr-price-amount {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.pr-price-period {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.pr-tagline {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* CTA buttons */
+.pr-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
+  border: 1.5px solid transparent;
+  letter-spacing: 0.01em;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+.pr-cta--free {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+.pr-cta--free:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pr-cta--premium {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 5px 16px rgba(1,52,122,0.28);
+}
+.pr-cta--premium:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  border-color: color-mix(in srgb, var(--accent) 85%, #000);
+  box-shadow: 0 6px 20px rgba(1,52,122,0.35);
+}
+.pr-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Features list */
+.pr-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pr-feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+}
+.pr-feature-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.pr-card--premium .pr-feature-dot {
+  background: var(--accent);
+}
+
+/* Skeleton loader */
+.pr-skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: var(--border);
+  opacity: 0.6;
+  animation: pr-pulse 1.4s ease-in-out infinite;
+}
+@keyframes pr-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 0.2; }
 }

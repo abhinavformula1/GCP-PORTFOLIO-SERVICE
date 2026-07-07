@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing — Abhinav Kumar</title>
+  <meta name="description" content="Simple, transparent pricing. Start free and unlock premium software architecture and GenAI engineering content.">
+  <!-- Theme applied before render to avoid flash of wrong theme (same key as portfolio) -->
+  <script>
+    (function () {
+      var s = localStorage.getItem('portfolio_theme');
+      var dark = s === 'dark' || (!s && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <link rel="stylesheet" href="/assets/style.css?v=2026-07-07-pricing-v14">
+  <!-- Material Web Components for topbar controls (language picker, theme toggle) -->
+  <script type="module" src="https://esm.run/@material/web@1.5.1/all.js"></script>
+  <!-- Google Sign-In -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100dvh;
+    }
+
+    .pr-page {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      color: var(--text);
+      font-family: 'Roboto Flex', 'Roboto', -apple-system, sans-serif;
+    }
+
+    /* Shared topbar sits here — styles come from /assets/style.css */
+
+    /* ── Main ────────────────────────────────────────────────────────────── */
+    .pr-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 24px 24px;
+    }
+
+    /* ── Hero ────────────────────────────────────────────────────────────── */
+    .pr-badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-align: center;
+      margin: 0 0 16px;
+    }
+    .pr-headline {
+      font-size: clamp(24px, 4vw, 32px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      text-align: center;
+      margin: 0 0 8px;
+      max-width: 540px;
+    }
+    .pr-subline {
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-align: center;
+      margin: 0 0 24px;
+    }
+
+    /* ── Cards layout ────────────────────────────────────────────────────── */
+    /* Flexbox chain is more reliable for equal-height than CSS Grid + stretch.
+       align-items:stretch at each level ensures height flows into nested flex
+       children without needing height:100% (which breaks on implicit grid heights) */
+    .pr-cards {
+      display: flex;
+      gap: 24px;
+      max-width: 780px;
+      width: 100%;
+      align-items: stretch;
+    }
+    #freeCardMount,
+    #premiumCardMount {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #freeCardMount > .pr-card,
+    #premiumCardMount > .pr-card {
+      flex: 1;
+    }
+    @media (max-width: 600px) {
+      .pr-cards { flex-direction: column; }
+    }
+
+    /* Card component styles live in /assets/style.css (pr-card, pr-cta, etc.) */
+
+    /* ── Footer notes ────────────────────────────────────────────────────── */
+    .pr-notes {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .pr-notes p {
+      margin: 0;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    /* ── Existing account ────────────────────────────────────────────────── */
+    .pr-existing {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .pr-existing p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body class="pr-page">
+
+  <!-- Shared header: renderAppHeader injects topbar here.
+       Must be id="sharedTopbar" so renderHeaderNavIntoTopbar can find .topbar-inner -->
+  <div id="sharedTopbar"></div>
+
+  <!-- Main -->
+  <main class="pr-main">
+
+    <h1 class="pr-headline">Choose what works for you.</h1>
+    <p class="pr-subline">Start free. Upgrade when you need more.</p>
+
+    <!-- Card mounts — renderPriceCard() fills these -->
+    <div class="pr-cards">
+      <div id="freeCardMount"></div>
+      <div id="premiumCardMount"></div>
+    </div>
+
+    <!-- Footer notes -->
+    <div class="pr-notes">
+      <p>No credit card required. Cancel anytime.</p>
+    </div>
+
+    <!-- Existing account — uses same topbar-signin-btn class as rest of site -->
+    <div class="pr-existing">
+      <p>Already have an account?</p>
+      <button type="button" class="topbar-signin-btn" id="bottomSignInBtn">
+        <span class="material-symbols-outlined" aria-hidden="true">login</span>
+        Sign in
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Shared tech footer: renderTechFooter() fills this -->
+  <div id="pricingFooter"></div>
+
+  <script type="module" src="./pricing.js?v=2026-07-07-v14"></script>
+</body>
+</html>

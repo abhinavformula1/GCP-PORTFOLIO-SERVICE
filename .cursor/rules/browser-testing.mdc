@@ -1,0 +1,32 @@
+---
+description: Always test UI changes with Browser MCP before reporting completion
+alwaysApply: true
+---
+
+# Browser MCP Testing
+
+After making UI changes (HTML, CSS, JS), **always test with Browser MCP** before telling the user the work is complete.
+
+## Required Steps
+
+1. Navigate to the relevant page using `browser_navigate`
+2. Take a screenshot using `browser_take_screenshot` to verify visual changes
+3. Test interactive elements (buttons, links, modals) using `browser_click`
+4. Verify the changes work as expected before reporting completion
+
+## Example Flow
+
+```
+1. Make CSS/HTML/JS changes
+2. browser_navigate → target URL
+3. browser_take_screenshot → verify visual appearance
+4. browser_click → test interactive elements
+5. browser_snapshot → verify state changes
+6. Only then report completion to user
+```
+
+## Don't
+
+- Report "Done" without testing
+- Assume changes work without verification
+- Skip testing because "it should work"
