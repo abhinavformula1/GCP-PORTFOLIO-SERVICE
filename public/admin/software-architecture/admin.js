@@ -98,6 +98,12 @@ initAuth({
     if (els.metadataConfigWorkspace)  els.metadataConfigWorkspace.hidden  = true;
     if (els.sponsorshipsWorkspace)    els.sponsorshipsWorkspace.hidden    = true;
     if (els.dropdown)                 els.dropdown.hidden                 = true;
+    // Show the auth wall (pricing gate) when logged out
+    const authWall = document.getElementById('adminAuthWall');
+    if (authWall) {
+      authWall.hidden = false;
+      document.body.dataset.authwall = '1';
+    }
   },
 });
 

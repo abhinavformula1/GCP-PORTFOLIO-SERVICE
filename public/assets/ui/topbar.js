@@ -63,8 +63,8 @@ function renderUserMenu(ids, handlers) {
   // default to this module's own toggle/close, bound to *this* render's
   // dropdown id (not the 'topbarDropdown' default — admin uses a custom id).
   const onToggle = typeof handlers?.toggleUserMenu === 'function'
-    ? handlers.toggleUserMenu
-    : function () { toggleUserMenu(ids.dropdown); };
+    ? function (e) { handlers.toggleUserMenu(ids.dropdown, e); }
+    : function (e) { toggleUserMenu(ids.dropdown, e); };
   avatarButton.addEventListener('click', onToggle);
 
   const signOutAttrs = { className: 'topbar-signout', text: 'Sign out' };
@@ -175,15 +175,23 @@ export function updateTopbarUser(p) {
   }
 }
 
-export function toggleUserMenu(dropdownId) {
+export function toggleUserMenu(dropdownId, event) {
+  // Stop propagation so the click doesn't immediately close the dropdown
+  if (event && typeof event.stopPropagation === 'function') {
+    event.stopPropagation();
+  }
   const id = dropdownId || 'topbarDropdown';
   const dd = document.getElementById(id);
   if (!dd) return;
   if (dd.hasAttribute('hidden')) {
     dd.removeAttribute('hidden');
     setTimeout(function () {
-      document.addEventListener('click', function () { closeUserMenu(id); }, { once: true });
-    }, 0);
+      document.addEventListener('click', function (e) {
+        // Don't close if clicking inside the dropdown
+        if (dd.contains(e.target)) return;
+        closeUserMenu(id);
+      }, { once: true });
+    }, 10);
   } else {
     dd.setAttribute('hidden', '');
   }
