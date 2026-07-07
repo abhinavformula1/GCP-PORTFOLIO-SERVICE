@@ -753,6 +753,97 @@ router.put('/admin/atlas/config', requireAdmin, [
   } catch (err) { return next(err); }
 });
 
+// ── Golden Dataset CRUD ──────────────────────────────────────────────────────
+//
+// GET  /api/admin/atlas/golden-dataset  — fetch all Q&A pairs
+// PUT  /api/admin/atlas/golden-dataset  — replace all Q&A pairs
+//
+// Stored in Firestore collection 'goldenDataset' with a single doc 'current'.
+// Falls back to the hardcoded GOLDEN_SET if Firestore is empty.
+//
+
+router.get('/admin/atlas/golden-dataset', async (req, res) => {
+  try {
+    if (!config.admin.localPreview) {
+      const auth  = String(req.headers.authorization || '');
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+      if (!token) { return res.status(401).json({ success: false, error: 'Missing token.' }); }
+      const user  = await googleAuth.verifyIdToken(token);
+      const email = String(user?.email || '').toLowerCase();
+      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
+        return res.status(403).json({ success: false, error: 'Admin access not allowed.' });
+      }
+    }
+  } catch (_) {
+    return res.status(401).json({ success: false, error: 'Invalid or expired token.' });
+  }
+
+  // Fallback function for hardcoded set
+  const getFallbackRows = () => GOLDEN_SET.map((item) => ({
+    question: item.question,
+    expectedArticleId: item.expectedArticleId,
+    expectedAnswer: item.expectedAnswer || '',
+  }));
+
+  try {
+    const doc = await firestore.getDb().collection('goldenDataset').doc('current').get();
+    if (doc.exists && doc.data()?.rows?.length) {
+      return res.json({ success: true, rows: doc.data().rows });
+    }
+    // Fallback to hardcoded set
+    return res.json({ success: true, rows: getFallbackRows(), source: 'fallback' });
+  } catch (err) {
+    // Firestore unavailable (local dev without GCP creds) — return fallback
+    console.warn('[golden-dataset] Firestore error, using fallback:', err.message);
+    return res.json({ success: true, rows: getFallbackRows(), source: 'fallback' });
+  }
+});
+
+router.put('/admin/atlas/golden-dataset', async (req, res) => {
+  try {
+    if (!config.admin.localPreview) {
+      const auth  = String(req.headers.authorization || '');
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+      if (!token) { return res.status(401).json({ success: false, error: 'Missing token.' }); }
+      const user  = await googleAuth.verifyIdToken(token);
+      const email = String(user?.email || '').toLowerCase();
+      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
+        return res.status(403).json({ success: false, error: 'Admin access not allowed.' });
+      }
+    }
+  } catch (_) {
+    return res.status(401).json({ success: false, error: 'Invalid or expired token.' });
+  }
+
+  const { rows } = req.body || {};
+  if (!Array.isArray(rows)) {
+    return res.status(400).json({ success: false, error: 'rows must be an array.' });
+  }
+
+  // Validate and sanitize rows
+  const cleanRows = rows
+    .filter(r => r && typeof r.question === 'string' && r.question.trim())
+    .map(r => ({
+      question: String(r.question).trim(),
+      expectedArticleId: String(r.expectedArticleId || '').trim(),
+      expectedAnswer: String(r.expectedAnswer || '').trim(),
+    }));
+
+  if (!cleanRows.length) {
+    return res.status(400).json({ success: false, error: 'At least one valid question is required.' });
+  }
+
+  try {
+    await firestore.getDb().collection('goldenDataset').doc('current').set({
+      rows: cleanRows,
+      updatedAt: new Date(),
+    });
+    return res.json({ success: true, count: cleanRows.length });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── RAG Evaluation SSE endpoint ─────────────────────────────────────────────
 //
 // GET /api/admin/atlas/rag-eval?token=<idToken>
@@ -798,9 +889,29 @@ router.get('/admin/atlas/rag-eval', async (req, res) => {
   };
 
   const k = Math.max(1, Math.min(Number(req.query.k) || 5, 20));
+  const mode = String(req.query.mode || 'golden'); // golden | smoke | regression
+
+  // ── Load golden dataset from Firestore (fallback to hardcoded) ───────────
+  let goldenSet = GOLDEN_SET;
+  try {
+    const doc = await firestore.getDb().collection('goldenDataset').doc('current').get();
+    if (doc.exists && doc.data()?.rows?.length) {
+      goldenSet = doc.data().rows;
+    }
+  } catch (_loadErr) {
+    // Use hardcoded fallback
+  }
+
+  // ── Apply mode filter ────────────────────────────────────────────────────
+  let evalSet = goldenSet;
+  if (mode === 'smoke') {
+    // Quick sanity check: first 10 questions
+    evalSet = goldenSet.slice(0, 10);
+  }
+  // 'golden' and 'regression' use the full set
 
   try {
-    const { metrics, details } = await evaluateRetrieval(GOLDEN_SET, {
+    const { metrics, details } = await evaluateRetrieval(evalSet, {
       k,
       delayMs: 300,
       onProgress({ index, total, question, hit, rank }) {
@@ -815,6 +926,7 @@ router.get('/admin/atlas/rag-eval', async (req, res) => {
       await firestore.getDb().collection('ragEvalRuns').add({
         ranAt:     new Date(),
         k,
+        mode,
         metrics,
         hits,
         misses:    total - hits,
@@ -873,6 +985,7 @@ router.get('/admin/atlas/rag-eval/history', async (req, res) => {
         id:       doc.id,
         ranAt:    d.ranAt?.toDate?.()?.toISOString() || null,
         k:        d.k,
+        mode:     d.mode || 'golden',
         metrics:  d.metrics,
         hits:     d.hits,
         misses:   d.misses,
