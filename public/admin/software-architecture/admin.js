@@ -56,7 +56,7 @@ import { renderSeoConfig, saveSeoConfig, updateSerpPreview } from './js/modules/
 import { renderAnalytics, refreshAnalytics } from './js/modules/analytics.js';
 import { renderSubscriptions, refreshSubscriptions } from './js/modules/subscriptions.js';
 import { renderAtlasConfig, saveAtlasConfig } from './js/modules/atlas/config.js';
-import { renderEvaluationPage, startRagEval, addGoldenRow, saveGoldenDataset, filterGoldenDataset } from './js/modules/atlas/evaluation.js';
+import { renderEvaluationPage, startRagEval, addGoldenRow, saveGoldenDataset, filterGoldenDataset, resetGoldenDataset } from './js/modules/atlas/evaluation.js';
 import { renderObservabilityPage, loadObservabilityData, filterTraces, closeTraceDetail } from './js/modules/atlas/observability.js';
 import { renderMonitoringPage }    from './js/modules/atlas/monitoring.js';
 
@@ -315,6 +315,7 @@ if (els.saveAtlasConfigBtn) els.saveAtlasConfigBtn.addEventListener('click', fun
 if (els.runEvalBtn)           els.runEvalBtn.addEventListener('click',           function () { startRagEval(els, state.credential); });
 if (els.addGoldenRowBtn)       els.addGoldenRowBtn.addEventListener('click',       function () { addGoldenRow(els); });
 if (els.saveGoldenDatasetBtn)  els.saveGoldenDatasetBtn.addEventListener('click',  function () { saveGoldenDataset(els); });
+if (els.resetGoldenDatasetBtn) els.resetGoldenDatasetBtn.addEventListener('click', function () { resetGoldenDataset(els); });
 if (els.goldenDatasetSearch)   els.goldenDatasetSearch.addEventListener('input',   function () { filterGoldenDataset(els); });
 
 // Observability

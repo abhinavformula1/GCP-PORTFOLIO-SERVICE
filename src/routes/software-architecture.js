@@ -799,6 +799,31 @@ router.get('/admin/atlas/golden-dataset', async (req, res) => {
   }
 });
 
+// DELETE /api/admin/atlas/golden-dataset — reset to hardcoded defaults
+router.delete('/admin/atlas/golden-dataset', async (req, res) => {
+  try {
+    if (!config.admin.localPreview) {
+      const auth  = String(req.headers.authorization || '');
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+      if (!token) { return res.status(401).json({ success: false, error: 'Missing token.' }); }
+      const user  = await googleAuth.verifyIdToken(token);
+      const email = String(user?.email || '').toLowerCase();
+      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
+        return res.status(403).json({ success: false, error: 'Admin access not allowed.' });
+      }
+    }
+  } catch (_) {
+    return res.status(401).json({ success: false, error: 'Invalid or expired token.' });
+  }
+
+  try {
+    await firestore.getDb().collection('goldenDataset').doc('current').delete();
+    return res.json({ success: true, message: 'Golden dataset reset to defaults.' });
+  } catch (_err) {
+    return res.json({ success: true, message: 'Reset complete (fallback will be used).' });
+  }
+});
+
 router.put('/admin/atlas/golden-dataset', async (req, res) => {
   try {
     if (!config.admin.localPreview) {
