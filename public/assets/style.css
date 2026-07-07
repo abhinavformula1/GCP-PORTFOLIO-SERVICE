@@ -915,6 +915,26 @@ a:hover { text-decoration: underline; }
   margin-bottom: 4px;
 }
 
+/* Mobile-only CTA buttons in header (hidden on desktop) */
+.header-mobile-ctas {
+  display: none;
+  gap: 12px;
+  margin-top: 16px;
+}
+.mobile-hire-btn {
+  --md-filled-button-container-height: 44px;
+  --md-filled-button-container-color: var(--brand-blue);
+  --md-filled-button-container-shape: 22px;
+  flex: 1;
+}
+.mobile-resume-btn {
+  --md-outlined-button-container-height: 44px;
+  --md-outlined-button-outline-color: var(--border);
+  --md-outlined-button-container-shape: 22px;
+  --md-outlined-button-label-text-color: var(--text-primary);
+  flex: 1;
+}
+
 /* M3-style filter chip: pill, outlined, single line. We don't reach for
    <md-filter-chip> here because (a) we want a clickable link semantic
    for LinkedIn / Trailblazer (anchors, not buttons) and (b) the chip
@@ -1327,18 +1347,60 @@ a:hover { text-decoration: underline; }
     order: 1;
     margin-right: auto;
   }
-  .header-nav-right {
-    width: 100%;
-    order: 3;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
+  /* ── Mobile UI: Hide topbar CTA buttons only (keep controls) ── */
   .header-nav-primary,
   .header-nav-download {
-    flex: 1;
-    min-width: 140px;
+    display: none !important;
   }
-  .header-mobile-sheet { inset: 136px 12px auto 12px; }
+  .header-nav-right {
+    width: auto !important;
+    order: 0 !important;
+    flex: 0 0 auto !important;
+  }
+
+  /* ── Mobile UI: Hamburger on LEFT, controls on RIGHT ── */
+  .topbar-with-header-nav .topbar-inner {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+  }
+  .header-nav {
+    display: flex !important;
+    width: 100% !important;
+    align-items: center !important;
+  }
+  .header-nav-left {
+    display: none !important;
+  }
+  .header-nav-right {
+    display: flex !important;
+    width: 100% !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  .header-nav-hamburger {
+    order: 0 !important;
+    flex: 0 0 auto !important;
+  }
+  #headerNavTopbarControls {
+    order: 1 !important;
+    display: flex !important;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto !important;
+  }
+
+  .header-mobile-sheet { inset: 64px 12px auto 12px; }
+
+  /* ── Mobile UI: Hide Sign In button ── */
+  .topbar-signin-btn { display: none !important; }
+
+  /* ── Mobile UI: Show CTA buttons in header section ── */
+  .header-mobile-ctas {
+    display: flex !important;
+    gap: 12px;
+    margin-top: 16px;
+  }
 }
 
 /* ── Outlined brand CTA (Refer Me, System Design, Leave a Recommendation) ──
@@ -1945,6 +2007,9 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
 .section { margin-bottom: 32px; }
 
 .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -1953,6 +2018,10 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
   margin-bottom: 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
+}
+.section-icon {
+  font-size: 18px;
+  color: var(--text-muted);
 }
 
 /* ── About ── */
@@ -1977,17 +2046,29 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
 .tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 8px;
 }
 
 .tag {
-  background: var(--tag-bg);
-  color: var(--tag-text);
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
   font-weight: 500;
-  border: 1px solid #2b3d6b;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.tag:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+}
+.tag .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--accent);
 }
 
 /* ── Education ── */
@@ -4015,6 +4096,9 @@ figure.sd-image-block figcaption {
   .header { grid-template-columns: 1fr; }
   .exp-badge { justify-self: start; }
   .header-name { font-size: 26px; }
+
+  /* ── Mobile UI: Simplify social buttons — LinkedIn + GitHub only ── */
+  /* Mobile: Header credentials now only has LinkedIn + GitHub, no hiding needed */
   /* System Design: stack topic list on top of the article on narrow screens.
      The .body single-column override above already does the stacking; we
      just trim the article padding so the prose isn't cramped on mobile. */
