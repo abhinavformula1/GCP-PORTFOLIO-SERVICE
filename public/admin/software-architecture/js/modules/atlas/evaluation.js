@@ -226,6 +226,27 @@ export function saveGoldenDataset(els) {
     .catch(function (err) { setSectionStatus(els.goldenDatasetStatus, err.message || 'Save failed.', 'error'); });
 }
 
+export function resetGoldenDataset(els) {
+  if (!window.confirm('Reset golden dataset to the default 50 questions? This will discard any custom changes.')) return;
+  
+  setSectionStatus(els.goldenDatasetStatus, 'Resetting…', 'info');
+  const token = state.credential || '';
+  fetch('/api/admin/atlas/golden-dataset', {
+    method: 'DELETE',
+    headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.success) {
+        setSectionStatus(els.goldenDatasetStatus, 'Reset to defaults. Reloading…', 'success');
+        setTimeout(function () { loadGoldenDataset(els); }, 500);
+      } else {
+        setSectionStatus(els.goldenDatasetStatus, d.error || 'Reset failed.', 'error');
+      }
+    })
+    .catch(function (err) { setSectionStatus(els.goldenDatasetStatus, err.message || 'Reset failed.', 'error'); });
+}
+
 function renderGoldenDataset(els, rows) {
   const tbody = els.goldenDatasetBody;
   if (!tbody) return;

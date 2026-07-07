@@ -263,6 +263,7 @@ export const els = {
   goldenDatasetStatus:  g('goldenDatasetStatus'),
   addGoldenRowBtn:       g('addGoldenRowBtn'),
   saveGoldenDatasetBtn:  g('saveGoldenDatasetBtn'),
+  resetGoldenDatasetBtn: g('resetGoldenDatasetBtn'),
   goldenDatasetSearch:   g('goldenDatasetSearch'),
   goldenDatasetFilterBtn:g('goldenDatasetFilterBtn'),
 
