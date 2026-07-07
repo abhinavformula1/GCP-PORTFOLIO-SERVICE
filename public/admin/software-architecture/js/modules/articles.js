@@ -17,7 +17,8 @@ import {
 } from '../../../../assets/ui/sdblocks.js';
 import { createComposer }     from '../../../../assets/ui/composer.js';
 import { enabledBlockTypes }  from '../../../../assets/ui/component-registry.js';
-import { createArticleCard }  from '../../../../assets/ui/article-card.js';
+import { createArticleCard, contentTypeLabel }  from '../../../../assets/ui/article-card.js';
+import { renderDataTable }    from '../../../../assets/ui/datatable.js';
 
 // ── Media ref tracking ────────────────────────────────────────────────────────
 
@@ -518,13 +519,10 @@ export function renderList() {
   const els = _els();
   if (!els.list) return;
   els.list.textContent = '';
-  // .sd-content-article-list's base rule is itself a multi-column grid;
-  // .sd-list-view is the modifier that switches it to a stacked single
-  // column (see styles.css). Toggling it here — rather than building two
-  // different DOM shapes below — keeps this function's only job "which
-  // cards, in which order", leaving all layout concerns to CSS.
-  els.list.classList.toggle('sd-list-view', state.currentArticleView === 'list');
+  const isListView = state.currentArticleView === 'list';
+  els.list.classList.toggle('sd-list-view', isListView);
   updateArticleStats();
+
   const statusMap    = { drafts: 'Draft', published: 'Published', archived: 'Archived' };
   const filterStatus = statusMap[state.currentArticleFilter] || null;
   const filtered     = filterStatus
@@ -545,6 +543,80 @@ export function renderList() {
     return;
   }
 
+  // ── List view: use DataTable (same as public page) ────────────────────────
+  if (isListView) {
+    const rows = filtered.map(function (a) {
+      const en = a.en || {};
+      const type = a.contentType || 'system-design';
+      return {
+        _id: a.id,
+        _article: a,
+        _status: a.status || 'Draft',
+        _type: type,
+        _typeLabel: contentTypeLabel(type),
+        _title: en.title || a.id || 'Untitled',
+        _readTime: a.readMinutes ? a.readMinutes + ' min read' : '',
+        _tier: a.tier || 'free',
+      };
+    });
+
+    renderDataTable(els.list, {
+      ariaLabel: 'Articles',
+      tableClassName: 'sd-admin-articles-table',
+      responsive: true,
+      emptyText: 'No articles yet.',
+      rows: rows,
+      columns: [
+        {
+          key: 'type',
+          header: 'Type',
+          width: 160,
+          renderHtml: function (r) {
+            return '<span class="sd-admin-type-chip" data-type="' + r._type + '">' + r._typeLabel + '</span>';
+          },
+        },
+        {
+          key: 'title',
+          header: 'Title',
+          renderHtml: function (r) {
+            let html = '<span class="sd-admin-title-text">' + r._title + '</span>';
+            if (r._status === 'Draft') html += ' <span class="sd-admin-draft-badge">Draft</span>';
+            return html;
+          },
+        },
+        {
+          key: 'readTime',
+          header: 'Read time',
+          width: 100,
+          align: 'right',
+          renderText: function (r) { return r._readTime; },
+        },
+        {
+          key: 'tier',
+          header: 'Tier',
+          width: 100,
+          align: 'right',
+          renderHtml: function (r) {
+            return r._tier === 'premium'
+              ? '<span class="sd-admin-tier-badge sd-admin-tier-premium"><span class="material-symbols-outlined">lock</span>Premium</span>'
+              : '<span class="sd-admin-tier-badge sd-admin-tier-free">Free</span>';
+          },
+        },
+      ],
+    });
+
+    // Add row click handlers after render
+    els.list.querySelectorAll('tbody tr').forEach(function (tr, i) {
+      if (!rows[i]) return;
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', function () {
+        fillForm(rows[i]._article);
+      });
+    });
+    return;
+  }
+
+  // ── Grid view: use article cards ──────────────────────────────────────────
   filtered.forEach(function (article) { els.list.appendChild(_articleCardForAdmin(article)); });
 }
 

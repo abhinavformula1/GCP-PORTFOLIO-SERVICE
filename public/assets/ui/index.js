@@ -43,6 +43,9 @@ export { createEl, materialIcon, injectShadowStyle } from './dom.js';
 /** Renders toggle card groups. Options: groups[{ label, cards }] */
 export { renderToggleCardGroups } from './toggle-cards.js';
 
+/** Renders a pricing tier card. Returns the CTA element. Options: name, price, period, tagline, features, ctaLabel, ctaHref, onCta, badge, highlight */
+export { renderPriceCard, updatePriceCardFeatures } from './price-card.js';
+
 /** Returns HTML string for icon cards. Args: items[], options */
 export { iconCardsHtml }         from './iconcards.js';
 

@@ -18,7 +18,62 @@ import { t } from '../core/i18n.js';
 const WELCOME_TOAST_TTL_MS = 10000;
 let _welcomeToastTimer = null;
 
+/**
+ * Dynamically create the welcome overlay modal if it doesn't exist.
+ * This allows any page to use the sign-in modal without duplicating HTML.
+ */
+function ensureOverlayExists(opts) {
+  if (document.getElementById('welcomeOverlay')) return;
+
+  const noteText = opts && opts.noteText
+    ? opts.noteText
+    : t().welcomeNote || 'Your details are only used to personalise the scheduling assistant.';
+
+  const html = `
+    <md-dialog id="welcomeOverlay" aria-labelledby="welcomeTitleId">
+      <div slot="headline" class="welcome-headline">
+        <div class="welcome-brand">
+          <div class="welcome-avatar">AK</div>
+          <div>
+            <div class="welcome-title" id="welcomeTitleId">${t().welcomeTitle || "Abhinav's Portfolio"}</div>
+            <div class="welcome-sub">${t().welcomeSub || 'Senior Salesforce & GenAI Application Engineer'}</div>
+          </div>
+        </div>
+        <button type="button" class="welcome-close" id="welcomeCloseBtn" aria-label="Close">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
+      <div slot="content" class="welcome-content">
+        <div id="welcomeGoogleBtn" class="welcome-google-wrap"></div>
+        <div class="welcome-sep"><span>${t().welcomeOr || 'or'}</span></div>
+        <md-outlined-button id="welcomeGuestBtn" class="welcome-guest-btn">
+          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">schedule</span>
+          <span>${t().welcomeGuestBtn || 'Maybe later'}</span>
+        </md-outlined-button>
+        <p class="welcome-note">
+          <span class="material-symbols-outlined welcome-note-icon" aria-hidden="true">lock</span>
+          <span>${noteText}</span>
+        </p>
+      </div>
+    </md-dialog>
+  `;
+  document.body.insertAdjacentHTML('beforeend', html);
+
+  // Wire close button
+  const closeBtn = document.getElementById('welcomeCloseBtn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', hideWelcomeOverlay);
+  }
+
+  // Wire guest button
+  const guestBtn = document.getElementById('welcomeGuestBtn');
+  if (guestBtn) {
+    guestBtn.addEventListener('click', hideWelcomeOverlay);
+  }
+}
+
 export function showWelcomeOverlay(opts) {
+  ensureOverlayExists(opts);
   const overlay = document.getElementById('welcomeOverlay');
   if (!overlay) return;
   const onShown = (opts && opts.onShown) || null;

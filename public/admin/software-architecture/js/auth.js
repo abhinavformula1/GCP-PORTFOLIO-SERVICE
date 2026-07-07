@@ -17,6 +17,7 @@ import {
   setSiteProfile,
 } from '../../../assets/core/state.js';
 import { hideWelcomeOverlay } from '../../../assets/ui/welcome.js';
+import { renderPriceCard, updatePriceCardFeatures } from '../../../assets/ui/price-card.js';
 import { state } from './state.js';
 import { setStatus } from './http.js';
 
@@ -254,15 +255,79 @@ export function initGoogle(els) {
   }
   const authWallBtn = document.getElementById('authWallGoogleBtn');
   if (authWallBtn && authWallBtn.childElementCount === 0) {
-    google.accounts.id.renderButton(authWallBtn, {
-      theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular', width: 280,
-    });
+    renderGoogleButtonRobust(authWallBtn, { text: 'signin_with', shape: 'rectangular' });
   }
   if (state.credential) {
     startAdminSession(state.credential).catch(handleAdminLoadError);
   } else {
     updateAdminChrome(null);
+    _initPricingGate();
   }
+}
+
+/**
+ * Renders pricing cards into the auth gate and loads tier features.
+ * Called once when the gate is shown to an unauthenticated visitor.
+ */
+function _initPricingGate() {
+  const freeMount    = document.getElementById('gateFreeMt');
+  const premiumMount = document.getElementById('gatePremiumMt');
+  if (!freeMount || !premiumMount) return;
+
+  renderPriceCard(freeMount, {
+    name:     'Free',
+    price:    '$0',
+    period:   '/month',
+    tagline:  'For readers exploring the content.',
+    ctaLabel: 'Get started free',
+    ctaHref:  '/',
+  });
+
+  renderPriceCard(premiumMount, {
+    name:      'Premium',
+    price:     '$29',
+    period:    '/month',
+    tagline:   'For professionals building on these patterns.',
+    badge:     'Most popular',
+    highlight: true,
+    ctaLabel:  'Subscribe',
+    onCta:     _handleGateSubscribe,
+  });
+
+  _loadGateTierFeatures();
+}
+
+async function _handleGateSubscribe(evt) {
+  const btn = evt.currentTarget;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Loading…';
+  try {
+    const res  = await fetch('/api/billing/checkout-session-guest-redirect', {
+      method:      'POST',
+      headers:     { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body:        JSON.stringify({ plan: 'monthly' }),
+    });
+    const data = await res.json().catch(function () { return null; });
+    if (data && data.url) { window.location.href = data.url; return; }
+    window.location.href = '/pricing';
+  } catch (_) {
+    btn.disabled    = false;
+    btn.textContent = orig;
+  }
+}
+
+async function _loadGateTierFeatures() {
+  try {
+    const res  = await fetch('/api/system-design/tier-config');
+    const data = await res.json().catch(function () { return null; });
+    if (!data || !data.success) return;
+    const freeItems    = (data.config && data.config.free    && data.config.free.items)    || [];
+    const premiumItems = (data.config && data.config.premium && data.config.premium.items) || [];
+    updatePriceCardFeatures('#gateFreeMt',    freeItems.map(function (i) { return i.label || String(i); }));
+    updatePriceCardFeatures('#gatePremiumMt', premiumItems.map(function (i) { return i.label || String(i); }));
+  } catch (_) { /* leave skeleton lines */ }
 }
 
 /**
