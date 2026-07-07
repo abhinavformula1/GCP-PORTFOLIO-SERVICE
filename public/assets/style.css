@@ -6670,8 +6670,8 @@ figure.sd-image-block figcaption {
 .pr-card {
   background: color-mix(in srgb, var(--bg) 92%, #ffffff 8%);
   border: 1.5px solid color-mix(in srgb, var(--border) 72%, #98a1b3 28%);
-  border-radius: 20px;
-  padding: 24px 22px 22px;
+  border-radius: 18px;
+  padding: 20px 18px 18px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -6684,7 +6684,7 @@ figure.sd-image-block figcaption {
   border-color: color-mix(in srgb, var(--accent) 88%, #0b3f84 12%);
   border-width: 2.5px;
   position: relative;
-  padding-top: 36px;
+  padding-top: 30px;
   background: color-mix(in srgb, var(--bg) 90%, #ffffff 10%);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
@@ -6721,9 +6721,9 @@ figure.sd-image-block figcaption {
   margin-bottom: 2px;
 }
 .pr-price-amount {
-  font-size: 36px;
+  font-size: 32px;
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 .pr-price-period {

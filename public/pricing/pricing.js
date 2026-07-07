@@ -121,7 +121,7 @@ async function handleSubscribe(evt) {
 
 renderPriceCard('#freeCardMount', {
   name:     'Free',
-  price:    '$0',
+  price:    '$ 0',
   period:   '/month',
   tagline:  'For readers exploring the content.',
   ctaLabel: 'Get started free',
@@ -130,7 +130,7 @@ renderPriceCard('#freeCardMount', {
 
 renderPriceCard('#premiumCardMount', {
   name:      'Premium',
-  price:     '$29',
+  price:     '...',
   period:    '/month',
   tagline:   'For professionals building on these patterns.',
   badge:     'Most popular',
@@ -138,6 +138,28 @@ renderPriceCard('#premiumCardMount', {
   ctaLabel:  'Subscribe',
   onCta:     handleSubscribe,
 });
+
+// ── Load Stripe price ──────────────────────────────────────────────────────────
+
+async function loadStripePrice() {
+  try {
+    const res = await fetch('/api/billing/prices');
+    const data = await res.json().catch(function () { return null; });
+    if (!data || !data.success || !data.prices || !data.prices.monthly) return;
+
+    const p = data.prices.monthly;
+    const amount = (p.amount / 100).toFixed(0);
+    const symbol = p.currency === 'inr' ? '₹' : p.currency === 'usd' ? '$' : p.currency.toUpperCase() + ' ';
+    const priceText = symbol + ' ' + amount;
+
+    const priceEl = document.querySelector('#premiumCardMount .pr-price-amount');
+    if (priceEl) priceEl.textContent = priceText;
+  } catch (_) {
+    // Keep placeholder on error
+  }
+}
+
+loadStripePrice();
 
 // ── Load tier features from API ───────────────────────────────────────────────
 

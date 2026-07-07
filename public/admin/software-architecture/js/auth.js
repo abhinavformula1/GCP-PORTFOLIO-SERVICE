@@ -276,7 +276,7 @@ function _initPricingGate() {
 
   renderPriceCard(freeMount, {
     name:     'Free',
-    price:    '$0',
+    price:    '$ 0',
     period:   '/month',
     tagline:  'For readers exploring the content.',
     ctaLabel: 'Get started free',
@@ -285,7 +285,7 @@ function _initPricingGate() {
 
   renderPriceCard(premiumMount, {
     name:      'Premium',
-    price:     '$29',
+    price:     '...',
     period:    '/month',
     tagline:   'For professionals building on these patterns.',
     badge:     'Most popular',
@@ -295,6 +295,25 @@ function _initPricingGate() {
   });
 
   _loadGateTierFeatures();
+  _loadStripePrice();
+}
+
+async function _loadStripePrice() {
+  try {
+    const res = await fetch('/api/billing/prices');
+    const data = await res.json().catch(function () { return null; });
+    if (!data || !data.success || !data.prices || !data.prices.monthly) return;
+
+    const p = data.prices.monthly;
+    const amount = (p.amount / 100).toFixed(0);
+    const symbol = p.currency === 'inr' ? '₹' : p.currency === 'usd' ? '$' : p.currency.toUpperCase() + ' ';
+    const priceText = symbol + ' ' + amount;
+
+    const priceEl = document.querySelector('#gatePremiumMt .pr-price-amount');
+    if (priceEl) priceEl.textContent = priceText;
+  } catch (_) {
+    // Keep placeholder on error
+  }
 }
 
 async function _handleGateSubscribe(evt) {
