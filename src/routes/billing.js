@@ -93,6 +93,46 @@ router.get('/billing/public-config', (_req, res) => {
   });
 });
 
+// Public: returns the configured Stripe price details (amount, currency) for display.
+router.get('/billing/prices', async (_req, res) => {
+  try {
+    const stripe = getStripe();
+    const priceMonthlyId = config.stripe.priceMonthly;
+    const priceYearlyId  = config.stripe.priceYearly;
+
+    const prices = {};
+
+    if (priceMonthlyId) {
+      try {
+        const price = await stripe.prices.retrieve(priceMonthlyId);
+        prices.monthly = {
+          id:       price.id,
+          amount:   price.unit_amount,
+          currency: price.currency,
+          interval: price.recurring?.interval || 'month',
+        };
+      } catch (_) { /* price not found or Stripe error */ }
+    }
+
+    if (priceYearlyId) {
+      try {
+        const price = await stripe.prices.retrieve(priceYearlyId);
+        prices.yearly = {
+          id:       price.id,
+          amount:   price.unit_amount,
+          currency: price.currency,
+          interval: price.recurring?.interval || 'year',
+        };
+      } catch (_) { /* price not found or Stripe error */ }
+    }
+
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600');
+    return res.status(200).json({ success: true, prices });
+  } catch (_err) {
+    return res.status(200).json({ success: true, prices: {} });
+  }
+});
+
 const validateCheckout = [
   body('priceId').optional().trim().isLength({ min: 4, max: 128 }),
   body('plan').optional().trim().isIn(['monthly', 'yearly']),
