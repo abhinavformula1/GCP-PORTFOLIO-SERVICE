@@ -30,7 +30,7 @@ async function _refreshAnalytics(els) {
   els.analyticsPanel.textContent = '';
   try {
     const month = (els.analyticsMonth && els.analyticsMonth.value) || '';
-    const url = '/api/admin/analytics' + (month ? '?month=' + encodeURIComponent(month) : '');
+    const url = '/api/admin/analytics/overview' + (month ? '?month=' + encodeURIComponent(month) : '');
     const data = await authedJson(url);
     state.analyticsState = data;
     _paintAnalytics(els);
@@ -45,7 +45,7 @@ function _paintAnalytics(els) {
   els.analyticsPanel.textContent = '';
   const analytics = state.analyticsState || {};
   const totals    = analytics.totals || {};
-  const recentVisitorChips = _buildRecentVisitorChips(analytics.recentVisitors || []);
+  const recentVisitorChips = _buildRecentVisitorChips(analytics.recentUsers || []);
 
   try {
     const mount = document.createElement('div');
