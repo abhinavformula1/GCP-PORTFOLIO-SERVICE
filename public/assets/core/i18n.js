@@ -329,11 +329,17 @@ export function applyPageLang(lang) {
   document.documentElement.lang = lang;
 }
 
+export function isSupportedLang(lang) {
+  return SUPPORTED_LANGUAGES.some(function (item) { return item.code === lang; });
+}
+
 // Single source of truth for UI language pickers.
 // Add new languages here (and in LANG / PAGE_LANG) without touching layout code.
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'fr', label: 'Français' },
+  { code: 'es', label: 'Español' },
+  { code: 'de', label: 'Deutsch' },
 ];
 
 // ── currentLang (live binding) ───────────────────────────────────────────────
@@ -342,10 +348,12 @@ export const SUPPORTED_LANGUAGES = [
 // refer, hireme) read the live binding and pick up changes for free.
 export let currentLang = 'en';
 
-export function setCurrentLang(lang) { currentLang = lang; }
+export function setCurrentLang(lang) {
+  currentLang = isSupportedLang(lang) ? lang : 'en';
+}
 
 /**
  * Convenience accessor for the active runtime dictionary, e.g. `t().botGreeting`.
  * Used everywhere the chat assistant needs to render i18n'd text.
  */
-export function t() { return LANG[currentLang]; }
+export function t() { return LANG[currentLang] || LANG.en; }

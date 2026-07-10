@@ -10,6 +10,8 @@ import { renderKpiCards }       from '../../../../assets/ui/kpi-cards.js';
 import { renderDataTable }      from '../../../../assets/ui/datatable.js';
 import { showToast }            from '../../../../assets/ui/toast.js';
 
+let _subsMenuCleanup = null;
+
 export async function renderSubscriptions(els) {
   if (!els.subscriptionsPanel) return;
   if (state.subscriptionsState && Array.isArray(state.subscriptionsState.subscriptions)) {
@@ -113,6 +115,7 @@ function _paintSubscriptions(els) {
       _renewMeta:    r.cancelAtPeriodEnd ? 'Cancels at period end' : 'Renews automatically',
       _customerId:   r.stripeCustomerId    ? String(r.stripeCustomerId)    : '',
       _subId:        r.stripeSubscriptionId ? String(r.stripeSubscriptionId) : '',
+      _cancelAtPeriodEnd: r.cancelAtPeriodEnd === true,
     });
   });
 
@@ -127,11 +130,150 @@ function _paintSubscriptions(els) {
       { key: 'period',     header: 'Current period',     renderHtml: function (r) { return '<div>' + safeText(r._periodLabel) + '</div>' + (r._daysLeft ? '<div class="sd-subs-muted">' + safeText(r._daysLeft) + '</div>' : ''); } },
       { key: 'renews',     header: 'Renews on',          renderHtml: function (r) { return '<div>' + safeText(r._renewDate || '—') + '</div>' + (r._renewMeta ? '<div class="sd-subs-muted">' + safeText(r._renewMeta) + '</div>' : ''); } },
       { key: 'actions',    header: 'Actions', align: 'right', renderHtml: function (r) {
-        return '<button type="button" class="sd-subs-kebab" aria-label="Actions"' +
-          ' data-uid="' + safeText(r.uid || '') + '" data-email="' + safeText(r._email || '') + '"' +
-          ' data-customer="' + safeText(r._customerId || '') + '" data-subscription="' + safeText(r._subId || '') + '"' +
-          '><span class="material-symbols-outlined" aria-hidden="true">more_horiz</span></button>';
+        const canOpenCustomer = !!r._customerId;
+        const canOpenSubscription = !!r._subId;
+        const canManageSubscription = !!r._subId;
+        const cancelLabel = r._cancelAtPeriodEnd ? 'Resume subscription' : 'Cancel at period end';
+        const cancelIcon = r._cancelAtPeriodEnd ? 'restart_alt' : 'event_busy';
+        const cancelAction = r._cancelAtPeriodEnd ? 'resume' : 'cancel';
+        return '' +
+          '<div class="reco-actions sd-subs-actions">' +
+            '<button type="button" class="reco-actions-trigger sd-subs-kebab" aria-label="Actions" aria-haspopup="menu" aria-expanded="false"' +
+              ' data-uid="' + safeText(r.uid || '') + '" data-email="' + safeText(r._email || '') + '"' +
+              ' data-customer="' + safeText(r._customerId || '') + '" data-subscription="' + safeText(r._subId || '') + '"' +
+            '><span class="material-symbols-outlined" aria-hidden="true">more_horiz</span></button>' +
+            '<div class="reco-actions-menu sd-subs-actions-menu" hidden role="menu">' +
+              (canOpenCustomer
+                ? '<button type="button" class="reco-action-item" role="menuitem" data-subs-action="open-customer" data-customer="' + safeText(r._customerId) + '">' +
+                    '<span class="material-symbols-outlined" aria-hidden="true">open_in_new</span><span>Open customer in Stripe</span>' +
+                  '</button>'
+                : '') +
+              (canOpenSubscription
+                ? '<button type="button" class="reco-action-item" role="menuitem" data-subs-action="open-subscription" data-subscription="' + safeText(r._subId) + '">' +
+                    '<span class="material-symbols-outlined" aria-hidden="true">receipt_long</span><span>Open subscription in Stripe</span>' +
+                  '</button>'
+                : '') +
+              (canOpenCustomer
+                ? '<button type="button" class="reco-action-item" role="menuitem" data-subs-action="open-portal" data-customer="' + safeText(r._customerId) + '">' +
+                    '<span class="material-symbols-outlined" aria-hidden="true">account_circle</span><span>Open billing portal</span>' +
+                  '</button>'
+                : '') +
+              (canManageSubscription
+                ? '<button type="button" class="reco-action-item' + (cancelAction === 'cancel' ? ' sd-section-action-delete' : '') + '" role="menuitem" data-subs-action="' + cancelAction + '" data-subscription="' + safeText(r._subId) + '">' +
+                    '<span class="material-symbols-outlined" aria-hidden="true">' + cancelIcon + '</span><span>' + cancelLabel + '</span>' +
+                  '</button>'
+                : '') +
+            '</div>' +
+          '</div>';
       } },
     ],
   });
+
+  _wireSubscriptionActions(els, tableMount, stripeMode);
+}
+
+function _wireSubscriptionActions(els, mount, stripeMode) {
+  if (!mount) return;
+  if (_subsMenuCleanup) {
+    try { _subsMenuCleanup(); } catch (_) {}
+    _subsMenuCleanup = null;
+  }
+
+  const dashBase = stripeMode === 'test' ? 'https://dashboard.stripe.com/test' : 'https://dashboard.stripe.com';
+
+  function closeMenus() {
+    mount.querySelectorAll('.sd-subs-actions-menu').forEach(function (menu) { menu.hidden = true; });
+    mount.querySelectorAll('.sd-subs-kebab[aria-expanded="true"]').forEach(function (btn) { btn.setAttribute('aria-expanded', 'false'); });
+  }
+
+  async function handleAction(btn) {
+    const action = String(btn.getAttribute('data-subs-action') || '');
+    const customerId = String(btn.getAttribute('data-customer') || '');
+    const subscriptionId = String(btn.getAttribute('data-subscription') || '');
+    closeMenus();
+
+    if (action === 'open-customer' && customerId) {
+      window.open(dashBase + '/customers/' + encodeURIComponent(customerId), '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (action === 'open-subscription' && subscriptionId) {
+      window.open(dashBase + '/subscriptions/' + encodeURIComponent(subscriptionId), '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (action === 'open-portal' && customerId) {
+      setSectionStatus(els.subscriptionsStatus, 'Opening billing portal…', 'info');
+      try {
+        const data = await authedJson('/api/admin/subscriptions/portal-session', {
+          method: 'POST',
+          body: JSON.stringify({ customerId }),
+        });
+        setSectionStatus(els.subscriptionsStatus, '', '');
+        if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+      } catch (err) {
+        setSectionStatus(els.subscriptionsStatus, err.message || 'Failed to open billing portal.', 'error');
+      }
+      return;
+    }
+    if ((action === 'cancel' || action === 'resume') && subscriptionId) {
+      const cancelAtPeriodEnd = action === 'cancel';
+      const prompt = cancelAtPeriodEnd
+        ? 'Cancel this subscription at the end of the current billing period?'
+        : 'Resume this subscription and keep renewing automatically?';
+      if (!window.confirm(prompt)) return;
+      setSectionStatus(els.subscriptionsStatus, cancelAtPeriodEnd ? 'Cancelling subscription…' : 'Resuming subscription…', 'info');
+      try {
+        await authedJson('/api/admin/subscriptions/cancel', {
+          method: 'POST',
+          body: JSON.stringify({ subscriptionId, cancelAtPeriodEnd }),
+        });
+        showToast(cancelAtPeriodEnd ? 'Subscription will cancel at period end.' : 'Subscription resumed.', { kind: 'success' });
+        state.subscriptionsState = null;
+        await refreshSubscriptions(els);
+      } catch (err) {
+        setSectionStatus(els.subscriptionsStatus, err.message || 'Subscription update failed.', 'error');
+      }
+    }
+  }
+
+  function onClick(event) {
+    const actionBtn = event.target.closest('[data-subs-action]');
+    if (actionBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      void handleAction(actionBtn);
+      return;
+    }
+
+    const trigger = event.target.closest('.sd-subs-kebab');
+    if (trigger && mount.contains(trigger)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const wrap = trigger.closest('.sd-subs-actions');
+      const menu = wrap ? wrap.querySelector('.sd-subs-actions-menu') : null;
+      if (!menu) return;
+      const willOpen = menu.hidden;
+      closeMenus();
+      menu.hidden = !willOpen;
+      trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      return;
+    }
+
+    if (!event.target.closest('.sd-subs-actions')) {
+      closeMenus();
+    }
+  }
+
+  function onKeydown(event) {
+    if (event.key === 'Escape') closeMenus();
+  }
+
+  document.addEventListener('click', onClick);
+  document.addEventListener('keydown', onKeydown);
+  mount.addEventListener('click', onClick);
+
+  _subsMenuCleanup = function () {
+    document.removeEventListener('click', onClick);
+    document.removeEventListener('keydown', onKeydown);
+    mount.removeEventListener('click', onClick);
+  };
 }

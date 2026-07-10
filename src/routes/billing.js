@@ -503,6 +503,28 @@ router.get('/admin/subscriptions/overview', requireAdmin, async (req, res, next)
   }
 });
 
+router.post('/admin/subscriptions/portal-session', requireAdmin, [
+  body('customerId').trim().isLength({ min: 6, max: 200 }).withMessage('Missing Stripe customer id.'),
+], async (req, res, next) => {
+  try {
+    assertStripeConfigured();
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new ValidationError(errors.array()[0].msg);
+
+    const stripe = getStripe();
+    const customerId = String(req.body.customerId || '').trim();
+    const siteUrl = resolveBaseUrlFromRequest(req);
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${siteUrl}/admin/software-architecture/`,
+    });
+    return res.status(200).json({ success: true, url: session.url });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // Admin: cancel/resume a subscription (at period end).
 router.post('/admin/subscriptions/cancel', requireAdmin, [
   body('subscriptionId').trim().isLength({ min: 6, max: 200 }).withMessage('Missing Stripe subscription id.'),
