@@ -57,6 +57,9 @@ function hookMenuButtons() {
   document.addEventListener('keydown', function (e) {
     if (e && e.key === 'Escape') closeMenus();
   });
+  window.addEventListener('scroll', closeMenus, { passive: true });
+  window.addEventListener('resize', closeMenus);
+  window.addEventListener('popstate', closeMenus);
 }
 
 export function setHeaderAdminVisible(visible) {
@@ -247,18 +250,22 @@ export function renderHeaderNavIntoTopbar(opts) {
   }
 
   if (homeBtn) homeBtn.addEventListener('click', function () {
+    closeMenus();
     if (typeof o.onHome === 'function') return o.onHome();
     if (typeof window.closeSystemDesign === 'function') window.closeSystemDesign();
   });
   if (sysBtn) sysBtn.addEventListener('click', function () {
+    closeMenus();
     if (typeof o.onSystemDesign === 'function') return o.onSystemDesign();
     if (typeof window.openSystemDesign === 'function') window.openSystemDesign();
   });
   if (resumeBtn) resumeBtn.addEventListener('click', function () {
+    closeMenus();
     if (typeof o.onResume === 'function') return o.onResume();
     if (typeof window.generateResumePdf === 'function') window.generateResumePdf();
   });
   if (touchBtn) touchBtn.addEventListener('click', function () {
+    closeMenus();
     if (typeof o.onGetInTouch === 'function') return o.onGetInTouch();
     if (typeof window.openHireMe === 'function') window.openHireMe();
   });

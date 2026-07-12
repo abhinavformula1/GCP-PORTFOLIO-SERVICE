@@ -18,12 +18,29 @@ import { t } from '../core/i18n.js';
 const WELCOME_TOAST_TTL_MS = 10000;
 let _welcomeToastTimer = null;
 
+function wireOverlayControls() {
+  const closeBtn = document.getElementById('welcomeCloseBtn');
+  if (closeBtn && !closeBtn.dataset.wiredWelcomeClose) {
+    closeBtn.addEventListener('click', hideWelcomeOverlay);
+    closeBtn.dataset.wiredWelcomeClose = 'true';
+  }
+
+  const guestBtn = document.getElementById('welcomeGuestBtn');
+  if (guestBtn && !guestBtn.dataset.wiredWelcomeGuest) {
+    guestBtn.addEventListener('click', hideWelcomeOverlay);
+    guestBtn.dataset.wiredWelcomeGuest = 'true';
+  }
+}
+
 /**
  * Dynamically create the welcome overlay modal if it doesn't exist.
  * This allows any page to use the sign-in modal without duplicating HTML.
  */
 function ensureOverlayExists(opts) {
-  if (document.getElementById('welcomeOverlay')) return;
+  if (document.getElementById('welcomeOverlay')) {
+    wireOverlayControls();
+    return;
+  }
 
   const noteText = opts && opts.noteText
     ? opts.noteText
@@ -58,18 +75,7 @@ function ensureOverlayExists(opts) {
     </md-dialog>
   `;
   document.body.insertAdjacentHTML('beforeend', html);
-
-  // Wire close button
-  const closeBtn = document.getElementById('welcomeCloseBtn');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', hideWelcomeOverlay);
-  }
-
-  // Wire guest button
-  const guestBtn = document.getElementById('welcomeGuestBtn');
-  if (guestBtn) {
-    guestBtn.addEventListener('click', hideWelcomeOverlay);
-  }
+  wireOverlayControls();
 }
 
 export function showWelcomeOverlay(opts) {

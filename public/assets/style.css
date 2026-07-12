@@ -10,126 +10,9 @@
    regardless of any `display:` rule the element happens to also match. */
 [hidden] { display: none !important; }
 
-/* ──────────────────────────────────────────────────────────────────
-   Material Design 3 — design tokens
-   ──────────────────────────────────────────────────────────────────
-   Reference: https://m3.material.io/styles/color/system/overview
-   Source palette: blue (close to existing brand accent #4f8ef7)
-   Scheme: dark
-   ────────────────────────────────────────────────────────────────── */
-:root {
-  /* M3 dark color scheme (subset — only what we use) */
-  --md-sys-color-primary:                  #abc7ff;
-  --md-sys-color-on-primary:               #002c71;
-  --md-sys-color-primary-container:        #0f448a;
-  --md-sys-color-on-primary-container:     #d8e2ff;
-  --md-sys-color-surface:                  #111318;
-  --md-sys-color-surface-container-low:    #181b1f;
-  --md-sys-color-surface-container:        #1d2024;
-  --md-sys-color-surface-container-high:   #272a2f;
-  --md-sys-color-surface-container-highest:#32353a;
-  --md-sys-color-on-surface:               #e2e2e9;
-  --md-sys-color-on-surface-variant:       #c5c6d0;
-  --md-sys-color-outline:                  #8e909a;
-  --md-sys-color-outline-variant:          #44474e;
-  --md-sys-color-error:                    #ffb4ab;
-  --md-sys-color-on-error:                 #690005;
-  --md-sys-color-success:                  #3ecf8e; /* not in M3 spec — kept for existing UX */
-
-  /* M3 motion tokens
-     https://m3.material.io/styles/motion/easing-and-duration/tokens-specs */
-  --md-sys-motion-easing-standard:                cubic-bezier(0.2, 0, 0, 1);
-  --md-sys-motion-easing-emphasized:              cubic-bezier(0.2, 0, 0, 1);
-  --md-sys-motion-easing-emphasized-decelerate:   cubic-bezier(0.05, 0.7, 0.1, 1);
-  --md-sys-motion-easing-emphasized-accelerate:   cubic-bezier(0.3, 0, 0.8, 0.15);
-  --md-sys-motion-duration-short1:                50ms;
-  --md-sys-motion-duration-short2:                100ms;
-  --md-sys-motion-duration-short3:                150ms;
-  --md-sys-motion-duration-short4:                200ms;
-  --md-sys-motion-duration-medium1:               250ms;
-  --md-sys-motion-duration-medium2:               300ms;
-  --md-sys-motion-duration-long1:                 450ms;
-
-  /* M3 state-layer opacities (translucent overlay on hover/focus/press) */
-  --md-sys-state-hover-opacity:    0.08;
-  --md-sys-state-focus-opacity:    0.10;
-  --md-sys-state-pressed-opacity:  0.10;
-
-  /* ── Legacy aliases — existing custom CSS continues to work,
-        now driven by M3 tokens underneath. */
-  --bg:              var(--md-sys-color-surface);
-  --surface:         var(--md-sys-color-surface-container);
-  --surface-2:       var(--md-sys-color-surface-container-high);
-  --border:          var(--md-sys-color-outline-variant);
-  /* Accent blue (links/headings/icons) should match primary CTAs. */
-  --accent:          var(--brand-blue);
-  --accent-soft:     var(--md-sys-color-primary-container);
-  --text:            var(--md-sys-color-on-surface);
-  --text-secondary:  var(--md-sys-color-on-surface-variant);
-  --text-muted:      var(--md-sys-color-outline);
-  --success:         var(--md-sys-color-success);
-  --tag-bg:          var(--md-sys-color-primary-container);
-  --tag-text:        var(--md-sys-color-primary);
-
-  /* ── Brand ────────────────────────────────────────────────────────────────
-     One source of truth for "portfolio blue" used by primary buttons/toggles.
-     - Matches the generated-image header CTA: #01347A
-     - Original spec (kept as a reference):  #0B3A6A
-  */
-  --brand-blue: #01347A;
-  --brand-blue-original: #0B3A6A;
-
-  color-scheme: dark;
-}
-
-/* ── M3 light scheme ──
-   Activated by the theme toggle (sets [data-theme="light"] on <html>).
-   Same Salesforce-blue brand seed, generated via M3 Material Theme Builder. */
-:root[data-theme="light"] {
-  --md-sys-color-primary:                  #0061a4;
-  --md-sys-color-on-primary:               #ffffff;
-  --md-sys-color-primary-container:        #d1e4ff;
-  --md-sys-color-on-primary-container:     #001d36;
-  --md-sys-color-surface:                  #fdfcff;
-  --md-sys-color-surface-container-low:    #f3f3fa;
-  --md-sys-color-surface-container:        #edeef4;
-  --md-sys-color-surface-container-high:   #e7e8ee;
-  --md-sys-color-surface-container-highest:#e1e2e8;
-  --md-sys-color-on-surface:               #1a1c1e;
-  --md-sys-color-on-surface-variant:       #43474e;
-  --md-sys-color-outline:                  #73777f;
-  --md-sys-color-outline-variant:          #c3c7cf;
-  --md-sys-color-error:                    #ba1a1a;
-  --md-sys-color-on-error:                 #ffffff;
-  --md-sys-color-success:                  #146c43;
-
-  color-scheme: light;
-}
-
-/* Honour OS preference for first-time visitors who haven't toggled yet.
-   Once they pick a theme, JS pins [data-theme="dark"|"light"] on <html>
-   and overrides this. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]):not([data-theme="light"]) {
-    --md-sys-color-primary:                  #0061a4;
-    --md-sys-color-on-primary:               #ffffff;
-    --md-sys-color-primary-container:        #d1e4ff;
-    --md-sys-color-on-primary-container:     #001d36;
-    --md-sys-color-surface:                  #fdfcff;
-    --md-sys-color-surface-container-low:    #f3f3fa;
-    --md-sys-color-surface-container:        #edeef4;
-    --md-sys-color-surface-container-high:   #e7e8ee;
-    --md-sys-color-surface-container-highest:#e1e2e8;
-    --md-sys-color-on-surface:               #1a1c1e;
-    --md-sys-color-on-surface-variant:       #43474e;
-    --md-sys-color-outline:                  #73777f;
-    --md-sys-color-outline-variant:          #c3c7cf;
-    --md-sys-color-error:                    #ba1a1a;
-    --md-sys-color-on-error:                 #ffffff;
-    --md-sys-color-success:                  #146c43;
-    color-scheme: light;
-  }
-}
+/* Shared color tokens live in /assets/theme.css so the public site and admin
+   can both theme from one source of truth. Keep this file focused on shared
+   component styles. */
 
 body {
   font-family: 'Roboto Flex', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1135,7 +1018,7 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 8px;
   color: var(--accent);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 14px;
   line-height: 1;
   height: 40px;          /* match header-nav md-text-button height */
@@ -2673,7 +2556,7 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
   opacity: 0.72;
 }
 .sd-topic-item.sd-premium.sd-active .sd-lock-icon {
-  color: var(--md-sys-color-primary);
+  color: var(--brand-blue);
 }
 
 /* ── Public sponsorship slot ─────────────────────────────────────────────────
@@ -3544,7 +3427,7 @@ button.download-resume-btn .material-symbols-outlined { font-size: 20px; }
   top: 12px;
   right: 12px;
   font-size: 18px;
-  color: var(--md-sys-color-outline);
+  color: var(--brand-blue);
 }
 
 .sd-article-card.sd-card-premium {
@@ -6493,10 +6376,11 @@ figure.sd-image-block figcaption {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.88);
+  background: color-mix(in srgb, var(--brand-blue) 10%, #ffffff);
   backdrop-filter: blur(4px);
-  color: #6d28d9;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  color: var(--brand-blue);
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 22%, transparent);
+  box-shadow: 0 6px 16px rgba(1, 52, 122, 0.12);
 }
 .sd-article-card-premium-chip .material-symbols-outlined {
   font-size: 15px;
@@ -6620,7 +6504,7 @@ figure.sd-image-block figcaption {
   align-items: center;
   margin-left: 6px;
   vertical-align: middle;
-  color: var(--text-muted, #aaa);
+  color: var(--brand-blue);
 }
 .sd-pub-list-lock .material-symbols-outlined {
   font-size: 13px;

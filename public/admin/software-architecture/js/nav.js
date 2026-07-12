@@ -61,7 +61,7 @@ export function setActiveModule(moduleName) {
 
   // Top-level module nav highlight.
   const moduleKey = isAtlasAny ? 'atlas-settings' : moduleName;
-  const modulesEl = document.getElementById('adminModulesNav');
+  const modulesEl = document.getElementById('adminModules') || document.getElementById('adminModulesNav');
   if (modulesEl) {
     modulesEl.querySelectorAll('.sd-admin-module').forEach(function (btn) {
       btn.classList.toggle('sd-admin-module-active', btn.dataset.module === moduleKey);
