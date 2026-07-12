@@ -8,8 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
-  <link rel="stylesheet" href="/assets/style.css?v=2026-07-06-modal-v18">
-  <link rel="stylesheet" href="./styles.css?v=2026-07-07-topbar-fix">
+  <link rel="stylesheet" href="/assets/theme.css?v=2026-07-13-theme-v1">
+  <link rel="stylesheet" href="/assets/style.css?v=2026-07-13-theme-v1">
+  <link rel="stylesheet" href="./styles.css?v=2026-07-13-theme-v1">
   <!-- Hide icon ligature text until Material Symbols font is ready (anti-FOUC) -->
   <style>.material-symbols-outlined{visibility:hidden}.fonts-loaded .material-symbols-outlined{visibility:visible}</style>
   <script>
@@ -1183,57 +1184,114 @@
         <!-- ① LLM Configuration -->
         <details class="sd-ai-accordion" open>
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">psychology</span>
-            1. LLM Configuration
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">psychology</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">1. LLM Configuration</span>
+                <span class="sd-ai-accordion-head-desc">Choose your language model and configure generation parameters</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Models available to visitors, generation parameters, and streaming behaviour. Changes take effect on the next chat session.</p>
-            <div id="atlasModelRows" class="sd-atlas-model-rows"></div>
-            <div class="sd-ai-field-row">
-              <label class="sd-seo-field">
-                <span>Fallback Model</span>
-                <select id="atlasFallbackModel">
-                  <option value="">None</option>
-                  <option value="flash-lite">Gemini 2.5 Flash-Lite</option>
-                  <option value="flash">Gemini 2.5 Flash</option>
-                </select>
-              </label>
-            </div>
-            <div class="sd-ai-field-row sd-ai-field-row-3">
-              <label class="sd-seo-field">
-                <span>Temperature <span class="sd-ai-hint">(0 – 2)</span></span>
-                <input id="atlasTemperature" type="number" min="0" max="2" step="0.05" placeholder="0.35" />
-              </label>
-              <label class="sd-seo-field">
-                <span>Top-P <span class="sd-ai-hint">(0 – 1)</span></span>
-                <input id="atlasTopP" type="number" min="0" max="1" step="0.05" placeholder="0.85" />
-              </label>
-              <label class="sd-seo-field">
-                <span>Max Tokens <span class="sd-ai-hint">(100 – 8192)</span></span>
-                <input id="atlasMaxOutputTokens" type="number" min="100" max="8192" step="50" placeholder="900" />
-              </label>
-            </div>
-            <div class="sd-seo-toggles">
-              <div class="sd-seo-toggle-row">
-                <div class="sd-seo-toggle-info">
-                  <strong>Streaming</strong>
-                  <span>Stream tokens progressively. Disable for simpler single-shot responses.</span>
+            <div class="sd-ai-llm-grid">
+              <section class="sd-ai-llm-panel">
+                <div class="sd-ai-llm-panel-title">Model Selection</div>
+                <div id="atlasModelRows" class="sd-atlas-model-rows"></div>
+              </section>
+
+              <section class="sd-ai-llm-panel sd-ai-llm-panel-main">
+                <div class="sd-ai-llm-panel-title">Generation Parameters</div>
+
+                <div class="sd-ai-llm-slider-grid">
+                  <label class="sd-ai-slider-card">
+                    <span class="sd-ai-slider-card-head">
+                      <span>Temperature <span class="sd-ai-hint">(0 – 2)</span></span>
+                      <span class="sd-ai-info-dot" aria-label="Controls creativity. Lower values produce more factual, repeatable responses." data-tooltip="Controls creativity. Lower values produce more factual, repeatable responses." tabindex="0">i</span>
+                    </span>
+                    <div class="sd-ai-slider-card-controls">
+                      <input id="atlasTemperature" class="sd-ai-slider-input" type="range" min="0" max="2" step="0.05" value="0.35" />
+                      <input id="atlasTemperatureValue" class="sd-ai-slider-value" type="number" min="0" max="2" step="0.05" value="0.35" data-sync-source="atlasTemperature" />
+                    </div>
+                    <div class="sd-ai-slider-scale">
+                      <span><strong>0</strong><em>Focused</em></span>
+                      <span><strong>2</strong><em>Creative</em></span>
+                    </div>
+                  </label>
+
+                  <label class="sd-ai-slider-card">
+                    <span class="sd-ai-slider-card-head">
+                      <span>Top-P <span class="sd-ai-hint">(0 – 1)</span></span>
+                      <span class="sd-ai-info-dot" aria-label="Controls response diversity by limiting the pool of candidate words." data-tooltip="Controls response diversity by limiting the pool of candidate words." tabindex="0">i</span>
+                    </span>
+                    <div class="sd-ai-slider-card-controls">
+                      <input id="atlasTopP" class="sd-ai-slider-input" type="range" min="0" max="1" step="0.05" value="0.85" />
+                      <input id="atlasTopPValue" class="sd-ai-slider-value" type="number" min="0" max="1" step="0.05" value="0.85" data-sync-source="atlasTopP" />
+                    </div>
+                    <div class="sd-ai-slider-scale">
+                      <span><strong>0</strong><em>Deterministic</em></span>
+                      <span><strong>1</strong><em>Diverse</em></span>
+                    </div>
+                  </label>
+
+                  <label class="sd-ai-slider-card">
+                    <span class="sd-ai-slider-card-head">
+                      <span>Max Tokens <span class="sd-ai-hint">(100 – 8192)</span></span>
+                      <span class="sd-ai-info-dot" aria-label="Maximum length of the generated response. Higher values increase cost and latency." data-tooltip="Maximum length of the generated response. Higher values increase cost and latency." tabindex="0">i</span>
+                    </span>
+                    <div class="sd-ai-slider-card-controls">
+                      <input id="atlasMaxOutputTokens" class="sd-ai-slider-input" type="range" min="100" max="8192" step="50" value="900" />
+                      <input id="atlasMaxOutputTokensValue" class="sd-ai-slider-value" type="number" min="100" max="8192" step="50" value="900" data-sync-source="atlasMaxOutputTokens" />
+                    </div>
+                    <div class="sd-ai-slider-scale">
+                      <span><strong>100</strong></span>
+                      <span><strong>8192</strong></span>
+                    </div>
+                  </label>
                 </div>
-                <label class="sd-toggle-switch" aria-label="Enable streaming">
-                  <input type="checkbox" id="atlasStreamingEnabled">
-                  <span class="sd-toggle-slider"></span>
-                </label>
-              </div>
-              <div class="sd-seo-toggle-row">
-                <div class="sd-seo-toggle-info">
-                  <strong>Show model picker in chat</strong>
-                  <span>Let visitors switch between Fast &amp; More detailed.</span>
+
+                <div class="sd-ai-llm-bottom-grid">
+                  <label class="sd-ai-setting-card sd-ai-setting-card-select">
+                    <span class="sd-ai-setting-title">
+                      Fallback Model
+                      <span class="sd-ai-info-dot" aria-hidden="true">i</span>
+                    </span>
+                    <select id="atlasFallbackModel">
+                      <option value="">None</option>
+                      <option value="flash-lite">Gemini 2.5 Flash-Lite</option>
+                      <option value="flash">Gemini 2.5 Flash</option>
+                    </select>
+                  </label>
+
+                  <div class="sd-ai-setting-card sd-ai-setting-card-toggle">
+                    <div class="sd-ai-setting-copy">
+                      <strong>Streaming</strong>
+                      <span>Stream tokens progressively</span>
+                    </div>
+                    <label class="sd-toggle-switch" aria-label="Enable streaming">
+                      <input type="checkbox" id="atlasStreamingEnabled">
+                      <span class="sd-toggle-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="sd-ai-setting-card sd-ai-setting-card-toggle">
+                    <div class="sd-ai-setting-copy">
+                      <strong>Show model picker in chat</strong>
+                      <span>Let visitors switch between models</span>
+                    </div>
+                    <label class="sd-toggle-switch" aria-label="Show model picker">
+                      <input type="checkbox" id="atlasModelSelectorVisible">
+                      <span class="sd-toggle-slider"></span>
+                    </label>
+                  </div>
                 </div>
-                <label class="sd-toggle-switch" aria-label="Show model picker">
-                  <input type="checkbox" id="atlasModelSelectorVisible">
-                  <span class="sd-toggle-slider"></span>
-                </label>
-              </div>
+              </section>
             </div>
           </div>
         </details>
@@ -1241,8 +1299,19 @@
         <!-- ② Embedding Configuration -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">hub</span>
-            2. Embedding Configuration
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">hub</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">2. Embedding Configuration</span>
+                <span class="sd-ai-accordion-head-desc">Select embedding model and vector parameters</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Controls the model and parameters used when converting article chunks and user queries into vectors. Re-index articles after changing these.</p>
@@ -1279,8 +1348,19 @@
         <!-- ③ Chunking Strategy -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">splitscreen</span>
-            3. Chunking Strategy
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">splitscreen</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">3. Chunking Strategy</span>
+                <span class="sd-ai-accordion-head-desc">Define how your documents are chunked</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">How articles are split into chunks before embedding. Smaller chunks = more precise retrieval. Larger = more context per chunk. Re-run the backfill after changing.</p>
@@ -1305,8 +1385,19 @@
         <!-- ④ Retrieval Configuration -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">manage_search</span>
-            4. Retrieval Configuration
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">manage_search</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">4. Retrieval Configuration</span>
+                <span class="sd-ai-accordion-head-desc">Configure search and retrieval behavior</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Controls how the vector store is queried at chat time. RAG must be enabled and articles indexed before these take effect.</p>
@@ -1358,8 +1449,19 @@
         <!-- ⑤ Prompt Configuration -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
-            5. Prompt Configuration
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">5. Prompt Configuration</span>
+                <span class="sd-ai-accordion-head-desc">Define system prompts and templates</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Override the default Atlas persona prompt and configure guardrails. Leave blank to use the built-in persona.</p>
@@ -1392,8 +1494,19 @@
         <!-- ⑥ Model Routing -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">alt_route</span>
-            6. Model Routing
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">alt_route</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">6. Model Routing</span>
+                <span class="sd-ai-accordion-head-desc">Route queries by model based on quality or cost</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Route different query types to different models to optimise cost vs quality. Default sends all queries to the selected default model.</p>
@@ -1419,8 +1532,19 @@
         <!-- ⑦ Evaluation Configuration -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">rule</span>
-            7. Evaluation Configuration
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">rule</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">7. Evaluation Configuration</span>
+                <span class="sd-ai-accordion-head-desc">Configure retrieval quality thresholds</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Thresholds used by the AI Evaluation page to determine PASS / FAIL. Adjust as your knowledge base matures.</p>
@@ -1441,8 +1565,19 @@
         <!-- ⑧ Observability Configuration -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
-            8. Observability Configuration
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">8. Observability Configuration</span>
+                <span class="sd-ai-accordion-head-desc">Control tracing, prompt capture, and token visibility</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Control what is captured per request. Enabling prompt/chunk capture increases Firestore storage. Tokens are always counted for billing.</p>
@@ -1470,8 +1605,19 @@
         <!-- ⑨ Cost Controls -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">payments</span>
-            9. Cost Controls
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">payments</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">9. Cost Controls</span>
+                <span class="sd-ai-accordion-head-desc">Set query budgets, caps, and alert thresholds</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Atlas stops accepting new questions once a budget cap is hit. Set to 0 to disable that cap. Token limit prevents a single malicious query from consuming disproportionate quota.</p>
@@ -1501,8 +1647,19 @@
         <!-- ⑩ Security -->
         <details class="sd-ai-accordion">
           <summary class="sd-ai-accordion-title">
-            <span class="material-symbols-outlined" aria-hidden="true">security</span>
-            10. Security
+            <span class="sd-ai-accordion-head">
+              <span class="sd-ai-accordion-head-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">security</span>
+              </span>
+              <span class="sd-ai-accordion-head-copy">
+                <span class="sd-ai-accordion-head-title">10. Security</span>
+                <span class="sd-ai-accordion-head-desc">Protect the pipeline from abuse and unsafe inputs</span>
+              </span>
+            </span>
+            <span class="sd-ai-accordion-meta">
+              <span class="sd-ai-config-badge">Configured</span>
+              <span class="material-symbols-outlined sd-ai-accordion-chevron" aria-hidden="true">expand_more</span>
+            </span>
           </summary>
           <div class="sd-ai-accordion-body">
             <p class="sd-seo-group-desc">Protect the pipeline from abuse. Rate limiting applies per authenticated user. Content moderation uses Gemini's safety filters.</p>

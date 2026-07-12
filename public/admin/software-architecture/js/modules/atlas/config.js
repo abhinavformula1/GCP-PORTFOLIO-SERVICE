@@ -21,6 +21,8 @@ export async function renderAtlasConfig(els) {
   try {
     const data = await authedJson('/api/admin/atlas/config');
     atlasConfig = data.config || {};
+    _wireConfigAccordion();
+    _wireConfigInputs();
     _fillForm(els, atlasConfig);
     setSectionStatus(els.atlasConfigStatus, '', '');
   } catch (err) {
@@ -63,7 +65,7 @@ function _fillForm(els, cfg) {
     row.innerHTML = [
       '<div class="sd-atlas-model-info"><strong>' + meta.label + '</strong><span>' + meta.detail + '</span></div>',
       '<div class="sd-atlas-model-controls">',
-      '  <label class="sd-atlas-default-label" title="Set as default">',
+      '  <label class="sd-atlas-model-select sd-atlas-default-label" title="Set as default">',
       '    <input type="radio" name="atlasDefaultModel" value="' + key + '"' + (defaultModel === key ? ' checked' : '') + '>',
       '    <span>Default</span>',
       '  </label>',
@@ -75,6 +77,7 @@ function _fillForm(els, cfg) {
     ].join('');
     els.atlasModelRows.appendChild(row);
   });
+  _syncModelCardState(els.atlasModelRows);
 
   // ① LLM
   _setV(els.atlasModelSelectorVisible, 'checked', cfg.modelSelectorVisible !== false);
@@ -83,6 +86,9 @@ function _fillForm(els, cfg) {
   _setV(els.atlasTopP,                'value',   cfg.topP           != null ? cfg.topP           : 0.85);
   _setV(els.atlasMaxOutputTokens,     'value',   cfg.maxOutputTokens!= null ? cfg.maxOutputTokens: 900);
   _setV(els.atlasStreamingEnabled,    'checked', cfg.streamingEnabled !== false);
+  _syncLinkedInput('atlasTemperature');
+  _syncLinkedInput('atlasTopP');
+  _syncLinkedInput('atlasMaxOutputTokens');
   // ② Embedding
   _setV(els.atlasEmbeddingModel,      'value',   cfg.embeddingModel  || 'gemini-embedding-001');
   _setV(els.atlasEmbeddingDimensions, 'value',   cfg.embeddingDimensions || 768);
@@ -167,6 +173,82 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
     contentModeration:    _c(els.atlasContentModeration,     false),
     rateLimitPerMinute:   _n(els.atlasRateLimitPerMinute,    20),
   };
+}
+
+function _wireConfigAccordion() {
+  const panel = document.querySelector('.sd-atlas-config-panel');
+  if (!panel || panel.dataset.accordionWired === 'true') return;
+  panel.dataset.accordionWired = 'true';
+
+  panel.addEventListener('toggle', function (event) {
+    const target = event.target;
+    if (!target || !target.classList || !target.classList.contains('sd-ai-accordion') || !target.open) return;
+    panel.querySelectorAll('.sd-ai-accordion').forEach(function (item) {
+      if (item !== target) item.open = false;
+    });
+  }, true);
+}
+
+function _wireConfigInputs() {
+  const panel = document.querySelector('.sd-atlas-config-panel');
+  if (!panel || panel.dataset.inputsWired === 'true') return;
+  panel.dataset.inputsWired = 'true';
+
+  panel.addEventListener('input', function (event) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    if (target.matches('#atlasTemperature, #atlasTopP, #atlasMaxOutputTokens')) {
+      _syncLinkedInput(target.id);
+      return;
+    }
+
+    if (target.matches('.sd-ai-slider-value[data-sync-source]')) {
+      const sourceId = target.dataset.syncSource;
+      if (!sourceId) return;
+      const source = document.getElementById(sourceId);
+      if (!source) return;
+      source.value = target.value;
+      return;
+    }
+
+    if (target.matches('input[name="atlasDefaultModel"], .sd-atlas-model-toggle')) {
+      _syncModelCardState(panel.querySelector('#atlasModelRows'));
+    }
+  });
+
+  panel.addEventListener('change', function (event) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    if (target.matches('.sd-ai-slider-value[data-sync-source]')) {
+      _syncLinkedInput(target.dataset.syncSource);
+      return;
+    }
+
+    if (target.matches('input[name="atlasDefaultModel"], .sd-atlas-model-toggle')) {
+      _syncModelCardState(panel.querySelector('#atlasModelRows'));
+    }
+  });
+}
+
+function _syncLinkedInput(sourceId) {
+  if (!sourceId) return;
+  const source = document.getElementById(sourceId);
+  const mirror = document.querySelector('.sd-ai-slider-value[data-sync-source="' + sourceId + '"]');
+  if (!source || !mirror) return;
+  mirror.value = source.value;
+}
+
+function _syncModelCardState(container) {
+  if (!container) return;
+  const selected = container.querySelector('input[name="atlasDefaultModel"]:checked');
+  container.querySelectorAll('.sd-atlas-model-row').forEach(function (row) {
+    const radio = row.querySelector('input[name="atlasDefaultModel"]');
+    const toggle = row.querySelector('.sd-atlas-model-toggle');
+    row.classList.toggle('is-default', Boolean(selected && radio && selected.value === radio.value));
+    row.classList.toggle('is-disabled', Boolean(toggle && !toggle.checked));
+  });
 }
 
 function _setV(el, prop, val) { if (el) el[prop] = val; }

@@ -307,15 +307,16 @@ export function applyGoogleProfileToChat(profile) {
   state.answers.email  = profile.email;
   state.showGoogleStep = false;
 
-  // Always update the avatar and header name
+  // Keep the assistant identity fixed as Atlas. Google sign-in should only
+  // prefill the user's details, not replace the assistant avatar/header.
   const avatar = document.querySelector('.ga-avatar');
-  if (avatar && profile.picture) {
-    avatar.innerHTML = '<img src="' + profile.picture + '" alt="' + profile.name + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
-    avatar.style.background = 'none';
-    avatar.style.padding = '0';
+  if (avatar) {
+    avatar.innerHTML = 'AK';
+    avatar.style.background = '';
+    avatar.style.padding = '';
   }
   const headerName = document.querySelector('.ga-header-name');
-  if (headerName) headerName.textContent = profile.name.split(' ')[0] + "'s session";
+  if (headerName) headerName.textContent = 'Atlas';
 
   // Free-form mode was requested before sign-in (user clicked Ask Atlas
   // while signed-out). Now they're signed in — drop straight into Atlas.

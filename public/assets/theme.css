@@ -1,0 +1,212 @@
+/* Global design tokens.
+   Keep shared colors, shadows, and semantic theme variables here so both the
+   public site and admin UI pull from one source of truth. */
+
+:root {
+  /* Core brand */
+  --brand-blue: #01347A;
+  --brand-blue-original: #0B3A6A;
+  --brand-violet: #7c4dff;
+  --brand-cyan: #1fb6ff;
+
+  /* Material-ish semantic system */
+  --md-sys-color-primary:                   #8fb8ff;
+  --md-sys-color-on-primary:                #001a45;
+  --md-sys-color-primary-container:         #0B3A6A;
+  --md-sys-color-on-primary-container:      #d9e8ff;
+  --md-sys-color-secondary-container:       #133b63;
+  --md-sys-color-on-secondary-container:    #dbe9ff;
+  --md-sys-color-surface:                   #0b1220;
+  --md-sys-color-surface-container-low:     #10192c;
+  --md-sys-color-surface-container:         #131f35;
+  --md-sys-color-surface-container-high:    #1b2942;
+  --md-sys-color-surface-container-highest: #243552;
+  --md-sys-color-on-surface:                #edf2ff;
+  --md-sys-color-on-surface-variant:        #b7c4de;
+  --md-sys-color-outline:                   #8290ad;
+  --md-sys-color-outline-variant:           #33435f;
+  --md-sys-color-inverse-surface:           #edf2ff;
+  --md-sys-color-inverse-on-surface:        #0f172a;
+  --md-sys-color-error:                     #ffb4ab;
+  --md-sys-color-on-error:                  #690005;
+  --md-sys-color-error-container:           #93000a;
+  --md-sys-color-on-error-container:        #ffdad6;
+  --md-sys-color-success:                   #34d399;
+
+  /* Motion */
+  --md-sys-motion-easing-standard:                cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized:              cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate:   cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate:   cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-sys-motion-duration-short1:                50ms;
+  --md-sys-motion-duration-short2:                100ms;
+  --md-sys-motion-duration-short3:                150ms;
+  --md-sys-motion-duration-short4:                200ms;
+  --md-sys-motion-duration-medium1:               250ms;
+  --md-sys-motion-duration-medium2:               300ms;
+  --md-sys-motion-duration-long1:                 450ms;
+
+  --md-sys-state-hover-opacity:    0.08;
+  --md-sys-state-focus-opacity:    0.10;
+  --md-sys-state-pressed-opacity:  0.10;
+
+  /* Shared aliases */
+  --bg:              var(--md-sys-color-surface);
+  --surface:         var(--md-sys-color-surface-container);
+  --surface-2:       var(--md-sys-color-surface-container-high);
+  --border:          var(--md-sys-color-outline-variant);
+  --accent:          var(--brand-blue);
+  --accent-soft:     var(--md-sys-color-primary-container);
+  --text:            var(--md-sys-color-on-surface);
+  --text-secondary:  var(--md-sys-color-on-surface-variant);
+  --text-muted:      var(--md-sys-color-outline);
+  --success:         var(--md-sys-color-success);
+  --tag-bg:          color-mix(in srgb, var(--md-sys-color-primary-container) 76%, white 24%);
+  --tag-text:        #d9e8ff;
+
+  /* Semantic theme tokens */
+  --theme-page-bg: linear-gradient(180deg, #f7f9ff 0%, #f2f6ff 100%);
+  --theme-panel: #ffffff;
+  --theme-panel-muted: #f8faff;
+  --theme-panel-emphasis: #eef3ff;
+  --theme-panel-border: #dbe4f5;
+  --theme-panel-border-strong: #b9c8ea;
+  --theme-shadow-sm: 0 8px 24px rgba(1, 52, 122, 0.08);
+  --theme-shadow-md: 0 16px 40px rgba(1, 52, 122, 0.14);
+  --theme-accent-soft: rgba(1, 52, 122, 0.1);
+  --theme-accent-strong: #01347A;
+  --theme-accent-stronger: #0B3A6A;
+  --theme-success-bg: #e9fbf1;
+  --theme-success-text: #13824d;
+  --theme-success-border: #b8f0cc;
+  --theme-icon-wash: linear-gradient(135deg, rgba(124, 77, 255, 0.12), rgba(31, 182, 255, 0.12));
+  --theme-icon-border: rgba(1, 52, 122, 0.16);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --brand-blue: #01347A;
+  --brand-blue-original: #0B3A6A;
+  --brand-violet: #7c4dff;
+  --brand-cyan: #1fb6ff;
+
+  --md-sys-color-primary:                   #01347A;
+  --md-sys-color-on-primary:                #ffffff;
+  --md-sys-color-primary-container:         #d9e8ff;
+  --md-sys-color-on-primary-container:      #001a45;
+  --md-sys-color-secondary-container:       #edf4ff;
+  --md-sys-color-on-secondary-container:    #0B3A6A;
+  --md-sys-color-surface:                   #f5f7ff;
+  --md-sys-color-surface-container-low:     #fafbff;
+  --md-sys-color-surface-container:         #ffffff;
+  --md-sys-color-surface-container-high:    #f6f8fe;
+  --md-sys-color-surface-container-highest: #edf2fb;
+  --md-sys-color-on-surface:                #111827;
+  --md-sys-color-on-surface-variant:        #5c6b85;
+  --md-sys-color-outline:                   #7d8ba5;
+  --md-sys-color-outline-variant:           #d9e2f2;
+  --md-sys-color-inverse-surface:           #1b2438;
+  --md-sys-color-inverse-on-surface:        #eef3ff;
+  --md-sys-color-error:                     #ba1a1a;
+  --md-sys-color-on-error:                  #ffffff;
+  --md-sys-color-error-container:           #ffdad6;
+  --md-sys-color-on-error-container:        #410002;
+  --md-sys-color-success:                   #16a34a;
+
+  --bg:              var(--md-sys-color-surface);
+  --surface:         var(--md-sys-color-surface-container);
+  --surface-2:       var(--md-sys-color-surface-container-high);
+  --border:          var(--md-sys-color-outline-variant);
+  --accent:          var(--brand-blue);
+  --accent-soft:     var(--md-sys-color-primary-container);
+  --text:            var(--md-sys-color-on-surface);
+  --text-secondary:  var(--md-sys-color-on-surface-variant);
+  --text-muted:      var(--md-sys-color-outline);
+  --success:         var(--md-sys-color-success);
+  --tag-bg:          #edf2ff;
+  --tag-text:        #01347A;
+
+  --theme-page-bg: linear-gradient(180deg, #f7f9ff 0%, #f2f6ff 100%);
+  --theme-panel: #ffffff;
+  --theme-panel-muted: #f8faff;
+  --theme-panel-emphasis: #eef3ff;
+  --theme-panel-border: #dbe4f5;
+  --theme-panel-border-strong: #b9c8ea;
+  --theme-shadow-sm: 0 8px 24px rgba(1, 52, 122, 0.08);
+  --theme-shadow-md: 0 18px 42px rgba(1, 52, 122, 0.14);
+  --theme-accent-soft: rgba(1, 52, 122, 0.1);
+  --theme-accent-strong: #01347A;
+  --theme-accent-stronger: #0B3A6A;
+  --theme-success-bg: #e9fbf1;
+  --theme-success-text: #13824d;
+  --theme-success-border: #b8f0cc;
+  --theme-icon-wash: linear-gradient(135deg, rgba(124, 77, 255, 0.12), rgba(31, 182, 255, 0.12));
+  --theme-icon-border: rgba(1, 52, 122, 0.16);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    --brand-blue: #01347A;
+    --brand-blue-original: #0B3A6A;
+    --brand-violet: #7c4dff;
+    --brand-cyan: #1fb6ff;
+
+    --md-sys-color-primary:                   #01347A;
+    --md-sys-color-on-primary:                #ffffff;
+    --md-sys-color-primary-container:         #d9e8ff;
+    --md-sys-color-on-primary-container:      #001a45;
+    --md-sys-color-secondary-container:       #edf4ff;
+    --md-sys-color-on-secondary-container:    #0B3A6A;
+    --md-sys-color-surface:                   #f5f7ff;
+    --md-sys-color-surface-container-low:     #fafbff;
+    --md-sys-color-surface-container:         #ffffff;
+    --md-sys-color-surface-container-high:    #f6f8fe;
+    --md-sys-color-surface-container-highest: #edf2fb;
+    --md-sys-color-on-surface:                #111827;
+    --md-sys-color-on-surface-variant:        #5c6b85;
+    --md-sys-color-outline:                   #7d8ba5;
+    --md-sys-color-outline-variant:           #d9e2f2;
+    --md-sys-color-inverse-surface:           #1b2438;
+    --md-sys-color-inverse-on-surface:        #eef3ff;
+    --md-sys-color-error:                     #ba1a1a;
+    --md-sys-color-on-error:                  #ffffff;
+    --md-sys-color-error-container:           #ffdad6;
+    --md-sys-color-on-error-container:        #410002;
+    --md-sys-color-success:                   #16a34a;
+
+    --bg:              var(--md-sys-color-surface);
+    --surface:         var(--md-sys-color-surface-container);
+    --surface-2:       var(--md-sys-color-surface-container-high);
+    --border:          var(--md-sys-color-outline-variant);
+    --accent:          var(--brand-blue);
+    --accent-soft:     var(--md-sys-color-primary-container);
+    --text:            var(--md-sys-color-on-surface);
+    --text-secondary:  var(--md-sys-color-on-surface-variant);
+    --text-muted:      var(--md-sys-color-outline);
+    --success:         var(--md-sys-color-success);
+    --tag-bg:          #edf2ff;
+    --tag-text:        #01347A;
+
+    --theme-page-bg: linear-gradient(180deg, #f7f9ff 0%, #f2f6ff 100%);
+    --theme-panel: #ffffff;
+    --theme-panel-muted: #f8faff;
+    --theme-panel-emphasis: #eef3ff;
+    --theme-panel-border: #dbe4f5;
+    --theme-panel-border-strong: #b9c8ea;
+    --theme-shadow-sm: 0 8px 24px rgba(1, 52, 122, 0.08);
+    --theme-shadow-md: 0 18px 42px rgba(1, 52, 122, 0.14);
+    --theme-accent-soft: rgba(1, 52, 122, 0.1);
+    --theme-accent-strong: #01347A;
+    --theme-accent-stronger: #0B3A6A;
+    --theme-success-bg: #e9fbf1;
+    --theme-success-text: #13824d;
+    --theme-success-border: #b8f0cc;
+    --theme-icon-wash: linear-gradient(135deg, rgba(124, 77, 255, 0.12), rgba(31, 182, 255, 0.12));
+    --theme-icon-border: rgba(1, 52, 122, 0.16);
+
+    color-scheme: light;
+  }
+}

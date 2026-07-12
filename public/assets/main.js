@@ -590,11 +590,23 @@ import '/assets/ui/loader.js';
   // i18n.js) because flipping the language has to also re-render the
   // chat assistant if the panel is open. That cross-module concern
   // belongs at the boot layer, where we can see both modules at once.
-  function setLang(lang) {
-    setCurrentLang(lang);
-    try { localStorage.setItem('portfolio_lang', lang); } catch (_) {}
-    try { updateTopbarLanguage(lang); } catch (_) {}
-    applyPageLang(lang);
+  function isSoftwareArchitectureRoute() {
+    return location.pathname === '/software-architecture'
+      || location.pathname === '/software-architecture/'
+      || location.pathname.startsWith('/software-architecture/');
+  }
+
+  function setLang(lang, opts) {
+    const options = opts || {};
+    const requestedLang = typeof lang === 'string' ? lang : 'en';
+    const effectiveLang = isSoftwareArchitectureRoute() ? 'en' : requestedLang;
+
+    setCurrentLang(effectiveLang);
+    try {
+      if (!options.skipStorage) localStorage.setItem('portfolio_lang', requestedLang);
+    } catch (_) {}
+    try { updateTopbarLanguage(effectiveLang); } catch (_) {}
+    applyPageLang(effectiveLang);
     const teaserText = document.querySelector('.chat-teaser-text');
     const teaserCta  = document.querySelector('.chat-teaser-cta');
     if (teaserText) teaserText.textContent = t().teaserText;
@@ -682,7 +694,7 @@ import '/assets/ui/loader.js';
       const stored = localStorage.getItem('portfolio_lang');
       if (stored) lang = stored;
     } catch (_) {}
-    setLang(lang);
+    setLang(lang, { suppressNotice: true });
   })();
 
   // Location popover (timezone-aware): extracted to ./ui/location.js
