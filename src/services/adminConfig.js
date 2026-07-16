@@ -1,12 +1,8 @@
 'use strict';
 
-const { FieldValue } = require('@google-cloud/firestore');
-const firestore = require('./firestore');
+const adminConfigRepository = require('../repositories/adminConfigRepository');
 
 // ── Tier configuration ────────────────────────────────────────────────────────
-const CONFIG_COLLECTION = 'config';
-const TIER_CONFIG_DOC   = 'tierSettings';
-
 const DEFAULT_TIER_CONFIG = {
   free: {
     items: [
@@ -23,9 +19,8 @@ const DEFAULT_TIER_CONFIG = {
 };
 
 async function getTierConfig() {
-  const snap = await firestore.getDb().collection(CONFIG_COLLECTION).doc(TIER_CONFIG_DOC).get();
-  if (!snap.exists) return DEFAULT_TIER_CONFIG;
-  const d = snap.data() || {};
+  const d = await adminConfigRepository.getTierConfigDoc();
+  if (!d) return DEFAULT_TIER_CONFIG;
   return {
     free:    { items: Array.isArray(d.free?.items)    ? d.free.items    : DEFAULT_TIER_CONFIG.free.items },
     premium: { items: Array.isArray(d.premium?.items) ? d.premium.items : DEFAULT_TIER_CONFIG.premium.items },
@@ -33,16 +28,13 @@ async function getTierConfig() {
 }
 
 async function upsertTierConfig(config) {
-  await firestore.getDb().collection(CONFIG_COLLECTION).doc(TIER_CONFIG_DOC).set({
+  await adminConfigRepository.saveTierConfigDoc({
     free:      { items: Array.isArray(config?.free?.items)    ? config.free.items    : [] },
     premium:   { items: Array.isArray(config?.premium?.items) ? config.premium.items : [] },
-    updatedAt: FieldValue.serverTimestamp(),
   });
 }
 
 // ── SEO / AEO configuration ───────────────────────────────────────────────────
-const SEO_CONFIG_DOC = 'seoConfig';
-
 const DEFAULT_SEO_CONFIG = {
   siteUrl:             'https://portfolio-service-647206478056.asia-southeast1.run.app',
   siteDescription:     'Senior Salesforce Application Engineer with 12+ years across Salesforce, GCP, MuleSoft and API integrations. Deep-dive system design articles on authentication, security, and enterprise architecture.',
@@ -55,9 +47,8 @@ const DEFAULT_SEO_CONFIG = {
 };
 
 async function getSeoConfig() {
-  const snap = await firestore.getDb().collection(CONFIG_COLLECTION).doc(SEO_CONFIG_DOC).get();
-  if (!snap.exists) return { ...DEFAULT_SEO_CONFIG };
-  const d = snap.data() || {};
+  const d = await adminConfigRepository.getSeoConfigDoc();
+  if (!d) return { ...DEFAULT_SEO_CONFIG };
   return {
     siteUrl:            String(d.siteUrl           || DEFAULT_SEO_CONFIG.siteUrl),
     siteDescription:    String(d.siteDescription   || DEFAULT_SEO_CONFIG.siteDescription),
@@ -71,7 +62,7 @@ async function getSeoConfig() {
 }
 
 async function upsertSeoConfig(cfg) {
-  await firestore.getDb().collection(CONFIG_COLLECTION).doc(SEO_CONFIG_DOC).set({
+  await adminConfigRepository.saveSeoConfigDoc({
     siteUrl:            String(cfg.siteUrl           || DEFAULT_SEO_CONFIG.siteUrl),
     siteDescription:    String(cfg.siteDescription   || DEFAULT_SEO_CONFIG.siteDescription),
     ogImageUrl:         String(cfg.ogImageUrl         || ''),
@@ -80,13 +71,10 @@ async function upsertSeoConfig(cfg) {
     sitemapEnabled:     cfg.sitemapEnabled   !== false,
     robotsNoindex:      !!cfg.robotsNoindex,
     hreflangFrEnabled:  !!cfg.hreflangFrEnabled,
-    updatedAt:          FieldValue.serverTimestamp(),
   });
 }
 
 // ── Atlas configuration ───────────────────────────────────────────────────────
-const ATLAS_CONFIG_DOC = 'atlasConfig';
-
 const DEFAULT_ATLAS_CONFIG = {
   // ── 1. LLM Configuration ────────────────────────────────────────────────
   enabledModels:            ['flash-lite', 'flash'],
@@ -123,6 +111,10 @@ const DEFAULT_ATLAS_CONFIG = {
   // ── 6. Model Routing ─────────────────────────────────────────────────────
   routingStrategy:          'default',         // default | rule-based | classifier
   routingFallbackModel:     'flash-lite',
+  webSearchEnabled:         true,
+  webSearchMode:            'web-intent',      // disabled | web-intent | always
+  webSearchMaxResults:      5,
+  webSearchTopic:           'general',         // general | news
 
   // ── 7. Evaluation Configuration ──────────────────────────────────────────
   recallThreshold:          0.80,
@@ -155,9 +147,8 @@ function _bool(val, def) { return typeof val === 'boolean' ? val : def; }
 function _str(val, def)  { return typeof val === 'string' && val ? val : def; }
 
 async function getAtlasConfig() {
-  const snap = await firestore.getDb().collection(CONFIG_COLLECTION).doc(ATLAS_CONFIG_DOC).get();
-  if (!snap.exists) return { ...DEFAULT_ATLAS_CONFIG };
-  const d = snap.data() || {};
+  const d = await adminConfigRepository.getAtlasConfigDoc();
+  if (!d) return { ...DEFAULT_ATLAS_CONFIG };
   const D = DEFAULT_ATLAS_CONFIG;
   return {
     // LLM
@@ -190,6 +181,10 @@ async function getAtlasConfig() {
     // Routing
     routingStrategy:          _str(d.routingStrategy,          D.routingStrategy),
     routingFallbackModel:     _str(d.routingFallbackModel,     D.routingFallbackModel),
+    webSearchEnabled:         _bool(d.webSearchEnabled,        D.webSearchEnabled),
+    webSearchMode:            _str(d.webSearchMode,            D.webSearchMode),
+    webSearchMaxResults:      _num(d.webSearchMaxResults,      D.webSearchMaxResults),
+    webSearchTopic:           _str(d.webSearchTopic,           D.webSearchTopic),
     // Evaluation
     recallThreshold:          _num(d.recallThreshold,          D.recallThreshold),
     faithfulnessThreshold:    _num(d.faithfulnessThreshold,    D.faithfulnessThreshold),
@@ -215,7 +210,7 @@ async function getAtlasConfig() {
 
 async function upsertAtlasConfig(cfg) {
   const D = DEFAULT_ATLAS_CONFIG;
-  await firestore.getDb().collection(CONFIG_COLLECTION).doc(ATLAS_CONFIG_DOC).set({
+  await adminConfigRepository.saveAtlasConfigDoc({
     // LLM
     enabledModels:            Array.isArray(cfg.enabledModels) ? cfg.enabledModels : D.enabledModels,
     defaultModel:             _str(cfg.defaultModel,             D.defaultModel),
@@ -246,6 +241,10 @@ async function upsertAtlasConfig(cfg) {
     // Routing
     routingStrategy:          _str(cfg.routingStrategy,          D.routingStrategy),
     routingFallbackModel:     _str(cfg.routingFallbackModel,     D.routingFallbackModel),
+    webSearchEnabled:         _bool(cfg.webSearchEnabled,        D.webSearchEnabled),
+    webSearchMode:            _str(cfg.webSearchMode,            D.webSearchMode),
+    webSearchMaxResults:      _num(cfg.webSearchMaxResults,      D.webSearchMaxResults),
+    webSearchTopic:           _str(cfg.webSearchTopic,           D.webSearchTopic),
     // Evaluation
     recallThreshold:          _num(cfg.recallThreshold,          D.recallThreshold),
     faithfulnessThreshold:    _num(cfg.faithfulnessThreshold,    D.faithfulnessThreshold),
@@ -266,34 +265,26 @@ async function upsertAtlasConfig(cfg) {
     contentModerationEnabled: _bool(cfg.contentModerationEnabled,D.contentModerationEnabled),
     // UI
     modelSelectorVisible:     cfg.modelSelectorVisible !== false,
-    updatedAt:                FieldValue.serverTimestamp(),
   });
 }
 
 // ── Component registry toggle map ─────────────────────────────────────────────
-const COMPONENT_REGISTRY_DOC = 'componentRegistry';
-
 async function getComponentRegistry() {
-  const snap = await firestore.getDb().collection(CONFIG_COLLECTION).doc(COMPONENT_REGISTRY_DOC).get();
-  if (!snap.exists) return {};
-  return snap.data()?.enabled || {};
+  const d = await adminConfigRepository.getComponentRegistryDoc();
+  if (!d) return {};
+  return d.enabled || {};
 }
 
 async function upsertComponentRegistry(enabled) {
-  await firestore.getDb().collection(CONFIG_COLLECTION).doc(COMPONENT_REGISTRY_DOC).set({
+  await adminConfigRepository.saveComponentRegistryDoc({
     enabled:   enabled || {},
-    updatedAt: FieldValue.serverTimestamp(),
   });
 }
 
 // ── Contact policy override (admin-managed) ───────────────────────────────────
-const APP_CONFIG_COLLECTION = 'appConfig';
-const CONTACT_POLICY_DOC = 'contactPolicy';
-
 async function getContactPolicyConfig() {
-  const snap = await firestore.getDb().collection(APP_CONFIG_COLLECTION).doc(CONTACT_POLICY_DOC).get();
-  if (!snap.exists) return null;
-  const data = snap.data() || {};
+  const data = await adminConfigRepository.getContactPolicyDoc();
+  if (!data) return null;
   return {
     privatePhone: Object.prototype.hasOwnProperty.call(data, 'privatePhone')
       ? String(data.privatePhone || '').trim()
@@ -327,14 +318,13 @@ function cleanPhone(value) {
 }
 
 async function upsertContactPolicyConfig({ privatePhone, allowedDomains, personalDomains, allowedEmails, blockedDomains, updatedBy }) {
-  await firestore.getDb().collection(APP_CONFIG_COLLECTION).doc(CONTACT_POLICY_DOC).set({
+  await adminConfigRepository.saveContactPolicyDoc({
     privatePhone:   cleanPhone(privatePhone),
     allowedDomains:  cleanStringList(allowedDomains),
     personalDomains: cleanStringList(personalDomains),
     allowedEmails:   cleanStringList(allowedEmails),
     blockedDomains:  cleanStringList(blockedDomains),
     updatedBy:      updatedBy || null,
-    updatedAt:      FieldValue.serverTimestamp(),
   }, { merge: true });
   return getContactPolicyConfig();
 }

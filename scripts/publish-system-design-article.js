@@ -4,7 +4,7 @@ require('dotenv').config();
 
 const fs = require('node:fs');
 const path = require('node:path');
-const firestore = require('../src/services/firestore');
+const articlesRepository = require('../src/repositories/articlesRepository');
 
 async function main() {
   const input = process.argv[2];
@@ -23,7 +23,7 @@ async function main() {
       const category = String(article.category || '').trim().toLowerCase();
       article.contentType = category === 'architecture' ? 'architecture' : 'system-design';
     }
-    const result = await firestore.upsertSystemDesignArticle(article, {
+    const result = await articlesRepository.upsertArticle(article, {
       publishedBy: process.env.USER || 'local-script',
     });
     console.log(`Published ${result.id} version ${result.version}`);

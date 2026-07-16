@@ -91,7 +91,7 @@ const KNOWLEDGE_BASE = {
         "Firestore for sessions / chat history / recommendations, Secret Manager for the",
         "Salesforce JWT key + Google OAuth client, Salesforce JWT-bearer integration via",
         "jsforce, custom Apex REST endpoints, and Salesforce → GCP callbacks via Named",
-        "Credentials. The 'Atlas' assistant you're talking to is wired to Gemini Flash.",
+        "Credentials. The 'Atlas' assistant you're talking to is wired to the portfolio's LLM layer, currently backed by Gemini Flash.",
       ].join(' '),
     },
   ],
@@ -165,7 +165,7 @@ const KNOWLEDGE_BASE = {
 
 /**
  * Render KNOWLEDGE_BASE as a compact, plain-text section the model can
- * reason over. Kept terse on purpose — Gemini Flash is fast but you pay
+ * reason over. Kept terse on purpose — the default fast model is cheap, but you still pay
  * for input tokens, so we don't ship verbose JSON.
  */
 function renderKnowledgeBase() {

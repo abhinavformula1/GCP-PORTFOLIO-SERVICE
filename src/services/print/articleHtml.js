@@ -2,20 +2,13 @@
 
 /**
  * Server-side article HTML renderer for PDF generation.
- *
- * Mirrors the rendering logic in public/assets/ui/sdblocks.js (which is ESM
- * and cannot be require()'d from Node.js CommonJS).  Produces identical CSS
- * class names so the @media print stylesheet in public/assets/style.css
- * applies exactly as on the live page.
  */
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
-const STYLE_PATH = path.join(__dirname, '../../public/assets/style.css');
-const FULL_CSS   = fs.existsSync(STYLE_PATH) ? fs.readFileSync(STYLE_PATH, 'utf8') : '';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const STYLE_PATH = path.join(__dirname, '../../../public/assets/style.css');
+const FULL_CSS = fs.existsSync(STYLE_PATH) ? fs.readFileSync(STYLE_PATH, 'utf8') : '';
 
 function esc(v) {
   return String(v == null ? '' : v)
@@ -34,13 +27,11 @@ function inlineMd(value) {
   return t;
 }
 
-// ── Block renderers — exact mirror of sdblocks.js ────────────────────────────
-
 function heroToHtml(b) {
   let h = '<section class="sd-hero-block">';
-  if (b.kicker)  h += '<div class="sd-kicker">' + esc(b.kicker) + '</div>';
+  if (b.kicker) h += '<div class="sd-kicker">' + esc(b.kicker) + '</div>';
   if (b.heading) h += '<h3>' + inlineMd(b.heading) + '</h3>';
-  if (b.text)    h += '<p>'  + inlineMd(b.text)    + '</p>';
+  if (b.text) h += '<p>' + inlineMd(b.text) + '</p>';
   const cells = Array.isArray(b.cells) ? b.cells.filter(c => c && (c.label || c.value)) : [];
   if (cells.length) {
     h += '<div class="sd-decision-grid">';
@@ -58,9 +49,9 @@ function cardsToHtml(b) {
   if (!items.length) return '';
   return '<div class="sd-card-grid">'
     + items.map(item =>
-        '<div class="sd-info-card"><strong>' + inlineMd(item.title) +
-        '</strong><span>' + inlineMd(item.text) + '</span></div>'
-      ).join('')
+      '<div class="sd-info-card"><strong>' + inlineMd(item.title)
+      + '</strong><span>' + inlineMd(item.text) + '</span></div>'
+    ).join('')
     + '</div>';
 }
 
@@ -69,12 +60,12 @@ function comparisonToHtml(b) {
   if (!rows.length) return '';
   return '<div class="sd-comparison">'
     + rows.map(row =>
-        '<div class="sd-comparison-row' + (row.selected ? ' sd-selected' : '') + '">' +
-        '<strong>' + esc(row.title) + '</strong>' +
-        (row.status ? '<span>' + esc(row.status) + '</span>' : '') +
-        (row.text   ? '<p>' + inlineMd(row.text) + '</p>' : '') +
-        '</div>'
-      ).join('')
+      '<div class="sd-comparison-row' + (row.selected ? ' sd-selected' : '') + '">'
+      + '<strong>' + esc(row.title) + '</strong>'
+      + (row.status ? '<span>' + esc(row.status) + '</span>' : '')
+      + (row.text ? '<p>' + inlineMd(row.text) + '</p>' : '')
+      + '</div>'
+    ).join('')
     + '</div>';
 }
 
@@ -83,8 +74,8 @@ function sequenceToHtml(b) {
   if (!steps.length) return '';
   return '<div class="sd-sequence">'
     + steps.map((step, i) =>
-        '<div><b>' + (i + 1) + '</b><span>' + inlineMd(step) + '</span></div>'
-      ).join('')
+      '<div><b>' + (i + 1) + '</b><span>' + inlineMd(step) + '</span></div>'
+    ).join('')
     + '</div>';
 }
 
@@ -118,12 +109,12 @@ function risksToHtml(b) {
   if (!items.length) return '';
   return '<div class="sd-risk-grid">'
     + items.map(item => {
-        const level = RISK_LEVELS.includes(item.level) ? item.level : 'medium';
-        return '<div class="sd-risk ' + level + '">' +
-               '<strong>' + esc(item.title) + '</strong>' +
-               '<span>' + inlineMd(item.text) + '</span>' +
-               '</div>';
-      }).join('')
+      const level = RISK_LEVELS.includes(item.level) ? item.level : 'medium';
+      return '<div class="sd-risk ' + level + '">'
+        + '<strong>' + esc(item.title) + '</strong>'
+        + '<span>' + inlineMd(item.text) + '</span>'
+        + '</div>';
+    }).join('')
     + '</div>';
 }
 
@@ -138,7 +129,7 @@ function imageToHtml(b) {
   if (!b.url) return '';
   let h = '<figure class="sd-image-block">';
   h += '<img src="' + esc(b.url) + '" alt="' + esc(b.alt || '') + '" loading="eager"';
-  if (b.width)  h += ' width="'  + Number(b.width)  + '"';
+  if (b.width) h += ' width="' + Number(b.width) + '"';
   if (b.height) h += ' height="' + Number(b.height) + '"';
   h += '>';
   if (b.caption) h += '<figcaption>' + esc(b.caption) + '</figcaption>';
@@ -149,24 +140,24 @@ function imageToHtml(b) {
 function imageToLiteHtml(b) {
   if (!b || !b.url) return '';
   const label = b.caption || b.alt || 'Image';
-  return '<div class="sd-print-image-lite">' +
-         '<strong>' + esc(label) + '</strong>' +
-         '<span>' + esc(b.url) + '</span>' +
-         '</div>';
+  return '<div class="sd-print-image-lite">'
+    + '<strong>' + esc(label) + '</strong>'
+    + '<span>' + esc(b.url) + '</span>'
+    + '</div>';
 }
 
 function blockToHtml(block, opts) {
   if (!block || !block.type) return '';
   const options = opts || {};
   switch (block.type) {
-    case 'heading':   return block.text ? '<h3>' + inlineMd(block.text) + '</h3>' : '';
-    case 'paragraph': return block.text ? '<p>'  + inlineMd(block.text) + '</p>'  : '';
+    case 'heading': return block.text ? '<h3>' + inlineMd(block.text) + '</h3>' : '';
+    case 'paragraph': return block.text ? '<p>' + inlineMd(block.text) + '</p>' : '';
     case 'bullets': {
       const items = Array.isArray(block.items) ? block.items.filter(Boolean) : [];
       return items.length ? '<ul>' + items.map(i => '<li>' + inlineMd(i) + '</li>').join('') + '</ul>' : '';
     }
-    case 'hero':       return heroToHtml(block);
-    case 'cards':      return cardsToHtml(block);
+    case 'hero': return heroToHtml(block);
+    case 'cards': return cardsToHtml(block);
     case 'flow': {
       const steps = Array.isArray(block.steps) ? block.steps.filter(Boolean) : [];
       return steps.length
@@ -174,13 +165,13 @@ function blockToHtml(block, opts) {
         : '';
     }
     case 'comparison': return comparisonToHtml(block);
-    case 'sequence':   return sequenceToHtml(block);
-    case 'matrix':     return matrixToHtml(block);
-    case 'risks':      return risksToHtml(block);
-    case 'code':       return codeToHtml(block);
-    case 'image':      return options.mode === 'lite' ? imageToLiteHtml(block) : imageToHtml(block);
-    case 'html':       return String(block.html || '');
-    default:           return '';
+    case 'sequence': return sequenceToHtml(block);
+    case 'matrix': return matrixToHtml(block);
+    case 'risks': return risksToHtml(block);
+    case 'code': return codeToHtml(block);
+    case 'image': return options.mode === 'lite' ? imageToLiteHtml(block) : imageToHtml(block);
+    case 'html': return String(block.html || '');
+    default: return '';
   }
 }
 
@@ -189,31 +180,21 @@ function blocksToHtml(blocks, opts) {
   return blocks.map(b => blockToHtml(b, opts)).filter(Boolean).join('');
 }
 
-// ── Document builder ──────────────────────────────────────────────────────────
-
-/**
- * Build a self-contained, printable HTML document for an article.
- * Embeds full site CSS so Puppeteer page.setContent() renders correctly
- * with the exact same visual output as the live site.
- */
 function buildPrintDocument(article, opts) {
   const options = opts || {};
   const loc = (article && article.en) ? article.en : (article || {});
-  const title  = loc.title || article.title || article.id || 'Design Note';
-  const sub    = loc.subtitle || article.subtitle || article.description || '';
-  const tags   = Array.isArray(article.tags) ? article.tags : [];
-  const mins   = article.readMinutes ? String(article.readMinutes) + ' min read' : '';
+  const title = loc.title || article.title || article.id || 'Design Note';
+  const sub = loc.subtitle || article.subtitle || article.description || '';
+  const tags = Array.isArray(article.tags) ? article.tags : [];
+  const mins = article.readMinutes ? String(article.readMinutes) + ' min read' : '';
   const contentType = String(article.contentType || '').trim().toLowerCase();
   const typeLabel = contentType === 'architecture'
     ? 'Architecture Note'
     : (contentType === 'case-study' ? 'Case Study' : 'System Design');
-  const date   = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const bodyHtml = blocksToHtml(article.blocks || [], options);
-
-  const tagsHtml = tags.map(t =>
-    '<span class="sd-tag">' + esc(t) + '</span>'
-  ).join('');
+  const tagsHtml = tags.map(t => '<span class="sd-tag">' + esc(t) + '</span>').join('');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -222,10 +203,7 @@ function buildPrintDocument(article, opts) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title>
 <style>
-/* ── Full site CSS (includes @media print rules) ── */
 ${FULL_CSS}
-
-/* ── Page-level resets for the PDF viewport ── */
 body {
   background: #fff;
   margin: 0;
@@ -236,7 +214,6 @@ body {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-
 .sd-print-header {
   display: flex;
   align-items: baseline;
@@ -244,42 +221,34 @@ body {
   gap: 12px;
   margin-bottom: 10px;
 }
-
 .sd-print-meta {
   font-size: 9.5pt;
   color: rgba(17, 17, 17, 0.72);
   letter-spacing: 0.01em;
 }
-
 .sd-print-meta strong {
   color: #111;
   font-weight: 700;
 }
-
 .sd-print-sep {
   margin: 0 6px;
   color: rgba(17, 17, 17, 0.42);
 }
-
 .sd-article-header {
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(17, 17, 17, 0.14);
 }
-
 .sd-article-title {
   margin-top: 6px;
 }
-
 .sd-article-sub {
   margin-top: 6px;
   color: rgba(17, 17, 17, 0.72);
 }
-
 .sd-article-meta {
   margin-top: 10px;
   gap: 8px;
 }
-
 .sd-article-meta .sd-tag {
   border: 1px solid rgba(17, 17, 17, 0.16);
   background: rgba(17, 17, 17, 0.04);
@@ -291,13 +260,11 @@ body {
   letter-spacing: 0;
   text-transform: none;
 }
-
 .sd-article-meta .sd-read-time {
   color: rgba(17, 17, 17, 0.64);
   font-size: 9pt;
   font-weight: 600;
 }
-
 .sd-print-image-lite {
   border: 1px solid rgba(0,0,0,0.12);
   border-radius: 10px;
@@ -320,7 +287,6 @@ body {
     <span>${esc(date)}</span>
   </div>
 </div>
-
 <article class="sd-article">
   <header class="sd-article-header">
     <h1 class="sd-article-title">${esc(title)}</h1>
@@ -330,7 +296,6 @@ body {
       ${mins ? `<span class="sd-read-time">${esc(mins)}</span>` : ''}
     </div>
   </header>
-
   <div class="sd-article-body">
     ${bodyHtml}
   </div>

@@ -3,7 +3,7 @@
 const express                    = require('express');
 const { body, validationResult } = require('express-validator');
 const rateLimit                  = require('express-rate-limit');
-const { summariseConversation }  = require('../services/gemini');
+const { summariseConversation }  = require('../services/llm');
 
 const router = express.Router();
 
@@ -34,7 +34,7 @@ router.post('/summarise', summariseLimiter, validateSummarise, async (req, res) 
     const summary = await summariseConversation(req.body);
     return res.status(200).json({ success: true, summary });
   } catch (err) {
-    console.error('Gemini summarise error:', err.message);
+    console.error('LLM summarise error:', err.message);
     return res.status(502).json({ error: 'Summary generation failed. Please try again.' });
   }
 });

@@ -55,6 +55,11 @@ const config = {
     apiKey: process.env.GEMINI_API_KEY || '',
   },
 
+  tavily: {
+    apiKey: process.env.TAVILY_API_KEY || '',
+    baseUrl: process.env.TAVILY_BASE_URL || 'https://api.tavily.com',
+  },
+
   google: {
     // Required to verify Google ID tokens server-side. Must match the
     // OAuth Client ID used by the frontend's Google Sign-In button.

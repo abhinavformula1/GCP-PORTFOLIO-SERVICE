@@ -13,7 +13,7 @@
     "action": { "type": "Keep" },
     "mostRecentVersions": {
       "packageNamePrefixes": ["app"],
-      "keepCount": 5
+      "keepCount": 2
     }
   }
 ]

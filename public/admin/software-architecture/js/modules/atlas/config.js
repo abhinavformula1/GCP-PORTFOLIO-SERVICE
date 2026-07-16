@@ -9,8 +9,8 @@
 import { authedJson, setSectionStatus } from '../../http.js';
 
 export const ATLAS_ALL_MODELS = {
-  'flash-lite': { label: 'Gemini 2.5 Flash-Lite', detail: 'Fast & economical · Default' },
-  'flash':      { label: 'Gemini 2.5 Flash',      detail: 'More detailed · Higher cost'  },
+  'flash-lite': { label: 'Flash-Lite', detail: 'Gemini 2.5 Flash-Lite · Fast & economical · Default' },
+  'flash':      { label: 'Flash',      detail: 'Gemini 2.5 Flash · More detailed · Higher cost'  },
 };
 
 /** Exposed so evaluation.js can read thresholds without a second fetch. */

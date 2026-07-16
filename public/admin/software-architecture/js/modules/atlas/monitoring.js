@@ -181,7 +181,7 @@ function _defaultServices() {
   return [
     { label: 'Express Server',  status: 'healthy',  icon: 'router',         detail: 'HTTP server running' },
     { label: 'Firestore',       status: 'unknown',  icon: 'database',       detail: 'No GCP credentials locally' },
-    { label: 'Gemini API',      status: 'unknown',  icon: 'smart_toy',      detail: 'Configured via GEMINI_API_KEY' },
+    { label: 'Primary LLM API', status: 'unknown',  icon: 'smart_toy',      detail: 'Current provider configured via GEMINI_API_KEY' },
     { label: 'Vertex AI',       status: 'unknown',  icon: 'model_training', detail: 'Embedding endpoint' },
     { label: 'Stripe',          status: 'unknown',  icon: 'payments',       detail: 'Subscription billing' },
     { label: 'Cloud Storage',   status: 'unknown',  icon: 'cloud_upload',   detail: 'Media asset storage' },
@@ -189,7 +189,7 @@ function _defaultServices() {
 }
 function _defaultDeps() {
   return [
-    { label: 'Gemini API',    endpoint: 'generativelanguage.googleapis.com', status: 'unknown', latencyMs: null, lastChecked: null },
+    { label: 'Primary LLM API', endpoint: 'generativelanguage.googleapis.com', status: 'unknown', latencyMs: null, lastChecked: null },
     { label: 'Firestore',     endpoint: 'firestore.googleapis.com',          status: 'unknown', latencyMs: null, lastChecked: null },
     { label: 'Stripe',        endpoint: 'api.stripe.com',                    status: 'unknown', latencyMs: null, lastChecked: null },
     { label: 'Cloud Storage', endpoint: 'storage.googleapis.com',            status: 'unknown', latencyMs: null, lastChecked: null },

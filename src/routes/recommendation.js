@@ -48,9 +48,9 @@ const crypto                          = require('crypto');
 const express                         = require('express');
 const { body, validationResult }      = require('express-validator');
 const { recommendationLimiter }       = require('../middleware/rateLimiter');
-const firestore                       = require('../services/firestore');
+const recommendationsRepository       = require('../repositories/recommendationsRepository');
 const salesforce                      = require('../services/salesforce');
-const googleAuth                      = require('../services/googleAuth');
+const googleAuth                      = require('../services/auth/google');
 const config                          = require('../config');
 const { ValidationError, AppError }   = require('../errors');
 
@@ -75,7 +75,7 @@ router.get('/recommendations', async (_req, res, _next) => {
   // render. Returning an empty list with a 200 keeps the section rendering
   // clean (just shows the empty state). The error is logged so we notice.
   try {
-    const items = await firestore.listActiveRecommendations();
+    const items = await recommendationsRepository.listActiveRecommendations();
     res.set('Cache-Control', 'public, max-age=30, s-maxage=30');
     return res.status(200).json({ success: true, recommendations: items });
   } catch (err) {
@@ -147,7 +147,7 @@ router.post('/recommendation', recommendationLimiter, validateRecommendation, as
 
     // 3. Firestore write — synchronous, fast, public read store.
     //    If this fails, the user gets a real error — they can retry.
-    const fsResult = await firestore.upsertRecommendation({
+    const fsResult = await recommendationsRepository.upsertRecommendation({
       uid,
       email,
       emailVerified: true,
@@ -246,7 +246,7 @@ router.delete('/recommendation', async (req, res, next) => {
     //    once it's gone here, the card stops appearing on every page
     //    load globally. We do this before SF so the user-visible effect
     //    happens immediately even if the SF callout is slow.
-    const fsResult = await firestore.deleteRecommendation(uid);
+    const fsResult = await recommendationsRepository.deleteRecommendation(uid);
 
     // 3. Salesforce SOFT delete. Best-effort: if it fails after retries
     //    the recruiter still got the visible deletion they asked for,
@@ -333,7 +333,7 @@ router.post('/recommendation/:uid/reply', async (req, res, next) => {
     // 3. Apply to the Firestore document. Idempotent — replaying the same
     //    callback (Salesforce DOES retry callouts on failure) just re-writes
     //    the same reply, no harm done.
-    const result = await firestore.writeRecommendationReply(uid, { reply, repliedAt });
+    const result = await recommendationsRepository.writeRecommendationReply(uid, { reply, repliedAt });
 
     if (!result.applied) {
       // The Firestore doc might not exist if we get the reply callback

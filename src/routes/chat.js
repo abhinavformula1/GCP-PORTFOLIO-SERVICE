@@ -18,7 +18,7 @@
 
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const firestore = require('../services/firestore');
+const chatSessionsRepository = require('../repositories/chatSessionsRepository');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -29,7 +29,7 @@ router.use('/chat', requireAuth);
 // ── GET /api/chat/active ─────────────────────────────────────────────────────
 router.get('/chat/active', async (req, res, next) => {
   try {
-    const chat = await firestore.getActiveChat(req.user.uid);
+    const chat = await chatSessionsRepository.getActiveChat(req.user.uid);
     return res.status(200).json({ success: true, chat });
   } catch (err) {
     return next(err);
@@ -52,7 +52,7 @@ router.post('/chat/active', async (req, res, next) => {
       throw new ValidationError('Invalid answers payload.');
     }
 
-    await firestore.upsertActiveChat(req.user.uid, { step, answers, message, locale });
+    await chatSessionsRepository.upsertActiveChat(req.user.uid, { step, answers, message, locale });
     return res.status(200).json({ success: true });
   } catch (err) {
     return next(err);
@@ -62,7 +62,7 @@ router.post('/chat/active', async (req, res, next) => {
 // ── DELETE /api/chat/active ──────────────────────────────────────────────────
 router.delete('/chat/active', async (req, res, next) => {
   try {
-    await firestore.clearActiveChat(req.user.uid);
+    await chatSessionsRepository.clearActiveChat(req.user.uid);
     return res.status(200).json({ success: true });
   } catch (err) {
     return next(err);
@@ -74,7 +74,7 @@ router.delete('/chat/active', async (req, res, next) => {
 router.post('/chat/complete', async (req, res, next) => {
   try {
     const { salesforceId, alreadySubmitted } = req.body || {};
-    await firestore.completeActiveChat(req.user.uid, { salesforceId, alreadySubmitted });
+    await chatSessionsRepository.completeActiveChat(req.user.uid, { salesforceId, alreadySubmitted });
     return res.status(200).json({ success: true });
   } catch (err) {
     return next(err);

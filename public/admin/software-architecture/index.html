@@ -1264,8 +1264,8 @@
                     </span>
                     <select id="atlasFallbackModel">
                       <option value="">None</option>
-                      <option value="flash-lite">Gemini 2.5 Flash-Lite</option>
-                      <option value="flash">Gemini 2.5 Flash</option>
+                      <option value="flash-lite">Flash-Lite (Gemini 2.5 Flash-Lite)</option>
+                      <option value="flash">Flash (Gemini 2.5 Flash)</option>
                     </select>
                   </label>
 
@@ -1521,8 +1521,8 @@
             <label class="sd-seo-field" style="margin-top:12px">
               <span>Fallback Model</span>
               <select id="atlasRoutingFallbackModel">
-                <option value="flash-lite">Gemini 2.5 Flash-Lite (cheaper)</option>
-                <option value="flash">Gemini 2.5 Flash (smarter)</option>
+                <option value="flash-lite">Flash-Lite (Gemini 2.5 Flash-Lite, cheaper)</option>
+                <option value="flash">Flash (Gemini 2.5 Flash, smarter)</option>
               </select>
             </label>
             <p class="sd-seo-field-hint">Used when the primary model is unavailable or rate-limited.</p>
@@ -1662,7 +1662,7 @@
             </span>
           </summary>
           <div class="sd-ai-accordion-body">
-            <p class="sd-seo-group-desc">Protect the pipeline from abuse. Rate limiting applies per authenticated user. Content moderation uses Gemini's safety filters.</p>
+            <p class="sd-seo-group-desc">Protect the pipeline from abuse. Rate limiting applies per authenticated user. Content moderation uses the active provider's safety filters.</p>
             <div class="sd-seo-toggles">
               <div class="sd-seo-toggle-row">
                 <div class="sd-seo-toggle-info"><strong>PII Redaction</strong><span>Strip personally identifiable information from user messages before sending to the LLM.</span></div>
@@ -1673,7 +1673,7 @@
                 <label class="sd-toggle-switch" aria-label="Injection detection"><input type="checkbox" id="atlasInjectionDetection"><span class="sd-toggle-slider"></span></label>
               </div>
               <div class="sd-seo-toggle-row">
-                <div class="sd-seo-toggle-info"><strong>Content Moderation</strong><span>Apply Gemini safety filters before returning responses to visitors.</span></div>
+                <div class="sd-seo-toggle-info"><strong>Content Moderation</strong><span>Apply the active provider's safety filters before returning responses to visitors.</span></div>
                 <label class="sd-toggle-switch" aria-label="Content moderation"><input type="checkbox" id="atlasContentModeration"><span class="sd-toggle-slider"></span></label>
               </div>
             </div>

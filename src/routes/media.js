@@ -14,7 +14,7 @@ const multer  = require('multer');
 const { body, validationResult } = require('express-validator');
 const { requireAdmin } = require('../middleware/auth');
 const { uploadMedia, listMediaObjects, deleteMediaObject, MAX_BYTES } = require('../services/gcs');
-const { listSystemDesignArticles } = require('../services/firestore');
+const { listArticles } = require('../repositories/articlesRepository');
 const sponsorBanner = require('../services/sponsorBanner');
 const { AppError, ValidationError } = require('../errors');
 
@@ -130,7 +130,7 @@ function throwAdcHelpIfNeeded(err) {
 }
 
 async function buildMediaReferenceMap({ bucket }) {
-  const articles = await listSystemDesignArticles();
+  const articles = await listArticles();
   const refMap = new Map(); // objectName -> [{ articleId, title, field }]
 
   function addRef(objectName, ref) {

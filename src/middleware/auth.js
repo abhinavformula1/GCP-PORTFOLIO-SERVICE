@@ -9,7 +9,7 @@
  * On failure: responds with 401 via the global error handler.
  */
 
-const googleAuth = require('../services/googleAuth');
+const googleAuth = require('../services/auth/google');
 const config = require('../config');
 const { AppError } = require('../errors');
 
@@ -37,6 +37,12 @@ function shouldAllowLocalAdminToken(req, token) {
   return isSafeLocalDevRuntime() && isLocalhostRequest(req) && token === 'local-admin-preview';
 }
 
+function extractBearerToken(req) {
+  const header = req.headers.authorization || '';
+  const m = /^Bearer\s+(.+)$/i.exec(header);
+  return m ? String(m[1] || '').trim() : '';
+}
+
 async function requireAuth(req, res, next) {
   try {
     if (config.admin.localPreview) {
@@ -44,16 +50,15 @@ async function requireAuth(req, res, next) {
       req.user = localPreviewUser();
       return next();
     }
-    const header = req.headers.authorization || '';
-    const m = /^Bearer\s+(.+)$/i.exec(header);
-    if (!m) throw new AppError('Missing Authorization header.', 401, 'UNAUTHORIZED');
+    const token = extractBearerToken(req);
+    if (!token) throw new AppError('Missing Authorization header.', 401, 'UNAUTHORIZED');
 
-    if (shouldAllowLocalAdminToken(req, m[1])) {
+    if (shouldAllowLocalAdminToken(req, token)) {
       req.user = localPreviewUser();
       return next();
     }
 
-    req.user = await googleAuth.verifyIdToken(m[1]);
+    req.user = await googleAuth.verifyIdToken(token);
     return next();
   } catch (err) {
     return next(err);
@@ -70,16 +75,15 @@ async function optionalAuth(req, _res, next) {
       req.user = localPreviewUser();
       return next();
     }
-    const header = req.headers.authorization || '';
-    const m = /^Bearer\s+(.+)$/i.exec(header);
-    if (!m) return next();
+    const token = extractBearerToken(req);
+    if (!token) return next();
 
-    if (shouldAllowLocalAdminToken(req, m[1])) {
+    if (shouldAllowLocalAdminToken(req, token)) {
       req.user = localPreviewUser();
       return next();
     }
 
-    req.user = await googleAuth.verifyIdToken(m[1]);
+    req.user = await googleAuth.verifyIdToken(token);
     return next();
   } catch (_err) {
     // Optional auth must never break public endpoints. Treat invalid/expired
@@ -98,9 +102,8 @@ async function requireAdmin(req, res, next) {
   // Localhost dev escape hatch for CMS work without Google OAuth setup.
   // Only enabled on localhost and never on Cloud Run.
   try {
-    const header = req.headers.authorization || '';
-    const m = /^Bearer\s+(.+)$/i.exec(header);
-    if (m && shouldAllowLocalAdminToken(req, m[1])) {
+    const token = extractBearerToken(req);
+    if (token && shouldAllowLocalAdminToken(req, token)) {
       req.user = localPreviewUser();
       return next();
     }
@@ -117,4 +120,51 @@ async function requireAdmin(req, res, next) {
   });
 }
 
-module.exports = { requireAuth, optionalAuth, requireAdmin };
+async function verifyAdminAccess(req, {
+  allowQueryToken = false,
+  allowHeaderToken = true,
+} = {}) {
+  if (config.admin.localPreview) {
+    req.user = localPreviewUser();
+    return req.user;
+  }
+
+  const headerToken = allowHeaderToken ? extractBearerToken(req) : '';
+  const queryToken = allowQueryToken ? String(req.query?.token || '').trim() : '';
+  const token = headerToken || queryToken;
+
+  if (!token) {
+    throw new AppError('Missing token.', 401, 'UNAUTHORIZED');
+  }
+
+  if (shouldAllowLocalAdminToken(req, token)) {
+    req.user = localPreviewUser();
+    return req.user;
+  }
+
+  try {
+    req.user = await googleAuth.verifyIdToken(token);
+  } catch (_) {
+    throw new AppError('Invalid or expired token.', 401, 'UNAUTHORIZED');
+  }
+
+  const email = String(req.user?.email || '').toLowerCase();
+  if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
+    throw new AppError('Admin access not allowed.', 403, 'FORBIDDEN');
+  }
+
+  return req.user;
+}
+
+function requireAdminAccess(options = {}) {
+  return async function adminAccessMiddleware(req, _res, next) {
+    try {
+      await verifyAdminAccess(req, options);
+      return next();
+    } catch (err) {
+      return next(err);
+    }
+  };
+}
+
+module.exports = { requireAuth, optionalAuth, requireAdmin, verifyAdminAccess, requireAdminAccess };

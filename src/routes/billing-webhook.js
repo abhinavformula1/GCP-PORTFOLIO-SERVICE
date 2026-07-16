@@ -2,7 +2,7 @@
 
 const config = require('../config');
 const { AppError } = require('../errors');
-const { getStripe, isStripeConfigured } = require('../services/stripe');
+const { getStripe, isStripeConfigured } = require('../services/billing/stripe');
 const billing = require('../services/billing');
 
 function assertWebhookConfigured() {
