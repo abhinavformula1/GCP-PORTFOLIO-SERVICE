@@ -4,11 +4,11 @@ const express   = require('express');
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const { AppError }           = require('../errors');
-const { generatePdf, resolveChromePath } = require('../services/pdf');
+const { generatePdf, resolveChromePath } = require('../services/print');
 const config = require('../config');
-const firestore = require('../services/firestore');
+const { getArticle } = require('../repositories/articlesRepository');
 const billing = require('../services/billing');
-const googleAuth = require('../services/googleAuth');
+const googleAuth = require('../services/auth/google');
 
 const router = express.Router();
 
@@ -42,7 +42,7 @@ router.get('/export', pdfLimiter, async (req, res, next) => {
       return res.status(400).json({ success: false, code: 'BAD_REQUEST', error: 'Missing or invalid article id.' });
     }
 
-    const article = await firestore.getSystemDesignArticle(id);
+    const article = await getArticle(id);
     if (!article) {
       return res.status(404).json({ success: false, code: 'NOT_FOUND', error: 'Article not found.' });
     }

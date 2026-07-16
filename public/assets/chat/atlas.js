@@ -735,7 +735,7 @@ function appendUsageMeta(wrap, usage) {
   if (usage.cached) {
     const meta = document.createElement('div');
     meta.className = 'ga-atlas-usage ga-atlas-usage-cache';
-    meta.textContent = 'Retrieved from cache · 0 Gemini tokens used · Est. cost ₹0.00';
+    meta.textContent = 'Retrieved from cache · 0 LLM tokens used · Est. cost ₹0.00';
     wrap.appendChild(meta);
     scrollToBottom();
     return;
@@ -746,7 +746,7 @@ function appendUsageMeta(wrap, usage) {
 
   const meta = document.createElement('div');
   meta.className = 'ga-atlas-usage';
-  const modelLabel = usage.modelLabel || usage.model || 'Gemini';
+  const modelLabel = usage.modelLabel || usage.model || 'LLM';
   meta.textContent = 'Usage: ' + formatNumber(totalTokens)
     + ' tokens (' + formatNumber(usage.inputTokens) + ' in / '
     + formatNumber(usage.outputTokens) + ' out) · Est. cost: ' + formatInr(estimatedInr)

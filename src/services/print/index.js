@@ -2,18 +2,10 @@
 
 /**
  * Server-side PDF generation via headless Chrome (Puppeteer).
- *
- * Uses page.goto(printUrl) where printUrl is a real HTTP URL served by our
- * own /print/system-design/:id route — NOT the SPA hash URL.
- *
- * Why this matters:
- *   - Real HTTP origin → GCS images load normally (no about:blank restrictions)
- *   - No hash routing → no Puppeteer v25 frame detachment
- *   - networkidle0 waits for ALL images to finish loading before pdf()
  */
 
 const puppeteer = require('puppeteer-core');
-const fs        = require('fs');
+const fs = require('fs');
 
 const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
@@ -47,8 +39,6 @@ const LAUNCH_ARGS = [
 ];
 
 async function waitForPageAssets(page, timeoutMs = 15_000) {
-  // Best-effort: fonts + images. If anything times out, we still proceed to PDF
-  // because a partial render is better than a hard failure.
   try {
     await page.evaluate(async (timeout) => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -68,16 +58,9 @@ async function waitForPageAssets(page, timeoutMs = 15_000) {
         }));
       }));
     }, timeoutMs);
-  } catch (_) { /* ignore */ }
+  } catch (_) {}
 }
 
-/**
- * Generate a PDF by navigating to a real server-rendered URL.
- *
- * @param {string} url      - Full URL of the print page (e.g. https://host/print/system-design/id)
- * @param {number} settleMs - Extra ms to wait after networkidle0 (default 1000)
- * @returns {Promise<Buffer>}
- */
 async function generatePdf(url, settleMs = 1000) {
   function isRetriablePdfError(message) {
     const msg = String(message || '');
@@ -89,14 +72,6 @@ async function generatePdf(url, settleMs = 1000) {
     return s.includes('?') ? (s + '&mode=lite') : (s + '?mode=lite');
   }
 
-  // Some pages can crash headless Chrome during navigation/print (e.g. image-heavy
-  // articles). We use:
-  //  - Attempt 1: full render (networkidle0, higher DPR)
-  //  - Attempt 2: lighter render (domcontentloaded, lower DPR)
-  //  - Attempt 3: "lite print" (server strips images; deterministic success path)
-  //
-  // Each attempt uses a fresh Chrome process to avoid a poisoned browser
-  // instance after a crash/disconnect.
   for (let attempt = 1; attempt <= 3; attempt++) {
     const browser = await puppeteer.launch({
       executablePath: resolveChromePath(),
@@ -108,12 +83,10 @@ async function generatePdf(url, settleMs = 1000) {
     try {
       const deviceScaleFactor = attempt === 1 ? 1.5 : 1;
       await page.setViewport({ width: 794, height: 1123, deviceScaleFactor });
-      // Make sure print CSS applies consistently.
       try { await page.emulateMediaType('print'); } catch (_) {}
 
       const waitUntil = attempt === 1 ? 'networkidle0' : 'domcontentloaded';
       const navUrl = attempt === 3 ? withLiteMode(url) : url;
-      // Lite mode is intentionally static; disabling JS reduces memory + crash risk.
       if (attempt === 3) {
         try { await page.setJavaScriptEnabled(false); } catch (_) {}
       }
@@ -124,16 +97,15 @@ async function generatePdf(url, settleMs = 1000) {
       } else if (attempt === 2) {
         await waitForPageAssets(page, 15_000);
       } else {
-        // Lite print: images are stripped server-side, so a short settle is enough.
         await new Promise((r) => setTimeout(r, 250));
       }
 
       const pdf = await page.pdf({
-        format:              'A4',
-        printBackground:     true,
+        format: 'A4',
+        printBackground: true,
         displayHeaderFooter: false,
-        headerTemplate:      '',
-        footerTemplate:      '',
+        headerTemplate: '',
+        footerTemplate: '',
         margin: { top: '18mm', right: '18mm', bottom: '22mm', left: '18mm' },
       });
       return Buffer.from(pdf);

@@ -23,11 +23,11 @@
 
 const crypto                         = require('crypto');
 const express                        = require('express');
-const firestore                      = require('../services/firestore');
+const usersRepository                = require('../repositories/usersRepository');
 const billing                        = require('../services/billing');
 const salesforce                     = require('../services/salesforce');
-const googleAuth                     = require('../services/googleAuth');
-const contactPolicy                  = require('../services/contactPolicy');
+const googleAuth                     = require('../services/auth/google');
+const contactPolicy                  = require('../services/auth/contactPolicy');
 const config                         = require('../config');
 const { ValidationError }            = require('../errors');
 
@@ -77,7 +77,7 @@ router.post('/session/start', async (req, res, next) => {
     // 2. Upsert the user document — degrade gracefully if Firestore is down
     let visit = { isReturning: false, visitCount: 1, firstSeenAt: null, lastSeenAt: null, tier: 'free' };
     try {
-      visit = await firestore.upsertUserVisit({ uid, email, name, picture });
+      visit = await usersRepository.upsertUserVisit({ uid, email, name, picture });
     } catch (fsErr) {
       console.error('[session] Firestore upsert failed (continuing without persistence):', fsErr.message);
     }

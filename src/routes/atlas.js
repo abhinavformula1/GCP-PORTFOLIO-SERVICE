@@ -15,7 +15,7 @@
  *     Firestore (NOT from the request body) so a tampered/stale client
  *     can't poison the model's context.
  *   - Both turns (user message + bot reply) are appended to Firestore
- *     synchronously after a successful Gemini call. Failures to persist
+ *     synchronously after a successful LLM call. Failures to persist
  *     are logged but do NOT fail the request — the visitor still sees
  *     the answer; we just lose resume-on-refresh for that turn.
  *
@@ -36,16 +36,22 @@ const { requireAuth }            = require('../middleware/auth');
 const { atlasLimiter }           = require('../middleware/rateLimiter');
 const config                     = require('../config');
 const {
-  ask, askStream, MAX_USER_MSG_CHARS, MAX_HISTORY_TURNS, GEMINI_MODELS,
-  DEFAULT_GEMINI_MODEL_KEY,
+  ask, askStream, MAX_USER_MSG_CHARS, MAX_HISTORY_TURNS, LLM_MODELS,
+  DEFAULT_LLM_MODEL_KEY,
 } = require('../services/atlas/respond');
-const firestore           = require('../services/firestore');
+const atlasRepository     = require('../repositories/atlasRepository');
 const adminConfig         = require('../services/adminConfig');
 const { buildRagContext } = require('../services/rag');
+const {
+  shouldUseWebSearch,
+  searchTavily,
+  buildWebSearchContext,
+  toPublicWebSearchMeta,
+} = require('../services/tavily/search');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
-const MODEL_KEYS = Object.keys(GEMINI_MODELS);
+const MODEL_KEYS = Object.keys(LLM_MODELS);
 const ATLAS_PERSONA_VERSION = '2026-06-15';
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const CACHEABLE_QUESTIONS = new Set([
@@ -94,7 +100,7 @@ const validateAsk = [
  */
 async function loadServerHistory(uid) {
   try {
-    const conv = await firestore.getActiveAtlasConversation(uid);
+    const conv = await atlasRepository.getActiveConversation(uid);
     return (conv && Array.isArray(conv.turns)) ? conv.turns : [];
   } catch (err) {
     console.warn('[atlas] loadServerHistory failed:', err.message);
@@ -108,9 +114,9 @@ async function loadServerHistory(uid) {
  */
 async function persistTurns(uid, userText, botText, usage) {
   try {
-    await firestore.appendAtlasTurn(uid, { role: 'user',  text: userText });
-    await firestore.appendAtlasTurn(uid, { role: 'model', text: botText, usage });
-    if (!usage || !usage.cached) await firestore.appendAtlasUsageEvent(uid, usage);
+    await atlasRepository.appendTurn(uid, { role: 'user',  text: userText });
+    await atlasRepository.appendTurn(uid, { role: 'model', text: botText, usage });
+    if (!usage || !usage.cached) await atlasRepository.appendUsageEvent(uid, usage);
   } catch (err) {
     console.warn('[atlas] persistTurns failed:', err.message);
   }
@@ -136,9 +142,9 @@ function cacheKeyFor({ message, model, history }) {
 }
 
 function cachedUsage(model) {
-  const modelInfo = GEMINI_MODELS[model] || GEMINI_MODELS[DEFAULT_GEMINI_MODEL_KEY];
+  const modelInfo = LLM_MODELS[model] || LLM_MODELS[DEFAULT_LLM_MODEL_KEY];
   return {
-    model:        modelInfo.id,
+    model:        modelInfo.providerModelId || modelInfo.key,
     modelLabel:   modelInfo.label,
     inputTokens:  0,
     outputTokens: 0,
@@ -152,7 +158,7 @@ function cachedUsage(model) {
 async function readCachedAnswer(cacheRef) {
   if (!cacheRef) return null;
   try {
-    return await firestore.getAtlasCacheEntry(cacheRef.key);
+    return await atlasRepository.getCacheEntry(cacheRef.key);
   } catch (err) {
     console.warn('[atlas] cache read failed:', err.message);
     return null;
@@ -167,52 +173,81 @@ async function readCachedAnswer(cacheRef) {
  * D — depends on adminConfig abstraction, never on Firestore directly.
  *
  * @param {string} userMessage
- * @returns {Promise<{ systemPrompt: string|undefined, generationConfig: object }>}
+ * @returns {Promise<{ systemPrompt: string|undefined, generationConfig: object, webSearch: object|null }>}
  */
-async function buildAtlasCallConfig(userMessage) {
+async function buildAtlasCallConfig(userMessage, cfg) {
   try {
-    const cfg = await adminConfig.getAtlasConfig();
+    const atlasCfg = cfg || await adminConfig.getAtlasConfig();
 
-    // Generation config — read from Firestore, falls back to gemini.js defaults
+    // Generation config — read from Firestore, falls back to provider defaults
     // when fields are absent (so removing a Firestore key doesn't break chat).
     const generationConfig = {};
-    if (typeof cfg.temperature    === 'number') generationConfig.temperature    = cfg.temperature;
-    if (typeof cfg.topP           === 'number') generationConfig.topP           = cfg.topP;
-    if (typeof cfg.maxOutputTokens=== 'number') generationConfig.maxOutputTokens= cfg.maxOutputTokens;
+    if (typeof atlasCfg.temperature     === 'number') generationConfig.temperature     = atlasCfg.temperature;
+    if (typeof atlasCfg.topP            === 'number') generationConfig.topP            = atlasCfg.topP;
+    if (typeof atlasCfg.maxOutputTokens === 'number') generationConfig.maxOutputTokens = atlasCfg.maxOutputTokens;
 
     // Custom system prompt — if admin has set one, use it as the base.
-    const basePrompt = (cfg.systemPrompt && cfg.systemPrompt.trim())
-      ? cfg.systemPrompt
+    const basePrompt = (atlasCfg.systemPrompt && atlasCfg.systemPrompt.trim())
+      ? atlasCfg.systemPrompt
       : require('../services/atlas/persona').SYSTEM_PROMPT;
+    let promptBase = basePrompt;
+    let webSearch = null;
+
+    if (shouldUseWebSearch(userMessage, atlasCfg)) {
+      try {
+        const webSearchResult = await searchTavily(userMessage, {
+          maxResults: atlasCfg.webSearchMaxResults,
+          topic: atlasCfg.webSearchTopic,
+        });
+        const webContext = buildWebSearchContext(webSearchResult);
+        if (webContext) {
+          promptBase = [basePrompt, '', webContext].join('\n');
+          webSearch = toPublicWebSearchMeta(webSearchResult);
+        }
+      } catch (webErr) {
+        console.warn('[atlas/web-search] Tavily lookup failed, continuing without web context:', webErr.message);
+      }
+    }
 
     // RAG augmentation — only when enabled and knowledge base is indexed.
     let systemPrompt;
-    if (cfg.ragEnabled) {
+    if (atlasCfg.ragEnabled) {
       try {
         systemPrompt = await buildRagContext(userMessage, {
-          topK:             cfg.ragTopK || 5,
-          baseSystemPrompt: basePrompt,
+          topK:             atlasCfg.ragTopK || 5,
+          baseSystemPrompt: promptBase,
         });
       } catch (ragErr) {
         console.warn('[atlas/rag] RAG context failed, falling back to base prompt:', ragErr.message);
-        systemPrompt = basePrompt;
+        systemPrompt = promptBase;
       }
     } else {
       // Only override the default persona when admin has set a custom prompt.
-      systemPrompt = cfg.systemPrompt && cfg.systemPrompt.trim() ? basePrompt : undefined;
+      systemPrompt = promptBase !== require('../services/atlas/persona').SYSTEM_PROMPT
+        ? promptBase
+        : undefined;
     }
 
-    return { systemPrompt, generationConfig };
+    return { systemPrompt, generationConfig, webSearch };
   } catch (err) {
     console.warn('[atlas] buildAtlasCallConfig failed, using defaults:', err.message);
-    return { systemPrompt: undefined, generationConfig: {} };
+    return { systemPrompt: undefined, generationConfig: {}, webSearch: null };
+  }
+}
+
+async function loadAtlasRuntimeConfig() {
+  try {
+    return await adminConfig.getAtlasConfig();
+  } catch (err) {
+    console.warn('[atlas] getAtlasConfig failed, using defaults:', err.message);
+    return null;
   }
 }
 
 async function saveCachedAnswer(cacheRef, { model, answer }) {
   if (!cacheRef || !answer) return;
   try {
-    await firestore.saveAtlasCacheEntry(cacheRef.key, {
+    await atlasRepository.saveCacheEntry(cacheRef.key, {
       normalizedQuestion: cacheRef.normalizedQuestion,
       model,
       personaVersion: ATLAS_PERSONA_VERSION,
@@ -244,7 +279,7 @@ function prepareAtlasRequest(req, _res, next) {
   return {
     transactionId: crypto.randomUUID(),
     message:       req.body.message,
-    model:         req.body.model || DEFAULT_GEMINI_MODEL_KEY,
+    model:         req.body.model || DEFAULT_LLM_MODEL_KEY,
     uid:           req.user.uid,
   };
 }
@@ -261,7 +296,10 @@ router.post('/atlas/ask',
 
     try {
       const history = await loadServerHistory(uid);
-      const cacheRef = cacheKeyFor({ message, model, history });
+      const atlasCfg = await loadAtlasRuntimeConfig();
+      const cacheRef = shouldUseWebSearch(message, atlasCfg)
+        ? null
+        : cacheKeyFor({ message, model, history });
       const cached = await readCachedAnswer(cacheRef);
       if (cached && cached.answer) {
         const usage = cachedUsage(model);
@@ -273,10 +311,11 @@ router.post('/atlas/ask',
           usage,
           cached: true,
           transactionId,
+          webSearch: null,
         });
       }
 
-      const { systemPrompt, generationConfig } = await buildAtlasCallConfig(message);
+      const { systemPrompt, generationConfig, webSearch } = await buildAtlasCallConfig(message, atlasCfg);
       const { answer, usage } = await ask({ message, history, model, systemPrompt, generationConfig });
 
       // Fire-and-forget persistence — we already have the answer; the
@@ -291,9 +330,10 @@ router.post('/atlas/ask',
         answerLen:     answer.length,
         model:         usage && usage.model,
         usage,
+        webSearchUsed: !!webSearch,
       });
 
-      return res.status(200).json({ success: true, answer, usage, cached: false, transactionId });
+      return res.status(200).json({ success: true, answer, usage, cached: false, transactionId, webSearch });
     } catch (err) {
       return next(err);
     }
@@ -338,18 +378,21 @@ router.post('/atlas/stream',
 
     try {
       const history = await loadServerHistory(uid);
-      const cacheRef = cacheKeyFor({ message, model, history });
+      const atlasCfg = await loadAtlasRuntimeConfig();
+      const cacheRef = shouldUseWebSearch(message, atlasCfg)
+        ? null
+        : cacheKeyFor({ message, model, history });
       const cached = await readCachedAnswer(cacheRef);
       if (cached && cached.answer) {
         finalAnswer = cached.answer;
         usage = cachedUsage(model);
-        send({ done: finalAnswer, usage, cached: true, transactionId });
+        send({ done: finalAnswer, usage, cached: true, transactionId, webSearch: null });
         persistTurns(uid, message, finalAnswer, usage);
         console.log('[atlas/stream/cache]', { transactionId, uid, model: usage.model });
         return undefined;
       }
 
-      const { systemPrompt, generationConfig } = await buildAtlasCallConfig(message);
+      const { systemPrompt, generationConfig, webSearch } = await buildAtlasCallConfig(message, atlasCfg);
       for await (const evt of askStream({ message, history, model, systemPrompt, generationConfig })) {
         if (aborted) break;
         if (evt.kind === 'chunk') {
@@ -357,7 +400,7 @@ router.post('/atlas/stream',
         } else if (evt.kind === 'done') {
           finalAnswer = evt.text;
           usage = evt.usage;
-          send({ done: finalAnswer, usage, transactionId });
+          send({ done: finalAnswer, usage, transactionId, webSearch });
         }
       }
 
@@ -371,11 +414,12 @@ router.post('/atlas/stream',
         model:     usage && usage.model,
         usage,
         aborted,
+        webSearchUsed: !!webSearch,
       });
     } catch (err) {
       // User-input errors (400/422) carry isOperational=true and a clean
       // user-facing message. Upstream / internal errors get a generic
-      // bubble — never surface raw Gemini JSON or stack traces to the
+      // bubble — never surface raw provider JSON or stack traces to the
       // visitor; log them server-side for debugging.
       const code        = err.code || 'INTERNAL_ERROR';
       const isUserError = err.isOperational && err.statusCode && err.statusCode < 500;
@@ -402,7 +446,7 @@ router.get('/atlas/conversations/active',
   requireAuth,
   async (req, res, next) => {
     try {
-      const conv = await firestore.getActiveAtlasConversation(req.user.uid);
+      const conv = await atlasRepository.getActiveConversation(req.user.uid);
       return res.status(200).json({
         success:      true,
         conversation: conv,
@@ -418,7 +462,7 @@ router.get('/atlas/usage',
   requireAuth,
   async (req, res, next) => {
     try {
-      const usage = await firestore.getAtlasUsageSummary(req.user.uid);
+      const usage = await atlasRepository.getUsageSummary(req.user.uid);
       return res.status(200).json({ success: true, usage });
     } catch (err) {
       return next(err);
@@ -431,7 +475,7 @@ router.delete('/atlas/conversations/active',
   requireAuth,
   async (req, res, next) => {
     try {
-      await firestore.clearActiveAtlasConversation(req.user.uid);
+      await atlasRepository.clearActiveConversation(req.user.uid);
       return res.status(200).json({ success: true });
     } catch (err) {
       return next(err);
@@ -444,12 +488,12 @@ router.get('/atlas/config',
   async (req, res, next) => {
     try {
       const cfg = await adminConfig.getAtlasConfig();
-      // Filter enabledModels to only those that exist in GEMINI_MODELS
-      const enabledModels = cfg.enabledModels.filter(function (k) { return !!GEMINI_MODELS[k]; });
+      // Filter enabledModels to only those that exist in LLM_MODELS
+      const enabledModels = cfg.enabledModels.filter(function (k) { return !!LLM_MODELS[k]; });
       // Ensure defaultModel is in the enabled set; fall back to first enabled.
       const defaultModel = enabledModels.includes(cfg.defaultModel)
         ? cfg.defaultModel
-        : (enabledModels[0] || DEFAULT_GEMINI_MODEL_KEY);
+        : (enabledModels[0] || DEFAULT_LLM_MODEL_KEY);
       return res.json({
         enabledModels,
         defaultModel,
@@ -460,12 +504,12 @@ router.get('/atlas/config',
       // credentials. If Firestore isn't configured locally, fall back to a
       // safe default config so the chat UI can still boot.
       if (config.admin.localPreview) {
-        const fallbackEnabled = ['flash-lite', 'flash'].filter(function (k) { return !!GEMINI_MODELS[k]; });
+        const fallbackEnabled = ['flash-lite', 'flash'].filter(function (k) { return !!LLM_MODELS[k]; });
         return res.json({
-          enabledModels: fallbackEnabled.length ? fallbackEnabled : [DEFAULT_GEMINI_MODEL_KEY],
+          enabledModels: fallbackEnabled.length ? fallbackEnabled : [DEFAULT_LLM_MODEL_KEY],
           defaultModel: fallbackEnabled.includes('flash-lite')
             ? 'flash-lite'
-            : (fallbackEnabled[0] || DEFAULT_GEMINI_MODEL_KEY),
+            : (fallbackEnabled[0] || DEFAULT_LLM_MODEL_KEY),
           modelSelectorVisible: true,
           degraded: true,
           degradedReason: 'FIRESTORE_NOT_CONFIGURED',

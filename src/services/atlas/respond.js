@@ -4,7 +4,7 @@
  * Atlas response orchestrator.
  *
  * One job: given a conversation history and the current user message,
- * call Gemini Flash with the persona system prompt and return a clean
+ * call the configured LLM provider with the persona system prompt and return a clean
  * answer. Sandwiches the LLM call with:
  *   - Input normalisation (trim, length cap, role validation)
  *   - History truncation (keep the last N turns to bound prompt size)
@@ -17,9 +17,9 @@
 const {
   generateChatResponse,
   generateChatResponseStream,
-  GEMINI_MODELS,
-  DEFAULT_GEMINI_MODEL_KEY,
-} = require('../gemini');
+  LLM_MODELS,
+  DEFAULT_LLM_MODEL_KEY,
+} = require('../llm');
 const { SYSTEM_PROMPT }                                     = require('./persona');
 
 const MAX_USER_MSG_CHARS  = 1000;
@@ -28,7 +28,7 @@ const MAX_REPLY_CHARS     = 4000;
 
 /**
  * Trim history to the last N turns, ensuring the first kept turn is a
- * 'user' message (Gemini requires the conversation to start with a user
+ * 'user' message (the current provider requires the conversation to start with a user
  * turn after the system instruction).
  */
 function truncateHistory(history) {
@@ -81,14 +81,14 @@ function inputError(message) {
 }
 
 function normaliseModel(model) {
-  if (!model) return DEFAULT_GEMINI_MODEL_KEY;
-  return GEMINI_MODELS[model] ? model : DEFAULT_GEMINI_MODEL_KEY;
+  if (!model) return DEFAULT_LLM_MODEL_KEY;
+  return LLM_MODELS[model] ? model : DEFAULT_LLM_MODEL_KEY;
 }
 
 /**
  * Validate + normalise a request: trims the user message, enforces
  * length, builds a clean history. Throws on bad input. Both ask() and
- * askStream() are thin wrappers around this + a Gemini call, so this
+ * askStream() are thin wrappers around this + an LLM call, so this
  * keeps the validation logic in one place.
  *
  * DIP note: callers may pass an optional `systemPrompt` override
@@ -170,8 +170,8 @@ async function* askStream(args) {
 module.exports = {
   ask,
   askStream,
-  GEMINI_MODELS,
-  DEFAULT_GEMINI_MODEL_KEY,
+  LLM_MODELS,
+  DEFAULT_LLM_MODEL_KEY,
   // Exported for tests / external observers.
   MAX_USER_MSG_CHARS,
   MAX_HISTORY_TURNS,

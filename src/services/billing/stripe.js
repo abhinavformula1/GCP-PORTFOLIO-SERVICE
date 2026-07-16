@@ -1,8 +1,8 @@
 'use strict';
 
 const Stripe = require('stripe');
-const config = require('../config');
-const { AppError } = require('../errors');
+const config = require('../../config');
+const { AppError } = require('../../errors');
 
 let _stripe = null;
 function getStripe() {
@@ -19,4 +19,3 @@ function isStripeConfigured() {
 }
 
 module.exports = { getStripe, isStripeConfigured };
-

@@ -1,6 +1,7 @@
 'use strict';
 
-const config = require('../config');
+const config = require('../../../config');
+const { resolveModel } = require('../models');
 
 // Gemini API version: `/v1beta/`.
 //
@@ -14,24 +15,7 @@ const config = require('../config');
 // gemini-2.5-flash all use `/v1beta/`, so we mirror that here for both
 // the single-shot and streaming endpoints (consistent error surface).
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const GEMINI_MODELS = Object.freeze({
-  'flash-lite': {
-    id: 'gemini-2.5-flash-lite',
-    label: 'Gemini 2.5 Flash-Lite',
-    inputUsdPerMillion: 0.10,
-    outputUsdPerMillion: 0.40,
-  },
-  flash: {
-    id: 'gemini-2.5-flash',
-    label: 'Gemini 2.5 Flash',
-    inputUsdPerMillion: 0.30,
-    outputUsdPerMillion: 2.50,
-  },
-});
-const DEFAULT_GEMINI_MODEL_KEY = 'flash-lite';
 const USD_TO_INR = 83;
-
-/* ── Shared helpers (used by both single-shot and streaming paths) ─────── */
 
 function requireApiKey() {
   if (!config.gemini.apiKey) {
@@ -43,7 +27,6 @@ function requireApiKey() {
   }
 }
 
-/** Build the Gemini request body shared by both endpoints. */
 function buildChatBody({ systemPrompt, history = [], userMessage, generationConfig }) {
   if (typeof systemPrompt !== 'string' || !systemPrompt.trim()) {
     throw new Error('systemPrompt is required.');
@@ -66,11 +49,6 @@ function buildChatBody({ systemPrompt, history = [], userMessage, generationConf
   };
 }
 
-/**
- * Inspect a candidate's finishReason and throw a typed error for the
- * blocking ones. Non-fatal reasons (MAX_TOKENS / RECITATION / null /
- * STOP) fall through silently so callers can use any partial text.
- */
 function checkFinishReason(candidate) {
   if (!candidate || !candidate.finishReason || candidate.finishReason === 'STOP') return;
   const reason = candidate.finishReason;
@@ -83,40 +61,48 @@ function checkFinishReason(candidate) {
   }
 }
 
-/** POST to Gemini with a timeout. Returns the raw `Response`. */
 async function fetchGemini(url, body, timeoutMs) {
   requireApiKey();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(`${url}?key=${config.gemini.apiKey}`, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-      signal:  controller.signal,
+      body: JSON.stringify(body),
+      signal: controller.signal,
     });
   } finally {
     clearTimeout(timer);
   }
 }
 
-function getModel(modelKey) {
-  return GEMINI_MODELS[modelKey] || GEMINI_MODELS[DEFAULT_GEMINI_MODEL_KEY];
+function resolveGeminiModel(modelKeyOrDescriptor) {
+  const model = typeof modelKeyOrDescriptor === 'object' && modelKeyOrDescriptor
+    ? modelKeyOrDescriptor
+    : resolveModel(modelKeyOrDescriptor);
+  if (model.provider !== 'gemini') {
+    const err = new Error(`Gemini provider cannot serve model: ${model.key || 'unknown'}`);
+    err.code = 'INVALID_PROVIDER_MODEL';
+    err.statusCode = 500;
+    throw err;
+  }
+  return model;
 }
 
 function modelUrl(model, action) {
-  return `${GEMINI_API_BASE}/${model.id}:${action}`;
+  return `${GEMINI_API_BASE}/${model.providerModelId}:${action}`;
 }
 
 function estimateUsageCost(model, usageMetadata) {
   const inputTokens = Number(usageMetadata?.promptTokenCount || 0);
   const outputTokens = Number(usageMetadata?.candidatesTokenCount || 0);
   const totalTokens = Number(usageMetadata?.totalTokenCount || inputTokens + outputTokens);
-  const inputUsd = (inputTokens / 1000000) * model.inputUsdPerMillion;
-  const outputUsd = (outputTokens / 1000000) * model.outputUsdPerMillion;
+  const inputUsd = (inputTokens / 1000000) * model.pricing.inputUsdPerMillion;
+  const outputUsd = (outputTokens / 1000000) * model.pricing.outputUsdPerMillion;
   const totalUsd = inputUsd + outputUsd;
   return {
-    model: model.id,
+    model: model.providerModelId,
     modelLabel: model.label,
     inputTokens,
     outputTokens,
@@ -126,27 +112,13 @@ function estimateUsageCost(model, usageMetadata) {
   };
 }
 
-/**
- * Low-level non-streaming Gemini call. URL + key + body + error handling
- * + candidate unwrapping.
- *
- * @param {object} body
- * @param {object} [opts]
- * @param {number} [opts.timeoutMs=15000]
- * @returns {Promise<string>}  Trimmed text. May be ''.
- */
 async function callGemini(body, opts) {
   const timeoutMs = (opts && opts.timeoutMs) || 15000;
-  const model = getModel(opts && opts.model);
+  const model = resolveGeminiModel(opts && opts.model);
   const res = await fetchGemini(modelUrl(model, 'generateContent'), body, timeoutMs);
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    // The full upstream body is preserved in `err.upstream` for server
-    // logs, but `err.message` stays generic so the route layer can show
-    // a clean user-facing string. `isOperational` remains false for
-    // upstream 5xx-style failures — see the route for how that's
-    // distinguished from user-input errors (which set isOperational=true).
     const err = new Error(`Gemini API upstream error ${res.status}.`);
     err.statusCode = 502;
     err.code = 'UPSTREAM_ERROR';
@@ -163,11 +135,6 @@ async function callGemini(body, opts) {
   };
 }
 
-/**
- * Calls Gemini Flash to generate a 2-sentence professional meeting summary.
- * @param {object} answers - { name, company, role, contractType, urgency, slot }
- * @returns {Promise<string>} summary text
- */
 async function summariseConversation(answers) {
   const { name, company, role, contractType, urgency, slot } = answers;
 
@@ -189,51 +156,15 @@ No filler phrases, no emojis, no bullet points. Plain text only.`;
   }).then((r) => r.text);
 }
 
-/**
- * Multi-turn chat completion against Gemini Flash.
- *
- * Maps a (systemPrompt, history[], userMessage) tuple to Gemini's
- * `systemInstruction` + `contents` format. History is the prior turns
- * (oldest→newest); the latest user message is appended last.
- *
- * @param {object}   args
- * @param {string}   args.systemPrompt   Fixed persona / knowledge-base prompt.
- * @param {Array<{role:'user'|'model', text:string}>} [args.history=[]]
- *                                       Prior turns. Roles must alternate.
- * @param {string}   args.userMessage    The current user turn.
- * @param {object}   [args.generationConfig]  Override defaults (temperature etc.)
- * @returns {Promise<string>}            Trimmed model reply.
- */
 async function generateChatResponse(args) {
   return callGemini(buildChatBody(args || {}), { model: args && args.model });
 }
 
-/**
- * Streaming variant of generateChatResponse(). Returns an async generator
- * that yields text chunks (delta tokens) as they arrive from Gemini.
- *
- * Usage:
- *   for await (const chunk of generateChatResponseStream({...})) {
- *     // chunk is a (small) string of new tokens; concat to build the reply
- *   }
- *
- * The HTTP layer (route) is expected to forward each chunk to the client
- * over Server-Sent Events. Aborting the consumer (early return / break)
- * will cancel the upstream fetch via AbortController.
- *
- * @param {object}   args              same shape as generateChatResponse()
- * @param {number}   [opts.timeoutMs=30000]  total wall-clock cap (default 30s)
- * @returns {AsyncGenerator<string>}
- */
 async function* generateChatResponseStream(args, opts) {
   const timeoutMs = (opts && opts.timeoutMs) || 30000;
   const body = buildChatBody(args || {});
-  const model = getModel(args && args.model);
+  const model = resolveGeminiModel(args && args.model);
 
-  // streamGenerateContent uses the same endpoint shape as generateContent
-  // but with `?alt=sse` for SSE-formatted output. We can't reuse fetchGemini
-  // here because it doesn't expose the alt= param, so the call is open-coded
-  // — but key validation, timer, and abort wiring all match.
   requireApiKey();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -241,10 +172,10 @@ async function* generateChatResponseStream(args, opts) {
   let res;
   try {
     res = await fetch(`${modelUrl(model, 'streamGenerateContent')}?alt=sse&key=${config.gemini.apiKey}`, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-      signal:  controller.signal,
+      body: JSON.stringify(body),
+      signal: controller.signal,
     });
   } catch (err) {
     clearTimeout(timer);
@@ -261,10 +192,7 @@ async function* generateChatResponseStream(args, opts) {
     throw e;
   }
 
-  // Gemini's SSE format is `data: {json}\n\n` per chunk. We consume the
-  // ReadableStream byte-by-byte, split on `\n\n`, parse each `data:` line.
-  // Done is signalled by the upstream closing the connection.
-  const reader  = res.body.getReader();
+  const reader = res.body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
 
@@ -304,9 +232,8 @@ async function* generateChatResponseStream(args, opts) {
 }
 
 module.exports = {
+  providerName: 'gemini',
   summariseConversation,
   generateChatResponse,
   generateChatResponseStream,
-  GEMINI_MODELS,
-  DEFAULT_GEMINI_MODEL_KEY,
 };

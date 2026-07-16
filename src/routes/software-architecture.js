@@ -10,19 +10,19 @@
 
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { requireAuth, optionalAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, optionalAuth, requireAdmin, requireAdminAccess } = require('../middleware/auth');
 const config = require('../config');
-const firestore = require('../services/firestore');
 const adminConfig = require('../services/adminConfig');
+const articlesRepository = require('../repositories/articlesRepository');
+const ragAdminRepository = require('../repositories/ragAdminRepository');
 const billing = require('../services/billing');
-const contactPolicy = require('../services/contactPolicy');
+const contactPolicy = require('../services/auth/contactPolicy');
 const sponsorships = require('../services/sponsorships');
 const localPreviewContent = require('../services/localPreviewContent');
 const { indexArticle, removeArticleChunks } = require('../services/rag');
 const { evaluateRetrieval }                 = require('../services/rag/evaluate');
 const { GOLDEN_SET }                        = require('../services/rag/goldenSet');
-const googleAuth                            = require('../services/googleAuth');
-const { generateChatResponse }              = require('../services/gemini');
+const { generateChatResponse }              = require('../services/llm');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -36,7 +36,7 @@ const BODY_MAX_LEN = 60000;
  *   Everything else (Draft, Retired, Coming soon) → remove chunks
  *
  * Never blocks the HTTP response. Failures are logged and swallowed so a
- * Gemini embedding outage never prevents an admin from saving an article.
+ * embedding-provider outage never prevents an admin from saving an article.
  */
 function triggerRagIndexing(article) {
   if (!article || !article.id) return;
@@ -152,7 +152,7 @@ async function generateWritingAssist(payload) {
     userMessage,
     generationConfig: { temperature: 0.35, topP: 0.85, maxOutputTokens: 900 },
   });
-  return { suggestion: stripSectionHeading(result.text, payload.sectionLabel), usage: result.usage, source: 'gemini' };
+  return { suggestion: stripSectionHeading(result.text, payload.sectionLabel), usage: result.usage, source: 'llm' };
 }
 
 function validateDomains(domains) {
@@ -301,7 +301,7 @@ router.get('/system-design/articles', optionalAuth, async (req, res) => {
     const entitlement = uid ? await billing.getUserSubscriptionEntitlement(uid) : { active: false };
     const canAccessPremium = forceLocked ? false : (config.admin.localPreview ? true : !!entitlement.active);
 
-    const articles = await firestore.listPublishedSystemDesignArticles();
+      const articles = await articlesRepository.listPublishedArticles();
     const safe = (Array.isArray(articles) ? articles : []).map(function (a) {
       const tier = String(a?.tier || '').trim().toLowerCase();
       const premium = tier === 'premium';
@@ -342,7 +342,7 @@ router.get('/system-design/articles', optionalAuth, async (req, res) => {
 
 router.get('/system-design/articles/:id', optionalAuth, async (req, res) => {
   try {
-    const article = await firestore.getSystemDesignArticle(req.params.id);
+    const article = await articlesRepository.getArticle(req.params.id);
     if (!article) return res.status(404).json({ success: false, error: 'Article not found.' });
     const tier = String(article?.tier || '').trim().toLowerCase();
     const premium = tier === 'premium';
@@ -379,7 +379,7 @@ router.get('/system-design/articles/:id', optionalAuth, async (req, res) => {
 
 router.get('/admin/system-design/articles', requireAdmin, async (_req, res, next) => {
   try {
-    const articles = await firestore.listSystemDesignArticles();
+    const articles = await articlesRepository.listArticles();
     return res.status(200).json({ success: true, articles });
   } catch (err) {
     // Local preview mode is used to iterate on UX without requiring live GCP
@@ -527,17 +527,17 @@ router.put('/admin/system-design/articles/:id', requireAdmin, validateArticle, a
       });
     }
 
-    const result = await firestore.upsertSystemDesignArticle(article, {
+    const result = await articlesRepository.upsertArticle(article, {
       publishedBy: req.user.email,
     });
     if (previousId && previousId !== result.id) {
-      await firestore.deleteSystemDesignArticle(previousId);
+      await articlesRepository.deleteArticle(previousId);
       // Old article ID is gone — remove its orphan chunks too.
       removeArticleChunks(previousId).catch((err) =>
         console.warn('[rag] removeArticleChunks (id-change) failed:', previousId, err.message)
       );
     }
-    const saved = await firestore.getSystemDesignArticle(result.id);
+    const saved = await articlesRepository.getArticle(result.id);
     // Index or de-index in the background — never blocks the save response.
     triggerRagIndexing(saved);
     return res.status(200).json({ success: true, article: saved, version: result.version });
@@ -762,22 +762,7 @@ router.put('/admin/atlas/config', requireAdmin, [
 // Falls back to the hardcoded GOLDEN_SET if Firestore is empty.
 //
 
-router.get('/admin/atlas/golden-dataset', async (req, res) => {
-  try {
-    if (!config.admin.localPreview) {
-      const auth  = String(req.headers.authorization || '');
-      const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-      if (!token) { return res.status(401).json({ success: false, error: 'Missing token.' }); }
-      const user  = await googleAuth.verifyIdToken(token);
-      const email = String(user?.email || '').toLowerCase();
-      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
-        return res.status(403).json({ success: false, error: 'Admin access not allowed.' });
-      }
-    }
-  } catch (_) {
-    return res.status(401).json({ success: false, error: 'Invalid or expired token.' });
-  }
-
+router.get('/admin/atlas/golden-dataset', requireAdminAccess(), async (req, res) => {
   // Fallback function for hardcoded set
   const getFallbackRows = () => GOLDEN_SET.map((item) => ({
     question: item.question,
@@ -786,9 +771,9 @@ router.get('/admin/atlas/golden-dataset', async (req, res) => {
   }));
 
   try {
-    const doc = await firestore.getDb().collection('goldenDataset').doc('current').get();
-    if (doc.exists && doc.data()?.rows?.length) {
-      return res.json({ success: true, rows: doc.data().rows });
+    const rows = await ragAdminRepository.getGoldenDatasetRows();
+    if (rows) {
+      return res.json({ success: true, rows });
     }
     // Fallback to hardcoded set
     return res.json({ success: true, rows: getFallbackRows(), source: 'fallback' });
@@ -800,46 +785,16 @@ router.get('/admin/atlas/golden-dataset', async (req, res) => {
 });
 
 // DELETE /api/admin/atlas/golden-dataset — reset to hardcoded defaults
-router.delete('/admin/atlas/golden-dataset', async (req, res) => {
+router.delete('/admin/atlas/golden-dataset', requireAdminAccess(), async (req, res) => {
   try {
-    if (!config.admin.localPreview) {
-      const auth  = String(req.headers.authorization || '');
-      const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-      if (!token) { return res.status(401).json({ success: false, error: 'Missing token.' }); }
-      const user  = await googleAuth.verifyIdToken(token);
-      const email = String(user?.email || '').toLowerCase();
-      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
-        return res.status(403).json({ success: false, error: 'Admin access not allowed.' });
-      }
-    }
-  } catch (_) {
-    return res.status(401).json({ success: false, error: 'Invalid or expired token.' });
-  }
-
-  try {
-    await firestore.getDb().collection('goldenDataset').doc('current').delete();
+    await ragAdminRepository.resetGoldenDataset();
     return res.json({ success: true, message: 'Golden dataset reset to defaults.' });
   } catch (_err) {
     return res.json({ success: true, message: 'Reset complete (fallback will be used).' });
   }
 });
 
-router.put('/admin/atlas/golden-dataset', async (req, res) => {
-  try {
-    if (!config.admin.localPreview) {
-      const auth  = String(req.headers.authorization || '');
-      const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-      if (!token) { return res.status(401).json({ success: false, error: 'Missing token.' }); }
-      const user  = await googleAuth.verifyIdToken(token);
-      const email = String(user?.email || '').toLowerCase();
-      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
-        return res.status(403).json({ success: false, error: 'Admin access not allowed.' });
-      }
-    }
-  } catch (_) {
-    return res.status(401).json({ success: false, error: 'Invalid or expired token.' });
-  }
-
+router.put('/admin/atlas/golden-dataset', requireAdminAccess(), async (req, res) => {
   const { rows } = req.body || {};
   if (!Array.isArray(rows)) {
     return res.status(400).json({ success: false, error: 'rows must be an array.' });
@@ -859,10 +814,7 @@ router.put('/admin/atlas/golden-dataset', async (req, res) => {
   }
 
   try {
-    await firestore.getDb().collection('goldenDataset').doc('current').set({
-      rows: cleanRows,
-      updatedAt: new Date(),
-    });
+    await ragAdminRepository.saveGoldenDatasetRows(cleanRows);
     return res.json({ success: true, count: cleanRows.length });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -881,27 +833,7 @@ router.put('/admin/atlas/golden-dataset', async (req, res) => {
 //   done      {}                                     — signals stream end
 //   error     { message }                            — on failure
 //
-router.get('/admin/atlas/rag-eval', async (req, res) => {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  try {
-    if (!config.admin.localPreview) {
-      const token = String(req.query.token || '');
-      if (!token) {
-        res.status(401).json({ success: false, error: 'Missing token.' });
-        return;
-      }
-      const user  = await googleAuth.verifyIdToken(token);
-      const email = String(user?.email || '').toLowerCase();
-      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
-        res.status(403).json({ success: false, error: 'Admin access not allowed.' });
-        return;
-      }
-    }
-  } catch (_authErr) {
-    res.status(401).json({ success: false, error: 'Invalid or expired token.' });
-    return;
-  }
-
+router.get('/admin/atlas/rag-eval', requireAdminAccess({ allowQueryToken: true, allowHeaderToken: false }), async (req, res) => {
   // ── SSE headers ───────────────────────────────────────────────────────────
   res.setHeader('Content-Type',  'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -919,9 +851,9 @@ router.get('/admin/atlas/rag-eval', async (req, res) => {
   // ── Load golden dataset from Firestore (fallback to hardcoded) ───────────
   let goldenSet = GOLDEN_SET;
   try {
-    const doc = await firestore.getDb().collection('goldenDataset').doc('current').get();
-    if (doc.exists && doc.data()?.rows?.length) {
-      goldenSet = doc.data().rows;
+    const rows = await ragAdminRepository.getGoldenDatasetRows();
+    if (rows) {
+      goldenSet = rows;
     }
   } catch (_loadErr) {
     // Use hardcoded fallback
@@ -946,20 +878,7 @@ router.get('/admin/atlas/rag-eval', async (req, res) => {
 
     // ── Persist run to Firestore for audit history ─────────────────────────
     try {
-      const hits  = details.filter(d => d.hit).length;
-      const total = details.length;
-      await firestore.getDb().collection('ragEvalRuns').add({
-        ranAt:     new Date(),
-        k,
-        mode,
-        metrics,
-        hits,
-        misses:    total - hits,
-        total,
-        passRate:  total > 0 ? Math.round((hits / total) * 100) : 0,
-        passed:    metrics.recallAtK >= 0.8,
-        details,
-      });
+      await ragAdminRepository.saveRagEvalRun({ k, mode, metrics, details });
     } catch (saveErr) {
       // Non-fatal — log but don't fail the SSE stream.
       console.error('[rag-eval] failed to save run history:', saveErr.message);
@@ -979,47 +898,11 @@ router.get('/admin/atlas/rag-eval', async (req, res) => {
 // GET /api/admin/atlas/rag-eval/history
 // Returns the last N evaluation runs ordered by most recent first.
 //
-router.get('/admin/atlas/rag-eval/history', async (req, res) => {
-  try {
-    if (!config.admin.localPreview) {
-      const auth  = String(req.headers.authorization || '');
-      const token = auth.startsWith('Bearer ') ? auth.slice(7) : String(req.query.token || '');
-      if (!token) { res.status(401).json({ success: false, error: 'Missing token.' }); return; }
-      const user  = await googleAuth.verifyIdToken(token);
-      const email = String(user?.email || '').toLowerCase();
-      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
-        res.status(403).json({ success: false, error: 'Admin access not allowed.' }); return;
-      }
-    }
-  } catch (_) {
-    res.status(401).json({ success: false, error: 'Invalid or expired token.' }); return;
-  }
-
+router.get('/admin/atlas/rag-eval/history', requireAdminAccess({ allowQueryToken: true }), async (req, res) => {
   const limit = Math.max(1, Math.min(Number(req.query.limit) || 10, 50));
 
   try {
-    const snap = await firestore.getDb()
-      .collection('ragEvalRuns')
-      .orderBy('ranAt', 'desc')
-      .limit(limit)
-      .get();
-
-    const runs = snap.docs.map(doc => {
-      const d = doc.data();
-      return {
-        id:       doc.id,
-        ranAt:    d.ranAt?.toDate?.()?.toISOString() || null,
-        k:        d.k,
-        mode:     d.mode || 'golden',
-        metrics:  d.metrics,
-        hits:     d.hits,
-        misses:   d.misses,
-        total:    d.total,
-        passRate: d.passRate,
-        passed:   d.passed,
-      };
-    });
-
+    const runs = await ragAdminRepository.listRagEvalRuns(limit);
     res.json({ success: true, runs });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -1030,27 +913,12 @@ router.get('/admin/atlas/rag-eval/history', async (req, res) => {
 //
 // DELETE /api/admin/atlas/rag-eval/history/:id
 //
-router.delete('/admin/atlas/rag-eval/history/:id', async (req, res) => {
-  try {
-    if (!config.admin.localPreview) {
-      const auth  = String(req.headers.authorization || '');
-      const token = auth.startsWith('Bearer ') ? auth.slice(7) : String(req.query.token || '');
-      if (!token) { res.status(401).json({ success: false, error: 'Missing token.' }); return; }
-      const user  = await googleAuth.verifyIdToken(token);
-      const email = String(user?.email || '').toLowerCase();
-      if (config.admin.allowedEmails.length && !config.admin.allowedEmails.includes(email)) {
-        res.status(403).json({ success: false, error: 'Admin access not allowed.' }); return;
-      }
-    }
-  } catch (_) {
-    res.status(401).json({ success: false, error: 'Invalid or expired token.' }); return;
-  }
-
+router.delete('/admin/atlas/rag-eval/history/:id', requireAdminAccess({ allowQueryToken: true }), async (req, res) => {
   const id = String(req.params.id || '');
   if (!id) { res.status(400).json({ success: false, error: 'Missing run id.' }); return; }
 
   try {
-    await firestore.getDb().collection('ragEvalRuns').doc(id).delete();
+    await ragAdminRepository.deleteRagEvalRun(id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

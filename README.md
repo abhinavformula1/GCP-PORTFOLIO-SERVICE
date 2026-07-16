@@ -22,7 +22,7 @@ npm install
 npm run dev        # node --watch server.js
 ```
 
-Set `GOOGLE_CLIENT_ID`, `SF_*`, and Firestore creds via `.env` (see `src/config/index.js` for the full list). Salesforce integration is gracefully skipped when `SF_*` envs are absent, so local dev works without a Salesforce dev org.
+Set `GOOGLE_CLIENT_ID`, `SF_*`, and Firestore creds via `.env` (see `src/config/index.js` for the full list). Salesforce integration is gracefully skipped when `SF_*` envs are absent, so local dev works without a Salesforce dev org. Atlas can also optionally use Tavily for live web augmentation on current-event or time-sensitive questions when `TAVILY_API_KEY` is set.
 
 ## Deployment
 

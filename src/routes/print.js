@@ -12,8 +12,8 @@
  */
 
 const express = require('express');
-const { getSystemDesignArticle } = require('../services/firestore');
-const { buildPrintDocument }     = require('../services/articleHtml');
+const { getArticle } = require('../repositories/articlesRepository');
+const { buildPrintDocument }     = require('../services/print/articleHtml');
 const config = require('../config');
 const crypto = require('crypto');
 
@@ -42,7 +42,7 @@ router.get('/system-design/:id', async (req, res, next) => {
       return res.status(400).send('Invalid article id.');
     }
 
-    const article = await getSystemDesignArticle(id);
+    const article = await getArticle(id);
     if (!article) {
       return res.status(404).send('Article not found.');
     }

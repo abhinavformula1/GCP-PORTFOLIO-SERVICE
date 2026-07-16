@@ -2,25 +2,11 @@
 
 /**
  * Contact-reveal policy.
- *
- * Pure function: given a verified Google email (or null for guests), decide
- * which sensitive contact fields the viewer is allowed to see and return
- * those values alongside the decision.
- *
- * Why a separate module:
- *   - One place to evolve the policy (add SMS reveal, calendar booking, etc).
- *   - Trivially unit-testable — no I/O, no side effects.
- *   - Mirrors the IAM "policy decision point" pattern: the route is the
- *     enforcement point, this module is the decision point.
  */
 
-const config = require('../config');
-const adminConfig = require('./adminConfig');
+const config = require('../../config');
+const adminConfig = require('../adminConfig');
 
-/**
- * Extract a normalised lowercase domain from an email address.
- * Returns '' for missing / malformed inputs (treated as untrusted).
- */
 function domainOf(email) {
   if (!email || typeof email !== 'string') return '';
   const at = email.lastIndexOf('@');
@@ -51,9 +37,7 @@ function matchesDomain(domain, allowedDomain) {
 function looksConfiguredPhone(phone) {
   const value = String(phone || '').trim();
   if (!value) return false;
-  // If the server is still using the sentinel placeholder, treat it as not configured.
   if (/[xX]/.test(value)) return false;
-  // Must contain at least a few digits to be useful
   const digits = value.replace(/[^\d]/g, '');
   return digits.length >= 8;
 }
@@ -61,13 +45,13 @@ function looksConfiguredPhone(phone) {
 function defaultPolicy() {
   return {
     privatePhone: String(config.contactPolicy.privatePhone || '').trim(),
-    allowedDomains:  normaliseDomains(config.contactPolicy.allowedDomains),
+    allowedDomains: normaliseDomains(config.contactPolicy.allowedDomains),
     personalDomains: normaliseDomains(config.contactPolicy.personalDomains),
-    allowedEmails:   Array.from(new Set(normaliseEmails([
+    allowedEmails: Array.from(new Set(normaliseEmails([
       ...config.admin.allowedEmails,
       ...config.contactPolicy.allowedEmails,
     ]))),
-    blockedDomains:  normaliseDomains(config.contactPolicy.blockedDomains),
+    blockedDomains: normaliseDomains(config.contactPolicy.blockedDomains),
   };
 }
 
@@ -119,21 +103,11 @@ function resolveWithPolicy(viewer, policy) {
   };
 }
 
-/**
- * Resolve the contact view for a viewer.
- *
- * @param {{email?: string} | null} viewer
- * @returns {{
- *   canSeePhone: boolean,
- *   phone: string | null,
- *   matchedDomain: string | null
- * }}
- */
 async function getContactPolicyConfig() {
   if (canUseLocalDefaults()) {
     return {
       source: 'environment',
-        ...defaultPolicy(),
+      ...defaultPolicy(),
       updatedBy: null,
       updatedAt: null,
       privatePhoneConfigured: looksConfiguredPhone(defaultPolicy().privatePhone),

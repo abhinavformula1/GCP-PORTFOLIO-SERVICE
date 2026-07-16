@@ -13,12 +13,10 @@
 
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { FieldValue } = require('@google-cloud/firestore');
 const config = require('../config');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { ValidationError, AppError } = require('../errors');
-const { getStripe, isStripeConfigured } = require('../services/stripe');
-const firestore = require('../services/firestore');
+const { getStripe, isStripeConfigured } = require('../services/billing/stripe');
 const billing = require('../services/billing');
 
 const router = express.Router();
@@ -409,25 +407,14 @@ router.post('/billing/claim', requireAuth, validateClaim, async (req, res, next)
       });
     } catch (_) {}
 
-    // Persist customer->uid mapping, then hydrate subscription entitlement into billingUsers.
-    await firestore.getDb().collection('billingCustomers').doc(customerId).set({
-      uid,
-      stripeCustomerId: customerId,
-      email: req.user.email || null,
-      updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-
-    // Ensure the uid doc has display identity even for guest->claim flows.
-    // (Guest checkout sessions don't carry uid, so webhooks can't populate billingUsers.)
     const paidName = String((session && session.customer_details && session.customer_details.name) || '').trim();
-    await firestore.getDb().collection('billingUsers').doc(uid).set({
+    await billing.claimStripeCheckoutOwnership({
       uid,
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: subscriptionId,
+      customerId,
+      subscriptionId,
       email: req.user.email || paidEmail || null,
       name: req.user.name || paidName || null,
-      updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
+    });
 
     const sub = await stripe.subscriptions.retrieve(subscriptionId);
     // Ensure local object has uid metadata even if update failed above.

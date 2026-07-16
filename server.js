@@ -92,8 +92,8 @@ app.use('/print',   printRoute);
 // articles so Google can discover every /software-architecture/<id> page.
 app.get('/sitemap.xml', async (_req, res, next) => {
   try {
-    const firestore = require('./src/services/firestore');
     const adminConfig = require('./src/services/adminConfig');
+    const articlesRepository = require('./src/repositories/articlesRepository');
     // Respect admin SEO toggle — return 404 if sitemap is disabled
     let seoConfig = {};
     try { seoConfig = await adminConfig.getSeoConfig(); } catch (_) {}
@@ -105,7 +105,7 @@ app.get('/sitemap.xml', async (_req, res, next) => {
       || 'https://portfolio-service-647206478056.asia-southeast1.run.app';
     let articles = [];
     try {
-      articles = await firestore.listPublishedSystemDesignArticles();
+      articles = await articlesRepository.listPublishedArticles();
     } catch (_) { /* non-fatal — sitemap still serves static pages */ }
 
     const now = new Date().toISOString().slice(0, 10);
@@ -149,7 +149,7 @@ ${articleUrls}
 app.get('/llms.txt', async (_req, res) => {
   try {
     const adminConfig = require('./src/services/adminConfig');
-    const firestore   = require('./src/services/firestore');
+    const articlesRepository = require('./src/repositories/articlesRepository');
     let seoConfig = {};
     try { seoConfig = await adminConfig.getSeoConfig(); } catch (_) {}
     if (!seoConfig.llmsTxtEnabled) {
@@ -159,7 +159,7 @@ app.get('/llms.txt', async (_req, res) => {
       || process.env.SITE_URL
       || 'https://portfolio-service-647206478056.asia-southeast1.run.app';
     let articles = [];
-    try { articles = await firestore.listPublishedSystemDesignArticles(); } catch (_) {}
+    try { articles = await articlesRepository.listPublishedArticles(); } catch (_) {}
 
     const articleLines = articles
       .filter((a) => !a.stub && a.tier !== 'premium')

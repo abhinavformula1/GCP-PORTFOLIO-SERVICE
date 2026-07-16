@@ -29,7 +29,7 @@
 
 require('dotenv').config();
 
-const firestore              = require('../src/services/firestore');
+const articlesRepository     = require('../src/repositories/articlesRepository');
 const { indexArticle }       = require('../src/services/rag');
 
 const DELAY_BETWEEN_ARTICLES_MS = 1000; // pause between articles
@@ -42,7 +42,7 @@ async function main() {
   // ── Load articles ──────────────────────────────────────────────────────────
   let articles;
   if (targetId) {
-    const article = await firestore.getSystemDesignArticle(targetId);
+    const article = await articlesRepository.getArticle(targetId);
     if (!article) {
       console.error(`Article not found: ${targetId}`);
       process.exitCode = 1;
@@ -50,7 +50,7 @@ async function main() {
     }
     articles = [article];
   } else {
-    const all = await firestore.listSystemDesignArticles();
+    const all = await articlesRepository.listArticles();
     articles   = all.filter((a) => a.status.toLowerCase() === 'published');
   }
 
