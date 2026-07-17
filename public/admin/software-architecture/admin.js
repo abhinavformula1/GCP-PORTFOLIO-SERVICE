@@ -17,6 +17,7 @@ import { initTheme }          from '../../assets/core/theme.js';
 import { showWelcomeOverlay } from '../../assets/ui/welcome.js';
 import { renderAppHeader }    from '../../assets/ui/app-header.js?v=2026-06-29-nav-align-1';
 import { renderAtlasShell }   from '../../assets/ui/atlas-shell.js';
+import { initCustomSelects }  from '../../assets/ui/select-menu.js';
 import {
   closeAssistant, initChat, minimiseAssistant, openAssistant, restartAssistant, toggleChatTeaser,
 } from '../../assets/chat/chat.js?v=2026-07-07-reuse-modal';
@@ -85,6 +86,7 @@ renderAppHeader('#sharedTopbar', {
 // (imports evaluate before this module's own code), so refresh them now
 // that the real nodes exist. Must run before any listener below reads them.
 refreshTopbarEls();
+initCustomSelects(document);
 
 // ── Auth init ─────────────────────────────────────────────────────────────────
 initAuth({

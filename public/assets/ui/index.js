@@ -49,6 +49,9 @@ export { renderPriceCard, updatePriceCardFeatures } from './price-card.js';
 /** Returns HTML string for icon cards. Args: items[], options */
 export { iconCardsHtml }         from './iconcards.js';
 
+/** Enhances native select fields with reusable custom dropdown UX. */
+export { initCustomSelects, refreshCustomSelects, syncSelect } from './select-menu.js';
+
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 /** Renders the site-wide app header. Options: logoHref, links[], user */

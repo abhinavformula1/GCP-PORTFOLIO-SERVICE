@@ -41,13 +41,11 @@ const {
 } = require('../services/atlas/respond');
 const atlasRepository     = require('../repositories/atlasRepository');
 const adminConfig         = require('../services/adminConfig');
-const { buildRagContext } = require('../services/rag');
 const {
-  shouldUseWebSearch,
-  searchTavily,
-  buildWebSearchContext,
-  toPublicWebSearchMeta,
-} = require('../services/tavily/search');
+  buildExecutionPlan,
+  loadRuntimeConfig,
+  buildCallConfig,
+} = require('../services/atlas/orchestrator');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -165,85 +163,6 @@ async function readCachedAnswer(cacheRef) {
   }
 }
 
-/**
- * Load the full Atlas config and derive per-request generation parameters.
- *
- * S — single responsibility: reads config + builds the two objects the
- *     route needs (systemPrompt override, generationConfig). Nothing else.
- * D — depends on adminConfig abstraction, never on Firestore directly.
- *
- * @param {string} userMessage
- * @returns {Promise<{ systemPrompt: string|undefined, generationConfig: object, webSearch: object|null }>}
- */
-async function buildAtlasCallConfig(userMessage, cfg) {
-  try {
-    const atlasCfg = cfg || await adminConfig.getAtlasConfig();
-
-    // Generation config — read from Firestore, falls back to provider defaults
-    // when fields are absent (so removing a Firestore key doesn't break chat).
-    const generationConfig = {};
-    if (typeof atlasCfg.temperature     === 'number') generationConfig.temperature     = atlasCfg.temperature;
-    if (typeof atlasCfg.topP            === 'number') generationConfig.topP            = atlasCfg.topP;
-    if (typeof atlasCfg.maxOutputTokens === 'number') generationConfig.maxOutputTokens = atlasCfg.maxOutputTokens;
-
-    // Custom system prompt — if admin has set one, use it as the base.
-    const basePrompt = (atlasCfg.systemPrompt && atlasCfg.systemPrompt.trim())
-      ? atlasCfg.systemPrompt
-      : require('../services/atlas/persona').SYSTEM_PROMPT;
-    let promptBase = basePrompt;
-    let webSearch = null;
-
-    if (shouldUseWebSearch(userMessage, atlasCfg)) {
-      try {
-        const webSearchResult = await searchTavily(userMessage, {
-          maxResults: atlasCfg.webSearchMaxResults,
-          topic: atlasCfg.webSearchTopic,
-        });
-        const webContext = buildWebSearchContext(webSearchResult);
-        if (webContext) {
-          promptBase = [basePrompt, '', webContext].join('\n');
-          webSearch = toPublicWebSearchMeta(webSearchResult);
-        }
-      } catch (webErr) {
-        console.warn('[atlas/web-search] Tavily lookup failed, continuing without web context:', webErr.message);
-      }
-    }
-
-    // RAG augmentation — only when enabled and knowledge base is indexed.
-    let systemPrompt;
-    if (atlasCfg.ragEnabled) {
-      try {
-        systemPrompt = await buildRagContext(userMessage, {
-          topK:             atlasCfg.ragTopK || 5,
-          baseSystemPrompt: promptBase,
-        });
-      } catch (ragErr) {
-        console.warn('[atlas/rag] RAG context failed, falling back to base prompt:', ragErr.message);
-        systemPrompt = promptBase;
-      }
-    } else {
-      // Only override the default persona when admin has set a custom prompt.
-      systemPrompt = promptBase !== require('../services/atlas/persona').SYSTEM_PROMPT
-        ? promptBase
-        : undefined;
-    }
-
-    return { systemPrompt, generationConfig, webSearch };
-  } catch (err) {
-    console.warn('[atlas] buildAtlasCallConfig failed, using defaults:', err.message);
-    return { systemPrompt: undefined, generationConfig: {}, webSearch: null };
-  }
-}
-
-async function loadAtlasRuntimeConfig() {
-  try {
-    return await adminConfig.getAtlasConfig();
-  } catch (err) {
-    console.warn('[atlas] getAtlasConfig failed, using defaults:', err.message);
-    return null;
-  }
-}
-
 async function saveCachedAnswer(cacheRef, { model, answer }) {
   if (!cacheRef || !answer) return;
   try {
@@ -296,8 +215,9 @@ router.post('/atlas/ask',
 
     try {
       const history = await loadServerHistory(uid);
-      const atlasCfg = await loadAtlasRuntimeConfig();
-      const cacheRef = shouldUseWebSearch(message, atlasCfg)
+      const atlasCfg = await loadRuntimeConfig();
+      const executionPlan = buildExecutionPlan(message, atlasCfg);
+      const cacheRef = executionPlan.useWebSearch
         ? null
         : cacheKeyFor({ message, model, history });
       const cached = await readCachedAnswer(cacheRef);
@@ -315,7 +235,7 @@ router.post('/atlas/ask',
         });
       }
 
-      const { systemPrompt, generationConfig, webSearch } = await buildAtlasCallConfig(message, atlasCfg);
+      const { systemPrompt, generationConfig, webSearch } = await buildCallConfig(message, atlasCfg, executionPlan);
       const { answer, usage } = await ask({ message, history, model, systemPrompt, generationConfig });
 
       // Fire-and-forget persistence — we already have the answer; the
@@ -378,8 +298,9 @@ router.post('/atlas/stream',
 
     try {
       const history = await loadServerHistory(uid);
-      const atlasCfg = await loadAtlasRuntimeConfig();
-      const cacheRef = shouldUseWebSearch(message, atlasCfg)
+      const atlasCfg = await loadRuntimeConfig();
+      const executionPlan = buildExecutionPlan(message, atlasCfg);
+      const cacheRef = executionPlan.useWebSearch
         ? null
         : cacheKeyFor({ message, model, history });
       const cached = await readCachedAnswer(cacheRef);
@@ -392,7 +313,7 @@ router.post('/atlas/stream',
         return undefined;
       }
 
-      const { systemPrompt, generationConfig, webSearch } = await buildAtlasCallConfig(message, atlasCfg);
+      const { systemPrompt, generationConfig, webSearch } = await buildCallConfig(message, atlasCfg, executionPlan);
       for await (const evt of askStream({ message, history, model, systemPrompt, generationConfig })) {
         if (aborted) break;
         if (evt.kind === 'chunk') {

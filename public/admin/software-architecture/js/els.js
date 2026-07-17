@@ -221,6 +221,7 @@ export const els = {
   atlasSystemPrompt:          g('atlasSystemPrompt'),
   atlasConversationMemory:    g('atlasConversationMemory'),
   atlasGuardrails:            g('atlasGuardrails'),
+  atlasExecutionMode:         g('atlasExecutionMode'),
   atlasRoutingStrategy:       g('atlasRoutingStrategy'),
   atlasRoutingFallbackModel:  g('atlasRoutingFallbackModel'),
   atlasRecallThreshold:       g('atlasRecallThreshold'),

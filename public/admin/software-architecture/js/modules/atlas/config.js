@@ -110,6 +110,7 @@ function _fillForm(els, cfg) {
   _setV(els.atlasConversationMemory,  'value',   cfg.conversationMemory != null ? cfg.conversationMemory : 5);
   _setV(els.atlasGuardrails,          'checked', cfg.guardrails === true);
   // ⑥ Routing
+  _setV(els.atlasExecutionMode,       'value',   cfg.executionMode || 'single-agent');
   _setV(els.atlasRoutingStrategy,     'value',   cfg.routingStrategy || 'default');
   _setV(els.atlasRoutingFallbackModel,'value',   cfg.routingFallbackModel || 'flash-lite');
   // ⑦ Evaluation
@@ -156,6 +157,7 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
     systemPrompt:         (_g(els.atlasSystemPrompt,         'value') || '').trim(),
     conversationMemory:   _n(els.atlasConversationMemory,    5),
     guardrails:           _c(els.atlasGuardrails,            false),
+    executionMode:        _g(els.atlasExecutionMode,         'value')  || 'single-agent',
     routingStrategy:      _g(els.atlasRoutingStrategy,       'value')  || 'default',
     routingFallbackModel: _g(els.atlasRoutingFallbackModel,  'value')  || 'flash-lite',
     recallThreshold:      _n(els.atlasRecallThreshold,       0.80),
