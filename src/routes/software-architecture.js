@@ -672,6 +672,7 @@ router.put('/admin/atlas/config', requireAdmin, [
   body('guardrailsEnabled').optional().isBoolean(),
   body('conversationMemoryTurns').optional().isInt({ min: 0, max: 20 }),
   // Routing
+  body('executionMode').optional().isIn(['pure-model', 'single-agent', 'multiagent']),
   body('routingStrategy').optional().isIn(['default', 'rule-based', 'classifier']),
   // Evaluation
   body('recallThreshold').optional().isFloat({ min: 0, max: 1 }),
@@ -726,6 +727,7 @@ router.put('/admin/atlas/config', requireAdmin, [
       guardrailsEnabled:        b.guardrailsEnabled    != null ? toBool(b.guardrailsEnabled)    : undefined,
       conversationMemoryTurns:  b.conversationMemoryTurns != null ? Number(b.conversationMemoryTurns) : undefined,
       // Routing
+      executionMode:           b.executionMode,
       routingStrategy:          b.routingStrategy,
       routingFallbackModel:     b.routingFallbackModel,
       // Evaluation

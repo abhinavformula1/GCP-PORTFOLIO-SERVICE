@@ -109,6 +109,7 @@ const DEFAULT_ATLAS_CONFIG = {
   conversationMemoryTurns:  5,
 
   // ── 6. Model Routing ─────────────────────────────────────────────────────
+  executionMode:            'single-agent',   // pure-model | single-agent | multiagent
   routingStrategy:          'default',         // default | rule-based | classifier
   routingFallbackModel:     'flash-lite',
   webSearchEnabled:         true,
@@ -147,65 +148,71 @@ function _bool(val, def) { return typeof val === 'boolean' ? val : def; }
 function _str(val, def)  { return typeof val === 'string' && val ? val : def; }
 
 async function getAtlasConfig() {
-  const d = await adminConfigRepository.getAtlasConfigDoc();
-  if (!d) return { ...DEFAULT_ATLAS_CONFIG };
-  const D = DEFAULT_ATLAS_CONFIG;
-  return {
-    // LLM
-    enabledModels:            Array.isArray(d.enabledModels) ? d.enabledModels : D.enabledModels,
-    defaultModel:             _str(d.defaultModel,             D.defaultModel),
-    fallbackModel:            typeof d.fallbackModel === 'string' ? d.fallbackModel : D.fallbackModel,
-    temperature:              _num(d.temperature,              D.temperature),
-    topP:                     _num(d.topP,                     D.topP),
-    maxOutputTokens:          _num(d.maxOutputTokens,          D.maxOutputTokens),
-    streamingEnabled:         _bool(d.streamingEnabled,        D.streamingEnabled),
-    // Embedding
-    embeddingModel:           _str(d.embeddingModel,           D.embeddingModel),
-    embeddingDimensions:      _num(d.embeddingDimensions,      D.embeddingDimensions),
-    distanceMetric:           _str(d.distanceMetric,           D.distanceMetric),
-    embeddingBatchSize:       _num(d.embeddingBatchSize,       D.embeddingBatchSize),
-    // Chunking
-    chunkSize:                _num(d.chunkSize,                D.chunkSize),
-    chunkOverlap:             _num(d.chunkOverlap,             D.chunkOverlap),
-    splitterType:             _str(d.splitterType,             D.splitterType),
-    // Retrieval
-    ragEnabled:               d.ragEnabled === true,
-    ragTopK:                  _num(d.ragTopK,                  D.ragTopK),
-    hybridSearchEnabled:      _bool(d.hybridSearchEnabled,     D.hybridSearchEnabled),
-    rerankerEnabled:          _bool(d.rerankerEnabled,         D.rerankerEnabled),
-    similarityThreshold:      _num(d.similarityThreshold,      D.similarityThreshold),
-    // Prompt
-    systemPrompt:             typeof d.systemPrompt === 'string' ? d.systemPrompt : D.systemPrompt,
-    guardrailsEnabled:        _bool(d.guardrailsEnabled,       D.guardrailsEnabled),
-    conversationMemoryTurns:  _num(d.conversationMemoryTurns,  D.conversationMemoryTurns),
-    // Routing
-    routingStrategy:          _str(d.routingStrategy,          D.routingStrategy),
-    routingFallbackModel:     _str(d.routingFallbackModel,     D.routingFallbackModel),
-    webSearchEnabled:         _bool(d.webSearchEnabled,        D.webSearchEnabled),
-    webSearchMode:            _str(d.webSearchMode,            D.webSearchMode),
-    webSearchMaxResults:      _num(d.webSearchMaxResults,      D.webSearchMaxResults),
-    webSearchTopic:           _str(d.webSearchTopic,           D.webSearchTopic),
-    // Evaluation
-    recallThreshold:          _num(d.recallThreshold,          D.recallThreshold),
-    faithfulnessThreshold:    _num(d.faithfulnessThreshold,    D.faithfulnessThreshold),
-    // Observability
-    tracingEnabled:           _bool(d.tracingEnabled,          D.tracingEnabled),
-    capturePrompts:           _bool(d.capturePrompts,          D.capturePrompts),
-    captureChunks:            _bool(d.captureChunks,           D.captureChunks),
-    captureTokens:            _bool(d.captureTokens,           D.captureTokens),
-    // Cost
-    budgetCapInr:             _num(d.budgetCapInr,             D.budgetCapInr),
-    dailyBudgetCapInr:        _num(d.dailyBudgetCapInr,        D.dailyBudgetCapInr),
-    tokenLimitPerQuery:       _num(d.tokenLimitPerQuery,       D.tokenLimitPerQuery),
-    budgetAlertThreshold:     _num(d.budgetAlertThreshold,     D.budgetAlertThreshold),
-    // Security
-    piiRedactionEnabled:      _bool(d.piiRedactionEnabled,     D.piiRedactionEnabled),
-    promptInjectionDetection: _bool(d.promptInjectionDetection,D.promptInjectionDetection),
-    rateLimitPerMinute:       _num(d.rateLimitPerMinute,       D.rateLimitPerMinute),
-    contentModerationEnabled: _bool(d.contentModerationEnabled,D.contentModerationEnabled),
-    // UI
-    modelSelectorVisible:     d.modelSelectorVisible !== false,
-  };
+  try {
+    const d = await adminConfigRepository.getAtlasConfigDoc();
+    if (!d) return { ...DEFAULT_ATLAS_CONFIG };
+    const D = DEFAULT_ATLAS_CONFIG;
+    return {
+      // LLM
+      enabledModels:            Array.isArray(d.enabledModels) ? d.enabledModels : D.enabledModels,
+      defaultModel:             _str(d.defaultModel,             D.defaultModel),
+      fallbackModel:            typeof d.fallbackModel === 'string' ? d.fallbackModel : D.fallbackModel,
+      temperature:              _num(d.temperature,              D.temperature),
+      topP:                     _num(d.topP,                     D.topP),
+      maxOutputTokens:          _num(d.maxOutputTokens,          D.maxOutputTokens),
+      streamingEnabled:         _bool(d.streamingEnabled,        D.streamingEnabled),
+      // Embedding
+      embeddingModel:           _str(d.embeddingModel,           D.embeddingModel),
+      embeddingDimensions:      _num(d.embeddingDimensions,      D.embeddingDimensions),
+      distanceMetric:           _str(d.distanceMetric,           D.distanceMetric),
+      embeddingBatchSize:       _num(d.embeddingBatchSize,       D.embeddingBatchSize),
+      // Chunking
+      chunkSize:                _num(d.chunkSize,                D.chunkSize),
+      chunkOverlap:             _num(d.chunkOverlap,             D.chunkOverlap),
+      splitterType:             _str(d.splitterType,             D.splitterType),
+      // Retrieval
+      ragEnabled:               d.ragEnabled === true,
+      ragTopK:                  _num(d.ragTopK,                  D.ragTopK),
+      hybridSearchEnabled:      _bool(d.hybridSearchEnabled,     D.hybridSearchEnabled),
+      rerankerEnabled:          _bool(d.rerankerEnabled,         D.rerankerEnabled),
+      similarityThreshold:      _num(d.similarityThreshold,      D.similarityThreshold),
+      // Prompt
+      systemPrompt:             typeof d.systemPrompt === 'string' ? d.systemPrompt : D.systemPrompt,
+      guardrailsEnabled:        _bool(d.guardrailsEnabled,       D.guardrailsEnabled),
+      conversationMemoryTurns:  _num(d.conversationMemoryTurns,  D.conversationMemoryTurns),
+      // Routing
+      executionMode:            _str(d.executionMode,            D.executionMode),
+      routingStrategy:          _str(d.routingStrategy,          D.routingStrategy),
+      routingFallbackModel:     _str(d.routingFallbackModel,     D.routingFallbackModel),
+      webSearchEnabled:         _bool(d.webSearchEnabled,        D.webSearchEnabled),
+      webSearchMode:            _str(d.webSearchMode,            D.webSearchMode),
+      webSearchMaxResults:      _num(d.webSearchMaxResults,      D.webSearchMaxResults),
+      webSearchTopic:           _str(d.webSearchTopic,           D.webSearchTopic),
+      // Evaluation
+      recallThreshold:          _num(d.recallThreshold,          D.recallThreshold),
+      faithfulnessThreshold:    _num(d.faithfulnessThreshold,    D.faithfulnessThreshold),
+      // Observability
+      tracingEnabled:           _bool(d.tracingEnabled,          D.tracingEnabled),
+      capturePrompts:           _bool(d.capturePrompts,          D.capturePrompts),
+      captureChunks:            _bool(d.captureChunks,           D.captureChunks),
+      captureTokens:            _bool(d.captureTokens,           D.captureTokens),
+      // Cost
+      budgetCapInr:             _num(d.budgetCapInr,             D.budgetCapInr),
+      dailyBudgetCapInr:        _num(d.dailyBudgetCapInr,        D.dailyBudgetCapInr),
+      tokenLimitPerQuery:       _num(d.tokenLimitPerQuery,       D.tokenLimitPerQuery),
+      budgetAlertThreshold:     _num(d.budgetAlertThreshold,     D.budgetAlertThreshold),
+      // Security
+      piiRedactionEnabled:      _bool(d.piiRedactionEnabled,     D.piiRedactionEnabled),
+      promptInjectionDetection: _bool(d.promptInjectionDetection, D.promptInjectionDetection),
+      rateLimitPerMinute:       _num(d.rateLimitPerMinute,       D.rateLimitPerMinute),
+      contentModerationEnabled: _bool(d.contentModerationEnabled, D.contentModerationEnabled),
+      // UI
+      modelSelectorVisible:     d.modelSelectorVisible !== false,
+    };
+  } catch (err) {
+    console.warn('[atlas-config] Firestore read failed, using defaults:', err.message);
+    return { ...DEFAULT_ATLAS_CONFIG };
+  }
 }
 
 async function upsertAtlasConfig(cfg) {
@@ -239,6 +246,7 @@ async function upsertAtlasConfig(cfg) {
     guardrailsEnabled:        _bool(cfg.guardrailsEnabled,       D.guardrailsEnabled),
     conversationMemoryTurns:  _num(cfg.conversationMemoryTurns,  D.conversationMemoryTurns),
     // Routing
+    executionMode:           _str(cfg.executionMode,          D.executionMode),
     routingStrategy:          _str(cfg.routingStrategy,          D.routingStrategy),
     routingFallbackModel:     _str(cfg.routingFallbackModel,     D.routingFallbackModel),
     webSearchEnabled:         _bool(cfg.webSearchEnabled,        D.webSearchEnabled),

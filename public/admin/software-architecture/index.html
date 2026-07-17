@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
   <link rel="stylesheet" href="/assets/theme.css?v=2026-07-13-theme-v1">
   <link rel="stylesheet" href="/assets/style.css?v=2026-07-13-theme-v1">
-  <link rel="stylesheet" href="./styles.css?v=2026-07-13-theme-v1">
+  <link rel="stylesheet" href="./styles.css?v=2026-07-17-custom-select-v1">
   <!-- Hide icon ligature text until Material Symbols font is ready (anti-FOUC) -->
   <style>.material-symbols-outlined{visibility:hidden}.fonts-loaded .material-symbols-outlined{visibility:visible}</style>
   <script>
@@ -1263,9 +1263,9 @@
                       <span class="sd-ai-info-dot" aria-hidden="true">i</span>
                     </span>
                     <select id="atlasFallbackModel">
-                      <option value="">None</option>
-                      <option value="flash-lite">Flash-Lite (Gemini 2.5 Flash-Lite)</option>
-                      <option value="flash">Flash (Gemini 2.5 Flash)</option>
+                      <option value="" data-icon="block" data-description="Do not route to a backup model unless you switch manually.">None</option>
+                      <option value="flash-lite" data-icon="bolt" data-description="Fast, lower-cost fallback for standard Atlas questions." data-badge="Recommended">Flash-Lite (Gemini 2.5 Flash-Lite)</option>
+                      <option value="flash" data-icon="auto_awesome" data-description="Higher-quality fallback when you want more detailed responses.">Flash (Gemini 2.5 Flash)</option>
                     </select>
                   </label>
 
@@ -1319,8 +1319,8 @@
               <label class="sd-seo-field">
                 <span>Embedding Model</span>
                 <select id="atlasEmbeddingModel">
-                  <option value="text-embedding-004">text-embedding-004 (recommended)</option>
-                  <option value="gemini-embedding-001">gemini-embedding-001</option>
+                  <option value="text-embedding-004" data-icon="hub" data-description="Balanced retrieval quality and cost for Atlas article search." data-badge="Recommended">text-embedding-004 (recommended)</option>
+                  <option value="gemini-embedding-001" data-icon="token" data-description="Legacy Gemini embedding option for compatibility testing.">gemini-embedding-001</option>
                 </select>
               </label>
               <label class="sd-seo-field">
@@ -1332,9 +1332,9 @@
               <label class="sd-seo-field">
                 <span>Distance Metric</span>
                 <select id="atlasDistanceMetric">
-                  <option value="COSINE">COSINE (recommended for text)</option>
-                  <option value="EUCLIDEAN">EUCLIDEAN</option>
-                  <option value="DOT_PRODUCT">DOT_PRODUCT</option>
+                  <option value="COSINE" data-icon="track_changes" data-description="Best default for semantic similarity across text embeddings." data-badge="Recommended">COSINE (recommended for text)</option>
+                  <option value="EUCLIDEAN" data-icon="straighten" data-description="Distance-based comparison, usually less intuitive for text search.">EUCLIDEAN</option>
+                  <option value="DOT_PRODUCT" data-icon="functions" data-description="Useful when embedding magnitudes are meaningful in scoring.">DOT_PRODUCT</option>
                 </select>
               </label>
               <label class="sd-seo-field">
@@ -1509,20 +1509,29 @@
             </span>
           </summary>
           <div class="sd-ai-accordion-body">
-            <p class="sd-seo-group-desc">Route different query types to different models to optimise cost vs quality. Default sends all queries to the selected default model.</p>
+            <p class="sd-seo-group-desc">Choose whether Atlas should answer as a pure model, a single orchestrated agent, or a future-ready multiagent supervisor flow.</p>
             <label class="sd-seo-field">
-              <span>Routing Strategy</span>
-              <select id="atlasRoutingStrategy">
-                <option value="default">Default — always use default model</option>
-                <option value="rule-based">Rule-Based — keyword/intent rules</option>
-                <option value="classifier">LLM Classifier — route by predicted task type</option>
+              <span>Execution Mode</span>
+              <select id="atlasExecutionMode">
+                <option value="pure-model" data-icon="deployed_code" data-description="Direct model response only. No retrieval and no web search." data-badge="Fastest">Pure Model — direct LLM, no RAG or web search</option>
+                <option value="single-agent" data-icon="smart_toy" data-description="One orchestrator can choose RAG, web search, or both before generating the answer." data-badge="Recommended">Single Agent — one orchestrator can use RAG, web search, or both</option>
+                <option value="multiagent" data-icon="hub" data-description="Supervisor-ready mode for future specialist agents and delegated workflows.">Multiagent — supervisor-ready mode for specialist agents</option>
               </select>
             </label>
+            <p class="sd-seo-field-hint">Today, multiagent mode uses the same response path as the orchestrator but records a supervisor-style execution plan so the architecture can grow without a rewrite.</p>
             <label class="sd-seo-field" style="margin-top:12px">
+              <span>Routing Strategy</span>
+              <select id="atlasRoutingStrategy">
+                <option value="default" data-icon="filter_alt" data-description="Always use the selected default model for every request.">Default — always use default model</option>
+                <option value="rule-based" data-icon="alt_route" data-description="Use explicit rules or heuristics to switch models by query type.">Rule-Based — keyword/intent rules</option>
+                <option value="classifier" data-icon="neurology" data-description="Use an LLM-driven classifier to predict which model should answer.">LLM Classifier — route by predicted task type</option>
+              </select>
+            </label>
+            <label class="sd-seo-field">
               <span>Fallback Model</span>
               <select id="atlasRoutingFallbackModel">
-                <option value="flash-lite">Flash-Lite (Gemini 2.5 Flash-Lite, cheaper)</option>
-                <option value="flash">Flash (Gemini 2.5 Flash, smarter)</option>
+                <option value="flash-lite" data-icon="bolt" data-description="Lower-cost backup model when the primary path is unavailable." data-badge="Recommended">Flash-Lite (Gemini 2.5 Flash-Lite, cheaper)</option>
+                <option value="flash" data-icon="auto_awesome" data-description="Higher-quality backup model for more complex generations.">Flash (Gemini 2.5 Flash, smarter)</option>
               </select>
             </label>
             <p class="sd-seo-field-hint">Used when the primary model is unavailable or rate-limited.</p>
@@ -2240,6 +2249,6 @@
   <div id="sharedAtlasShell"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./admin.js?v=2026-07-07-chat-google"></script>
+  <script type="module" src="./admin.js?v=2026-07-17-custom-select-v1"></script>
 </body>
 </html>
