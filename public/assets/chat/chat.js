@@ -31,7 +31,7 @@ import {
 } from '../core/state.js';
 import { authedFetch }     from '../core/auth.js';
 import { GOOGLE_CLIENT_ID } from '../core/config.js';
-import { renderFreeFormMode, resetAtlasState } from './atlas.js';
+import { renderFreeFormMode, resetAtlasState } from './atlas.js?v=2026-07-18-history-limit-1';
 import { createInputRow } from './widgets.js';
 import { showWelcomeOverlay } from '../ui/welcome.js';
 

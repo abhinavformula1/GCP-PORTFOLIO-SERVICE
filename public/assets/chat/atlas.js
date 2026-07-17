@@ -76,6 +76,7 @@ const VARIANT_STORAGE_KEY = 'atlas_chip_variant_v1';
 const MODEL_STORAGE_KEY = 'atlas_model_choice_v1';
 const ATLAS_STREAM_TIMEOUT_MS = 20000;
 const GOOGLE_TOKEN_EXPIRY_SKEW_SECONDS = 60;
+const MAX_CLIENT_HISTORY_TURNS = 20;
 
 // All possible model options (superset). The admin may enable a subset.
 const MODEL_OPTIONS = {
@@ -345,6 +346,24 @@ async function sendAtlasMessage(text) {
   }
 }
 
+function buildRequestHistory(history) {
+  if (!Array.isArray(history) || history.length === 0) return [];
+  return history
+    .filter(function (turn) {
+      return turn
+        && (turn.role === 'user' || turn.role === 'model')
+        && typeof turn.text === 'string'
+        && turn.text.trim();
+    })
+    .slice(-MAX_CLIENT_HISTORY_TURNS)
+    .map(function (turn) {
+      return {
+        role: turn.role,
+        text: turn.text,
+      };
+    });
+}
+
 /**
  * Stream the reply from /api/atlas/stream. Returns true on success
  * (streamed and got a `done` event), false on a soft failure that
@@ -360,6 +379,7 @@ async function streamAsk(message, history) {
   let resp;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ATLAS_STREAM_TIMEOUT_MS);
+  const requestHistory = buildRequestHistory(history);
   try {
     resp = await fetch('/api/atlas/stream', {
       method: 'POST',
@@ -368,7 +388,7 @@ async function streamAsk(message, history) {
         'Content-Type':  'application/json',
         'Accept':        'text/event-stream',
       },
-      body: JSON.stringify({ message, history, model: atlasState.model }),
+      body: JSON.stringify({ message, history: requestHistory, model: atlasState.model }),
       signal: controller.signal,
     });
   } catch (_e) {
@@ -511,6 +531,7 @@ async function postAskJson(message, history) {
     return { ok: false, status: 401, body: { error: friendlyHttpError(401) } };
   }
   let resp;
+  const requestHistory = buildRequestHistory(history);
   try {
     resp = await fetch('/api/atlas/ask', {
       method:  'POST',
@@ -518,7 +539,7 @@ async function postAskJson(message, history) {
         'Authorization': 'Bearer ' + googleCredential,
         'Content-Type':  'application/json',
       },
-      body: JSON.stringify({ message, history, model: atlasState.model }),
+      body: JSON.stringify({ message, history: requestHistory, model: atlasState.model }),
     });
   } catch (e) {
     throw new Error('Network error reaching Atlas.', { cause: e });
