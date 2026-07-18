@@ -45,6 +45,7 @@ import { showWelcomeOverlay } from '../ui/welcome.js';
 // presumptuous to lock them into a fixed time before any conversation has
 // happened, so the new flow promises an email follow-up instead.
 const TOTAL_STEPS = 6;
+const CHAT_HEADER_TITLE = 'Atlas';
 
 const state = {
   step: 0,
@@ -131,7 +132,7 @@ function setFabIcon(name) {
 function hideTeaser() {
   const t = document.getElementById('chatTeaser');
   if (t) t.setAttribute('hidden', '');
-  setFabIcon('chat');
+  setFabIcon('forum');
 }
 
 export function toggleChatTeaser() {
@@ -158,7 +159,7 @@ export function openAssistant() {
   const avatar = document.querySelector('.ga-avatar');
   if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
   const headerName = document.querySelector('.ga-header-name');
-  if (headerName) headerName.textContent = 'Atlas';
+  if (headerName) headerName.textContent = CHAT_HEADER_TITLE;
   const overlay = document.getElementById('assistantOverlay');
   overlay.removeAttribute('data-mode');
   document.getElementById('gaMessages').innerHTML = '';
@@ -168,9 +169,8 @@ export function openAssistant() {
   overlay.removeAttribute('hidden');
   hideTeaser();
 
-  // Show the "Start over" button only for signed-in users (it operates
-  // on Firestore-backed history, which guests don't have).
-  setStartOverBtnVisible(!!(siteProfile && siteProfile.type !== 'guest'));
+  // Keep the refresh action visible so the chat can always be restarted.
+  setStartOverBtnVisible(true);
 
   // If a saved guided-flow conversation exists for this user, jump straight
   // back into it (skip the mode chooser — they're clearly resuming the
@@ -233,7 +233,7 @@ export function minimiseAssistant() {
   document.getElementById('assistantOverlay').setAttribute('hidden', '');
   const launcher = document.getElementById('chatLauncher');
   launcher.removeAttribute('hidden');
-  setFabIcon('chat');
+  setFabIcon('forum');
 }
 
 /**
@@ -259,8 +259,10 @@ function setStartOverBtnVisible(visible) {
   if (!btn) return;
   if (visible) btn.removeAttribute('hidden');
   else         btn.setAttribute('hidden', '');
-  // Reset to the guided-flow handler whenever we toggle visibility from
-  // chat.js. Atlas mode rebinds this to its own startOver in renderFreeFormMode().
+  // Guided mode uses the original refresh/start-over behavior. Free-form
+  // mode can rebind this same control to its Atlas-specific restart logic.
+  btn.title = 'Refresh chat';
+  btn.ariaLabel = 'Refresh chat';
   btn.onclick = restartAssistant;
 }
 
@@ -288,7 +290,7 @@ export function resetChatState() {
   const avatar = document.querySelector('.ga-avatar');
   if (avatar) { avatar.innerHTML = 'AK'; avatar.style.background = ''; avatar.style.padding = ''; }
   const headerName = document.querySelector('.ga-header-name');
-  if (headerName) headerName.textContent = 'Atlas';
+  if (headerName) headerName.textContent = CHAT_HEADER_TITLE;
   const overlay = document.getElementById('assistantOverlay');
   if (overlay) overlay.removeAttribute('data-mode');
   const progressTrack = document.querySelector('.ga-progress-track');
@@ -316,7 +318,7 @@ export function applyGoogleProfileToChat(profile) {
     avatar.style.padding = '';
   }
   const headerName = document.querySelector('.ga-header-name');
-  if (headerName) headerName.textContent = 'Atlas';
+  if (headerName) headerName.textContent = CHAT_HEADER_TITLE;
 
   // Free-form mode was requested before sign-in (user clicked Ask Atlas
   // while signed-out). Now they're signed in — drop straight into Atlas.
@@ -862,14 +864,8 @@ function initChatResize() {
 /* ── Boot ────────────────────────────────────────────────────────────────── */
 
 export function initChat() {
-  // Reveal the FAB launcher 5s after page load. The teaser auto-nudge
-  // ("Hi! Looking to hire…") was removed so the FAB clicks straight into
-  // the chat — no intermediate "Let's talk" pop.
-  setTimeout(function () {
-    const launcher = document.getElementById('chatLauncher');
-    if (!launcher) return;
-    launcher.removeAttribute('hidden');
-  }, 5000);
+  const launcher = document.getElementById('chatLauncher');
+  if (launcher) launcher.removeAttribute('hidden');
 
   const teaserClose = document.getElementById('chatTeaserClose');
   if (teaserClose) {

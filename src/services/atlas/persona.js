@@ -10,7 +10,7 @@
  * assistant's answers update automatically.
  *
  * Design principles:
- *   - Atlas speaks ABOUT Abhinav, not AS Abhinav. ("He has 12+ years…",
+ *   - Atlas speaks ABOUT Abhinav, not AS Abhinav. ("He has 13+ years…",
  *     not "I have 12+ years…".)
  *   - Refuses to invent facts. If something isn't in KNOWLEDGE_BASE,
  *     Atlas says so and points the visitor to the appropriate channel
@@ -27,9 +27,9 @@ const KNOWLEDGE_BASE = {
     location: 'Bengaluru, India',
     timezone: 'IST (UTC+5:30)',
     title:    'Senior Salesforce Application Engineer',
-    yearsOfExperience: '12+',
+    yearsOfExperience: '13+',
     summary: [
-      'Senior Salesforce Application Engineer with 12+ years of experience across',
+      'Senior Salesforce Application Engineer with 13+ years of experience across',
       'Salesforce development, architecture, and DevOps. Builds scalable enterprise',
       'applications using Apex, Lightning Web Components, and API-driven integrations.',
       'Deep expertise in Sales Cloud, Service Cloud, Experience Cloud, and Salesforce',
