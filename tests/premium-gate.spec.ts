@@ -34,10 +34,12 @@ test.describe('Guest user (not signed in)', () => {
     await mockArticleAccess(page, false);
   });
 
-  test('sees lock icon on premium card in grid', async ({ page }) => {
+  test('sees premium tier badge in list view', async ({ page }) => {
     await page.goto(SA_PAGE);
-    await page.waitForSelector('.sd-article-card');
-    await expect(page.locator('.sd-article-card-premium-chip').first()).toBeVisible();
+    await page.waitForSelector('#pubViewList');
+    await page.locator('#pubViewList').click();
+    await page.waitForSelector('.sd-pub-articles-table');
+    await expect(page.locator('.sd-pub-tier-premium').first()).toBeVisible();
   });
 
   test('sees paywall when opening premium article directly', async ({ page }) => {
@@ -76,10 +78,8 @@ test.describe('Signed-in free user', () => {
 
   test('free articles are fully readable', async ({ page }) => {
     await page.goto(SA_PAGE);
-    await page.waitForSelector('.sd-article-card');
-    // Click the first card that does NOT have a premium chip
-    const freeCard = page.locator('.sd-article-card:not(:has(.sd-article-card-premium-chip))').first();
-    await freeCard.click();
+    await page.waitForSelector('.sd-pub-card');
+    await page.getByRole('heading', { name: /System Design: Processing 1 Million Salesforce Records with Outbound API Callouts/i }).click();
     await expect(page.locator('.sd-article-body')).toBeVisible();
     await expect(page.locator('.sd-tier-gate')).not.toBeAttached();
   });
@@ -91,16 +91,17 @@ test.describe('Active subscriber', () => {
     await mockSubscriberSession(page);
   });
 
-  test('sees no lock icon on premium card in grid', async ({ page }) => {
+  test('premium articles remain visible in list view', async ({ page }) => {
     await page.goto(SA_PAGE);
-    await page.waitForSelector('.sd-article-card');
+    await page.waitForSelector('#pubViewList');
+    await page.locator('#pubViewList').click();
     // Wait for session/start to complete so siteProfile is set, then re-render applies
     await page.waitForResponse(resp =>
       resp.url().includes('/api/session/start') && resp.status() === 200
     );
     // Small render-tick settle
     await page.waitForTimeout(400);
-    await expect(page.locator('.sd-article-card-premium-chip')).not.toBeVisible();
+    await expect(page.locator('.sd-pub-tier-premium').first()).toBeVisible();
   });
 
   test('sees full article body on premium article', async ({ page }) => {
@@ -155,7 +156,9 @@ test.describe('Navigation', () => {
 
   test('article list shows correct content type badges', async ({ page }) => {
     await page.goto(SA_PAGE);
-    await page.waitForSelector('.sd-article-card');
-    await expect(page.locator('.sd-article-card')).not.toHaveCount(0);
+    await page.waitForSelector('#pubViewList');
+    await page.locator('#pubViewList').click();
+    await page.waitForSelector('.sd-pub-chip');
+    await expect(page.locator('.sd-pub-chip')).not.toHaveCount(0);
   });
 });

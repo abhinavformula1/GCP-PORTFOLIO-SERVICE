@@ -586,6 +586,41 @@
 
       </main>
     </div>
+
+    <!-- ── Recommendations Section ──
+         Public read of /api/recommendations populates this list on page load.
+         Submission requires Google Sign-In; the modal below only opens for
+         signed-in users (otherwise the CTA invites them to sign in first).
+         My replies appear under each recommendation, written into Firestore
+         by the SF → GCP callback when I post a reply in Salesforce. -->
+    <section class="recos-section" id="recosSection">
+      <div class="recos-inner">
+        <!-- Centred hero header (Google marketing-page pattern):
+             title → muted subtitle → primary CTA, all stacked and
+             centre-aligned. The CTA sits directly under the invitation
+             text so the reading flow ends on an action. -->
+        <div class="recos-header">
+          <h2 class="recos-title" data-i18n="recoTitle">Recommendations</h2>
+          <p class="recos-subtitle" id="recosSubtitle" data-i18n="recoSubtitle">
+            What people I've worked with — and recruiters I've spoken with — have to say.
+          </p>
+          <md-outlined-button class="recos-cta" id="recosCtaBtn"
+            onclick="window.openLeaveRecommendation && window.openLeaveRecommendation()">
+            <span class="material-symbols-outlined" slot="icon" aria-hidden="true">rate_review</span>
+            <span data-i18n="recoCta">Leave a Recommendation</span>
+          </md-outlined-button>
+        </div>
+
+        <!-- Empty state — shown when there are zero recommendations to render. -->
+        <div class="recos-empty" id="recosEmpty" hidden>
+          <span class="material-symbols-outlined recos-empty-icon" aria-hidden="true">forum</span>
+          <p class="recos-empty-text">Be the first to leave a recommendation.</p>
+        </div>
+
+        <!-- Card grid — JS hydrates this on /api/recommendations success. -->
+        <div class="recos-grid" id="recosGrid"></div>
+      </div>
+    </section>
   </div>
 
   <!-- ── Hire Me Dialog (M3 <md-dialog>) ── -->
@@ -902,41 +937,6 @@
           <p class="sponsor-cta" id="sponsorCta"></p>
         </div>
       </a>
-    </div>
-  </section>
-
-  <!-- ── Recommendations Section ──
-       Public read of /api/recommendations populates this list on page load.
-       Submission requires Google Sign-In; the modal below only opens for
-       signed-in users (otherwise the CTA invites them to sign in first).
-       My replies appear under each recommendation, written into Firestore
-       by the SF → GCP callback when I post a reply in Salesforce. -->
-  <section class="recos-section" id="recosSection">
-    <div class="recos-inner">
-      <!-- Centred hero header (Google marketing-page pattern):
-           title → muted subtitle → primary CTA, all stacked and
-           centre-aligned. The CTA sits directly under the invitation
-           text so the reading flow ends on an action. -->
-      <div class="recos-header">
-        <h2 class="recos-title" data-i18n="recoTitle">Recommendations</h2>
-        <p class="recos-subtitle" id="recosSubtitle" data-i18n="recoSubtitle">
-          What people I've worked with — and recruiters I've spoken with — have to say.
-        </p>
-        <md-outlined-button class="recos-cta" id="recosCtaBtn"
-          onclick="window.openLeaveRecommendation && window.openLeaveRecommendation()">
-          <span class="material-symbols-outlined" slot="icon" aria-hidden="true">rate_review</span>
-          <span data-i18n="recoCta">Leave a Recommendation</span>
-        </md-outlined-button>
-      </div>
-
-      <!-- Empty state — shown when there are zero recommendations to render. -->
-      <div class="recos-empty" id="recosEmpty" hidden>
-        <span class="material-symbols-outlined recos-empty-icon" aria-hidden="true">forum</span>
-        <p class="recos-empty-text">Be the first to leave a recommendation.</p>
-      </div>
-
-      <!-- Card grid — JS hydrates this on /api/recommendations success. -->
-      <div class="recos-grid" id="recosGrid"></div>
     </div>
   </section>
 
