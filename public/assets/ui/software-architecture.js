@@ -11,9 +11,8 @@
  *
  * Two views:
  *   - List view (landing): shows all articles with filtering by content type
- *     and domain tags. The old sidebar is hidden; a new integrated sidebar
- *     with domain filters is rendered inside the content area.
- *   - Article detail view: shows a single article with the topic sidebar.
+ *     and domain tags inside the main content area.
+ *   - Article detail view: shows a single article in a full-width reading layout.
  *
  * URL routing: uses the History API (/software-architecture/<id>) so every
  * article gets a real, crawlable URL that Google can index. The server
@@ -32,7 +31,7 @@ import { iconCardsHtml } from './iconcards.js';
 import { mountSponsorSlot } from './sponsorship.js';
 import { showToast } from './toast.js';
 import { openBillingCheckoutModal, initBillingClaimFlow } from './billing-checkout.js';
-import { createArticleCard, contentTypeLabel } from './article-card.js';
+import { contentTypeLabel } from './article-card.js';
 import { renderDataTable } from './datatable.js';
 
 // ── Topic catalogue ──────────────────────────────────────────────────────────
@@ -46,7 +45,6 @@ let _activeView  = 'resume';   // 'resume' | 'sysdesign'
 let _activeTopic = null;
 let _resumeAside = null;
 let _resumeMain  = null;
-let _sdAside     = null;
 let _sdDetail    = null;
 let _btn         = null;
 let _topicFilter = '';
@@ -55,9 +53,7 @@ let _cmsLoadStarted = false;
 let _cmsLoading = false;
 let _cmsLoaded   = false;
 let _tierConfig  = null;
-let _userToggledSidebar = false;
 
-const SIDEBAR_COLLAPSE_KEY = 'sd_topics_collapsed';
 const LIST_FILTERS_KEY = 'sd_list_filters_v1';
 const PUB_VIEW_KEY = 'sd_pub_view';
 const ARTICLE_VISITS_KEY = 'sd_article_visits';
@@ -95,6 +91,7 @@ let _pubArticleView = (function () {
 }());
 
 let _topicsExpanded = false; // "show all" toggle for low-count domain tags
+let _landingSearchShortcutBound = false;
 
 let _localPreviewEnabled = null;
 function closeWelcomeOverlayIfOpen() {
@@ -176,7 +173,7 @@ const CONTENT_TABS = [
   { id: 'case-study',    label: 'Case Studies',       icon: 'menu_book' },
 ];
 
-// Domain/tag categories for sidebar (dynamically populated from article tags)
+// Domain/tag icon mapping for the landing page filter chips.
 const DOMAIN_ICONS = {
   'Integration':   'sync_alt',
   'Security':      'shield',
@@ -259,12 +256,6 @@ async function loadSeoConfig() {
     }
   } catch (_) { /* non-fatal — defaults remain */ }
 }
-const CONTENT_TYPE_LABELS = {
-  'system-design': 'System Design',
-  architecture:    'Architecture Notes',
-  'case-study':    'Case Studies',
-};
-
 function topicById(id) {
   const topics = getTopics();
   for (const topic of topics) {
@@ -392,10 +383,6 @@ function localeOf(topic) {
 // Topic ids use hyphens (URL-friendly) but data-i18n / PAGE_LANG keys are
 // JS identifiers, so we normalise hyphens to underscores when building
 // per-topic keys. e.g. "gcp-sf-integration" -> "sd_gcp_sf_integration_title".
-function topicKey(id, suffix) {
-  return 'sd_' + String(id).replace(/-/g, '_') + '_' + suffix;
-}
-
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s)
@@ -463,199 +450,39 @@ function normaliseCmsTopic(article) {
   };
 }
 
-function renderSidebar(mode) {
-  if (!_sdAside) return;
-  const topics = getTopics();
-  const published = topics.filter(function (t) { return t && !t.stub; });
-  const domains = getArticleDomains(published);
-  const isDetail = mode === 'detail';
-  const isFr = currentLang === 'fr';
-
-  // Split domains: primary (≥2 articles) always visible; secondary (=1) behind toggle
-  const primaryDomains = domains.filter(function (d) { return d && d.count >= 2; });
-  const secondaryDomains = domains.filter(function (d) { return d && d.count === 1; });
-
-  const typeCounts = {};
-  CONTENT_TABS.forEach(function (t) {
-    if (t.id === 'all') return;
-    typeCounts[t.id] = published.filter(function (a) { return getContentType(a) === t.id; }).length;
-  });
-
-  let html = '<div class="sd-sa-sidebar' + (isDetail ? ' sd-sa-sidebar--detail' : '') + '">';
-
-  // Search
-  html += '<label class="sd-topic-search sd-sa-search">';
-  html += '<span class="material-symbols-outlined" aria-hidden="true">search</span>';
-  html += '<input type="search" value="' + escapeHtml(isDetail ? _topicFilter : '') + '"';
-  html += ' placeholder="' + escapeHtml(isFr ? 'Rechercher…' : 'Search articles…') + '"';
-  html += ' aria-label="' + escapeHtml(isFr ? 'Rechercher des articles' : 'Search articles') + '">';
-  html += '</label>';
-
-  // ── BY TYPE section ──────────────────────────────────────────────────────
-  html += '<div class="sd-sa-section">';
-  html += '<div class="sd-sa-section-label">' + escapeHtml(isFr ? 'PAR TYPE' : 'BY TYPE') + '</div>';
-  html += '<nav class="sd-sa-nav" role="list">';
-
-  const allActive = (_activeContentTab === 'all' && _activeDomain === 'all') ? ' sd-domain-active' : '';
-  html += '<button type="button" class="sd-domain-item' + allActive + '" data-filter-kind="type" data-filter-id="all">';
-  html += '<span class="material-symbols-outlined" aria-hidden="true">apps</span>';
-  html += '<span class="sd-domain-label">' + escapeHtml(isFr ? 'Tous les articles' : 'All Articles') + '</span>';
-  html += '<span class="sd-domain-count">' + published.length + '</span>';
-  html += '</button>';
-
-  CONTENT_TABS.forEach(function (tab) {
-    if (tab.id === 'all') return;
-    const count = typeCounts[tab.id] || 0;
-    const active = (_activeContentTab === tab.id && _activeDomain === 'all') ? ' sd-domain-active' : '';
-    const muted = !count ? ' sd-domain-item-empty' : '';
-    html += '<button type="button" class="sd-domain-item' + active + muted + '" data-filter-kind="type" data-filter-id="' + tab.id + '"' + (!count ? ' disabled' : '') + '>';
-    html += '<span class="material-symbols-outlined" aria-hidden="true">' + tab.icon + '</span>';
-    html += '<span class="sd-domain-label">' + escapeHtml(tab.label) + '</span>';
-    html += '<span class="sd-domain-count">' + count + '</span>';
-    html += '</button>';
-  });
-
-  html += '</nav>';
-  html += '</div>';
-
-  // ── BY TOPIC section ─────────────────────────────────────────────────────
-  if (primaryDomains.length || secondaryDomains.length) {
-    html += '<div class="sd-sa-section-divider" role="separator"></div>';
-    html += '<div class="sd-sa-section">';
-    html += '<div class="sd-sa-section-label">' + escapeHtml(isFr ? 'PAR SUJET' : 'BY TOPIC') + '</div>';
-    html += '<nav class="sd-sa-nav" role="list">';
-
-    primaryDomains.forEach(function (d) {
-      const active = _activeDomain === d.name ? ' sd-domain-active' : '';
-      const icon = DOMAIN_ICONS[d.name] || 'label';
-      html += '<button type="button" class="sd-domain-item' + active + '" data-filter-kind="domain" data-filter-id="' + escapeHtml(d.name) + '" title="' + escapeHtml(d.name) + '">';
-      html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
-      html += '<span class="sd-domain-label">' + escapeHtml(d.name) + '</span>';
-      html += '<span class="sd-domain-count">' + d.count + '</span>';
-      html += '</button>';
-    });
-
-    if (secondaryDomains.length) {
-      secondaryDomains.forEach(function (d) {
-        const active = _activeDomain === d.name ? ' sd-domain-active' : '';
-        const icon = DOMAIN_ICONS[d.name] || 'label';
-        html += '<button type="button" class="sd-domain-item sd-domain-secondary' + (_topicsExpanded ? '' : ' sd-domain-secondary-hidden') + active + '"';
-        html += ' data-filter-kind="domain" data-filter-id="' + escapeHtml(d.name) + '" title="' + escapeHtml(d.name) + '">';
-        html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
-        html += '<span class="sd-domain-label">' + escapeHtml(d.name) + '</span>';
-        html += '<span class="sd-domain-count">' + d.count + '</span>';
-        html += '</button>';
-      });
-
-      html += '<button type="button" class="sd-sa-topics-more" id="topicsMoreBtn">';
-      html += '<span class="material-symbols-outlined" aria-hidden="true">' + (_topicsExpanded ? 'expand_less' : 'expand_more') + '</span>';
-      html += '<span>' + (_topicsExpanded
-        ? escapeHtml(isFr ? 'Réduire' : 'Show less')
-        : ('+ ' + secondaryDomains.length + ' ' + escapeHtml(isFr ? 'de plus' : 'more'))) + '</span>';
-      html += '</button>';
-    }
-
-    html += '</nav>';
-    html += '</div>';
-  }
-
-  // Footer collapse control
-  html += '<div class="sd-sa-footer">';
-  html += '<button type="button" class="sd-sa-collapse" aria-label="Collapse sidebar" title="Collapse sidebar">';
-  html += '<span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>';
-  html += '<span class="sd-sa-collapse-label">' + escapeHtml(isFr ? 'Réduire' : 'Collapse') + '</span>';
-  html += '</button>';
-  html += '</div>';
-
-  html += '</div>';
-  _sdAside.innerHTML = html;
-
-  // Wire up search
-  const search = _sdAside.querySelector('.sd-topic-search input');
-  if (search) {
-    search.addEventListener('input', function () {
-      _topicFilter = search.value || '';
-      if (isDetail) renderSidebar('detail');
-    });
-  }
-
-  // Wire up type filters — selecting a type clears domain
-  _sdAside.querySelectorAll('[data-filter-kind="type"]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      _activeContentTab = btn.getAttribute('data-filter-id') || 'all';
-      _activeDomain = 'all';
-      _topicFilter = '';
-      persistListFilters();
-      if (isDetail) { navigate(PATH_PREFIX); handleRoute(); return; }
-      renderLandingRoute();
-    });
-  });
-
-  // Wire up domain filters — selecting a domain clears type
-  _sdAside.querySelectorAll('[data-filter-kind="domain"]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      _activeDomain = btn.getAttribute('data-filter-id') || 'all';
-      _activeContentTab = 'all';
-      persistListFilters();
-      if (isDetail) renderSidebar('detail');
-      else renderLandingRoute();
-    });
-  });
-
-  // Wire up "+ N more" toggle
-  const moreBtn = _sdAside.querySelector('#topicsMoreBtn');
-  if (moreBtn) {
-    moreBtn.addEventListener('click', function () {
-      _topicsExpanded = !_topicsExpanded;
-      renderSidebar(mode);
-    });
-  }
-
-  // Collapse control
-  const collapseBtn = _sdAside.querySelector('.sd-sa-collapse');
-  if (collapseBtn) {
-    function syncCollapseIcon() {
-      const body = document.querySelector('.body');
-      const icon = collapseBtn.querySelector('.material-symbols-outlined');
-      if (!icon || !body) return;
-      icon.textContent = body.classList.contains('sd-topics-collapsed') ? 'left_panel_open' : 'left_panel_close';
-    }
-    syncCollapseIcon();
-    collapseBtn.addEventListener('click', function () {
-      const body = document.querySelector('.body');
-      if (!body) return;
-      const collapsed = body.classList.toggle('sd-topics-collapsed');
-      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
-      syncCollapseIcon();
-    });
-  }
-}
-
-function _normContentType(raw) {
-  const v = String(raw || '').trim().toLowerCase();
-  return (v === 'architecture' || v === 'case-study' || v === 'system-design') ? v : 'system-design';
-}
-
 function renderLandingMain() {
   if (!_sdDetail) return;
   restoreListFilters();
   const topics = getTopics();
-  const filtered = filterArticles(topics, _activeContentTab, _activeDomain);
+  const filtered = filterArticles(topics, _activeContentTab, _activeDomain, _topicFilter);
   const subActive = !!(siteProfile && siteProfile.subscription && siteProfile.subscription.active);
+  const published = topics.filter(function (t) { return t && !t.stub; });
+  const domains = getArticleDomains(published);
+  const primaryDomains = domains.slice(0, 7);
+  const secondaryDomains = domains.slice(7);
+  const isFr = currentLang === 'fr';
+  const shortcutLabel = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K';
 
-  // ── Header + toolbar ─────────────────────────────────────────────────────
   let html = '<section class="sd-list-view sd-sa-list">';
   html += '<header class="sd-list-header">';
   html += '<h1 class="sd-list-title">' + escapeHtml(uiText('pageTitle')) + '</h1>';
   html += '<p class="sd-list-subtitle">' + escapeHtml(uiText('pageSubtitle')) + '</p>';
-  // Toolbar: type chips (left) + view toggle (right)
-  html += '<div class="sd-sa-toolbar">';
+  html += '<div class="sd-sa-searchbar-row">';
+  html += '<label class="sd-topic-search sd-sa-search-main">';
+  html += '<span class="material-symbols-outlined" aria-hidden="true">search</span>';
+  html += '<input id="sdLandingSearch" type="search" value="' + escapeHtml(_topicFilter) + '"';
+  html += ' placeholder="' + escapeHtml(isFr ? 'Rechercher des articles d’architecture…' : 'Search architecture articles...') + '"';
+  html += ' aria-label="' + escapeHtml(isFr ? 'Rechercher des articles' : 'Search articles') + '">';
+  html += '<span class="sd-sa-search-hint" aria-hidden="true">' + escapeHtml(shortcutLabel) + '</span>';
+  html += '</label>';
+  html += '</div>';
+  html += '<div class="sd-sa-toolbar sd-sa-toolbar-stacked">';
+  html += '<div class="sd-sa-type-row">';
   html += '<div class="sd-type-chips" role="group" aria-label="Filter by type">';
-  // "All Articles" chip — clears type filter
   const allChipActive = (_activeContentTab === 'all' && _activeDomain === 'all') ? ' sd-type-chip-active' : '';
   html += '<button type="button" class="sd-type-chip' + allChipActive + '" data-tab="all">';
   html += '<span class="material-symbols-outlined" aria-hidden="true">apps</span>';
-  html += escapeHtml(currentLang === 'fr' ? 'Tous' : 'All Articles');
+  html += escapeHtml(currentLang === 'fr' ? 'Tous les articles' : 'All Articles');
   html += '</button>';
   CONTENT_TABS.forEach(function (tab) {
     if (tab.id === 'all') return;
@@ -666,21 +493,52 @@ function renderLandingMain() {
     html += '</button>';
   });
   html += '</div>';
+  html += '</div>';
+  html += '<div class="sd-sa-bottom-row">';
+  if (primaryDomains.length || secondaryDomains.length) {
+    html += '<div class="sd-sa-topics-bar">';
+    html += '<div class="sd-sa-topics-label">' + escapeHtml(isFr ? 'SUJETS' : 'TOPICS') + '</div>';
+    html += '<div class="sd-sa-topics-chips">';
+    primaryDomains.forEach(function (d) {
+      const active = _activeDomain === d.name ? ' sd-pub-topic-chip-active' : '';
+      const icon = DOMAIN_ICONS[d.name] || 'label';
+      html += '<button type="button" class="sd-pub-topic-chip' + active + '" data-domain="' + escapeHtml(d.name) + '">';
+      html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
+      html += '<span>' + escapeHtml(d.name) + '</span>';
+      html += '</button>';
+    });
+    secondaryDomains.forEach(function (d) {
+      const active = _activeDomain === d.name ? ' sd-pub-topic-chip-active' : '';
+      const hidden = _topicsExpanded ? '' : ' sd-pub-topic-chip-hidden';
+      const icon = DOMAIN_ICONS[d.name] || 'label';
+      html += '<button type="button" class="sd-pub-topic-chip' + active + hidden + '" data-domain="' + escapeHtml(d.name) + '">';
+      html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
+      html += '<span>' + escapeHtml(d.name) + '</span>';
+      html += '</button>';
+    });
+    if (secondaryDomains.length) {
+      html += '<button type="button" class="sd-pub-topic-more" id="sdTopicsMoreBtn">';
+      html += '<span>' + escapeHtml(_topicsExpanded ? (isFr ? 'Réduire' : 'Show less') : (isFr ? 'Plus' : 'More')) + '</span>';
+      html += '<span class="material-symbols-outlined" aria-hidden="true">' + (_topicsExpanded ? 'expand_less' : 'expand_more') + '</span>';
+      html += '</button>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
   html += '<div class="sd-pub-view-toggle" role="group" aria-label="View mode">';
   html += '<button type="button" id="pubViewGrid" class="sd-pub-view-btn' + (_pubArticleView === 'grid' ? ' sd-pub-view-btn-active' : '') + '" aria-pressed="' + (_pubArticleView === 'grid') + '" title="Grid view">';
-  html += '<span class="material-symbols-outlined">grid_view</span></button>';
+  html += '<span class="material-symbols-outlined">grid_view</span><span>' + escapeHtml(isFr ? 'Grille' : 'Grid') + '</span></button>';
   html += '<button type="button" id="pubViewList" class="sd-pub-view-btn' + (_pubArticleView === 'list' ? ' sd-pub-view-btn-active' : '') + '" aria-pressed="' + (_pubArticleView === 'list') + '" title="List view">';
-  html += '<span class="material-symbols-outlined">view_list</span></button>';
+  html += '<span class="material-symbols-outlined">view_list</span><span>' + escapeHtml(isFr ? 'Liste' : 'List') + '</span></button>';
+  html += '</div>';
   html += '</div>';
   html += '</div>';
   html += '</header>';
-  // Article container — populated via DOM below
   html += '<div class="sd-article-list-mount"></div>';
   html += '</section>';
 
   _sdDetail.innerHTML = html;
 
-  // ── Populate article area using createArticleCard / renderDataTable ───────
   const mount = _sdDetail.querySelector('.sd-article-list-mount');
 
   if (!filtered.length) {
@@ -693,12 +551,11 @@ function renderLandingMain() {
     }
     mount.appendChild(emptyEl);
   } else if (_pubArticleView === 'list') {
-    // ── List view: DataTable ────────────────────────────────────────────
     mount.className = 'sd-article-list-mount sd-pub-list-view';
     const listVisits = getArticleVisits();
     const rows = filtered.map(function (t) {
       const loc = localeOf(t);
-      const type = _normContentType(t.contentType);
+      const type = getContentType(t);
       return {
         _id: t.id,
         _title: loc.title || t.id,
@@ -770,39 +627,35 @@ function renderLandingMain() {
       });
     }
   } else {
-    // ── Grid view: createArticleCard ────────────────────────────────────
     const grid = document.createElement('div');
-    grid.className = 'sd-pub-article-grid';
+    grid.className = 'sd-pub-card-grid';
     const visits = getArticleVisits();
     filtered.forEach(function (t) {
-      const loc = localeOf(t);
-      const card = createArticleCard(
-        {
-          id: t.id,
-          en: { title: loc.title, subtitle: loc.subtitle },
-          contentType: t.contentType,
-          status: 'Published',
-          thumbnail: t.thumbnail || null,
-          readMinutes: t.readMinutes,
-          order: null,
+      const card = createPublicArticleCard(t, {
+        lastVisited: visits[t.id] || null,
+        isPremium: t.tier === 'premium' && !subActive,
+        onClick: function () {
+          navigate(PATH_PREFIX + '/' + t.id + (forceLockedEnabled() ? '?forceLocked=1' : ''));
+          handleRoute();
         },
-        {
-          showBadge: false,
-          showOrder: false,
-          lastVisited: visits[t.id] || null,
-          isPremium: t.tier === 'premium' && !subActive,
-          onClick: function () {
-            navigate(PATH_PREFIX + '/' + t.id + (forceLockedEnabled() ? '?forceLocked=1' : ''));
-            handleRoute();
-          },
-        }
-      );
+      });
       grid.appendChild(card);
     });
     mount.appendChild(grid);
+    const footer = document.createElement('div');
+    footer.className = 'sd-pub-card-grid-footer';
+    footer.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span><span>' + escapeHtml(uiText('comingSoon')) + '</span>';
+    mount.appendChild(footer);
   }
 
-  // ── Wire up type chips ────────────────────────────────────────────────────
+  const search = _sdDetail.querySelector('#sdLandingSearch');
+  if (search) {
+    search.addEventListener('input', function () {
+      _topicFilter = search.value || '';
+      renderLandingMain();
+    });
+  }
+
   _sdDetail.querySelectorAll('.sd-type-chip').forEach(function (chip) {
     chip.addEventListener('click', function () {
       const next = chip.getAttribute('data-tab') || 'all';
@@ -815,11 +668,28 @@ function renderLandingMain() {
         _activeDomain = 'all';
       }
       persistListFilters();
-      renderLandingRoute();
+      renderLandingMain();
     });
   });
 
-  // ── Wire up view-toggle ───────────────────────────────────────────────────
+  _sdDetail.querySelectorAll('.sd-pub-topic-chip[data-domain]').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      const next = chip.getAttribute('data-domain') || 'all';
+      _activeDomain = (_activeDomain === next) ? 'all' : next;
+      _activeContentTab = 'all';
+      persistListFilters();
+      renderLandingMain();
+    });
+  });
+
+  const topicsMoreBtn = _sdDetail.querySelector('#sdTopicsMoreBtn');
+  if (topicsMoreBtn) {
+    topicsMoreBtn.addEventListener('click', function () {
+      _topicsExpanded = !_topicsExpanded;
+      renderLandingMain();
+    });
+  }
+
   const gridBtn = _sdDetail.querySelector('#pubViewGrid');
   const listBtn = _sdDetail.querySelector('#pubViewList');
   function applyViewToggle(view) {
@@ -831,23 +701,9 @@ function renderLandingMain() {
   if (listBtn) listBtn.addEventListener('click', function () { applyViewToggle('list'); });
 }
 
-function renderLandingRoute() {
-  renderSidebar('list');
-  renderLandingMain();
-}
-
-function rerenderSystemDesignView() {
-  // Keep existing detail sidebar behavior; landing sidebar is rendered from route handler.
-  if (_activeView === 'sysdesign' && _activeTopic) renderSidebar('detail');
-  if (_activeView !== 'sysdesign') return;
-  if (_activeTopic) renderTopicDetail();
-  else renderLandingRoute();
-}
-
 function applyCmsTopics(topics) {
   if (!topics.length) return;
   _cmsTopics = topics;
-  highlightActiveTopic();
   if (_activeTopic && !topicById(_activeTopic)) _activeTopic = topics[0].id;
 }
 
@@ -886,11 +742,14 @@ async function loadCmsTopics() {
     const topics = articles.map(normaliseCmsTopic).filter(Boolean);
     applyCmsTopics(topics);
   } catch (err) {
-    console.warn('[system-design] content load failed:', err.message);
+    console.warn('[software-architecture] content load failed:', err.message);
   } finally {
     _cmsLoaded = true;
     _cmsLoading = false;
-    rerenderSystemDesignView();
+    if (_activeView === 'sysdesign') {
+      if (_activeTopic) renderTopicDetail();
+      else renderLandingMain();
+    }
   }
 }
 
@@ -930,154 +789,13 @@ function ensureDom() {
     if (_resumeMain)  _resumeMain.classList.add('resume-main');
   }
 
-  if (_sdAside && _sdDetail) return true;
-
-  _sdAside = document.createElement('aside');
-  _sdAside.className = 'sd-topics';
-  _sdAside.setAttribute('hidden', '');
-
-  function setSidebarCollapsed(collapsed) {
-    body.classList.toggle('sd-topics-collapsed', !!collapsed);
-    _userToggledSidebar = true;
-    try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
-  }
-
-  // Restore persisted collapse state (desktop-only UI affordance).
-  try {
-    const persisted = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
-    if (persisted === '1') setSidebarCollapsed(true);
-  } catch (_) {}
+  if (_sdDetail) return true;
 
   _sdDetail = document.createElement('main');
   _sdDetail.className = 'sd-detail';
   _sdDetail.setAttribute('hidden', '');
-
-  // No UI that collapses itself. Sidebar collapse is user-driven.
-
-  body.appendChild(_sdAside);
   body.appendChild(_sdDetail);
-  renderTopicList();
   return true;
-}
-
-// ── Rendering ────────────────────────────────────────────────────────────────
-function renderTopicList() {
-  if (!_sdAside) return;
-  const query = normaliseText(_topicFilter);
-  let html = '';
-  html += '<div class="sd-topics-header">';
-  html += '<div class="sd-topics-header-row">';
-  html += '<label class="sd-topic-search">';
-  html += '<span class="material-symbols-outlined" aria-hidden="true">search</span>';
-  html += '<input type="search" value="' + escapeHtml(_topicFilter) + '" placeholder="' + escapeHtml(uiText('search')) + '" aria-label="' + escapeHtml(uiText('search')) + '">';
-  html += '</label>';
-  html += '<button type="button" class="sd-topics-collapse-btn" aria-label="Collapse article list" title="Collapse article list">';
-  html += '<span class="material-symbols-outlined" aria-hidden="true">left_panel_close</span>';
-  html += '</button>';
-  html += '</div>';
-  html += '</div>';
-  html += '<button type="button" class="sd-overview-link' + (!_activeTopic ? ' sd-active' : '') + '" data-topic-id="">';
-  html += '<span class="material-symbols-outlined" aria-hidden="true">dashboard</span>';
-  html += '<span>Overview</span>';
-  html += '</button>';
-  html += '<div class="sd-topic-list" role="list">';
-  let visibleCount = 0;
-  Object.keys(CONTENT_TYPE_LABELS).forEach(function (type) {
-    let group = '';
-    let groupCount = 0;
-    const topics = getTopics();
-    for (const t of topics) {
-      if (getContentType(t) !== type) continue;
-      const loc = localeOf(t);
-      const haystack = normaliseText(loc.title + ' ' + loc.subtitle + ' ' + (t.tags || []).join(' '));
-      if (query && haystack.indexOf(query) === -1) continue;
-      groupCount += 1;
-      visibleCount += 1;
-      const active   = t.id === _activeTopic ? ' sd-active' : '';
-      const disabled = t.stub ? ' sd-disabled' : '';
-      const premium  = t.tier === 'premium' ? ' sd-premium' : '';
-      group += '<li class="sd-topic-item' + active + disabled + premium + '" data-topic-id="' + t.id + '">';
-      group += '<button type="button" class="sd-topic-btn" data-topic-id="' + t.id + '"' + (t.id === _activeTopic ? ' aria-current="page"' : '') + '>';
-      if (t.thumbnail) {
-        group += '<img class="sd-topic-thumb" src="' + escapeHtml(t.thumbnail) + '" alt="" loading="lazy" aria-hidden="true">';
-      }
-      group += '<span class="sd-topic-text">';
-      group += '<span class="sd-topic-title" data-i18n="' + topicKey(t.id, 'title') + '">' + escapeHtml(loc.title) + '</span>';
-      group += '<span class="sd-topic-sub" data-i18n="' + topicKey(t.id, 'subtitle') + '">' + escapeHtml(loc.subtitle) + '</span>';
-      group += '</span>';
-      if (t.tier === 'premium' && t.hasAccess === false) {
-        group += '<span class="material-symbols-outlined sd-lock-icon" aria-label="Locked">lock</span>';
-      }
-      group += '</button>';
-      group += '</li>';
-    }
-    if (groupCount) {
-      html += '<section class="sd-topic-group">';
-      html += '<div class="sd-topic-group-title">' + escapeHtml(CONTENT_TYPE_LABELS[type]) + '</div>';
-      html += '<ul role="list">' + group + '</ul>';
-      html += '</section>';
-    }
-  });
-  if (!visibleCount) {
-    html += _cmsLoaded
-      ? '<div class="sd-topic-empty">' + escapeHtml(uiText('noResults')) + '</div>'
-      : '<div class="sd-topic-empty sd-topic-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
-  }
-  html += '</div>';
-  _sdAside.innerHTML = html;
-  const collapseBtn = _sdAside.querySelector('.sd-topics-collapse-btn');
-  if (collapseBtn) {
-    collapseBtn.addEventListener('click', function () {
-      const body = document.querySelector('.body');
-      if (!body) return;
-      const collapsed = body.classList.toggle('sd-topics-collapsed');
-      _userToggledSidebar = true;
-      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
-    });
-    // Icon should reflect state.
-    const body = document.querySelector('.body');
-    const icon = collapseBtn.querySelector('.material-symbols-outlined');
-    if (icon && body) {
-      icon.textContent = body.classList.contains('sd-topics-collapsed') ? 'left_panel_open' : 'left_panel_close';
-    }
-    collapseBtn.addEventListener('click', function () {
-      const body = document.querySelector('.body');
-      const icon = collapseBtn.querySelector('.material-symbols-outlined');
-      if (icon && body) icon.textContent = body.classList.contains('sd-topics-collapsed') ? 'left_panel_open' : 'left_panel_close';
-    });
-  }
-  const search = _sdAside.querySelector('.sd-topic-search input');
-  if (search) {
-    search.addEventListener('input', function () {
-      _topicFilter = search.value || '';
-      renderTopicList();
-      highlightActiveTopic();
-      const nextSearch = _sdAside.querySelector('.sd-topic-search input');
-      if (nextSearch) {
-        nextSearch.focus();
-        nextSearch.setSelectionRange(nextSearch.value.length, nextSearch.value.length);
-      }
-    });
-  }
-  _sdAside.querySelectorAll('.sd-topic-btn').forEach(function (b) {
-    b.addEventListener('click', function () {
-      const id = b.getAttribute('data-topic-id');
-      navigate(PATH_PREFIX + '/' + id);
-      handleRoute();
-    });
-  });
-  const overview = _sdAside.querySelector('.sd-overview-link');
-  if (overview) {
-    overview.addEventListener('click', function () {
-      // Overview should land you in a "clean" library state.
-      _activeContentTab = 'all';
-      _activeDomain = 'all';
-      _topicFilter = '';
-      persistListFilters();
-      navigate(PATH_PREFIX);
-      handleRoute();
-    });
-  }
 }
 
 // ── List view helpers ─────────────────────────────────────────────────────────
@@ -1107,181 +825,108 @@ function getContentTypeEyebrow(topic) {
   return 'SYSTEM DESIGN';
 }
 
-function filterArticles(topics, contentTab, domain) {
+function matchesTopicSearch(topic, query) {
+  const q = normaliseText(query || '');
+  if (!q) return true;
+  const loc = localeOf(topic);
+  const haystack = [
+    loc.title,
+    loc.subtitle,
+    topic.contentType,
+    (topic.tags || []).join(' '),
+  ].join(' ');
+  return normaliseText(haystack).indexOf(q) !== -1;
+}
+
+function getPublicCardVisual(topic) {
+  const type = getContentType(topic);
+  const tags = Array.isArray(topic.tags) ? topic.tags.map(function (tag) { return String(tag || '').toLowerCase(); }) : [];
+  if (tags.includes('rag')) return { icon: 'device_hub', accent: 'blue' };
+  if (tags.includes('salesforce')) return { icon: 'cloud', accent: 'green' };
+  if (tags.includes('integration')) return { icon: 'hub', accent: 'pink' };
+  if (tags.includes('mulesoft')) return { icon: 'shield_lock', accent: 'indigo' };
+  if (tags.includes('ldv')) return { icon: 'database', accent: 'emerald' };
+  if (type === 'system-design') return { icon: 'history', accent: 'violet' };
+  if (type === 'case-study') return { icon: 'inventory_2', accent: 'amber' };
+  return { icon: 'architecture', accent: 'blue' };
+}
+
+function createPublicArticleCard(topic, opts) {
+  const options = opts || {};
+  const loc = localeOf(topic);
+  const visual = getPublicCardVisual(topic);
+  const article = document.createElement('article');
+  article.className = 'sd-pub-card';
+  article.dataset.topicId = topic.id;
+  article.dataset.accent = visual.accent;
+
+  const iconWrap = document.createElement('div');
+  iconWrap.className = 'sd-pub-card-icon';
+  const icon = document.createElement('span');
+  icon.className = 'material-symbols-outlined';
+  icon.textContent = visual.icon;
+  iconWrap.appendChild(icon);
+
+  const body = document.createElement('div');
+  body.className = 'sd-pub-card-body';
+
+  const eyebrow = document.createElement('div');
+  eyebrow.className = 'sd-pub-card-eyebrow';
+  eyebrow.textContent = getContentTypeEyebrow(topic);
+
+  const title = document.createElement('h3');
+  title.className = 'sd-pub-card-title';
+  title.textContent = loc.title || topic.id || 'Untitled';
+
+  body.append(eyebrow, title);
+
+  if (loc.subtitle) {
+    const subtitle = document.createElement('p');
+    subtitle.className = 'sd-pub-card-subtitle';
+    subtitle.textContent = loc.subtitle;
+    body.appendChild(subtitle);
+  }
+
+  if (Array.isArray(topic.tags) && topic.tags.length) {
+    const tags = document.createElement('div');
+    tags.className = 'sd-pub-card-tags';
+    topic.tags.slice(0, 4).forEach(function (tag) {
+      const chip = document.createElement('span');
+      chip.className = 'sd-pub-card-tag';
+      chip.textContent = tag;
+      tags.appendChild(chip);
+    });
+    body.appendChild(tags);
+  }
+
+  const footer = document.createElement('div');
+  footer.className = 'sd-pub-card-footer';
+
+  const readMeta = document.createElement('span');
+  readMeta.className = 'sd-pub-card-meta';
+  readMeta.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">schedule</span>' + escapeHtml(topic.readMinutes ? String(topic.readMinutes) + ' ' + uiText('minRead') : '5 ' + uiText('minRead'));
+
+  const viewedMeta = document.createElement('span');
+  viewedMeta.className = 'sd-pub-card-meta';
+  viewedMeta.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">visibility</span>' + escapeHtml(options.lastVisited ? ('Viewed ' + relativeTime(options.lastVisited)) : 'New article');
+
+  footer.append(readMeta, viewedMeta);
+  article.append(iconWrap, body, footer);
+
+  if (typeof options.onClick === 'function') {
+    article.addEventListener('click', function () { options.onClick(topic); });
+  }
+  return article;
+}
+
+function filterArticles(topics, contentTab, domain, query) {
   return topics.filter(function (t) {
     if (t.stub) return false;
     if (contentTab !== 'all' && getContentType(t) !== contentTab) return false;
     if (domain !== 'all' && !(t.tags || []).includes(domain)) return false;
+    if (!matchesTopicSearch(t, query)) return false;
     return true;
   });
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function renderLanding() {
-  if (!_sdDetail) return;
-  // Bring back last-used filters for a smoother "continue reading" experience.
-  restoreListFilters();
-  const topics = getTopics();
-  const published = topics.filter(function (t) { return !t.stub; });
-  const domains = getArticleDomains(published);
-  const filtered = filterArticles(topics, _activeContentTab, _activeDomain);
-
-  let html = '<section class="sd-list-view">';
-
-  // ── Header ──
-  html += '<header class="sd-list-header">';
-  html += '<h1 class="sd-list-title">' + escapeHtml(uiText('pageTitle')) + '</h1>';
-  html += '<p class="sd-list-subtitle">' + escapeHtml(uiText('pageSubtitle')) + '</p>';
-
-  // ── Content type tabs ──
-  html += '<div class="sd-content-tabs-row">';
-  html += '<nav class="sd-content-tabs" role="tablist">';
-  CONTENT_TABS.forEach(function (tab) {
-    const active = _activeContentTab === tab.id ? ' sd-tab-active' : '';
-    html += '<button type="button" class="sd-content-tab' + active + '" data-tab="' + tab.id + '" role="tab" aria-selected="' + (_activeContentTab === tab.id) + '">';
-    html += '<span class="material-symbols-outlined" aria-hidden="true">' + tab.icon + '</span>';
-    html += '<span>' + escapeHtml(tab.label) + '</span>';
-    html += '</button>';
-  });
-  html += '</nav>';
-  const canClear = !(_activeContentTab === 'all' && _activeDomain === 'all');
-  html += '<button type="button" class="sd-clear-filters' + (canClear ? '' : ' sd-clear-filters-hidden') + '" aria-label="Clear filters">Clear</button>';
-  html += '</div>';
-  html += '</header>';
-
-  // ── Main content area with sidebar ──
-  html += '<div class="sd-list-body">';
-
-  // ── Domains sidebar ──
-  html += '<aside class="sd-domains-sidebar">';
-  html += '<nav class="sd-domains-nav" role="list">';
-  // "All" item
-  const allActive = _activeDomain === 'all' ? ' sd-domain-active' : '';
-  html += '<button type="button" class="sd-domain-item' + allActive + '" data-domain="all">';
-  html += '<span class="material-symbols-outlined" aria-hidden="true">apps</span>';
-  html += '<span class="sd-domain-label">' + escapeHtml(uiText('all')) + '</span>';
-  html += '<span class="sd-domain-count">' + published.length + '</span>';
-  html += '</button>';
-  // Domain items (hide 0-count)
-  domains.forEach(function (d) {
-    if (d.count === 0) return;
-    const active = _activeDomain === d.name ? ' sd-domain-active' : '';
-    const icon = DOMAIN_ICONS[d.name] || 'label';
-    html += '<button type="button" class="sd-domain-item' + active + '" data-domain="' + escapeHtml(d.name) + '">';
-    html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
-    html += '<span class="sd-domain-label">' + escapeHtml(d.name) + '</span>';
-    html += '<span class="sd-domain-count">' + d.count + '</span>';
-    html += '</button>';
-  });
-  html += '</nav>';
-  html += '</aside>';
-
-  // ── Article list ──
-  html += '<div class="sd-article-list">';
-  if (filtered.length) {
-    filtered.forEach(function (t) {
-      const loc = localeOf(t);
-      const eyebrow = getContentTypeEyebrow(t);
-      const premiumClass = t.tier === 'premium' ? ' sd-card-premium' : '';
-      html += '<article class="sd-article-card' + premiumClass + '" data-topic-id="' + t.id + '">';
-
-      // Thumbnail (icon-based for now)
-      html += '<div class="sd-card-thumb">';
-      html += '<span class="material-symbols-outlined">' + (t.icon || 'article') + '</span>';
-      html += '</div>';
-
-      // Content
-      html += '<div class="sd-card-content">';
-      html += '<div class="sd-card-eyebrow">' + escapeHtml(eyebrow) + '</div>';
-      html += '<h2 class="sd-card-title">' + escapeHtml(loc.title) + '</h2>';
-      html += '<p class="sd-card-subtitle">' + escapeHtml(loc.subtitle) + '</p>';
-
-      // Tags
-      if (t.tags && t.tags.length) {
-        html += '<div class="sd-card-tags">';
-        t.tags.slice(0, 4).forEach(function (tag) {
-          html += '<span class="sd-card-tag">' + escapeHtml(tag) + '</span>';
-        });
-        html += '</div>';
-      }
-      html += '</div>';
-
-      // Meta (date + read time)
-      html += '<div class="sd-card-meta">';
-      if (t.publishedAt) {
-        html += '<span class="sd-card-date"><span class="material-symbols-outlined">calendar_today</span>' + formatDate(t.publishedAt) + '</span>';
-      }
-      if (t.readMinutes) {
-        html += '<span class="sd-card-read"><span class="material-symbols-outlined">schedule</span>' + t.readMinutes + ' ' + uiText('minRead') + '</span>';
-      }
-      html += '</div>';
-
-      // Arrow
-      html += '<div class="sd-card-arrow"><span class="material-symbols-outlined">arrow_forward</span></div>';
-
-      if (t.tier === 'premium' && t.hasAccess === false) {
-        html += '<span class="material-symbols-outlined sd-card-lock" aria-label="Locked">lock</span>';
-      }
-      html += '</article>';
-    });
-  } else {
-    html += _cmsLoaded
-      ? '<p class="sd-list-empty">' + escapeHtml(uiText('noResults')) + '</p>'
-      : '<div class="sd-list-empty sd-list-loading"><sd-loader size="sm" label="' + uiText('loading') + '"></sd-loader></div>';
-  }
-
-  // Coming soon footer
-  html += '<div class="sd-list-footer">' + escapeHtml(uiText('comingSoon')) + '</div>';
-  html += '</div>'; // .sd-article-list
-
-  html += '</div>'; // .sd-list-body
-  html += '<div class="sd-sponsor-slot-placeholder" data-placement="homepage"></div>';
-  html += '</section>';
-
-  _sdDetail.innerHTML = html;
-
-  // ── Event listeners ──
-  // Content tabs
-  _sdDetail.querySelectorAll('.sd-content-tab').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      _activeContentTab = tab.getAttribute('data-tab');
-      persistListFilters();
-      renderLanding();
-    });
-  });
-  // Domain filters
-  _sdDetail.querySelectorAll('.sd-domain-item').forEach(function (item) {
-    item.addEventListener('click', function () {
-      _activeDomain = item.getAttribute('data-domain');
-      persistListFilters();
-      renderLanding();
-    });
-  });
-  const clearBtn = _sdDetail.querySelector('.sd-clear-filters');
-  if (clearBtn) {
-    clearBtn.addEventListener('click', function () {
-      _activeContentTab = 'all';
-      _activeDomain = 'all';
-      persistListFilters();
-      renderLanding();
-    });
-  }
-  // Article cards
-  _sdDetail.querySelectorAll('.sd-article-card').forEach(function (card) {
-    card.addEventListener('click', function () {
-      navigate(PATH_PREFIX + '/' + card.getAttribute('data-topic-id'));
-      handleRoute();
-    });
-  });
-
-  const homeSlot = _sdDetail.querySelector('.sd-sponsor-slot-placeholder[data-placement="homepage"]');
-  if (homeSlot) mountSponsorSlot(homeSlot, 'homepage');
 }
 
 function renderTopicDetail() {
@@ -1548,14 +1193,6 @@ function exportCurrentTopicPdf() {
     });
 }
 
-function highlightActiveTopic() {
-  if (!_sdAside) return;
-  _sdAside.querySelectorAll('.sd-topic-item').forEach(function (li) {
-    if (li.getAttribute('data-topic-id') === _activeTopic) li.classList.add('sd-active');
-    else li.classList.remove('sd-active');
-  });
-}
-
 // ── View toggle ──────────────────────────────────────────────────────────────
 function setView(view) {
   if (!ensureDom()) return;
@@ -1573,7 +1210,6 @@ function setView(view) {
   }
   if (_resumeAside) _resumeAside.toggleAttribute('hidden', sysOn);
   if (_resumeMain)  _resumeMain.toggleAttribute('hidden', sysOn);
-  _sdAside.toggleAttribute('hidden', !sysOn);
   _sdDetail.toggleAttribute('hidden', !sysOn);
   updateButton();
 }
@@ -1597,7 +1233,7 @@ function updateButton() {
 }
 
 // ── History API routing ──────────────────────────────────────────────────────
-// URLs: /software-architecture           → topic list landing
+// URLs: /software-architecture           → article library landing
 //       /software-architecture/<id>      → specific article
 // The server catch-all serves index.html for every /software-architecture/* path so
 // direct loads, reloads, and social shares all work correctly.
@@ -1643,42 +1279,25 @@ function handleRoute() {
     _activeTopic = null;
     resetMeta();
     setView('sysdesign');
-    // Landing view uses the left sidebar for filters (matches reference design)
-    if (_sdAside) _sdAside.removeAttribute('hidden');
     const body = document.querySelector('.body');
     if (body) {
       body.classList.add('sd-sa-list');
-      body.classList.remove('sd-list-mode');
-      // Restore persisted collapse for list view
-      try {
-        const persisted = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
-        body.classList.toggle('sd-topics-collapsed', persisted === '1');
-      } catch (_) {}
+      body.classList.add('sd-list-mode');
     }
-    renderLandingRoute();
+    renderLandingMain();
     return;
   }
   const topics = getTopics();
   if (!topicById(id) && topics.length) id = topics[0].id;
   _activeTopic = id;
   recordArticleVisit(id);
-  _userToggledSidebar = false;
   applyArticleMeta(topicById(id));
   setView('sysdesign');
-  // Show old sidebar for article detail view
-  if (_sdAside) _sdAside.removeAttribute('hidden');
   const body = document.querySelector('.body');
   if (body) {
-    body.classList.remove('sd-list-mode');
     body.classList.remove('sd-sa-list');
-    // Allow collapse in detail view too (same rail model as reference)
-    try {
-      const persisted = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
-      body.classList.toggle('sd-topics-collapsed', persisted === '1');
-    } catch (_) {}
+    body.classList.add('sd-list-mode');
   }
-  renderSidebar('detail');
-  highlightActiveTopic();
   renderTopicDetail();
 }
 
@@ -1742,18 +1361,38 @@ export function initSystemDesign() {
   });
 
   window.addEventListener('popstate', handleRoute);
+  if (!_landingSearchShortcutBound) {
+    document.addEventListener('keydown', function (e) {
+      if (_activeView !== 'sysdesign' || _activeTopic) return;
+      if (e.defaultPrevented) return;
+      const target = e.target;
+      const tag = target && target.tagName ? String(target.tagName).toLowerCase() : '';
+      const isTypingTarget = tag === 'input' || tag === 'textarea' || (target && target.isContentEditable);
+      const search = document.getElementById('sdLandingSearch');
+      if (!search) return;
+      if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') {
+        e.preventDefault();
+        search.focus();
+        if (typeof search.select === 'function') search.select();
+        return;
+      }
+      if (!isTypingTarget && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === '/') {
+        e.preventDefault();
+        search.focus();
+      }
+    });
+    _landingSearchShortcutBound = true;
+  }
   // Refresh visit badges when the page is restored from bfcache (browser back/forward).
   window.addEventListener('pageshow', function (e) {
     if (e.persisted && !_activeTopic) renderLandingMain();
   });
   const observer = new MutationObserver(function () {
-    renderTopicList();
-    highlightActiveTopic();
     if (_activeView === 'sysdesign') {
       // When on the landing (list) route, _activeTopic is null and the list view
       // owns _sdDetail. Don't let renderTopicDetail() wipe it on locale flips.
       if (_activeTopic) renderTopicDetail();
-      else renderLanding();
+      else renderLandingMain();
     }
     updateButton();
   });

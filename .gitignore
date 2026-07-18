@@ -25,3 +25,4 @@ certificate.pem
 # Playwright test artifacts — generated on test run, never commit
 test-results/
 playwright-report/
+AtlasNotebook.ipynb
