@@ -37,7 +37,7 @@ async function upsertTierConfig(config) {
 // ── SEO / AEO configuration ───────────────────────────────────────────────────
 const DEFAULT_SEO_CONFIG = {
   siteUrl:             'https://portfolio-service-647206478056.asia-southeast1.run.app',
-  siteDescription:     'Senior Salesforce Application Engineer with 12+ years across Salesforce, GCP, MuleSoft and API integrations. Deep-dive system design articles on authentication, security, and enterprise architecture.',
+  siteDescription:     'Senior Salesforce Application Engineer with 13+ years across Salesforce, GCP, MuleSoft and API integrations. Deep-dive system design articles on authentication, security, and enterprise architecture.',
   ogImageUrl:          '',
   adsensePublisherId:  '',
   jsonLdEnabled:       true,

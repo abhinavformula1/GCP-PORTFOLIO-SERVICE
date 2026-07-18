@@ -785,6 +785,17 @@ import '/assets/ui/loader.js';
      launcher, panel resize, Esc-to-close, persistence to /api/chat/active,
      AI summarisation — lives in ./chat/chat.js. main.js just wires the
      window.* exports for inline-onclick handlers and calls initChat().  */
+  function initProjectDetailToggles() {
+    document.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest ? event.target.closest('.details-toggle') : null;
+      if (!btn) return;
+      const card = btn.closest('[data-expandable-card], .project');
+      if (!card) return;
+      const expanded = card.classList.toggle('is-expanded');
+      btn.setAttribute('aria-expanded', String(expanded));
+    });
+  }
+
   window.toggleChatTeaser  = toggleChatTeaser;
   window.openAssistant     = openAssistant;
   window.closeAssistant    = closeAssistant;
@@ -799,6 +810,7 @@ import '/assets/ui/loader.js';
     restartAssistant,
   });
   initChat();
+  initProjectDetailToggles();
 
   // Hire Me modal → ./ui/hireme.js
   // Refer Me modal → ./refer/refer.js
