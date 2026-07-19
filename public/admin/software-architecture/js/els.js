@@ -244,13 +244,23 @@ export const els = {
   runEvalBtn:           g('runEvalBtn'),
 
   // Summary & metrics mount points (renderKpiCards targets)
+  evalTabRetrievalBtn: g('evalTabRetrievalBtn'),
+  evalTabGenerationBtn:g('evalTabGenerationBtn'),
+  evalRetrievalPanel:  g('evalRetrievalPanel'),
+  evalGenerationPanel: g('evalGenerationPanel'),
   evalSummaryMount:     g('evalSummaryMount'),
   evalMetricsWrap:      g('evalMetricsWrap'),
   evalMetricsMount:     g('evalMetricsMount'),
+  evalGenerationSummaryMount:  g('evalGenerationSummaryMount'),
+  evalGenerationMetricsWrap:   g('evalGenerationMetricsWrap'),
+  evalGenerationMetricsMount:  g('evalGenerationMetricsMount'),
 
   // Threshold chips
   evalThresholdRecall:  g('evalThresholdRecall'),
   evalThresholdMrr:     g('evalThresholdMrr'),
+  generationEvalStatusCard:  g('generationEvalStatusCard'),
+  generationEvalStatusBadge: g('generationEvalStatusBadge'),
+  generationEvalStatusText:  g('generationEvalStatusText'),
 
   // Progress + gate
   ragProgressWrap:      g('ragProgressWrap'),

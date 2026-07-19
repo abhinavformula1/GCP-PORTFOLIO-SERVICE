@@ -161,8 +161,32 @@ async function findNearestChunks(queryVector, topK) {
   });
 }
 
+async function getChunksForArticle(articleId) {
+  if (!articleId) return [];
+
+  const db = getDb();
+  const snap = await db
+    .collection(RAG_COLLECTION)
+    .where('articleId', '==', String(articleId))
+    .get();
+
+  return snap.docs
+    .map((doc) => {
+      const d = doc.data() || {};
+      return {
+        articleId: String(d.articleId || ''),
+        articleTitle: String(d.articleTitle || ''),
+        chunkIndex: Number(d.chunkIndex || 0),
+        blockType: String(d.blockType || 'paragraph'),
+        text: String(d.text || ''),
+      };
+    })
+    .sort((a, b) => a.chunkIndex - b.chunkIndex);
+}
+
 module.exports = {
   saveChunks,
   deleteChunksForArticle,
   findNearestChunks,
+  getChunksForArticle,
 };

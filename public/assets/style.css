@@ -15,12 +15,21 @@
    component styles. */
 
 body {
+  --copy-font-size: 18px;
+  --copy-font-weight: 400;
+  --copy-font-family: 'Roboto Flex', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-family: 'Roboto Flex', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-optical-sizing: auto;
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
+}
+
+p {
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
 }
 
 /* Material Symbols Outlined — Google's official icon set
@@ -1923,7 +1932,9 @@ main > .section {
 
 /* ── About ── */
 .about-text {
-  font-size: 13px;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   color: var(--text-secondary);
   line-height: 1.72;
 }
@@ -1949,23 +1960,20 @@ main > .section {
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   background: #f4f7ff;
   color: #36507d;
   border-radius: 20px;
   padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
+  line-height: 1.5;
   border: 1px solid #dce7fb;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .tag:hover {
   border-color: #bfd2f7;
   background: #eef4ff;
-}
-.tag .material-symbols-outlined {
-  font-size: 14px;
-  color: #4a6aa5;
 }
 
 .profile-card {
@@ -2010,7 +2018,9 @@ main > .section {
 
 .profile-card-title {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   line-height: 1.55;
   color: var(--text-secondary);
 }
@@ -2021,12 +2031,24 @@ main > .section {
 }
 
 /* ── Education ── */
-.edu-name { font-size: 13px; font-weight: 600; }
-.edu-degree { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.edu-year { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.edu-name,
+.edu-degree,
+.edu-year {
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
+  line-height: 1.6;
+}
+.edu-name { color: var(--text); }
+.edu-degree { color: var(--text-secondary); margin-top: 2px; }
+.edu-year { color: var(--text-muted); margin-top: 2px; }
 
 /* ── Certifications ── */
 .cert-group { margin-bottom: 14px; }
+.cert-groups {
+  display: flex;
+  flex-direction: column;
+}
 .cert-group-title {
   font-size: 11px;
   font-weight: 600;
@@ -2040,10 +2062,28 @@ main > .section {
   display: flex;
   align-items: flex-start;
   gap: 7px;
-  font-size: 12.5px;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   color: var(--text-secondary);
   margin-bottom: 5px;
-  line-height: 1.4;
+  line-height: 1.6;
+}
+.cert-toggle-wrap {
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+.cert-section .project-link {
+  width: 100%;
+  justify-content: center;
+}
+.cert-section[data-expandable-card="true"] .cert-groups .cert-group:nth-child(n+3),
+.cert-section[data-expandable-card="true"] .cert-groups .cert-toggle-wrap + .cert-group {
+  display: none;
+}
+.cert-section[data-expandable-card="true"].is-expanded .cert-groups .cert-group:nth-child(n+3),
+.cert-section[data-expandable-card="true"].is-expanded .cert-groups .cert-toggle-wrap + .cert-group {
+  display: block;
 }
 
 .cert-dot {
@@ -2150,7 +2190,9 @@ main > .section {
 }
 
 .job-bullets li {
-  font-size: 13px;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   color: #3d4a60;
   padding-left: 14px;
   position: relative;
@@ -2906,7 +2948,9 @@ main > .section {
 
 .sd-landing-hero p {
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   line-height: 1.6;
   margin: 0;
   max-width: 720px;
@@ -3024,7 +3068,9 @@ main > .section {
 }
 
 .sd-list-subtitle {
-  font-size: 15px;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.55;
@@ -3103,7 +3149,9 @@ main > .section {
 }
 
 .sd-article-sub {
-  font-size: 14px;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   color: var(--text-secondary);
   margin: 0 0 16px;
   line-height: 1.5;
@@ -3178,7 +3226,9 @@ main > .section {
 
 /* Article body — long-form prose */
 .sd-article-body {
-  font-size: 14px;
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   line-height: 1.7;
   color: var(--text-secondary);
 }
@@ -3200,6 +3250,9 @@ main > .section {
   padding-left: 22px;
 }
 .sd-article-body li {
+  font-size: var(--copy-font-size);
+  font-weight: var(--copy-font-weight);
+  font-family: var(--copy-font-family);
   margin-bottom: 8px;
 }
 .sd-article-body strong {

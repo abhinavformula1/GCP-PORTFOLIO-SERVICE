@@ -37,8 +37,10 @@
  *    generation second."
  */
 
-const { embedText }        = require('./embedText');
-const { findNearestChunks } = require('./ragStore');
+const { embedText }         = require('./embedText');
+const { findNearestChunks, getChunksForArticle } = require('./ragStore');
+const { buildRagSystemPrompt } = require('./ragPrompt');
+const { generateChatResponse } = require('../llm');
 
 // ── Core metric functions (pure — no I/O) ────────────────────────────────────
 
@@ -84,6 +86,107 @@ function computeMetrics(results) {
   };
 }
 
+const JUDGE_SYSTEM_PROMPT = [
+  'You are a strict offline evaluator for a retrieval augmented generation system.',
+  'Score the candidate answer using only the provided retrieved context and reference context.',
+  'Return JSON only. No markdown, no prose, no code fences.',
+  'Scoring rules:',
+  '- faithfulness: fraction of answer claims that are supported by the retrieved context.',
+  '- hallucination: fraction of answer claims that are unsupported or contradicted by the retrieved context.',
+  '- answerCorrectness: how correct and complete the answer is versus the reference answer or reference article context.',
+  '- All scores must be numbers between 0 and 1.',
+  '- If there are no clear claims, return zeros.',
+].join('\n');
+
+function meanMetric(values) {
+  const nums = (values || []).filter(function (v) { return Number.isFinite(v); });
+  if (!nums.length) return null;
+  const sum = nums.reduce(function (acc, v) { return acc + v; }, 0);
+  return Number((sum / nums.length).toFixed(4));
+}
+
+function normaliseScore(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return Math.max(0, Math.min(1, Number(num.toFixed(4))));
+}
+
+function compactChunkText(chunks, maxChunks, maxCharsPerChunk) {
+  return (Array.isArray(chunks) ? chunks : [])
+    .slice(0, maxChunks)
+    .map(function (chunk, index) {
+      const text = String(chunk && chunk.text || '').trim().slice(0, maxCharsPerChunk);
+      return [
+        '[' + (index + 1) + '] ' + String(chunk && chunk.articleTitle || chunk && chunk.articleId || 'Unknown source'),
+        'Type: ' + String(chunk && chunk.blockType || 'paragraph'),
+        text,
+      ].join('\n');
+    })
+    .join('\n\n');
+}
+
+function buildJudgeUserMessage(args) {
+  return [
+    'Question:',
+    String(args.question || ''),
+    '',
+    'Candidate answer:',
+    String(args.answer || ''),
+    '',
+    'Retrieved context used by the generator:',
+    compactChunkText(args.retrievedChunks, 5, 900) || 'None',
+    '',
+    'Reference article context:',
+    compactChunkText(args.referenceChunks, 6, 700) || 'None',
+    '',
+    'Expected answer (optional):',
+    String(args.expectedAnswer || '').trim() || 'None',
+    '',
+    'Return JSON with this exact shape:',
+    '{"claimCount":0,"supportedClaims":0,"unsupportedClaims":0,"contradictedClaims":0,"faithfulness":0,"hallucination":0,"answerCorrectness":0,"reasoning":"brief"}',
+  ].join('\n');
+}
+
+function parseJudgeJson(text) {
+  const raw = String(text || '').trim();
+  if (!raw) throw new Error('Judge returned empty response.');
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) throw new Error('Judge did not return JSON.');
+  return JSON.parse(raw.slice(start, end + 1));
+}
+
+async function runGenerationJudge(args) {
+  const judgeResponse = await generateChatResponse({
+    systemPrompt: JUDGE_SYSTEM_PROMPT,
+    history: [],
+    userMessage: buildJudgeUserMessage(args),
+    model: args.judgeModel || 'flash-lite',
+    generationConfig: {
+      temperature: 0,
+      topP: 0.1,
+      maxOutputTokens: 500,
+    },
+  });
+
+  const parsed = parseJudgeJson(judgeResponse && judgeResponse.text);
+  const claimCount = Math.max(0, Number(parsed.claimCount || 0));
+  const supportedClaims = Math.max(0, Number(parsed.supportedClaims || 0));
+  const unsupportedClaims = Math.max(0, Number(parsed.unsupportedClaims || 0));
+  const contradictedClaims = Math.max(0, Number(parsed.contradictedClaims || 0));
+
+  return {
+    claimCount,
+    supportedClaims,
+    unsupportedClaims,
+    contradictedClaims,
+    faithfulness: normaliseScore(parsed.faithfulness),
+    hallucination: normaliseScore(parsed.hallucination),
+    answerCorrectness: normaliseScore(parsed.answerCorrectness),
+    reasoning: String(parsed.reasoning || '').trim(),
+  };
+}
+
 // ── Evaluator (I/O) ───────────────────────────────────────────────────────────
 
 /**
@@ -92,6 +195,7 @@ function computeMetrics(results) {
  * @param {Array<{
  *   question:          string,
  *   expectedArticleId: string,
+ *   expectedAnswer?:   string,
  * }>} goldenSet
  *
  * @param {{
@@ -109,17 +213,23 @@ async function evaluateRetrieval(goldenSet, opts = {}) {
   const k        = Math.max(1, Math.min(Number(opts.k) || 5, 20));
   const delayMs  = Number(opts.delayMs) || 300;
   const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
+  const generationEval = opts.generationEval && opts.generationEval.enabled
+    ? opts.generationEval
+    : null;
 
   const rawResults = [];
   const details    = [];
 
   for (let i = 0; i < goldenSet.length; i++) {
-    const { question, expectedArticleId } = goldenSet[i];
+    const { question, expectedArticleId, expectedAnswer } = goldenSet[i];
 
     let chunks = [];
     let hit    = false;
     let rank   = null;
     let error  = null;
+    let answer = '';
+    let generationError = null;
+    let generationScores = null;
 
     try {
       const queryVector = await embedText(question);
@@ -127,6 +237,36 @@ async function evaluateRetrieval(goldenSet, opts = {}) {
       ({ hit, rank } = checkHit(chunks, expectedArticleId));
     } catch (err) {
       error = err.message;
+    }
+
+    if (generationEval) {
+      try {
+        const basePrompt = String(generationEval.baseSystemPrompt || '').trim();
+        const systemPrompt = buildRagSystemPrompt(chunks, basePrompt);
+        const generated = await generateChatResponse({
+          systemPrompt,
+          history: [],
+          userMessage: question,
+          model: generationEval.answerModel || 'flash-lite',
+          generationConfig: generationEval.answerGenerationConfig || undefined,
+        });
+        answer = String(generated && generated.text || '').trim();
+
+        const referenceChunks = expectedArticleId
+          ? await getChunksForArticle(expectedArticleId).catch(function () { return []; })
+          : [];
+
+        generationScores = await runGenerationJudge({
+          question,
+          answer,
+          retrievedChunks: chunks,
+          referenceChunks,
+          expectedAnswer,
+          judgeModel: generationEval.judgeModel || 'flash-lite',
+        });
+      } catch (err) {
+        generationError = err.message;
+      }
     }
 
     rawResults.push({ hit, rank, k });
@@ -137,6 +277,17 @@ async function evaluateRetrieval(goldenSet, opts = {}) {
       hit,
       rank,
       retrievedArticles: chunks.map((c) => c.articleId),
+      answer,
+      expectedAnswer: expectedAnswer || '',
+      faithfulness: generationScores ? generationScores.faithfulness : null,
+      hallucination: generationScores ? generationScores.hallucination : null,
+      answerCorrectness: generationScores ? generationScores.answerCorrectness : null,
+      claimCount: generationScores ? generationScores.claimCount : 0,
+      supportedClaims: generationScores ? generationScores.supportedClaims : 0,
+      unsupportedClaims: generationScores ? generationScores.unsupportedClaims : 0,
+      contradictedClaims: generationScores ? generationScores.contradictedClaims : 0,
+      generationReasoning: generationScores ? generationScores.reasoning : '',
+      generationError: generationError || undefined,
       error:             error || undefined,
     });
 
@@ -149,8 +300,15 @@ async function evaluateRetrieval(goldenSet, opts = {}) {
     }
   }
 
+  const metrics = computeMetrics(rawResults);
+  if (generationEval) {
+    metrics.faithfulness = meanMetric(details.map(function (d) { return d.faithfulness; }));
+    metrics.hallucination = meanMetric(details.map(function (d) { return d.hallucination; }));
+    metrics.answerCorrectness = meanMetric(details.map(function (d) { return d.answerCorrectness; }));
+  }
+
   return {
-    metrics: computeMetrics(rawResults),
+    metrics,
     details,
   };
 }

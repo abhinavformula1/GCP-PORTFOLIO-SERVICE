@@ -6,7 +6,7 @@
  */
 
 import { state }              from '../../state.js';
-import { setSectionStatus }   from '../../http.js';
+import { authedJson, setSectionStatus }   from '../../http.js';
 import { escapeHtml, formatWhen } from '../../utils.js';
 import { atlasConfig }        from './config.js';
 import { renderKpiCards }     from '../../../../../assets/ui/kpi-cards.js';
@@ -15,23 +15,57 @@ import { showToast }          from '../../../../../assets/ui/toast.js';
 
 let _ragEvalSource = null;
 let _latestEvalSummary = null;
+let _runtimeAtlasConfig = null;
+let _activeEvalTab = 'retrieval';
+let _historyRunsCache = [];
+const EVAL_SUMMARY_CACHE_KEY = 'sd-atlas-eval-summary-v1';
+const EVAL_TAB_CACHE_KEY = 'sd-atlas-eval-tab-v1';
 
 // ── Columns shared across table renders ───────────────────────────────────────
-const HISTORY_COLS = [
-  { header: 'Run',         renderText: function (r, i, all) { return '#' + (all.length - i); } },
-  { header: 'Date & Time', renderText: function (r) { return r.ranAt ? new Date(r.ranAt).toLocaleString() : '—'; } },
-  { header: 'Mode',        renderHtml: function (r) { return '<span class="sd-eval-mode-chip">' + escapeHtml(_modeLabel(r.mode)) + '</span>'; } },
-  { header: 'Recall@K',    renderText: function (r) { return r.metrics?.recallAtK != null ? (r.metrics.recallAtK * 100).toFixed(1) + '%' : '—'; } },
-  { header: 'Precision@K', renderText: function (r) { return r.metrics?.precisionAtK != null ? (r.metrics.precisionAtK * 100).toFixed(1) + '%' : '—'; } },
-  { header: 'MRR',         renderText: function (r) { return r.metrics?.mrr       != null ? r.metrics.mrr.toFixed(3) : '—'; } },
-  { header: 'Faithfulness',renderText: function (r) { return r.metrics?.faithfulness != null ? (r.metrics.faithfulness * 100).toFixed(1) + '%' : '—'; } },
-  { header: 'Pass / Total',renderText: function (r) { return (r.hits || 0) + ' / ' + (r.total || 0); } },
-  { header: 'Status',      renderHtml: function (r) {
+const HISTORY_COLS_RETRIEVAL = [
+  { header: 'Run',         width: 72,  renderText: function (r, i, all) { return '#' + (all.length - i); } },
+  { header: 'Date & Time', width: 148, renderText: function (r) { return r.ranAt ? new Date(r.ranAt).toLocaleString() : '—'; } },
+  { header: 'Mode',        width: 96,  renderHtml: function (r) { return '<span class="sd-eval-mode-chip">' + escapeHtml(_modeLabel(r.mode)) + '</span>'; } },
+  { header: 'Recall@K',    width: 84,  align: 'right', renderText: function (r) { return r.metrics?.recallAtK != null ? (r.metrics.recallAtK * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Precision@K', width: 92,  align: 'right', renderText: function (r) { return r.metrics?.precisionAtK != null ? (r.metrics.precisionAtK * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'MRR',         width: 72,  align: 'right', renderText: function (r) { return r.metrics?.mrr       != null ? r.metrics.mrr.toFixed(3) : '—'; } },
+  { header: 'Pass / Total',width: 84,  align: 'right', renderText: function (r) { return (r.hits || 0) + ' / ' + (r.total || 0); } },
+  { header: 'Status',      width: 88,  renderHtml: function (r) {
     return _didRunPass(r)
       ? '<span class="sd-obs-badge sd-obs-badge--pass">PASS</span>'
       : '<span class="sd-obs-badge sd-obs-badge--fail">FAIL</span>';
   }},
-  { header: 'Actions', renderHtml: function (r) {
+  { header: 'Actions', width: 110, renderHtml: function (r) {
+    if (r && r._localOnly) {
+      return '<span class="sd-obs-none">Pending save</span>';
+    }
+    return '<button type="button" class="sd-eval-golden-remove" data-delete-run-id="' + escapeHtml(r.id || '') + '" title="Delete run">' +
+      '<span class="material-symbols-outlined" aria-hidden="true">delete</span>' +
+    '</button>';
+  }},
+];
+
+const HISTORY_COLS_GENERATION = [
+  { header: 'Run',         width: 72,  renderText: function (r, i, all) { return '#' + (all.length - i); } },
+  { header: 'Date & Time', width: 148, renderText: function (r) { return r.ranAt ? new Date(r.ranAt).toLocaleString() : '—'; } },
+  { header: 'Mode',        width: 96,  renderHtml: function (r) { return '<span class="sd-eval-mode-chip">' + escapeHtml(_modeLabel(r.mode)) + '</span>'; } },
+  { header: 'Faithfulness',width: 96,  align: 'right', renderText: function (r) { return r.metrics?.faithfulness != null ? (r.metrics.faithfulness * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Hallucination', width: 102, align: 'right', renderText: function (r) { return r.metrics?.hallucination != null ? (r.metrics.hallucination * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Answer Correctness', width: 126, align: 'right', renderText: function (r) { return r.metrics?.answerCorrectness != null ? (r.metrics.answerCorrectness * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Judge Status', width: 110, renderHtml: function (r) {
+    return _hasGenerationMetrics(r)
+      ? '<span class="sd-obs-badge sd-obs-badge--pass">AVAILABLE</span>'
+      : '<span class="sd-obs-badge sd-obs-badge--miss">PENDING</span>';
+  }},
+  { header: 'Status',      width: 88,  renderHtml: function (r) {
+    return _didGenerationPass(r)
+      ? '<span class="sd-obs-badge sd-obs-badge--pass">PASS</span>'
+      : '<span class="sd-obs-badge sd-obs-badge--fail">FAIL</span>';
+  }},
+  { header: 'Actions', width: 110, renderHtml: function (r) {
+    if (r && r._localOnly) {
+      return '<span class="sd-obs-none">Pending save</span>';
+    }
     return '<button type="button" class="sd-eval-golden-remove" data-delete-run-id="' + escapeHtml(r.id || '') + '" title="Delete run">' +
       '<span class="material-symbols-outlined" aria-hidden="true">delete</span>' +
     '</button>';
@@ -50,6 +84,9 @@ const FAILED_COLS = [
   }},
   { header: 'Hit?',  renderHtml: function () { return '<span class="sd-obs-badge sd-obs-badge--miss">Miss</span>'; } },
   { header: 'Rank',  renderText: function (r) { return r.rank != null ? String(r.rank) : '—'; } },
+  { header: 'Faithfulness', renderText: function (r) { return r.faithfulness != null ? (r.faithfulness * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Hallucination', renderText: function (r) { return r.hallucination != null ? (r.hallucination * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Answer Correctness', renderText: function (r) { return r.answerCorrectness != null ? (r.answerCorrectness * 100).toFixed(1) + '%' : '—'; } },
   { header: 'Actions', renderHtml: function (r) {
     return '<button type="button" class="sd-eval-golden-remove" data-dismiss-row="' + escapeHtml(String(r.index)) + '" title="Dismiss">' +
       '<span class="material-symbols-outlined" aria-hidden="true">delete</span>' +
@@ -58,27 +95,33 @@ const FAILED_COLS = [
 ];
 
 // ── ① Render / init ───────────────────────────────────────────────────────────
-export function renderEvaluationPage(els) {
+export async function renderEvaluationPage(els) {
   _latestEvalSummary = null;
-  const enabled = atlasConfig && atlasConfig.ragEnabled;
+  const cfg = await _ensureAtlasConfig();
+  const enabled = cfg && cfg.ragEnabled;
   if (els.runEvalBtn) {
     els.runEvalBtn.disabled = !enabled;
     els.runEvalBtn.title = enabled ? '' : 'Enable RAG in AI Configuration → Retrieval first.';
   }
-  if (els.evalThresholdRecall && atlasConfig)
-    els.evalThresholdRecall.textContent = atlasConfig.recallThreshold != null
-      ? ((atlasConfig.recallThreshold * 100).toFixed(0) + ' %') : '80 %';
-  if (els.evalThresholdMrr && atlasConfig)
-    els.evalThresholdMrr.textContent = atlasConfig.faithfulnessThreshold != null
-      ? atlasConfig.faithfulnessThreshold.toFixed(2) : '0.70';
+  if (els.evalThresholdRecall && cfg)
+    els.evalThresholdRecall.textContent = cfg.recallThreshold != null
+      ? ((cfg.recallThreshold * 100).toFixed(0) + ' %') : '80 %';
+  if (els.evalThresholdMrr && cfg)
+    els.evalThresholdMrr.textContent = cfg.faithfulnessThreshold != null
+      ? cfg.faithfulnessThreshold.toFixed(2) : '0.70';
 
+  _wireEvalTabs(els);
+  _setEvalTab(els, _readCachedTab());
+  _renderGenerationEvalStatus(els);
+  _applyCachedSummary(els);
   loadGoldenDataset(els);
   loadEvalHistory(els);
 }
 
 // ── ② Run evaluation ──────────────────────────────────────────────────────────
 export function startRagEval(els, credential) {
-  if (!atlasConfig || !atlasConfig.ragEnabled) {
+  const cfg = _getActiveAtlasConfig();
+  if (!cfg || !cfg.ragEnabled) {
     showToast('RAG is disabled. Enable it in AI Configuration → Retrieval before running evaluation.', { kind: 'warning', duration: 0 });
     return;
   }
@@ -116,10 +159,16 @@ export function startRagEval(els, credential) {
       const livePass = typeof d.passed === 'boolean' ? d.passed : undefined;
       renderEvalMetrics(els, d.metrics, livePass);
       _latestEvalSummary = {
+        id: d.savedRun && d.savedRun.id ? d.savedRun.id : '',
         ranAt: d.savedRun && d.savedRun.ranAt ? d.savedRun.ranAt : new Date().toISOString(),
+        mode: d.savedRun && d.savedRun.mode ? d.savedRun.mode : mode,
         metrics: d.metrics,
         pass: typeof d.passed === 'boolean' ? d.passed : null,
+        hits: d.savedRun && d.savedRun.hits != null ? d.savedRun.hits : null,
+        total: d.savedRun && d.savedRun.total != null ? d.savedRun.total : null,
+        _localOnly: !(d.savedRun && d.savedRun.id),
       };
+      _persistLatestSummary(_latestEvalSummary);
       if (d.details) renderFailedCases(els, d.details);
       if (els.ragProgressBar)   els.ragProgressBar.style.width = '100%';
       if (els.ragProgressLabel) els.ragProgressLabel.textContent = 'Complete.';
@@ -150,24 +199,29 @@ export function startRagEval(els, credential) {
 
 // ── ③ Evaluation Metrics — renderKpiCards ─────────────────────────────────────
 export function renderEvalMetrics(els, metrics, forcedPass) {
-  if (!els.evalMetricsMount) return;
-  const rT = (atlasConfig && atlasConfig.recallThreshold)     || 0.80;
-  const mT = (atlasConfig && atlasConfig.faithfulnessThreshold) || 0.70;
+  if (!els.evalMetricsMount && !els.evalGenerationMetricsMount) return;
+  const cfg = _getActiveAtlasConfig();
+  const rT = (cfg && cfg.recallThreshold)     || 0.80;
+  const mT = (cfg && cfg.faithfulnessThreshold) || 0.70;
 
   const pct = function (v) { return v != null ? +(v * 100).toFixed(1) : null; };
   const fix = function (v) { return v != null ? +v.toFixed(3) : null; };
 
-  const cards = [
+  const retrievalCards = [
     { title: 'Recall@K',           icon: 'manage_search',  iconVariant: 'ok',      value: pct(metrics.recallAtK)        != null ? pct(metrics.recallAtK) + ' %' : '—',   cardVariant: _pass(pct(metrics.recallAtK) / 100, rT),      trend: 'target ≥ ' + (rT * 100).toFixed(0) + ' %' },
     { title: 'Precision@K',        icon: 'target',         iconVariant: 'arr',     value: pct(metrics.precisionAtK)     != null ? pct(metrics.precisionAtK) + ' %' : '—', trend: 'of all retrieved slots' },
     { title: 'MRR',                icon: 'leaderboard',    iconVariant: 'mrr',     value: fix(metrics.mrr)              != null ? fix(metrics.mrr) : '—',                  cardVariant: _pass(metrics.mrr, mT),                       trend: 'target ≥ ' + mT.toFixed(2) },
+  ];
+  const generationCards = [
     { title: 'Faithfulness',       icon: 'verified',       iconVariant: 'users',   value: pct(metrics.faithfulness)     != null ? pct(metrics.faithfulness) + ' %' : '—',  cardVariant: _pass(pct(metrics.faithfulness), 70),          trend: 'LLM answer vs. chunks' },
     { title: 'Hallucination Score',icon: 'psychology_alt', iconVariant: 'danger',  value: pct(metrics.hallucination)    != null ? pct(metrics.hallucination) + ' %' : '—',  cardVariant: _passInv(pct(metrics.hallucination), 20),      trend: 'lower is better' },
     { title: 'Answer Correctness', icon: 'fact_check',     iconVariant: 'info',    value: pct(metrics.answerCorrectness)!= null ? pct(metrics.answerCorrectness) + ' %' : '—', cardVariant: _pass(pct(metrics.answerCorrectness), 70), trend: 'vs. golden answer' },
   ];
 
-  renderKpiCards(els.evalMetricsMount, { cards });
+  if (els.evalMetricsMount) renderKpiCards(els.evalMetricsMount, { cards: retrievalCards });
+  if (els.evalGenerationMetricsMount) renderKpiCards(els.evalGenerationMetricsMount, { cards: generationCards });
   _show(els.evalMetricsWrap, true);
+  _show(els.evalGenerationMetricsWrap, true);
 
   const pass = typeof forcedPass === 'boolean'
     ? forcedPass
@@ -179,7 +233,8 @@ export function renderEvalMetrics(els, metrics, forcedPass) {
     els.ragGateBadge.className = 'sd-observability-gate sd-observability-gate--' + (pass ? 'pass' : 'fail');
     _show(els.ragGateBadge, true);
   }
-  _updateSummary(els, metrics, pass);
+  _updateRetrievalSummary(els, metrics, pass);
+  _updateGenerationSummary(els, metrics);
 }
 
 // ── ④ Golden Dataset (editable form — stays custom) ───────────────────────────
@@ -309,34 +364,55 @@ export function loadEvalHistory(els) {
 
 function _renderHistory(els, runs) {
   if (!els.ragHistoryMount || !els.ragHistoryWrap) return;
-  if (runs.length) {
-    const latest = runs[0];
+  const mergedRuns = _mergeLatestRunIntoHistory(runs);
+  _historyRunsCache = mergedRuns;
+  if (mergedRuns.length) {
+    const latest = mergedRuns[0];
     if (latest && latest.metrics) {
-      const rT = (atlasConfig && atlasConfig.recallThreshold)       || 0.80;
-      const mT = (atlasConfig && atlasConfig.faithfulnessThreshold) || 0.70;
+      const cfg = _getActiveAtlasConfig();
+      const rT = (cfg && cfg.recallThreshold)       || 0.80;
+      const mT = (cfg && cfg.faithfulnessThreshold) || 0.70;
       const pass = (latest.metrics.recallAtK || 0) >= rT && (latest.metrics.mrr || 0) >= mT;
       const latestMs = latest.ranAt ? Date.parse(latest.ranAt) : 0;
       const liveMs = _latestEvalSummary && _latestEvalSummary.ranAt ? Date.parse(_latestEvalSummary.ranAt) : 0;
       if (!_latestEvalSummary || !liveMs || latestMs >= liveMs) {
         _latestEvalSummary = {
+          id: latest.id || '',
           ranAt: latest.ranAt || null,
+          mode: latest.mode || 'golden',
           metrics: latest.metrics,
           pass,
+          hits: latest.hits,
+          total: latest.total,
+          _localOnly: !!latest._localOnly,
         };
+        _persistLatestSummary(_latestEvalSummary);
         _updateSummary(els, { recallAtK: latest.metrics.recallAtK, mrr: latest.metrics.mrr, hits: latest.hits, total: latest.total }, pass, latest.ranAt);
+      } else if (_latestEvalSummary && _latestEvalSummary.metrics) {
+        _updateSummary(els, {
+          recallAtK: _latestEvalSummary.metrics.recallAtK,
+          mrr: _latestEvalSummary.metrics.mrr,
+          hits: _latestEvalSummary.hits,
+          total: _latestEvalSummary.total,
+        }, _latestEvalSummary.pass, _latestEvalSummary.ranAt);
       }
     }
   }
+  _renderHistoryTable(els, mergedRuns);
+  _show(els.ragHistoryWrap, true);
+  _wireHistoryDelete(els);
+}
+
+function _renderHistoryTable(els, mergedRuns) {
   // Pass index into renderText via closure over the array
-  const cols = HISTORY_COLS.map(function (c) {
+  const baseCols = _activeEvalTab === 'generation' ? HISTORY_COLS_GENERATION : HISTORY_COLS_RETRIEVAL;
+  const cols = baseCols.map(function (c) {
     if (c.header === 'Run') {
-      return Object.assign({}, c, { renderText: function (r, i) { return '#' + (runs.length - i); } });
+      return Object.assign({}, c, { renderText: function (r, i) { return '#' + (mergedRuns.length - i); } });
     }
     return c;
   });
-  renderDataTable(els.ragHistoryMount, { columns: cols, rows: runs, emptyText: 'No runs recorded yet.' });
-  _show(els.ragHistoryWrap, true);
-  _wireHistoryDelete(els);
+  renderDataTable(els.ragHistoryMount, { columns: cols, rows: mergedRuns, emptyText: 'No runs recorded yet.' });
 }
 
 function _wireHistoryDelete(els) {
@@ -392,6 +468,11 @@ function _wireFailedDismiss(els) {
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 function _updateSummary(els, metrics, pass, ranAt) {
+  _updateRetrievalSummary(els, metrics, pass, ranAt);
+  _updateGenerationSummary(els, metrics, ranAt);
+}
+
+function _updateRetrievalSummary(els, metrics, pass, ranAt) {
   if (!els.evalSummaryMount) return;
   const passRate = metrics.hits != null && metrics.total
     ? ((metrics.hits / metrics.total) * 100).toFixed(0) + ' %' : '—';
@@ -407,14 +488,194 @@ function _updateSummary(els, metrics, pass, ranAt) {
   });
 }
 
+function _updateGenerationSummary(els, metrics, ranAt) {
+  if (!els.evalGenerationSummaryMount) return;
+  const faithfulness = Number(metrics.faithfulness);
+  const hallucination = Number(metrics.hallucination);
+  const answerCorrectness = Number(metrics.answerCorrectness);
+  const hasGenerationScores = [faithfulness, hallucination, answerCorrectness].some(function (v) { return Number.isFinite(v) && v >= 0; });
+  const composite = hasGenerationScores
+    ? _mean([
+      Number.isFinite(faithfulness) ? faithfulness : null,
+      Number.isFinite(answerCorrectness) ? answerCorrectness : null,
+      Number.isFinite(hallucination) ? (1 - hallucination) : null,
+    ])
+    : null;
+  const generationReady = Number.isFinite(faithfulness) && faithfulness >= 0.7
+    && Number.isFinite(answerCorrectness) && answerCorrectness >= 0.7
+    && Number.isFinite(hallucination) && hallucination <= 0.2;
+  renderKpiCards(els.evalGenerationSummaryMount, {
+    cards: [
+      { title: 'Overall Score', icon: 'star', iconVariant: 'arr', value: composite != null ? (composite * 100).toFixed(1) + ' %' : '—' },
+      { title: 'Judge Status', icon: 'fact_check', iconVariant: hasGenerationScores ? 'ok' : 'neutral', value: hasGenerationScores ? 'Available' : 'Pending' },
+      { title: 'Last Run', icon: 'schedule', iconVariant: 'users', value: ranAt ? formatWhen(ranAt) : 'Just now' },
+      { title: 'Generation Ready', icon: 'auto_awesome', iconVariant: generationReady ? 'ok' : hasGenerationScores ? 'danger' : 'neutral',
+        value: generationReady ? 'Yes' : hasGenerationScores ? 'Not yet' : '—',
+        cardVariant: generationReady ? 'pass' : hasGenerationScores ? 'fail' : '' },
+    ],
+  });
+}
+
+function _readCachedSummary() {
+  try {
+    const raw = localStorage.getItem(EVAL_SUMMARY_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.metrics) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+function _persistLatestSummary(summary) {
+  if (!summary || !summary.metrics) return;
+  try {
+    localStorage.setItem(EVAL_SUMMARY_CACHE_KEY, JSON.stringify(summary));
+  } catch (_) {}
+}
+
+function _applyCachedSummary(els) {
+  const cached = _readCachedSummary();
+  if (!cached || !cached.metrics) return;
+  _latestEvalSummary = cached;
+  _updateSummary(els, Object.assign({}, cached.metrics, {
+    hits: cached.hits,
+    total: cached.total,
+  }), cached.pass, cached.ranAt);
+}
+
+function _renderGenerationEvalStatus(els) {
+  const cfg = _getActiveAtlasConfig();
+  const ready = !!(cfg && cfg._meta && cfg._meta.generationEvalsReady);
+  const reason = cfg && cfg._meta && cfg._meta.generationEvalsReason
+    ? String(cfg._meta.generationEvalsReason)
+    : 'Generation eval status is unavailable.';
+  if (els.generationEvalStatusBadge) {
+    els.generationEvalStatusBadge.textContent = ready ? 'Enabled' : 'Disabled';
+    els.generationEvalStatusBadge.className = 'sd-eval-generation-badge sd-eval-generation-badge--' + (ready ? 'ok' : 'off');
+  }
+  if (els.generationEvalStatusText) {
+    els.generationEvalStatusText.textContent = ready
+      ? reason + ' Old history rows will stay blank until you run a fresh evaluation.'
+      : reason;
+  }
+  if (els.generationEvalStatusCard) {
+    els.generationEvalStatusCard.classList.toggle('is-disabled', !ready);
+  }
+}
+
+function _mergeLatestRunIntoHistory(runs) {
+  const list = Array.isArray(runs) ? runs.slice() : [];
+  if (!_latestEvalSummary || !_latestEvalSummary.metrics || !_latestEvalSummary.ranAt) return list;
+
+  const latestMs = Date.parse(_latestEvalSummary.ranAt || '') || 0;
+  if (!latestMs) return list;
+
+  const alreadyPresent = list.some(function (run) {
+    if (!run) return false;
+    if (_latestEvalSummary.id && run.id && run.id === _latestEvalSummary.id) return true;
+    const runMs = run.ranAt ? Date.parse(run.ranAt) : 0;
+    return !!runMs && runMs === latestMs;
+  });
+  if (alreadyPresent) return list;
+
+  const synthetic = {
+    id: _latestEvalSummary.id || '',
+    ranAt: _latestEvalSummary.ranAt,
+    mode: _latestEvalSummary.mode || 'golden',
+    metrics: _latestEvalSummary.metrics,
+    hits: _latestEvalSummary.hits,
+    total: _latestEvalSummary.total,
+    passed: _latestEvalSummary.pass === true,
+    _localOnly: true,
+  };
+  list.unshift(synthetic);
+  return list;
+}
+
 function _didRunPass(run) {
-  const rT = (atlasConfig && atlasConfig.recallThreshold) || 0.80;
-  const mT = (atlasConfig && atlasConfig.faithfulnessThreshold) || 0.70;
+  const cfg = _getActiveAtlasConfig();
+  const rT = (cfg && cfg.recallThreshold) || 0.80;
+  const mT = (cfg && cfg.faithfulnessThreshold) || 0.70;
   const metrics = run && run.metrics ? run.metrics : {};
   return Number(metrics.recallAtK || 0) >= rT && Number(metrics.mrr || 0) >= mT;
+}
+
+function _didGenerationPass(run) {
+  const metrics = run && run.metrics ? run.metrics : {};
+  return Number(metrics.faithfulness) >= 0.7
+    && Number(metrics.answerCorrectness) >= 0.7
+    && Number(metrics.hallucination) <= 0.2;
+}
+
+function _hasGenerationMetrics(run) {
+  const metrics = run && run.metrics ? run.metrics : {};
+  return metrics.faithfulness != null || metrics.hallucination != null || metrics.answerCorrectness != null;
+}
+
+function _getActiveAtlasConfig() {
+  return atlasConfig || _runtimeAtlasConfig || null;
+}
+
+async function _ensureAtlasConfig() {
+  const live = _getActiveAtlasConfig();
+  if (live) return live;
+  try {
+    const data = await authedJson('/api/admin/atlas/config');
+    _runtimeAtlasConfig = Object.assign({}, data && data.config ? data.config : {}, {
+      _meta: data && data.meta ? data.meta : {},
+    });
+  } catch (_) {
+    _runtimeAtlasConfig = {};
+  }
+  return _runtimeAtlasConfig;
 }
 
 function _pass(val, threshold)    { return val == null ? '' : val >= threshold ? 'pass' : 'fail'; }
 function _passInv(val, threshold) { return val == null ? '' : val <= threshold ? 'pass' : 'fail'; }
 function _modeLabel(mode) { return { golden: 'Golden', smoke: 'Smoke', regression: 'Full Regression' }[mode] || (mode || 'Golden'); }
 function _show(el, show)  { if (el) el.hidden = !show; }
+function _mean(values) {
+  const nums = values.filter(function (v) { return typeof v === 'number' && Number.isFinite(v); });
+  if (!nums.length) return null;
+  return nums.reduce(function (sum, v) { return sum + v; }, 0) / nums.length;
+}
+function _wireEvalTabs(els) {
+  if (els.evalTabRetrievalBtn && !els.evalTabRetrievalBtn._wired) {
+    els.evalTabRetrievalBtn._wired = true;
+    els.evalTabRetrievalBtn.addEventListener('click', function () { _setEvalTab(els, 'retrieval'); });
+  }
+  if (els.evalTabGenerationBtn && !els.evalTabGenerationBtn._wired) {
+    els.evalTabGenerationBtn._wired = true;
+    els.evalTabGenerationBtn.addEventListener('click', function () { _setEvalTab(els, 'generation'); });
+  }
+}
+function _setEvalTab(els, tab) {
+  const nextTab = tab === 'generation' ? 'generation' : 'retrieval';
+  _activeEvalTab = nextTab;
+  if (els.evalTabRetrievalBtn) {
+    const active = nextTab === 'retrieval';
+    els.evalTabRetrievalBtn.classList.toggle('is-active', active);
+    els.evalTabRetrievalBtn.setAttribute('aria-selected', String(active));
+  }
+  if (els.evalTabGenerationBtn) {
+    const active = nextTab === 'generation';
+    els.evalTabGenerationBtn.classList.toggle('is-active', active);
+    els.evalTabGenerationBtn.setAttribute('aria-selected', String(active));
+  }
+  _show(els.evalRetrievalPanel, nextTab === 'retrieval');
+  _show(els.evalGenerationPanel, nextTab === 'generation');
+  if (_historyRunsCache && _historyRunsCache.length && els.ragHistoryMount) {
+    _renderHistoryTable(els, _historyRunsCache);
+  }
+  try { localStorage.setItem(EVAL_TAB_CACHE_KEY, nextTab); } catch (_) {}
+}
+function _readCachedTab() {
+  try {
+    const tab = localStorage.getItem(EVAL_TAB_CACHE_KEY);
+    return tab === 'generation' ? 'generation' : 'retrieval';
+  } catch (_) {
+    return 'retrieval';
+  }
+}

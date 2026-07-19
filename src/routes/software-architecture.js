@@ -23,6 +23,7 @@ const { indexArticle, removeArticleChunks } = require('../services/rag');
 const { evaluateRetrieval }                 = require('../services/rag/evaluate');
 const { GOLDEN_SET }                        = require('../services/rag/goldenSet');
 const { generateChatResponse }              = require('../services/llm');
+const { SYSTEM_PROMPT }                     = require('../services/atlas/persona');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -108,6 +109,15 @@ function stripSectionHeading(text, sectionLabel) {
   const headingPattern = new RegExp('^(?:#{1,6}\\s*)?(?:\\*\\*)?' + escaped + '(?:\\*\\*)?\\s*\\n+', 'i');
   value = value.replace(headingPattern, '').trim();
   return value;
+}
+
+function buildEvalGenerationConfig(atlasCfg) {
+  const cfg = atlasCfg && typeof atlasCfg === 'object' ? atlasCfg : {};
+  const generationConfig = {};
+  if (typeof cfg.temperature === 'number') generationConfig.temperature = cfg.temperature;
+  if (typeof cfg.topP === 'number') generationConfig.topP = cfg.topP;
+  if (typeof cfg.maxOutputTokens === 'number') generationConfig.maxOutputTokens = cfg.maxOutputTokens;
+  return generationConfig;
 }
 
 async function generateWritingAssist(payload) {
@@ -642,7 +652,16 @@ router.get('/admin/system/health', requireAdmin, async (_req, res) => {
 router.get('/admin/atlas/config', requireAdmin, async (_req, res, next) => {
   try {
     const cfg = await adminConfig.getAtlasConfig();
-    return res.status(200).json({ success: true, config: cfg });
+    return res.status(200).json({
+      success: true,
+      config: cfg,
+      meta: {
+        generationEvalsReady: !!config.gemini.apiKey,
+        generationEvalsReason: config.gemini.apiKey
+          ? 'Gemini-backed offline generation evals are available for new runs.'
+          : 'Gemini API key is missing in this environment, so generation evals cannot run yet.',
+      },
+    });
   } catch (err) { return next(err); }
 });
 
@@ -874,9 +893,25 @@ router.get('/admin/atlas/rag-eval', requireAdminAccess({ allowQueryToken: true, 
   const evalConfig = await adminConfig.getAtlasConfig().catch(function () { return null; });
 
   try {
+    const baseSystemPrompt = evalConfig && typeof evalConfig.systemPrompt === 'string' && evalConfig.systemPrompt.trim()
+      ? evalConfig.systemPrompt.trim()
+      : SYSTEM_PROMPT;
+    const answerModel = evalConfig && typeof evalConfig.defaultModel === 'string' && evalConfig.defaultModel
+      ? evalConfig.defaultModel
+      : 'flash-lite';
+    const judgeModel = evalConfig && typeof evalConfig.routingFallbackModel === 'string' && evalConfig.routingFallbackModel
+      ? evalConfig.routingFallbackModel
+      : 'flash-lite';
     const { metrics, details } = await evaluateRetrieval(evalSet, {
       k,
       delayMs: 300,
+      generationEval: {
+        enabled: true,
+        baseSystemPrompt,
+        answerModel,
+        answerGenerationConfig: buildEvalGenerationConfig(evalConfig),
+        judgeModel,
+      },
       onProgress({ index, total, question, hit, rank }) {
         send('progress', { index, total, question, hit, rank });
       },

@@ -20,7 +20,9 @@ export async function renderAtlasConfig(els) {
   setSectionStatus(els.atlasConfigStatus, 'Loading…', 'info');
   try {
     const data = await authedJson('/api/admin/atlas/config');
-    atlasConfig = data.config || {};
+    atlasConfig = Object.assign({}, data.config || {}, {
+      _meta: data.meta || {},
+    });
     _wireConfigAccordion();
     _wireConfigInputs();
     _fillForm(els, atlasConfig);
@@ -42,7 +44,9 @@ export async function saveAtlasConfig(els) {
     const splitterRadio = document.querySelector('input[name="atlasSplitterType"]:checked');
     const payload = _buildPayload(els, enabledModels, defaultModel, splitterRadio);
     await authedJson('/api/admin/atlas/config', { method: 'PUT', body: JSON.stringify(payload) });
-    atlasConfig = payload;
+    atlasConfig = Object.assign({}, payload, {
+      _meta: atlasConfig && atlasConfig._meta ? atlasConfig._meta : {},
+    });
     setSectionStatus(els.atlasConfigStatus, 'Atlas settings saved.', 'success');
   } catch (err) {
     setSectionStatus(els.atlasConfigStatus, 'Save failed: ' + err.message, 'error');
