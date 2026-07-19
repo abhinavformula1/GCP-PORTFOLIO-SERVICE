@@ -59,9 +59,10 @@ function _fillForm(els, cfg) {
   const enabled      = Array.isArray(cfg.enabledModels) ? cfg.enabledModels : ['flash-lite', 'flash'];
   const defaultModel = cfg.defaultModel || 'flash-lite';
   Object.keys(ATLAS_ALL_MODELS).forEach(function (key) {
-    const meta = ATLAS_ALL_MODELS[key];
+    const meta = _getModelUiMeta(cfg, key);
     const row  = document.createElement('div');
     row.className = 'sd-atlas-model-row';
+    row.setAttribute('data-model-key', key);
     row.innerHTML = [
       '<div class="sd-atlas-model-info"><strong>' + meta.label + '</strong><span>' + meta.detail + '</span></div>',
       '<div class="sd-atlas-model-controls">',
@@ -72,6 +73,16 @@ function _fillForm(els, cfg) {
       '  <label class="sd-toggle-switch" aria-label="Enable ' + meta.label + '">',
       '    <input type="checkbox" class="sd-atlas-model-toggle" data-key="' + key + '"' + (enabled.includes(key) ? ' checked' : '') + '>',
       '    <span class="sd-toggle-slider"></span>',
+      '  </label>',
+      '</div>',
+      '<div class="sd-atlas-model-copy-grid">',
+      '  <label class="sd-atlas-model-copy-field">',
+      '    <span>Chat button title</span>',
+      '    <input type="text" class="sd-atlas-model-copy-input" data-model-copy="label" value="' + escapeHtmlAttr(meta.label) + '" maxlength="40" placeholder="Fast & economical">',
+      '  </label>',
+      '  <label class="sd-atlas-model-copy-field">',
+      '    <span>Chat button subtitle</span>',
+      '    <input type="text" class="sd-atlas-model-copy-input" data-model-copy="detail" value="' + escapeHtmlAttr(meta.detail) + '" maxlength="60" placeholder="Default">',
       '  </label>',
       '</div>',
     ].join('');
@@ -137,6 +148,7 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
   return {
     enabledModels,    defaultModel,
     fallbackModel:        _g(els.atlasFallbackModel,         'value')  || '',
+    modelOptions:         _readModelOptions(els.atlasModelRows),
     temperature:          _n(els.atlasTemperature,           0.35),
     topP:                 _n(els.atlasTopP,                  0.85),
     maxOutputTokens:      _n(els.atlasMaxOutputTokens,       900),
@@ -251,6 +263,44 @@ function _syncModelCardState(container) {
     row.classList.toggle('is-default', Boolean(selected && radio && selected.value === radio.value));
     row.classList.toggle('is-disabled', Boolean(toggle && !toggle.checked));
   });
+}
+
+function _getModelUiMeta(cfg, key) {
+  const base = ATLAS_ALL_MODELS[key] || { label: key, detail: '' };
+  const source = cfg && cfg.modelOptions && cfg.modelOptions[key];
+  return {
+    label: source && typeof source.label === 'string' && source.label.trim()
+      ? source.label.trim()
+      : base.label,
+    detail: source && typeof source.detail === 'string' && source.detail.trim()
+      ? source.detail.trim()
+      : base.detail,
+  };
+}
+
+function _readModelOptions(container) {
+  const options = {};
+  if (!container) return options;
+  container.querySelectorAll('.sd-atlas-model-row').forEach(function (row) {
+    const key = row.getAttribute('data-model-key');
+    if (!key) return;
+    const labelInput = row.querySelector('[data-model-copy="label"]');
+    const detailInput = row.querySelector('[data-model-copy="detail"]');
+    const base = ATLAS_ALL_MODELS[key] || { label: key, detail: '' };
+    options[key] = {
+      label: labelInput && labelInput.value.trim() ? labelInput.value.trim() : base.label,
+      detail: detailInput && detailInput.value.trim() ? detailInput.value.trim() : base.detail,
+    };
+  });
+  return options;
+}
+
+function escapeHtmlAttr(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function _setV(el, prop, val) { if (el) el[prop] = val; }

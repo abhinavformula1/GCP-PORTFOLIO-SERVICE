@@ -18,6 +18,13 @@ const adminConfig = require('../adminConfig');
 const { SYSTEM_PROMPT } = require('./persona');
 const { buildRagContext } = require('../rag');
 const {
+  traceIfEnabled,
+  previewText,
+  summarizeExecutionPlan,
+  summarizeGenerationConfig,
+  summarizeWebSearchMeta,
+} = require('../observability/langsmith');
+const {
   shouldUseWebSearch,
   searchTavily,
   buildWebSearchContext,
@@ -166,7 +173,68 @@ async function buildCallConfig(userMessage, atlasCfg, executionPlan) {
 }
 
 module.exports = {
-  buildExecutionPlan,
-  loadRuntimeConfig,
-  buildCallConfig,
+  buildExecutionPlan: traceIfEnabled(buildExecutionPlan, {
+    name: 'atlas.build_execution_plan',
+    run_type: 'chain',
+    processInputs(inputs) {
+      const args = Array.isArray(inputs.args) ? inputs.args : [];
+      const userMessage = args[0];
+      const atlasCfg = args[1];
+      return {
+        messagePreview: previewText(userMessage),
+        messageChars: String(userMessage || '').trim().length,
+        ragEnabled: !!(atlasCfg && atlasCfg.ragEnabled),
+        webSearchEnabled: !!(atlasCfg && atlasCfg.webSearchEnabled),
+        webSearchMode: atlasCfg && atlasCfg.webSearchMode ? String(atlasCfg.webSearchMode) : '',
+        executionMode: atlasCfg && atlasCfg.executionMode ? String(atlasCfg.executionMode) : '',
+      };
+    },
+    processOutputs(outputs) {
+      return {
+        plan: summarizeExecutionPlan(outputs),
+      };
+    },
+  }),
+  loadRuntimeConfig: traceIfEnabled(loadRuntimeConfig, {
+    name: 'atlas.load_runtime_config',
+    run_type: 'retriever',
+    processOutputs(outputs) {
+      return outputs && typeof outputs === 'object'
+        ? {
+          ragEnabled: !!outputs.ragEnabled,
+          executionMode: String(outputs.executionMode || ''),
+          defaultModel: String(outputs.defaultModel || ''),
+          webSearchMode: String(outputs.webSearchMode || ''),
+          tracingEnabled: !!outputs.tracingEnabled,
+        }
+        : {};
+    },
+  }),
+  buildCallConfig: traceIfEnabled(buildCallConfig, {
+    name: 'atlas.build_call_config',
+    run_type: 'chain',
+    processInputs(inputs) {
+      const args = Array.isArray(inputs.args) ? inputs.args : [];
+      const userMessage = args[0];
+      const atlasCfg = args[1];
+      const executionPlan = args[2];
+      return {
+        messagePreview: previewText(userMessage),
+        messageChars: String(userMessage || '').trim().length,
+        hasAtlasConfig: !!atlasCfg,
+        requestedPlan: summarizeExecutionPlan(executionPlan),
+      };
+    },
+    processOutputs(outputs) {
+      return outputs && typeof outputs === 'object'
+        ? {
+          plan: summarizeExecutionPlan(outputs.plan),
+          generationConfig: summarizeGenerationConfig(outputs.generationConfig),
+          hasSystemPrompt: !!outputs.systemPrompt,
+          systemPromptChars: outputs.systemPrompt ? String(outputs.systemPrompt).length : 0,
+          webSearch: summarizeWebSearchMeta(outputs.webSearch),
+        }
+        : {};
+    },
+  }),
 };

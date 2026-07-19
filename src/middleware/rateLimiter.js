@@ -71,7 +71,7 @@ const recommendationLimiter = rateLimit({
 // just the secondary gate.
 const atlasLimiter = rateLimit({
   windowMs:       60 * 60 * 1000,  // 1 hour
-  max:            15,
+  max:            30,
   standardHeaders: 'draft-7',
   legacyHeaders:  false,
   message: {

@@ -14,6 +14,7 @@ import { renderDataTable }    from '../../../../../assets/ui/datatable.js';
 import { showToast }          from '../../../../../assets/ui/toast.js';
 
 let _ragEvalSource = null;
+let _latestEvalSummary = null;
 
 // ── Columns shared across table renders ───────────────────────────────────────
 const HISTORY_COLS = [
@@ -26,7 +27,7 @@ const HISTORY_COLS = [
   { header: 'Faithfulness',renderText: function (r) { return r.metrics?.faithfulness != null ? (r.metrics.faithfulness * 100).toFixed(1) + '%' : '—'; } },
   { header: 'Pass / Total',renderText: function (r) { return (r.hits || 0) + ' / ' + (r.total || 0); } },
   { header: 'Status',      renderHtml: function (r) {
-    return r.passed
+    return _didRunPass(r)
       ? '<span class="sd-obs-badge sd-obs-badge--pass">PASS</span>'
       : '<span class="sd-obs-badge sd-obs-badge--fail">FAIL</span>';
   }},
@@ -58,6 +59,7 @@ const FAILED_COLS = [
 
 // ── ① Render / init ───────────────────────────────────────────────────────────
 export function renderEvaluationPage(els) {
+  _latestEvalSummary = null;
   const enabled = atlasConfig && atlasConfig.ragEnabled;
   if (els.runEvalBtn) {
     els.runEvalBtn.disabled = !enabled;
@@ -111,7 +113,13 @@ export function startRagEval(els, credential) {
   source.addEventListener('result', function (evt) {
     try {
       const d = JSON.parse(evt.data);
-      renderEvalMetrics(els, d.metrics);
+      const livePass = typeof d.passed === 'boolean' ? d.passed : undefined;
+      renderEvalMetrics(els, d.metrics, livePass);
+      _latestEvalSummary = {
+        ranAt: d.savedRun && d.savedRun.ranAt ? d.savedRun.ranAt : new Date().toISOString(),
+        metrics: d.metrics,
+        pass: typeof d.passed === 'boolean' ? d.passed : null,
+      };
       if (d.details) renderFailedCases(els, d.details);
       if (els.ragProgressBar)   els.ragProgressBar.style.width = '100%';
       if (els.ragProgressLabel) els.ragProgressLabel.textContent = 'Complete.';
@@ -141,7 +149,7 @@ export function startRagEval(els, credential) {
 }
 
 // ── ③ Evaluation Metrics — renderKpiCards ─────────────────────────────────────
-export function renderEvalMetrics(els, metrics) {
+export function renderEvalMetrics(els, metrics, forcedPass) {
   if (!els.evalMetricsMount) return;
   const rT = (atlasConfig && atlasConfig.recallThreshold)     || 0.80;
   const mT = (atlasConfig && atlasConfig.faithfulnessThreshold) || 0.70;
@@ -161,7 +169,9 @@ export function renderEvalMetrics(els, metrics) {
   renderKpiCards(els.evalMetricsMount, { cards });
   _show(els.evalMetricsWrap, true);
 
-  const pass = (metrics.recallAtK || 0) >= rT && (metrics.mrr || 0) >= mT;
+  const pass = typeof forcedPass === 'boolean'
+    ? forcedPass
+    : (metrics.recallAtK || 0) >= rT && (metrics.mrr || 0) >= mT;
   if (els.ragGateBadge) {
     els.ragGateBadge.textContent = pass
       ? '✓ PASS — Recall@K and MRR meet thresholds. Configuration is production-ready.'
@@ -305,7 +315,16 @@ function _renderHistory(els, runs) {
       const rT = (atlasConfig && atlasConfig.recallThreshold)       || 0.80;
       const mT = (atlasConfig && atlasConfig.faithfulnessThreshold) || 0.70;
       const pass = (latest.metrics.recallAtK || 0) >= rT && (latest.metrics.mrr || 0) >= mT;
-      _updateSummary(els, { recallAtK: latest.metrics.recallAtK, mrr: latest.metrics.mrr, hits: latest.hits, total: latest.total }, pass, latest.ranAt);
+      const latestMs = latest.ranAt ? Date.parse(latest.ranAt) : 0;
+      const liveMs = _latestEvalSummary && _latestEvalSummary.ranAt ? Date.parse(_latestEvalSummary.ranAt) : 0;
+      if (!_latestEvalSummary || !liveMs || latestMs >= liveMs) {
+        _latestEvalSummary = {
+          ranAt: latest.ranAt || null,
+          metrics: latest.metrics,
+          pass,
+        };
+        _updateSummary(els, { recallAtK: latest.metrics.recallAtK, mrr: latest.metrics.mrr, hits: latest.hits, total: latest.total }, pass, latest.ranAt);
+      }
     }
   }
   // Pass index into renderText via closure over the array
@@ -386,6 +405,13 @@ function _updateSummary(els, metrics, pass, ranAt) {
         cardVariant: pass === true ? 'pass' : pass === false ? 'fail' : '' },
     ],
   });
+}
+
+function _didRunPass(run) {
+  const rT = (atlasConfig && atlasConfig.recallThreshold) || 0.80;
+  const mT = (atlasConfig && atlasConfig.faithfulnessThreshold) || 0.70;
+  const metrics = run && run.metrics ? run.metrics : {};
+  return Number(metrics.recallAtK || 0) >= rT && Number(metrics.mrr || 0) >= mT;
 }
 
 function _pass(val, threshold)    { return val == null ? '' : val >= threshold ? 'pass' : 'fail'; }

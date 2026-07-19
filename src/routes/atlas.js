@@ -186,6 +186,37 @@ async function saveCachedAnswer(cacheRef, { model, answer }) {
  * Both POST handlers begin with this same dance, so centralising avoids
  * the duplication that SonarQube flags on the route module.
  */
+
+function atlasEnabledModels(atlasCfg) {
+  const models = Array.isArray(atlasCfg && atlasCfg.enabledModels)
+    ? atlasCfg.enabledModels.filter(function (key) { return !!LLM_MODELS[key]; })
+    : [];
+  return models.length ? models : [DEFAULT_LLM_MODEL_KEY];
+}
+
+function resolveAtlasModel(requestedModel, atlasCfg) {
+  const enabledModels = atlasEnabledModels(atlasCfg);
+  const configuredDefault = enabledModels.includes(atlasCfg && atlasCfg.defaultModel)
+    ? atlasCfg.defaultModel
+    : (enabledModels[0] || DEFAULT_LLM_MODEL_KEY);
+  if (atlasCfg && atlasCfg.modelSelectorVisible === false) return configuredDefault;
+  if (requestedModel && enabledModels.includes(requestedModel)) return requestedModel;
+  return configuredDefault;
+}
+
+function resolveAtlasFallbackModel(primaryModel, atlasCfg) {
+  const candidates = [
+    atlasCfg && atlasCfg.routingFallbackModel,
+    atlasCfg && atlasCfg.fallbackModel,
+  ];
+  for (const candidate of candidates) {
+    if (candidate && candidate !== primaryModel && LLM_MODELS[candidate]) {
+      return candidate;
+    }
+  }
+  return '';
+}
+
 function prepareAtlasRequest(req, _res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -216,13 +247,15 @@ router.post('/atlas/ask',
     try {
       const history = await loadServerHistory(uid);
       const atlasCfg = await loadRuntimeConfig();
+      const resolvedModel = resolveAtlasModel(model, atlasCfg);
+      const fallbackModel = resolveAtlasFallbackModel(resolvedModel, atlasCfg);
       const executionPlan = buildExecutionPlan(message, atlasCfg);
       const cacheRef = executionPlan.useWebSearch
         ? null
-        : cacheKeyFor({ message, model, history });
+        : cacheKeyFor({ message, model: resolvedModel, history });
       const cached = await readCachedAnswer(cacheRef);
       if (cached && cached.answer) {
-        const usage = cachedUsage(model);
+        const usage = cachedUsage(resolvedModel);
         persistTurns(uid, message, cached.answer, usage);
         console.log('[atlas/cache]', { transactionId, uid, model: usage.model });
         return res.status(200).json({
@@ -236,12 +269,12 @@ router.post('/atlas/ask',
       }
 
       const { systemPrompt, generationConfig, webSearch } = await buildCallConfig(message, atlasCfg, executionPlan);
-      const { answer, usage } = await ask({ message, history, model, systemPrompt, generationConfig });
+      const { answer, usage } = await ask({ message, history, model: resolvedModel, fallbackModel, systemPrompt, generationConfig });
 
       // Fire-and-forget persistence — we already have the answer; the
       // user shouldn't wait on Firestore to see it.
       persistTurns(uid, message, answer, usage);
-      saveCachedAnswer(cacheRef, { model, answer });
+      saveCachedAnswer(cacheRef, { model: resolvedModel, answer });
 
       console.log('[atlas]', {
         transactionId, uid,
@@ -299,14 +332,16 @@ router.post('/atlas/stream',
     try {
       const history = await loadServerHistory(uid);
       const atlasCfg = await loadRuntimeConfig();
+      const resolvedModel = resolveAtlasModel(model, atlasCfg);
+      const fallbackModel = resolveAtlasFallbackModel(resolvedModel, atlasCfg);
       const executionPlan = buildExecutionPlan(message, atlasCfg);
       const cacheRef = executionPlan.useWebSearch
         ? null
-        : cacheKeyFor({ message, model, history });
+        : cacheKeyFor({ message, model: resolvedModel, history });
       const cached = await readCachedAnswer(cacheRef);
       if (cached && cached.answer) {
         finalAnswer = cached.answer;
-        usage = cachedUsage(model);
+        usage = cachedUsage(resolvedModel);
         send({ done: finalAnswer, usage, cached: true, transactionId, webSearch: null });
         persistTurns(uid, message, finalAnswer, usage);
         console.log('[atlas/stream/cache]', { transactionId, uid, model: usage.model });
@@ -314,7 +349,7 @@ router.post('/atlas/stream',
       }
 
       const { systemPrompt, generationConfig, webSearch } = await buildCallConfig(message, atlasCfg, executionPlan);
-      for await (const evt of askStream({ message, history, model, systemPrompt, generationConfig })) {
+      for await (const evt of askStream({ message, history, model: resolvedModel, fallbackModel, systemPrompt, generationConfig })) {
         if (aborted) break;
         if (evt.kind === 'chunk') {
           send({ chunk: evt.text });
@@ -326,7 +361,7 @@ router.post('/atlas/stream',
       }
 
       if (!aborted && finalAnswer) persistTurns(uid, message, finalAnswer, usage);
-      if (!aborted && finalAnswer) saveCachedAnswer(cacheRef, { model, answer: finalAnswer });
+      if (!aborted && finalAnswer) saveCachedAnswer(cacheRef, { model: resolvedModel, answer: finalAnswer });
 
       console.log('[atlas/stream]', {
         transactionId, uid,
@@ -418,6 +453,7 @@ router.get('/atlas/config',
       return res.json({
         enabledModels,
         defaultModel,
+        modelOptions: cfg.modelOptions || {},
         modelSelectorVisible: cfg.modelSelectorVisible,
       });
     } catch (err) {
@@ -431,6 +467,10 @@ router.get('/atlas/config',
           defaultModel: fallbackEnabled.includes('flash-lite')
             ? 'flash-lite'
             : (fallbackEnabled[0] || DEFAULT_LLM_MODEL_KEY),
+          modelOptions: {
+            'flash-lite': { label: 'Fast & economical', detail: 'Default' },
+            flash: { label: 'More detailed', detail: 'Higher cost' },
+          },
           modelSelectorVisible: true,
           degraded: true,
           degradedReason: 'FIRESTORE_NOT_CONFIGURED',

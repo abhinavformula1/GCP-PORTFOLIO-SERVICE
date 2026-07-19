@@ -651,6 +651,7 @@ router.put('/admin/atlas/config', requireAdmin, [
   body('enabledModels.*').isString().notEmpty(),
   body('defaultModel').isString().notEmpty().withMessage('defaultModel is required.'),
   body('modelSelectorVisible').isBoolean().withMessage('modelSelectorVisible must be a boolean.'),
+  body('modelOptions').optional().isObject().withMessage('modelOptions must be an object.'),
   // LLM
   body('temperature').optional().isFloat({ min: 0, max: 2 }),
   body('topP').optional().isFloat({ min: 0, max: 1 }),
@@ -703,6 +704,7 @@ router.put('/admin/atlas/config', requireAdmin, [
       enabledModels:            b.enabledModels,
       defaultModel:             b.defaultModel,
       fallbackModel:            typeof b.fallbackModel === 'string' ? b.fallbackModel : '',
+      modelOptions:             b.modelOptions,
       temperature:              b.temperature          != null ? Number(b.temperature)          : undefined,
       topP:                     b.topP                 != null ? Number(b.topP)                 : undefined,
       maxOutputTokens:          b.maxOutputTokens      != null ? Number(b.maxOutputTokens)      : undefined,
@@ -869,6 +871,8 @@ router.get('/admin/atlas/rag-eval', requireAdminAccess({ allowQueryToken: true, 
   }
   // 'golden' and 'regression' use the full set
 
+  const evalConfig = await adminConfig.getAtlasConfig().catch(function () { return null; });
+
   try {
     const { metrics, details } = await evaluateRetrieval(evalSet, {
       k,
@@ -877,16 +881,21 @@ router.get('/admin/atlas/rag-eval', requireAdminAccess({ allowQueryToken: true, 
         send('progress', { index, total, question, hit, rank });
       },
     });
+    const recallThreshold = typeof evalConfig?.recallThreshold === 'number' ? evalConfig.recallThreshold : 0.80;
+    const mrrThreshold = typeof evalConfig?.faithfulnessThreshold === 'number' ? evalConfig.faithfulnessThreshold : 0.70;
+    const passed = Number(metrics?.recallAtK || 0) >= recallThreshold
+      && Number(metrics?.mrr || 0) >= mrrThreshold;
 
     // ── Persist run to Firestore for audit history ─────────────────────────
+    let savedRun = null;
     try {
-      await ragAdminRepository.saveRagEvalRun({ k, mode, metrics, details });
+      savedRun = await ragAdminRepository.saveRagEvalRun({ k, mode, metrics, details, passed });
     } catch (saveErr) {
       // Non-fatal — log but don't fail the SSE stream.
       console.error('[rag-eval] failed to save run history:', saveErr.message);
     }
 
-    send('result', { metrics, details });
+    send('result', { metrics, details, passed, savedRun });
   } catch (err) {
     send('error', { message: err.message || 'Evaluation failed.' });
   } finally {

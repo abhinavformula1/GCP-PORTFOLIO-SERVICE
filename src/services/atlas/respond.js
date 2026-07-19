@@ -20,7 +20,15 @@ const {
   LLM_MODELS,
   DEFAULT_LLM_MODEL_KEY,
 } = require('../llm');
-const { SYSTEM_PROMPT }                                     = require('./persona');
+const { SYSTEM_PROMPT } = require('./persona');
+const {
+  traceIfEnabled,
+  previewText,
+  summarizeGenerationConfig,
+  summarizeUsage,
+  summarizeStreamEvents,
+} = require('../observability/langsmith');
+const { AppError } = require('../../errors');
 
 const MAX_USER_MSG_CHARS  = 1000;
 const MAX_HISTORY_TURNS   = 10;
@@ -85,6 +93,37 @@ function normaliseModel(model) {
   return LLM_MODELS[model] ? model : DEFAULT_LLM_MODEL_KEY;
 }
 
+
+function isQuotaError(err) {
+  const text = String(err && (err.upstream || err.message) || '').toLowerCase();
+  return text.includes('quota exceeded') || text.includes('resource_exhausted') || text.includes('error 429');
+}
+
+function normaliseFallbackModel(model, primaryModel) {
+  const resolved = normaliseModel(model);
+  if (!resolved || resolved === primaryModel) return '';
+  return resolved;
+}
+
+function shouldRetryWithFallback(primaryModel, fallbackModel, err) {
+  return !!(fallbackModel
+    && fallbackModel !== primaryModel
+    && err
+    && err.code === 'UPSTREAM_ERROR'
+    && isQuotaError(err));
+}
+
+function toFriendlyQuotaError(primaryModel, fallbackModel, err) {
+  if (!err || !isQuotaError(err) || primaryModel !== 'flash') return err;
+  const hasFallback = !!fallbackModel && fallbackModel !== primaryModel;
+  const message = hasFallback
+    ? 'Gemini 2.5 Flash is out of free quota right now, and the configured fallback model is unavailable. Please ask the admin to check Atlas model settings.'
+    : 'Gemini 2.5 Flash is out of free quota right now. Please ask the admin to switch Atlas to Flash-Lite and try again.';
+  const friendly = new AppError(message, 429, 'MODEL_QUOTA_EXCEEDED');
+  friendly.upstream = err.upstream;
+  return friendly;
+}
+
 /**
  * Validate + normalise a request: trims the user message, enforces
  * length, builds a clean history. Throws on bad input. Both ask() and
@@ -139,8 +178,17 @@ function prepareCall(args) {
  */
 async function ask(args) {
   const call = prepareCall(args);
-  const result = await generateChatResponse(call);
-  return { answer: sanitiseReply(result.text), usage: result.usage };
+  const fallbackModel = normaliseFallbackModel(args && args.fallbackModel, call.model);
+  try {
+    const result = await generateChatResponse(call);
+    return { answer: sanitiseReply(result.text), usage: result.usage };
+  } catch (err) {
+    if (!shouldRetryWithFallback(call.model, fallbackModel, err)) {
+      throw toFriendlyQuotaError(call.model, fallbackModel, err);
+    }
+    const fallbackResult = await generateChatResponse(Object.assign({}, call, { model: fallbackModel }));
+    return { answer: sanitiseReply(fallbackResult.text), usage: fallbackResult.usage };
+  }
 }
 
 /**
@@ -154,22 +202,84 @@ async function ask(args) {
  */
 async function* askStream(args) {
   const call = prepareCall(args);
+  const fallbackModel = normaliseFallbackModel(args && args.fallbackModel, call.model);
   let acc = '';
   let usage = null;
-  for await (const evt of generateChatResponseStream(call)) {
-    if (evt.kind === 'chunk') {
-      acc += evt.text;
-      yield { kind: 'chunk', text: evt.text };
-    } else if (evt.kind === 'usage') {
-      usage = evt.usage;
+
+  const streamWithModel = async function* (modelKey) {
+    for await (const evt of generateChatResponseStream(Object.assign({}, call, { model: modelKey }))) {
+      if (evt.kind === 'chunk') {
+        acc += evt.text;
+        yield { kind: 'chunk', text: evt.text };
+      } else if (evt.kind === 'usage') {
+        usage = evt.usage;
+      }
     }
+  };
+
+  try {
+    yield* streamWithModel(call.model);
+  } catch (err) {
+    if (!shouldRetryWithFallback(call.model, fallbackModel, err)) {
+      throw toFriendlyQuotaError(call.model, fallbackModel, err);
+    }
+    acc = '';
+    usage = null;
+    yield* streamWithModel(fallbackModel);
   }
+
   yield { kind: 'done', text: sanitiseReply(acc), usage };
 }
 
 module.exports = {
-  ask,
-  askStream,
+  ask: traceIfEnabled(ask, {
+    name: 'atlas.ask',
+    run_type: 'chain',
+    processInputs(inputs) {
+      return {
+        model: String(inputs.model || ''),
+        messagePreview: previewText(inputs.message),
+        messageChars: String(inputs.message || '').trim().length,
+        historyTurns: Array.isArray(inputs.history) ? inputs.history.length : 0,
+        historyPreview: Array.isArray(inputs.history)
+          ? inputs.history.slice(-2).map(function (turn) {
+            return {
+              role: turn && turn.role ? turn.role : '',
+              textPreview: previewText(turn && turn.text ? turn.text : ''),
+            };
+          })
+          : [],
+        hasSystemPrompt: !!inputs.systemPrompt,
+        systemPromptChars: inputs.systemPrompt ? String(inputs.systemPrompt).length : 0,
+        generationConfig: summarizeGenerationConfig(inputs.generationConfig),
+      };
+    },
+    processOutputs(outputs) {
+      return {
+        answerPreview: previewText(outputs.answer),
+        answerChars: String(outputs.answer || '').length,
+        usage: summarizeUsage(outputs.usage),
+      };
+    },
+  }),
+  askStream: traceIfEnabled(askStream, {
+    name: 'atlas.ask_stream',
+    run_type: 'chain',
+    processInputs(inputs) {
+      return {
+        model: String(inputs.model || ''),
+        messagePreview: previewText(inputs.message),
+        messageChars: String(inputs.message || '').trim().length,
+        historyTurns: Array.isArray(inputs.history) ? inputs.history.length : 0,
+        hasSystemPrompt: !!inputs.systemPrompt,
+        systemPromptChars: inputs.systemPrompt ? String(inputs.systemPrompt).length : 0,
+        generationConfig: summarizeGenerationConfig(inputs.generationConfig),
+      };
+    },
+    processOutputs(outputs) {
+      return summarizeStreamEvents(outputs.outputs);
+    },
+  }),
   LLM_MODELS,
   DEFAULT_LLM_MODEL_KEY,
   // Exported for tests / external observers.

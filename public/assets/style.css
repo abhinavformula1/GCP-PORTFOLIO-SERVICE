@@ -4681,25 +4681,25 @@ figure.sd-image-block figcaption {
   top: auto;
   right: 16px;
   bottom: 16px;
-  width: 360px;
-  height: 600px;
+  width: 392px;
+  height: 648px;
   max-height: calc(100vh - 32px);
   max-width: calc(100vw - 32px);
 }
 
 .ga-modal {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(207, 222, 241, 0.9);
+  border-radius: 22px;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16), 0 4px 14px rgba(15, 23, 42, 0.06);
   overflow: hidden;
 }
 
 /* Header — messaging style top bar */
 .ga-header {
-  background: #ffffff;
-  border-bottom: 1px solid #e9eef7;
-  padding: 14px 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  border-bottom: 1px solid #e6edf7;
+  padding: 16px 18px 15px;
   gap: 14px;
   align-items: center;
 }
@@ -4745,27 +4745,31 @@ figure.sd-image-block figcaption {
 }
 
 .ga-header-btn {
-  color: #4b5563;
+  color: #5f6f86;
   font-size: 18px;
   padding: 6px;
 }
 .ga-header-btn:hover {
-  color: #111827;
-  background: #f3f6fb;
+  color: #12335f;
+  background: #eff5fd;
 }
 
 .ga-header-btn-icon {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .ga-header-btn-icon .material-symbols-outlined {
   font-size: 26px;
   line-height: 1;
+}
+
+#gaStartOverBtn .material-symbols-outlined {
+  font-size: 22px;
 }
 
 /* Progress — purple thread instead of blue */
@@ -4774,78 +4778,92 @@ figure.sd-image-block figcaption {
 
 /* Messages canvas — soft off-white */
 .ga-messages {
-  background: #f7f8fa;
-  padding: 16px 14px 12px;
-  gap: 10px;
+  background:
+    radial-gradient(circle at top right, rgba(11, 58, 106, 0.06), transparent 34%),
+    linear-gradient(180deg, #f7faff 0%, #f4f7fb 100%);
+  padding: 18px 16px 14px;
+  gap: 12px;
 }
 
 /* Bubbles */
 .ga-bubble {
-  max-width: 78%;
-  padding: 10px 13px;
-  font-size: 13px;
-  line-height: 1.5;
-  border-radius: 14px;
-  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.06);
+  max-width: 80%;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.62;
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 .ga-bubble-bot {
-  background: #d1e4ff;
-  color: #1f2733;
-  border-bottom-left-radius: 4px;
+  background: linear-gradient(180deg, #edf5ff 0%, #dbeafe 100%);
+  color: #1e293b;
+  border: 1px solid rgba(165, 199, 240, 0.92);
+  border-bottom-left-radius: 6px;
 }
 .ga-bubble-user {
-  background: #0070D2;
+  background: linear-gradient(180deg, #0b72d9 0%, #005fb8 100%);
   color: #ffffff;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 6px;
 }
 
 /* Atlas avatar tucked into the top-left of each bot bubble — Aura-style */
 .ga-msg-bot {
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0;
+  display: grid;
+  grid-template-columns: 14px minmax(0, max-content);
+  align-items: start;
+  column-gap: 0;
+  row-gap: 8px;
 }
 .ga-msg-bot::before {
   content: '';
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: #0B2A5B url('/assets/chat/atlas-avatar.png') center/cover no-repeat;
-  flex-shrink: 0;
-  margin-right: -10px;   /* overlap into the bubble corner */
-  margin-top: -14px;     /* sit at the corner — most of the avatar above the bubble */
-  margin-left: -6px;     /* nudge slightly past the bubble's left edge */
+  margin-right: -14px;   /* overlap into the bubble corner */
+  margin-top: -10px;     /* sit at the corner — most of the avatar above the bubble */
+  margin-left: -6px;     /* sit tighter to the bubble so the circle matches the corner */
   position: relative;
   z-index: 2;
   border: 2px solid #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+  grid-column: 1;
+  grid-row: 1;
 }
 /* Make room for the avatar overlap inside the bubble */
-.ga-msg-bot .ga-bubble-bot { padding-left: 28px; }
+.ga-msg-bot .ga-bubble-bot {
+  grid-column: 2;
+  grid-row: 1;
+  width: fit-content;
+  padding-left: 28px;
+  border-top-left-radius: 28px;
+}
 /* Hide the avatar on subsequent bot messages in a sequence — only the
    first bot bubble in a group shows Atlas, like Slack/Aura. */
 .ga-msg-bot + .ga-msg-bot::before { visibility: hidden; }
-.ga-msg-bot + .ga-msg-bot .ga-bubble-bot { padding-left: 13px; }
+.ga-msg-bot + .ga-msg-bot .ga-bubble-bot { padding-left: 12px; }
 
 /* Input area — light footer */
 .ga-input-area {
   background: #ffffff;
-  border-top: 1px solid #e5e7eb;
-  padding: 12px 14px 14px;
+  border-top: 1px solid #e7eef8;
+  padding: 14px 16px 16px;
 }
 .ga-text-input {
-  background: #f4f5f7;
-  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border: 1px solid #d8e4f3;
   color: #1f2733;
-  border-radius: 22px;
-  height: 40px;
-  padding: 0 14px;
-  font-size: 13px;
+  border-radius: 999px;
+  height: 48px;
+  padding: 0 16px;
+  font-size: 14px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
 }
 .ga-text-input::placeholder { color: #9ca3af; }
 .ga-text-input:focus {
   border-color: #0070D2;
   background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(0, 112, 210, 0.12);
   outline: none;
 }
 .ga-send-btn {
@@ -4866,27 +4884,37 @@ figure.sd-image-block figcaption {
   display: flex;
   align-items: center;
 }
-.ga-input-row .ga-text-input { flex: 1; padding-right: 44px; }
+.ga-input-row .ga-text-input { flex: 1; padding-right: 58px; }
 .ga-input-row .ga-send-icon-btn {
   position: absolute;
-  right: 10px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
   padding: 0;
   border: none;
   background: transparent;
-  color: #0070D2;
+  color: #0b72d9;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.15s ease;
+  border-radius: 999px;
+  box-shadow: none;
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
-.ga-input-row .ga-send-icon-btn:hover:not(:disabled) { opacity: 0.65; }
-.ga-input-row .ga-send-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.ga-input-row .ga-send-icon-btn:hover:not(:disabled) {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.05);
+}
+.ga-input-row .ga-send-icon-btn:disabled {
+  background: transparent;
+  color: #8ea0b7;
+  opacity: 1;
+  cursor: not-allowed;
+}
 .ga-input-row .ga-send-icon-btn .ga-send-svg {
   transform: rotate(-35deg);   /* tilt the paper-plane up-and-to-the-right */
   transform-origin: 50% 50%;
@@ -5499,23 +5527,27 @@ figure.sd-image-block figcaption {
 .ga-atlas-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 6px 0 4px 40px;   /* indent so they line up with bot bubble text */
+  gap: 8px;
+  margin: 10px 0 6px 42px;   /* indent so they line up with bot bubble text */
 }
 .ga-atlas-chip {
-  background: #f4f7fb;
-  color: #0070D2;
+  background: rgba(255, 255, 255, 0.82);
+  color: #0b3a6a;
   border: 1px solid #d6e4f5;
-  border-radius: 16px;
-  padding: 6px 12px;
+  border-radius: 999px;
+  padding: 8px 13px;
   font-size: 12px;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 .ga-atlas-chip:hover {
-  background: #e8f1fb;
-  border-color: #0070D2;
+  background: #edf5ff;
+  border-color: #0b72d9;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(11, 58, 106, 0.08);
 }
 
 /* Free-form input bar tightening — slightly more breathing room because
@@ -5523,13 +5555,14 @@ figure.sd-image-block figcaption {
 .ga-overlay[data-mode="freeform"] .ga-input-area { padding-top: 10px; }
 
 .ga-atlas-budget {
-  background: #f8fbff;
-  border: 1px solid #d6e4f5;
-  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  border: 1px solid #d9e7f6;
+  border-radius: 18px;
   color: #24445f;
   font-size: 11px;
-  margin-bottom: 8px;
-  padding: 8px 10px;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
 }
 .ga-atlas-budget-row {
   align-items: center;
@@ -5539,19 +5572,19 @@ figure.sd-image-block figcaption {
 }
 .ga-atlas-budget-row span { color: #5f7284; }
 .ga-atlas-budget-row strong {
-  color: #0070D2;
+  color: #0b72d9;
   font-weight: 700;
   white-space: nowrap;
 }
 .ga-atlas-budget-bar {
-  background: #dcebf8;
+  background: #dce9f7;
   border-radius: 999px;
-  height: 5px;
-  margin-top: 6px;
+  height: 7px;
+  margin-top: 8px;
   overflow: hidden;
 }
 .ga-atlas-budget-bar span {
-  background: #0070D2;
+  background: linear-gradient(90deg, #0b72d9 0%, #42a5ff 100%);
   border-radius: inherit;
   display: block;
   height: 100%;
@@ -5559,66 +5592,102 @@ figure.sd-image-block figcaption {
 }
 .ga-atlas-budget-note {
   color: #6f7f8f;
-  font-size: 10px;
-  margin-top: 5px;
+  font-size: 10.5px;
+  margin-top: 7px;
 }
 
 .ga-atlas-model-picker {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 .ga-atlas-model-btn {
-  background: #f8fbff;
-  border: 1px solid #d6e4f5;
-  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  border: 1px solid #d7e4f4;
+  border-radius: 14px;
   color: #24445f;
   cursor: pointer;
   font-family: inherit;
-  padding: 7px 9px;
+  padding: 9px 10px;
   text-align: left;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 .ga-atlas-model-btn span {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .ga-atlas-model-btn small {
   color: #6f7f8f;
   display: block;
   font-size: 10px;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 .ga-atlas-model-btn[aria-pressed="true"] {
-  background: #eef7ff;
-  border-color: #0070D2;
-  box-shadow: 0 0 0 1px rgba(0, 112, 210, 0.12);
+  background: linear-gradient(180deg, #eef6ff 0%, #e0f0ff 100%);
+  border-color: #0b72d9;
+  box-shadow: 0 0 0 1px rgba(0, 112, 210, 0.12), 0 10px 20px rgba(0, 112, 210, 0.08);
+  transform: translateY(-1px);
 }
 .ga-atlas-usage {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 2;
+  grid-row: 2;
+  width: auto;
+  max-width: 80%;
+  justify-self: start;
+  box-sizing: border-box;
+  margin: 8px 0 0 0;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid #f0d3b4;
+  background: #ffffff;
   color: #6f7f8f;
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 1.35;
-  margin: 4px 0 0 40px;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+}
+.ga-atlas-usage-item {
+  color: #6b7280;
+  white-space: nowrap;
+}
+.ga-atlas-usage-item-strong {
+  color: #27405f;
+  font-weight: 700;
+}
+.ga-atlas-usage-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #d0b18c;
+  flex: 0 0 auto;
 }
 .ga-atlas-usage-cache {
+  border-color: #bfe0cc;
+  background: #f7fffa;
+}
+.ga-atlas-usage-cache .ga-atlas-usage-item-strong {
   color: #2e6f4f;
 }
 
 /* Typing indicator — three pulsing dots */
 .ga-bubble.ga-typing {
-  padding: 10px 14px;
+  padding: 12px 15px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-height: 28px;
+  gap: 5px;
+  min-height: 32px;
 }
 .ga-typing-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(11, 58, 106, 0.42);
   animation: gaTypingBounce 1.2s infinite ease-in-out;
 }
 .ga-typing-dot:nth-child(2) { animation-delay: 0.15s; }
@@ -5687,14 +5756,25 @@ figure.sd-image-block figcaption {
 
 /* Mobile: reduce chooser card padding + chip font slightly */
 @media (max-width: 480px) {
+  .ga-overlay {
+    right: 12px;
+    bottom: 12px;
+    width: calc(100vw - 24px);
+    height: min(78vh, 640px);
+  }
   .ga-mode-card { padding: 10px 12px; gap: 10px; }
   .ga-mode-icon { width: 34px; height: 34px; }
   .ga-mode-title { font-size: 13px; }
   .ga-mode-body  { font-size: 11px; }
+  .ga-header-name { font-size: 18px; }
+  .ga-bubble { max-width: 86%; font-size: 13.5px; }
   .ga-atlas-chips { margin-left: 36px; }
   .ga-atlas-chip  { font-size: 11px; padding: 5px 10px; }
   .ga-atlas-model-picker { grid-template-columns: 1fr; }
-  .ga-atlas-usage { margin-left: 36px; }
+  .ga-atlas-usage {
+    max-width: 86%;
+    margin-left: 0;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

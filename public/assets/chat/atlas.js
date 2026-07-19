@@ -77,6 +77,7 @@ const MODEL_STORAGE_KEY = 'atlas_model_choice_v1';
 const ATLAS_STREAM_TIMEOUT_MS = 20000;
 const GOOGLE_TOKEN_EXPIRY_SKEW_SECONDS = 60;
 const MAX_CLIENT_HISTORY_TURNS = 20;
+const LOCAL_ATLAS_DEV_TOKEN = 'local-admin-preview';
 
 // All possible model options (superset). The admin may enable a subset.
 const MODEL_OPTIONS = {
@@ -93,6 +94,22 @@ const MODEL_OPTIONS = {
 // Resolved at runtime from /api/atlas/config — falls back to defaults.
 let _atlasRemoteConfig = null;
 
+function applyRemoteModelOptions(remoteOptions) {
+  if (!remoteOptions || typeof remoteOptions !== 'object') return;
+  Object.keys(MODEL_OPTIONS).forEach(function (key) {
+    const incoming = remoteOptions[key];
+    if (!incoming || typeof incoming !== 'object') return;
+    MODEL_OPTIONS[key] = {
+      label: typeof incoming.label === 'string' && incoming.label.trim()
+        ? incoming.label.trim()
+        : MODEL_OPTIONS[key].label,
+      detail: typeof incoming.detail === 'string' && incoming.detail.trim()
+        ? incoming.detail.trim()
+        : MODEL_OPTIONS[key].detail,
+    };
+  });
+}
+
 async function fetchAtlasConfig() {
   if (_atlasRemoteConfig) return _atlasRemoteConfig;
   try {
@@ -108,6 +125,7 @@ async function fetchAtlasConfig() {
       modelSelectorVisible: true,
     };
   }
+  applyRemoteModelOptions(_atlasRemoteConfig.modelOptions);
   return _atlasRemoteConfig;
 }
 
@@ -146,7 +164,19 @@ function readStoredModel(enabledModels) {
   const allowed = enabledModels || Object.keys(MODEL_OPTIONS);
   let stored;
   try { stored = sessionStorage.getItem(MODEL_STORAGE_KEY); } catch (_) {}
-  return (stored && allowed.includes(stored)) ? stored : (allowed[0] || 'flash-lite');
+  return (stored && allowed.includes(stored)) ? stored : '';
+}
+
+function resolveInitialModel(remoteCfg, enabledModels) {
+  const allowed = enabledModels || Object.keys(MODEL_OPTIONS);
+  const backendDefault = remoteCfg && remoteCfg.defaultModel && allowed.includes(remoteCfg.defaultModel)
+    ? remoteCfg.defaultModel
+    : (allowed[0] || 'flash-lite');
+  if (remoteCfg && remoteCfg.modelSelectorVisible === false) {
+    try { sessionStorage.removeItem(MODEL_STORAGE_KEY); } catch (_) {}
+    return backendDefault;
+  }
+  return readStoredModel(allowed) || backendDefault;
 }
 
 /* ── State ────────────────────────────────────────────────────────────── */
@@ -196,8 +226,8 @@ export async function renderFreeFormMode() {
   const remoteCfg = await fetchAtlasConfig();
   const enabledModels = (remoteCfg.enabledModels || []).filter(function (k) { return !!MODEL_OPTIONS[k]; });
   if (enabledModels.length === 0) enabledModels.push('flash-lite');
-  // Reconcile stored model against enabled set.
-  atlasState.model = readStoredModel(enabledModels);
+  // Backend default is authoritative; stored choice only applies when the picker is enabled.
+  atlasState.model = resolveInitialModel(remoteCfg, enabledModels);
 
   // Render the input bar early so it's there even while we wait for the
   // server to load any saved conversation.
@@ -208,17 +238,11 @@ export async function renderFreeFormMode() {
   // show the greeting + suggested chips.
   const restored = await fetchSavedConversation();
   if (restored && restored.length) {
-    appendBotBubble(
-      "Welcome back — picking up where we left off."
-    );
     replayHistory(restored);
     atlasState.history = restored.slice();
-  } else {
-    appendBotBubble(
-      "Hi — I'm **Atlas**, Abhinav's virtual assistant. Ask me anything about his experience, projects, or how to get in touch.\n\n_(I won't make things up — if I don't know, I'll say so.)_"
-    );
-    renderSuggestedChips(msgs);
+    return;
   }
+  renderSuggestedChips(msgs);
 }
 
 function replayHistory(turns) {
@@ -364,6 +388,16 @@ function buildRequestHistory(history) {
     });
 }
 
+function isLocalAtlasDevRuntime() {
+  return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+}
+
+function getAtlasAuthToken() {
+  if (hasFreshGoogleCredential()) return googleCredential;
+  if (isLocalAtlasDevRuntime()) return LOCAL_ATLAS_DEV_TOKEN;
+  return '';
+}
+
 /**
  * Stream the reply from /api/atlas/stream. Returns true on success
  * (streamed and got a `done` event), false on a soft failure that
@@ -371,12 +405,16 @@ function buildRequestHistory(history) {
  * count as a soft failure.
  */
 async function streamAsk(message, history) {
-  if (!hasFreshGoogleCredential()) {
+  const authToken = getAtlasAuthToken();
+  if (!authToken) {
     handleInvalidGoogleCredential();
     return true;  // No fallback — same outcome with JSON.
   }
 
   let resp;
+  const startedAt = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now()
+    : Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ATLAS_STREAM_TIMEOUT_MS);
   const requestHistory = buildRequestHistory(history);
@@ -384,7 +422,7 @@ async function streamAsk(message, history) {
     resp = await fetch('/api/atlas/stream', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + googleCredential,
+        'Authorization': 'Bearer ' + authToken,
         'Content-Type':  'application/json',
         'Accept':        'text/event-stream',
       },
@@ -414,9 +452,8 @@ async function streamAsk(message, history) {
   }
 
   // Open a streaming bubble that we'll fill chunk-by-chunk.
-  const typing = appendTypingIndicator();
-  const bubbleWrap = appendBotBubble('');
-  const bubble = bubbleWrap.querySelector('.ga-bubble.ga-md');
+  const bubbleWrap = appendTypingIndicator();
+  const bubble = bubbleWrap.querySelector('.ga-bubble');
   let acc = '';
   let typingRemoved = false;
   let final = '';
@@ -446,17 +483,19 @@ async function streamAsk(message, history) {
         try { parsed = JSON.parse(jsonStr); } catch (_) { continue; }
 
         if (parsed.error) {
-          if (!typingRemoved && typing) { typing.remove(); typingRemoved = true; }
-          // Replace the empty bubble with an error bubble for clarity.
-          bubbleWrap.remove();
+          if (bubbleWrap && bubbleWrap.parentNode) bubbleWrap.remove();
           appendErrorBubble(parsed.error);
           return true;
         }
 
         if (typeof parsed.chunk === 'string') {
-          // Lazy-remove the typing indicator on the first real chunk so
-          // there's no visual flicker between dots and text.
-          if (!typingRemoved && typing) { typing.remove(); typingRemoved = true; }
+          // Reuse the same placeholder bubble for streamed content so Atlas
+          // doesn't show a second empty bot shell before the first chunk lands.
+          if (!typingRemoved && bubble) {
+            bubble.classList.remove('ga-typing');
+            bubble.classList.add('ga-md');
+            typingRemoved = true;
+          }
           acc += parsed.chunk;
           if (bubble) bubble.innerHTML = renderMarkdown(acc);
           scrollToBottom();
@@ -466,17 +505,19 @@ async function streamAsk(message, history) {
           final = parsed.done;
           usage = parsed.usage || null;
           cached = !!parsed.cached;
-          if (bubble) bubble.innerHTML = renderMarkdown(final);
+          if (bubble) {
+            bubble.classList.remove('ga-typing');
+            bubble.classList.add('ga-md');
+            bubble.innerHTML = renderMarkdown(final);
+          }
         }
       }
     }
   } catch (_e) {
-    if (!typingRemoved && typing) typing.remove();
-    bubbleWrap.remove();
+    if (bubbleWrap && bubbleWrap.parentNode) bubbleWrap.remove();
     return false;  // Try JSON fallback.
   } finally {
     clearTimeout(timeout);
-    if (typing && typing.parentNode) typing.remove();
   }
 
   // Update local history with the AUTHORITATIVE final text (the server
@@ -487,8 +528,14 @@ async function streamAsk(message, history) {
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
     if (usage && cached) usage.cached = true;
-    appendUsageMeta(bubbleWrap, usage);
+    appendUsageMeta(bubbleWrap, usage, {
+      latencyMs: ((typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now()) - startedAt,
+    });
     setTimeout(refreshUsageSummary, 800);
+  } else if (bubbleWrap && bubbleWrap.parentNode) {
+    bubbleWrap.remove();
   }
   return true;
 }
@@ -498,6 +545,9 @@ async function streamAsk(message, history) {
  */
 async function fallbackJsonAsk(message, history) {
   const typing = appendTypingIndicator();
+  const startedAt = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now()
+    : Date.now();
   try {
     const res = await postAskJson(message, history);
     if (!res.ok) {
@@ -515,7 +565,11 @@ async function fallbackJsonAsk(message, history) {
     const bubbleWrap = appendBotBubble(answer);
     const usage = res.body && res.body.usage;
     if (usage && res.body && res.body.cached) usage.cached = true;
-    appendUsageMeta(bubbleWrap, usage);
+    appendUsageMeta(bubbleWrap, usage, {
+      latencyMs: ((typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now()) - startedAt,
+    });
     setTimeout(refreshUsageSummary, 800);
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
@@ -527,7 +581,8 @@ async function fallbackJsonAsk(message, history) {
 }
 
 async function postAskJson(message, history) {
-  if (!hasFreshGoogleCredential()) {
+  const authToken = getAtlasAuthToken();
+  if (!authToken) {
     return { ok: false, status: 401, body: { error: friendlyHttpError(401) } };
   }
   let resp;
@@ -536,7 +591,7 @@ async function postAskJson(message, history) {
     resp = await fetch('/api/atlas/ask', {
       method:  'POST',
       headers: {
-        'Authorization': 'Bearer ' + googleCredential,
+        'Authorization': 'Bearer ' + authToken,
         'Content-Type':  'application/json',
       },
       body: JSON.stringify({ message, history: requestHistory, model: atlasState.model }),
@@ -578,6 +633,10 @@ function decodeJwtPayload(token) {
 
 function handleInvalidGoogleCredential() {
   setGoogleCredential(null);
+  if (isLocalAtlasDevRuntime()) {
+    appendErrorBubble('Atlas local auth reset. Retrying with localhost dev access.');
+    return;
+  }
   appendErrorBubble("Your Google sign-in expired. Please sign in again to chat with Atlas.");
   if (typeof window.showWelcomeOverlay === 'function') window.showWelcomeOverlay();
 }
@@ -585,11 +644,12 @@ function handleInvalidGoogleCredential() {
 /* ── Persistence ──────────────────────────────────────────────────────── */
 
 async function fetchSavedConversation() {
-  if (!googleCredential) return null;
+  const authToken = getAtlasAuthToken();
+  if (!authToken) return null;
   try {
     const resp = await fetch('/api/atlas/conversations/active', {
       method:  'GET',
-      headers: { 'Authorization': 'Bearer ' + googleCredential },
+      headers: { 'Authorization': 'Bearer ' + authToken },
     });
     if (!resp.ok) return null;
     const data = await resp.json();
@@ -601,11 +661,12 @@ async function fetchSavedConversation() {
 }
 
 async function fetchUsageSummary() {
-  if (!hasFreshGoogleCredential()) return null;
+  const authToken = getAtlasAuthToken();
+  if (!authToken) return null;
   try {
     const resp = await fetch('/api/atlas/usage', {
       method:  'GET',
-      headers: { 'Authorization': 'Bearer ' + googleCredential },
+      headers: { 'Authorization': 'Bearer ' + authToken },
     });
     if (!resp.ok) return null;
     const data = await resp.json();
@@ -643,16 +704,16 @@ function renderBudgetUsage(usage) {
 async function startOver() {
   if (atlasState.inFlight) return;
 
-  const beforeClear = await fetchUsageSummary();
-  const activeUsage = beforeClear && beforeClear.activeConversation;
+  await fetchUsageSummary();
 
   // Wipe server-side history first (best effort) so a refresh doesn't
   // resurrect the old conversation.
-  if (googleCredential) {
+  const authToken = getAtlasAuthToken();
+  if (authToken) {
     try {
       await fetch('/api/atlas/conversations/active', {
         method:  'DELETE',
-        headers: { 'Authorization': 'Bearer ' + googleCredential },
+        headers: { 'Authorization': 'Bearer ' + authToken },
       });
     } catch (_) { /* fall through — local reset still happens */ }
   }
@@ -669,14 +730,6 @@ async function startOver() {
   appendBotBubble(
     "Fresh start. Ask me anything about Abhinav."
   );
-  if (activeUsage && Number(activeUsage.totalTokens || 0)) {
-    appendBotBubble(
-      'Previous conversation usage: **' + formatNumber(activeUsage.totalTokens)
-      + ' tokens** (' + formatNumber(activeUsage.inputTokens) + ' in / '
-      + formatNumber(activeUsage.outputTokens) + ' out), estimated cost **'
-      + formatInr(Number(activeUsage.estimatedInr || 0)) + '**.'
-    );
-  }
   if (msgs) renderSuggestedChips(msgs);
   setTimeout(refreshUsageSummary, 800);
 }
@@ -751,28 +804,47 @@ function appendTypingIndicator() {
   });
 }
 
-function appendUsageMeta(wrap, usage) {
+function appendUsageMeta(wrap, usage, extras) {
   if (!wrap || !usage) return;
+  const meta = document.createElement('div');
+  meta.className = 'ga-atlas-usage';
+  const latencyMs = Number(extras && extras.latencyMs);
+  const latencyLabel = Number.isFinite(latencyMs) && latencyMs > 0
+    ? formatDurationMs(latencyMs)
+    : '';
   if (usage.cached) {
-    const meta = document.createElement('div');
-    meta.className = 'ga-atlas-usage ga-atlas-usage-cache';
-    meta.textContent = 'Retrieved from cache · 0 LLM tokens used · Est. cost ₹0.00';
+    meta.classList.add('ga-atlas-usage-cache');
+    meta.innerHTML = ''
+      + '<span class="ga-atlas-usage-item ga-atlas-usage-item-strong">Cached response</span>'
+      + '<span class="ga-atlas-usage-dot" aria-hidden="true"></span>'
+      + '<span class="ga-atlas-usage-item">0 tokens</span>'
+      + '<span class="ga-atlas-usage-dot" aria-hidden="true"></span>'
+      + '<span class="ga-atlas-usage-item">₹0.00</span>'
+      + (latencyLabel
+        ? '<span class="ga-atlas-usage-dot" aria-hidden="true"></span><span class="ga-atlas-usage-item">' + escapeHtml(latencyLabel) + '</span>'
+        : '');
     wrap.appendChild(meta);
+    syncUsageWidth(wrap, meta);
     scrollToBottom();
     return;
   }
+
   const totalTokens = Number(usage.totalTokens || 0);
   const estimatedInr = Number(usage.estimatedInr || 0);
   if (!totalTokens && !estimatedInr) return;
 
-  const meta = document.createElement('div');
-  meta.className = 'ga-atlas-usage';
-  const modelLabel = usage.modelLabel || usage.model || 'LLM';
-  meta.textContent = 'Usage: ' + formatNumber(totalTokens)
-    + ' tokens (' + formatNumber(usage.inputTokens) + ' in / '
-    + formatNumber(usage.outputTokens) + ' out) · Est. cost: ' + formatInr(estimatedInr)
-    + ' · ' + modelLabel;
+  const modelLabel = escapeHtml(usage.modelLabel || usage.model || 'LLM');
+  meta.innerHTML = ''
+    + '<span class="ga-atlas-usage-item ga-atlas-usage-item-strong">' + modelLabel + '</span>'
+    + '<span class="ga-atlas-usage-dot" aria-hidden="true"></span>'
+    + '<span class="ga-atlas-usage-item">' + escapeHtml(formatNumber(totalTokens)) + ' tokens</span>'
+    + '<span class="ga-atlas-usage-dot" aria-hidden="true"></span>'
+    + '<span class="ga-atlas-usage-item">' + escapeHtml(formatInr(estimatedInr)) + '</span>'
+    + (latencyLabel
+      ? '<span class="ga-atlas-usage-dot" aria-hidden="true"></span><span class="ga-atlas-usage-item">' + escapeHtml(latencyLabel) + '</span>'
+      : '');
   wrap.appendChild(meta);
+  syncUsageWidth(wrap, meta);
   scrollToBottom();
 }
 
@@ -787,11 +859,43 @@ function formatInr(value) {
   return '₹' + amount.toFixed(2);
 }
 
+function formatDurationMs(value) {
+  const ms = Math.max(0, Number(value || 0));
+  if (!ms) return '';
+  if (ms < 1000) return Math.round(ms) + 'ms';
+  return (ms / 1000).toFixed(1) + 's';
+}
+
 function setSendDisabled(disabled) {
   const btn = document.getElementById('gaAtlasSendBtn');
   if (btn) btn.disabled = !!disabled;
   const inp = document.getElementById('gaAtlasInput');
   if (inp) inp.disabled = !!disabled;
+}
+
+function syncUsageWidth(wrap, meta) {
+  if (!wrap || !meta) return;
+  const bubble = wrap.querySelector('.ga-bubble-bot');
+  if (!bubble) return;
+
+  if (meta._bubbleWidthObserver && typeof meta._bubbleWidthObserver.disconnect === 'function') {
+    meta._bubbleWidthObserver.disconnect();
+  }
+
+  const applyWidth = function () {
+    const width = Math.ceil(bubble.getBoundingClientRect().width || 0);
+    if (width > 0) meta.style.width = width + 'px';
+  };
+
+  applyWidth();
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyWidth);
+  if (typeof setTimeout === 'function') setTimeout(applyWidth, 80);
+
+  if (typeof ResizeObserver === 'function') {
+    const observer = new ResizeObserver(applyWidth);
+    observer.observe(bubble);
+    meta._bubbleWidthObserver = observer;
+  }
 }
 
 function scrollToBottom() {

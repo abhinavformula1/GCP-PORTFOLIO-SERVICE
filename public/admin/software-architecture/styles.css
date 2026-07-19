@@ -6742,6 +6742,45 @@ md-dialog:not([open]) {
   gap: 14px;
 }
 
+.sd-atlas-model-copy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.sd-atlas-model-copy-field {
+  display: grid;
+  gap: 6px;
+}
+
+.sd-atlas-model-copy-field span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.sd-atlas-model-copy-input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--sd-admin-panel-border) 88%, transparent);
+  background: color-mix(in srgb, var(--sd-admin-panel-bg) 92%, white);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+
+.sd-atlas-model-copy-input:focus,
+.sd-atlas-model-copy-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--sd-admin-accent) 55%, var(--sd-admin-panel-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sd-admin-accent) 16%, transparent);
+}
+
 .sd-atlas-model-select {
   display: inline-flex;
   align-items: center;
@@ -7022,6 +7061,10 @@ md-dialog:not([open]) {
   .sd-atlas-model-controls {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .sd-atlas-model-copy-grid {
+    grid-template-columns: 1fr;
   }
 }
 

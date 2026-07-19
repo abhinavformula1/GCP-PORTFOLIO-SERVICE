@@ -2,6 +2,13 @@
 
 const config = require('../../../config');
 const { resolveModel } = require('../models');
+const {
+  traceIfEnabled,
+  previewText,
+  summarizeGenerationConfig,
+  summarizeUsage,
+  summarizeStreamEvents,
+} = require('../../observability/langsmith');
 
 // Gemini API version: `/v1beta/`.
 //
@@ -234,6 +241,66 @@ async function* generateChatResponseStream(args, opts) {
 module.exports = {
   providerName: 'gemini',
   summariseConversation,
-  generateChatResponse,
-  generateChatResponseStream,
+  generateChatResponse: traceIfEnabled(generateChatResponse, {
+    name: 'llm.gemini.generate_chat_response',
+    run_type: 'llm',
+    getInvocationParams(args) {
+      const model = resolveGeminiModel(args && args.model);
+      return {
+        provider: 'google-genai',
+        model: model.providerModelId,
+        temperature: args && args.generationConfig ? args.generationConfig.temperature : undefined,
+        top_p: args && args.generationConfig ? args.generationConfig.topP : undefined,
+        max_tokens: args && args.generationConfig ? args.generationConfig.maxOutputTokens : undefined,
+      };
+    },
+    processInputs(inputs) {
+      const model = resolveGeminiModel(inputs && inputs.model);
+      return {
+        provider: 'gemini',
+        model: model.providerModelId,
+        systemPromptPreview: previewText(inputs.systemPrompt),
+        systemPromptChars: inputs.systemPrompt ? String(inputs.systemPrompt).length : 0,
+        historyTurns: Array.isArray(inputs.history) ? inputs.history.length : 0,
+        userMessagePreview: previewText(inputs.userMessage),
+        userMessageChars: String(inputs.userMessage || '').trim().length,
+        generationConfig: summarizeGenerationConfig(inputs.generationConfig),
+      };
+    },
+    processOutputs(outputs) {
+      return {
+        textPreview: previewText(outputs.text),
+        textChars: String(outputs.text || '').length,
+        usage: summarizeUsage(outputs.usage),
+      };
+    },
+  }),
+  generateChatResponseStream: traceIfEnabled(generateChatResponseStream, {
+    name: 'llm.gemini.generate_chat_response_stream',
+    run_type: 'llm',
+    getInvocationParams(args) {
+      const model = resolveGeminiModel(args && args.model);
+      return {
+        provider: 'google-genai',
+        model: model.providerModelId,
+        temperature: args && args.generationConfig ? args.generationConfig.temperature : undefined,
+        top_p: args && args.generationConfig ? args.generationConfig.topP : undefined,
+        max_tokens: args && args.generationConfig ? args.generationConfig.maxOutputTokens : undefined,
+      };
+    },
+    processInputs(inputs) {
+      const model = resolveGeminiModel(inputs && inputs.model);
+      return {
+        provider: 'gemini',
+        model: model.providerModelId,
+        historyTurns: Array.isArray(inputs.history) ? inputs.history.length : 0,
+        userMessagePreview: previewText(inputs.userMessage),
+        userMessageChars: String(inputs.userMessage || '').trim().length,
+        generationConfig: summarizeGenerationConfig(inputs.generationConfig),
+      };
+    },
+    processOutputs(outputs) {
+      return summarizeStreamEvents(outputs.outputs);
+    },
+  }),
 };
