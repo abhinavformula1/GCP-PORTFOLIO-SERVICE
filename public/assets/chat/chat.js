@@ -30,7 +30,6 @@ import {
   pendingChatHistory, setPendingChatHistory,
 } from '../core/state.js';
 import { authedFetch }     from '../core/auth.js';
-import { GOOGLE_CLIENT_ID } from '../core/config.js';
 import { renderFreeFormMode, resetAtlasState } from './atlas.js?v=2026-07-19-local-atlas-dev-1';
 import { createInputRow } from './widgets.js';
 import { showWelcomeOverlay } from '../ui/welcome.js';
@@ -390,9 +389,10 @@ function updateProgress() {
 }
 
 /* ── Atlas entry ─────────────────────────────────────────────────────────
-   Atlas now has a single entry path: free-form Q&A. Production still
-   requires sign-in before entering Atlas; localhost stays open for
-   local development/testing.
+   Atlas now has a single entry path: free-form Q&A.
+   Signed-out visitors must pass through the shared Google sign-in flow
+   before entering Atlas, including on localhost once the origin is
+   configured in GCP.
    ───────────────────────────────────────────────────────────────────── */
 
 function renderAtlasEntry() {
@@ -409,8 +409,7 @@ function renderAtlasEntry() {
   msgs.innerHTML = '';
   area.innerHTML = '';
 
-  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  if (!isLocal && (!googleCredential || !siteProfile || siteProfile.type === 'guest')) {
+  if (!googleCredential || !siteProfile || siteProfile.type === 'guest') {
     renderAtlasSignInPrompt();
     return;
   }
@@ -432,23 +431,7 @@ function renderAtlasSignInPrompt() {
   signInBtn.className = 'ga-signin-btn';
   signInBtn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="18" height="18"><span>Continue with Google</span>';
   signInBtn.onclick = function () {
-    showWelcomeOverlay({ onShown: function () {
-      if (window.google && window.google.accounts && GOOGLE_CLIENT_ID) {
-        google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: function (response) {
-            if (window.handleGoogleSignIn) window.handleGoogleSignIn(response);
-          },
-          auto_select: false,
-        });
-        const container = document.getElementById('welcomeGoogleBtn');
-        if (container) {
-          google.accounts.id.renderButton(container, {
-            theme: 'outline', size: 'large', width: 356, text: 'continue_with',
-          });
-        }
-      }
-    }});
+    openGoogleSignInOverlay();
   };
 
   const sep = document.createElement('div');
@@ -479,23 +462,7 @@ function renderGoogleStep() {
   signInBtn.className = 'ga-signin-btn';
   signInBtn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="18" height="18"><span>Continue with Google</span>';
   signInBtn.onclick = function () {
-    showWelcomeOverlay({ onShown: function () {
-      if (window.google && window.google.accounts && GOOGLE_CLIENT_ID) {
-        google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: function (response) {
-            if (window.handleGoogleSignIn) window.handleGoogleSignIn(response);
-          },
-          auto_select: false,
-        });
-        const container = document.getElementById('welcomeGoogleBtn');
-        if (container) {
-          google.accounts.id.renderButton(container, {
-            theme: 'outline', size: 'large', width: 356, text: 'continue_with',
-          });
-        }
-      }
-    }});
+    openGoogleSignInOverlay();
   };
 
   const sep = document.createElement('div');
@@ -515,6 +482,14 @@ function renderGoogleStep() {
   wrap.appendChild(sep);
   wrap.appendChild(guestBtn);
   area.appendChild(wrap);
+}
+
+function openGoogleSignInOverlay() {
+  if (typeof window.showWelcomeOverlay === 'function') {
+    window.showWelcomeOverlay();
+    return;
+  }
+  showWelcomeOverlay();
 }
 
 function renderStep() {
