@@ -7094,6 +7094,32 @@ md-dialog:not([open]) {
   border-radius: 16px;
 }
 
+.sd-analytics-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.sd-analytics-section-head {
+  display: grid;
+  gap: 4px;
+}
+
+.sd-analytics-section-head h3 {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.sd-analytics-section-head p {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
 .sd-analytics-trendcard {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -8966,6 +8992,44 @@ md-dialog:not([open]) {
 /* ── AI Evaluation ───────────────────────────────────────────────────────────
    ② Run modes ④ Golden dataset ⑤–⑥ tables (① summary + ③ metrics → renderKpiCards) */
 
+/* ① Tabs ------------------------------------------------------------------ */
+.sd-eval-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.sd-eval-tab {
+  appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 2px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.sd-eval-tab:hover {
+  color: var(--text);
+}
+
+.sd-eval-tab.is-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.sd-eval-panel {
+  display: grid;
+  gap: 16px;
+}
+
 /* ② Run modes ------------------------------------------------------------- */
 .sd-eval-run-modes {
   display: grid;
@@ -9048,6 +9112,97 @@ md-dialog:not([open]) {
   color: var(--muted);
 }
 .sd-eval-threshold-chips strong { color: var(--text); }
+
+.sd-eval-generation-card {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  display: grid;
+  gap: 6px;
+}
+
+.sd-eval-generation-card.is-disabled {
+  border-color: color-mix(in srgb, #ef4444 20%, var(--border));
+  background: color-mix(in srgb, #ef4444 4%, var(--surface));
+}
+
+.sd-eval-generation-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.sd-eval-generation-head .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--primary);
+}
+
+.sd-eval-generation-card.is-disabled .material-symbols-outlined {
+  color: #ef4444;
+}
+
+.sd-eval-generation-head strong {
+  display: block;
+  font-size: 0.84rem;
+  color: var(--text);
+}
+
+.sd-eval-generation-text {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.sd-eval-generation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.sd-eval-generation-badge--ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.sd-eval-generation-badge--off {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+@media (max-width: 1200px) {
+  .sd-eval-run-modes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .sd-eval-tabs {
+    gap: 18px;
+  }
+
+  .sd-eval-run-modes {
+    grid-template-columns: 1fr;
+  }
+
+  .sd-eval-generation-head {
+    grid-template-columns: auto 1fr;
+  }
+
+  .sd-eval-generation-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
 
 /* Progress bar */
 .sd-eval-progress-wrap {

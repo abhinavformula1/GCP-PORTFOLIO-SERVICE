@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
   <link rel="stylesheet" href="/assets/theme.css?v=2026-07-13-theme-v1">
-  <link rel="stylesheet" href="/assets/style.css?v=2026-07-19-atlas-ui-refresh-1">
-  <link rel="stylesheet" href="./styles.css?v=2026-07-17-custom-select-v1">
+  <link rel="stylesheet" href="/assets/style.css?v=2026-07-19-copy-18px-1">
+  <link rel="stylesheet" href="./styles.css?v=2026-07-19-eval-tabs-v1">
   <!-- Hide icon ligature text until Material Symbols font is ready (anti-FOUC) -->
   <style>.material-symbols-outlined{visibility:hidden}.fonts-loaded .material-symbols-outlined{visibility:visible}</style>
   <script>
@@ -1929,13 +1929,59 @@
       </div>
       <div id="atlasEvalStatus" class="sd-admin-section-status"></div>
 
-      <!-- ① Evaluation Summary ─────────────────────────────────────────────── -->
-      <div class="sd-seo-group">
-        <h3 class="sd-seo-group-title">
-          <span class="material-symbols-outlined" aria-hidden="true">bar_chart_4_bars</span>
-          Evaluation Summary
-        </h3>
-        <div id="evalSummaryMount"></div>
+      <div class="sd-eval-tabs" role="tablist" aria-label="Evaluation views">
+        <button type="button" id="evalTabRetrievalBtn" class="sd-eval-tab is-active" role="tab" aria-selected="true" aria-controls="evalRetrievalPanel">
+          Retrieval Evaluation
+        </button>
+        <button type="button" id="evalTabGenerationBtn" class="sd-eval-tab" role="tab" aria-selected="false" aria-controls="evalGenerationPanel">
+          Generation Evaluation
+        </button>
+      </div>
+
+      <div id="evalRetrievalPanel" class="sd-eval-panel" role="tabpanel">
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">
+            <span class="material-symbols-outlined" aria-hidden="true">bar_chart_4_bars</span>
+            Retrieval Evaluation Overview
+          </h3>
+          <p class="sd-seo-group-desc">How well your system retrieves the right context before answer generation.</p>
+          <div id="evalSummaryMount"></div>
+        </div>
+
+        <div class="sd-seo-group" id="evalMetricsWrap" hidden>
+          <h3 class="sd-seo-group-title">
+            <span class="material-symbols-outlined" aria-hidden="true">monitoring</span>
+            Retrieval Metrics
+          </h3>
+          <div id="evalMetricsMount"></div>
+        </div>
+      </div>
+
+      <div id="evalGenerationPanel" class="sd-eval-panel" role="tabpanel" hidden>
+        <div class="sd-seo-group">
+          <h3 class="sd-seo-group-title">
+            <span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
+            Generation Evaluation Overview
+          </h3>
+          <p class="sd-seo-group-desc">How well the answer stays faithful to retrieved context and matches the expected answer.</p>
+          <div id="generationEvalStatusCard" class="sd-eval-generation-card">
+            <div class="sd-eval-generation-head">
+              <span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
+              <strong>Generation evals</strong>
+              <span id="generationEvalStatusBadge" class="sd-eval-generation-badge">—</span>
+            </div>
+            <p id="generationEvalStatusText" class="sd-eval-generation-text">Checking generation eval readiness…</p>
+          </div>
+          <div id="evalGenerationSummaryMount"></div>
+        </div>
+
+        <div class="sd-seo-group" id="evalGenerationMetricsWrap" hidden>
+          <h3 class="sd-seo-group-title">
+            <span class="material-symbols-outlined" aria-hidden="true">fact_check</span>
+            Generation Metrics
+          </h3>
+          <div id="evalGenerationMetricsMount"></div>
+        </div>
       </div>
 
       <!-- ② Run Evaluation ────────────────────────────────────────────────── -->
@@ -1984,15 +2030,6 @@
         </div>
         <!-- Gate badge -->
         <div id="ragGateBadge" class="sd-observability-gate" hidden></div>
-      </div>
-
-      <!-- ③ Evaluation Metrics ─────────────────────────────────────────────── -->
-      <div class="sd-seo-group" id="evalMetricsWrap" hidden>
-        <h3 class="sd-seo-group-title">
-          <span class="material-symbols-outlined" aria-hidden="true">monitoring</span>
-          Evaluation Metrics
-        </h3>
-        <div id="evalMetricsMount"></div>
       </div>
 
       <!-- ④ Golden Dataset ────────────────────────────────────────────────── -->
@@ -2245,6 +2282,6 @@
   <div id="sharedAtlasShell"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./admin.js?v=2026-07-17-custom-select-v1"></script>
+  <script type="module" src="./admin.js?v=2026-07-19-eval-tabs-v1"></script>
 </body>
 </html>
