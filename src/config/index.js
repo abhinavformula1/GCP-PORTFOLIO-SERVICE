@@ -60,6 +60,13 @@ const config = {
     baseUrl: process.env.TAVILY_BASE_URL || 'https://api.tavily.com',
   },
 
+  langsmith: {
+    apiKey: process.env.LANGSMITH_API_KEY || '',
+    endpoint: process.env.LANGSMITH_ENDPOINT || 'https://api.smith.langchain.com',
+    project: process.env.LANGSMITH_PROJECT || 'atlas',
+    tracingEnabled: String(process.env.LANGSMITH_TRACING || '').trim().toLowerCase() === 'true',
+  },
+
   google: {
     // Required to verify Google ID tokens server-side. Must match the
     // OAuth Client ID used by the frontend's Google Sign-In button.

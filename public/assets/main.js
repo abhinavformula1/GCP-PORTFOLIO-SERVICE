@@ -60,7 +60,7 @@ import {
   toggleChatTeaser,
   resetChatState, applyGoogleProfileToChat,
   initChat,
-} from './chat/chat.js?v=2026-07-18-history-limit-1';
+} from './chat/chat.js?v=2026-07-19-local-atlas-dev-1';
 import {
   refreshRecommendations, updateRecommendationCta,
   openLeaveRecommendation, closeLeaveRecommendation,

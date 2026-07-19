@@ -31,7 +31,7 @@ import {
 } from '../core/state.js';
 import { authedFetch }     from '../core/auth.js';
 import { GOOGLE_CLIENT_ID } from '../core/config.js';
-import { renderFreeFormMode, resetAtlasState } from './atlas.js?v=2026-07-18-history-limit-1';
+import { renderFreeFormMode, resetAtlasState } from './atlas.js?v=2026-07-19-local-atlas-dev-1';
 import { createInputRow } from './widgets.js';
 import { showWelcomeOverlay } from '../ui/welcome.js';
 
@@ -181,9 +181,8 @@ export function openAssistant() {
     return;
   }
 
-  // Otherwise: show the two-card mode chooser. Sign-in gating happens
-  // inside the chooser when the user picks the path that requires it.
-  renderModeChooser();
+  // Atlas now opens directly into the free-form assistant flow.
+  renderAtlasEntry();
 }
 
 export function closeAssistant() {
@@ -390,17 +389,16 @@ function updateProgress() {
   document.getElementById('gaProgressBar').style.width = pct + '%';
 }
 
-/* ── Mode chooser ────────────────────────────────────────────────────────
-   Two-card landing screen that runs once per chat-open (unless the user
-   is resuming a saved guided-flow conversation). Picks between:
-     - "Schedule a chat with Abhinav" → existing 7-step hire flow
-     - "Ask Atlas anything"           → free-form Q&A (./atlas.js)
-   Atlas mode requires Google Sign-In; guests see an inline sign-in
-   prompt when they pick that card.
+/* ── Atlas entry ─────────────────────────────────────────────────────────
+   Atlas now has a single entry path: free-form Q&A. Production still
+   requires sign-in before entering Atlas; localhost stays open for
+   local development/testing.
    ───────────────────────────────────────────────────────────────────── */
 
-function renderModeChooser() {
-  // Reset progress bar — chooser is "step 0".
+function renderAtlasEntry() {
+  state.mode = 'freeform';
+
+  // Reset progress bar while the assistant boots.
   const bar = document.getElementById('gaProgressBar');
   if (bar) bar.style.width = '0%';
 
@@ -411,69 +409,13 @@ function renderModeChooser() {
   msgs.innerHTML = '';
   area.innerHTML = '';
 
-  addBotMessage("Hi — I'm Atlas, Abhinav's virtual assistant. What would you like to do?");
+  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isLocal && (!googleCredential || !siteProfile || siteProfile.type === 'guest')) {
+    renderAtlasSignInPrompt();
+    return;
+  }
 
-  const wrap = document.createElement('div');
-  wrap.className = 'ga-mode-chooser';
-
-  const scheduleCard = buildModeCard({
-    icon:     'event_available',
-    title:    'Get in touch',
-    body:     "Share a few details and I'll email you back to set up a chat.",
-    cta:      'Start',
-    onClick:  function () {
-      state.mode = 'guided';
-      area.innerHTML = '';
-      msgs.innerHTML = '';
-      // Hand off to the existing guided flow.
-      if (siteProfile && siteProfile.type !== 'guest') {
-        applyGoogleProfileToChat(siteProfile);
-      } else {
-        state.showGoogleStep = !!(GOOGLE_CLIENT_ID && window.google && (!siteProfile));
-        renderStep();
-      }
-    },
-  });
-
-  const askCard = buildModeCard({
-    icon:     'forum',
-    title:    'Ask Atlas anything',
-    body:     'Free-form Q&A about his experience, projects, and skills.',
-    cta:      'Ask',
-    onClick:  function () {
-      // Pin the intended mode now so the sign-in callback in main.js
-      // (→ applyGoogleProfileToChat) can route to free-form instead of
-      // the guided hire flow.
-      state.mode = 'freeform';
-      const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-      if (!isLocal && (!googleCredential || !siteProfile || siteProfile.type === 'guest')) {
-        renderAtlasSignInPrompt();
-        return;
-      }
-      renderFreeFormMode();
-    },
-  });
-
-  wrap.appendChild(scheduleCard);
-  wrap.appendChild(askCard);
-  area.appendChild(wrap);
-}
-
-function buildModeCard(opts) {
-  const card = document.createElement('button');
-  card.type = 'button';
-  card.className = 'ga-mode-card';
-  card.innerHTML =
-    '<div class="ga-mode-icon"><span class="material-symbols-outlined" aria-hidden="true">' +
-      escHtml(opts.icon) +
-    '</span></div>' +
-    '<div class="ga-mode-text">' +
-      '<div class="ga-mode-title">' + escHtml(opts.title) + '</div>' +
-      '<div class="ga-mode-body">'  + escHtml(opts.body)  + '</div>' +
-    '</div>' +
-    '<div class="ga-mode-cta">' + escHtml(opts.cta) + ' &rsaquo;</div>';
-  card.onclick = opts.onClick;
-  return card;
+  renderFreeFormMode();
 }
 
 function renderAtlasSignInPrompt() {
@@ -481,7 +423,7 @@ function renderAtlasSignInPrompt() {
   if (!area) return;
   area.innerHTML = '';
 
-  addBotMessage("Atlas needs a quick sign-in so I know who I'm talking to. It's a one-click Google sign-in — your details aren't shared.");
+  addBotMessage("Atlas needs a quick sign-in before starting. It's a one-click Google sign-in — your details aren't shared.");
 
   const wrap = document.createElement('div');
   wrap.className = 'ga-google-step';
@@ -515,8 +457,8 @@ function renderAtlasSignInPrompt() {
 
   const backBtn = document.createElement('button');
   backBtn.className = 'ga-guest-btn';
-  backBtn.textContent = 'Back';
-  backBtn.onclick = function () { renderModeChooser(); };
+  backBtn.textContent = 'Close';
+  backBtn.onclick = forceCloseAssistant;
 
   wrap.appendChild(signInBtn);
   wrap.appendChild(sep);

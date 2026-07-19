@@ -75,11 +75,39 @@ async function upsertSeoConfig(cfg) {
 }
 
 // ── Atlas configuration ───────────────────────────────────────────────────────
+const DEFAULT_ATLAS_MODEL_OPTIONS = {
+  'flash-lite': {
+    label: 'Fast & economical',
+    detail: 'Default',
+  },
+  flash: {
+    label: 'More detailed',
+    detail: 'Higher cost',
+  },
+};
+
+function sanitiseAtlasModelOptions(source, fallback) {
+  const base = fallback && typeof fallback === 'object'
+    ? fallback
+    : DEFAULT_ATLAS_MODEL_OPTIONS;
+  const input = source && typeof source === 'object' ? source : {};
+  return Object.keys(DEFAULT_ATLAS_MODEL_OPTIONS).reduce((acc, key) => {
+    const raw = input[key] && typeof input[key] === 'object' ? input[key] : {};
+    const fromBase = base[key] && typeof base[key] === 'object' ? base[key] : DEFAULT_ATLAS_MODEL_OPTIONS[key];
+    acc[key] = {
+      label: _str(raw.label, fromBase.label),
+      detail: _str(raw.detail, fromBase.detail),
+    };
+    return acc;
+  }, {});
+}
+
 const DEFAULT_ATLAS_CONFIG = {
   // ── 1. LLM Configuration ────────────────────────────────────────────────
   enabledModels:            ['flash-lite', 'flash'],
   defaultModel:             'flash-lite',
   fallbackModel:            '',
+  modelOptions:             sanitiseAtlasModelOptions(),
   temperature:              0.35,
   topP:                     0.85,
   maxOutputTokens:          900,
@@ -157,6 +185,7 @@ async function getAtlasConfig() {
       enabledModels:            Array.isArray(d.enabledModels) ? d.enabledModels : D.enabledModels,
       defaultModel:             _str(d.defaultModel,             D.defaultModel),
       fallbackModel:            typeof d.fallbackModel === 'string' ? d.fallbackModel : D.fallbackModel,
+      modelOptions:             sanitiseAtlasModelOptions(d.modelOptions, D.modelOptions),
       temperature:              _num(d.temperature,              D.temperature),
       topP:                     _num(d.topP,                     D.topP),
       maxOutputTokens:          _num(d.maxOutputTokens,          D.maxOutputTokens),
@@ -222,6 +251,7 @@ async function upsertAtlasConfig(cfg) {
     enabledModels:            Array.isArray(cfg.enabledModels) ? cfg.enabledModels : D.enabledModels,
     defaultModel:             _str(cfg.defaultModel,             D.defaultModel),
     fallbackModel:            typeof cfg.fallbackModel === 'string' ? cfg.fallbackModel : D.fallbackModel,
+    modelOptions:             sanitiseAtlasModelOptions(cfg.modelOptions, D.modelOptions),
     temperature:              _num(cfg.temperature,              D.temperature),
     topP:                     _num(cfg.topP,                     D.topP),
     maxOutputTokens:          _num(cfg.maxOutputTokens,          D.maxOutputTokens),

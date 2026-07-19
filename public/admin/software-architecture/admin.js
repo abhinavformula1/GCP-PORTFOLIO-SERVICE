@@ -20,7 +20,7 @@ import { renderAtlasShell }   from '../../assets/ui/atlas-shell.js';
 import { initCustomSelects }  from '../../assets/ui/select-menu.js';
 import {
   closeAssistant, initChat, minimiseAssistant, openAssistant, restartAssistant, toggleChatTeaser,
-} from '../../assets/chat/chat.js?v=2026-07-18-history-limit-1';
+} from '../../assets/chat/chat.js?v=2026-07-19-local-atlas-dev-1';
 import { showToast }          from '../../assets/ui/toast.js';
 import '../../assets/ui/loader.js';
 

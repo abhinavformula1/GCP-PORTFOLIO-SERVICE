@@ -41,12 +41,12 @@ async function saveGoldenDatasetRows(rows) {
     });
 }
 
-async function saveRagEvalRun({ k, mode, metrics, details }) {
+async function saveRagEvalRun({ k, mode, metrics, details, passed }) {
   const hits = Array.isArray(details) ? details.filter((d) => d && d.hit).length : 0;
   const total = Array.isArray(details) ? details.length : 0;
-
-  await firestore.getDb().collection(RAG_EVAL_RUNS_COLLECTION).add({
-    ranAt: new Date(),
+  const ranAt = new Date();
+  const payload = {
+    ranAt,
     k,
     mode,
     metrics,
@@ -54,9 +54,23 @@ async function saveRagEvalRun({ k, mode, metrics, details }) {
     misses: total - hits,
     total,
     passRate: total > 0 ? Math.round((hits / total) * 100) : 0,
-    passed: Number(metrics?.recallAtK || 0) >= 0.8,
+    passed: passed === true,
     details,
-  });
+  };
+
+  const ref = await firestore.getDb().collection(RAG_EVAL_RUNS_COLLECTION).add(payload);
+  return {
+    id: ref.id,
+    ranAt: ranAt.toISOString(),
+    k,
+    mode,
+    metrics,
+    hits,
+    misses: total - hits,
+    total,
+    passRate: payload.passRate,
+    passed: payload.passed,
+  };
 }
 
 async function listRagEvalRuns(limit) {

@@ -31,6 +31,7 @@
     "geoip-lite": "^1.4.10",
     "google-auth-library": "^10.6.2",
     "jsforce": "^3.10.14",
+    "langsmith": "^0.8.3",
     "multer": "^2.2.0",
     "puppeteer-core": "^25.1.0",
     "sharp": "^0.35.2",
