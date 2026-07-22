@@ -454,7 +454,6 @@ function renderLandingMain() {
   if (!_sdDetail) return;
   restoreListFilters();
   const topics = getTopics();
-  const filtered = filterArticles(topics, _activeContentTab, _activeDomain, _topicFilter);
   const subActive = !!(siteProfile && siteProfile.subscription && siteProfile.subscription.active);
   const published = topics.filter(function (t) { return t && !t.stub; });
   const domains = getArticleDomains(published);
@@ -540,6 +539,65 @@ function renderLandingMain() {
   _sdDetail.innerHTML = html;
 
   const mount = _sdDetail.querySelector('.sd-article-list-mount');
+  renderLandingResults(mount, topics, subActive);
+
+  const search = _sdDetail.querySelector('#sdLandingSearch');
+  if (search) {
+    search.addEventListener('input', function () {
+      _topicFilter = search.value || '';
+      renderLandingResults(mount, getTopics(), subActive);
+    });
+  }
+
+  _sdDetail.querySelectorAll('.sd-type-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      const next = chip.getAttribute('data-tab') || 'all';
+      if (next === 'all') {
+        _activeContentTab = 'all';
+        _activeDomain = 'all';
+      } else {
+        // Toggle-off: clicking active chip resets to "all"
+        _activeContentTab = (_activeContentTab === next) ? 'all' : next;
+        _activeDomain = 'all';
+      }
+      persistListFilters();
+      renderLandingMain();
+    });
+  });
+
+  _sdDetail.querySelectorAll('.sd-pub-topic-chip[data-domain]').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      const next = chip.getAttribute('data-domain') || 'all';
+      _activeDomain = (_activeDomain === next) ? 'all' : next;
+      _activeContentTab = 'all';
+      persistListFilters();
+      renderLandingMain();
+    });
+  });
+
+  const topicsMoreBtn = _sdDetail.querySelector('#sdTopicsMoreBtn');
+  if (topicsMoreBtn) {
+    topicsMoreBtn.addEventListener('click', function () {
+      _topicsExpanded = !_topicsExpanded;
+      renderLandingMain();
+    });
+  }
+
+  const gridBtn = _sdDetail.querySelector('#pubViewGrid');
+  const listBtn = _sdDetail.querySelector('#pubViewList');
+  function applyViewToggle(view) {
+    _pubArticleView = view;
+    try { localStorage.setItem(PUB_VIEW_KEY, view); } catch (_) {}
+    renderLandingMain();
+  }
+  if (gridBtn) gridBtn.addEventListener('click', function () { applyViewToggle('grid'); });
+  if (listBtn) listBtn.addEventListener('click', function () { applyViewToggle('list'); });
+}
+
+function renderLandingResults(mount, topics, subActive) {
+  if (!mount) return;
+  const filtered = filterArticles(topics, _activeContentTab, _activeDomain, _topicFilter);
+  mount.replaceChildren();
 
   if (!filtered.length) {
     const emptyEl = document.createElement('p');
@@ -627,6 +685,7 @@ function renderLandingMain() {
       });
     }
   } else {
+    mount.className = 'sd-article-list-mount';
     const grid = document.createElement('div');
     grid.className = 'sd-pub-card-grid';
     const visits = getArticleVisits();
@@ -647,58 +706,6 @@ function renderLandingMain() {
     footer.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span><span>' + escapeHtml(uiText('comingSoon')) + '</span>';
     mount.appendChild(footer);
   }
-
-  const search = _sdDetail.querySelector('#sdLandingSearch');
-  if (search) {
-    search.addEventListener('input', function () {
-      _topicFilter = search.value || '';
-      renderLandingMain();
-    });
-  }
-
-  _sdDetail.querySelectorAll('.sd-type-chip').forEach(function (chip) {
-    chip.addEventListener('click', function () {
-      const next = chip.getAttribute('data-tab') || 'all';
-      if (next === 'all') {
-        _activeContentTab = 'all';
-        _activeDomain = 'all';
-      } else {
-        // Toggle-off: clicking active chip resets to "all"
-        _activeContentTab = (_activeContentTab === next) ? 'all' : next;
-        _activeDomain = 'all';
-      }
-      persistListFilters();
-      renderLandingMain();
-    });
-  });
-
-  _sdDetail.querySelectorAll('.sd-pub-topic-chip[data-domain]').forEach(function (chip) {
-    chip.addEventListener('click', function () {
-      const next = chip.getAttribute('data-domain') || 'all';
-      _activeDomain = (_activeDomain === next) ? 'all' : next;
-      _activeContentTab = 'all';
-      persistListFilters();
-      renderLandingMain();
-    });
-  });
-
-  const topicsMoreBtn = _sdDetail.querySelector('#sdTopicsMoreBtn');
-  if (topicsMoreBtn) {
-    topicsMoreBtn.addEventListener('click', function () {
-      _topicsExpanded = !_topicsExpanded;
-      renderLandingMain();
-    });
-  }
-
-  const gridBtn = _sdDetail.querySelector('#pubViewGrid');
-  const listBtn = _sdDetail.querySelector('#pubViewList');
-  function applyViewToggle(view) {
-    _pubArticleView = view;
-    try { localStorage.setItem(PUB_VIEW_KEY, view); } catch (_) {}
-    renderLandingMain();
-  }
-  if (gridBtn) gridBtn.addEventListener('click', function () { applyViewToggle('grid'); });
-  if (listBtn) listBtn.addEventListener('click', function () { applyViewToggle('list'); });
 }
 
 function applyCmsTopics(topics) {

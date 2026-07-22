@@ -8034,7 +8034,7 @@ md-dialog:not([open]) {
 .sd-obs-row-miss { background: transparent; }
 
 .sd-obs-question {
-  max-width: 380px;
+  max-width: 280px;
   word-break: break-word;
 }
 
@@ -8042,24 +8042,31 @@ md-dialog:not([open]) {
   font-family: var(--mono, monospace);
   font-size: 11px;
   color: var(--muted);
-  max-width: 200px;
-  word-break: break-all;
+  max-width: 150px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .sd-obs-retrieved-cell {
   max-width: 220px;
   font-size: 11px;
+  white-space: normal;
 }
 
 .sd-obs-retrieved {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   font-family: var(--mono, monospace);
   font-size: 10px;
   background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
   border-radius: 4px;
   padding: 1px 5px;
   margin: 1px 2px 1px 0;
-  word-break: break-all;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  vertical-align: top;
 }
 
 .sd-obs-retrieved--match {
