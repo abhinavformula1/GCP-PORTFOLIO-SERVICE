@@ -635,6 +635,15 @@ md-dialog:not([open]) {
   color: var(--md-sys-color-on-surface);
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
 }
+:root:not([data-theme="light"]) .topbar-signin-btn {
+  color: var(--fnd-color-always-light);
+  border-color: color-mix(in srgb, var(--fnd-color-always-light) 22%, transparent);
+}
+:root:not([data-theme="light"]) .topbar-signin-btn:hover {
+  border-color: color-mix(in srgb, var(--fnd-color-always-light) 48%, transparent);
+  color: var(--fnd-color-always-light);
+  background: color-mix(in srgb, var(--fnd-color-always-light) 6%, transparent);
+}
 .topbar-signin-btn[hidden] { display: none; }
 .topbar-avatar-btn {
   background: none;
@@ -1078,6 +1087,21 @@ a:hover { text-decoration: underline; }
   background: var(--accent);
   border-radius: 0;
 }
+:root:not([data-theme="light"]) .header-nav-link {
+  --md-text-button-label-text-color: var(--fnd-color-always-light);
+  --md-text-button-hover-label-text-color: var(--fnd-color-always-light);
+  --md-text-button-pressed-label-text-color: var(--fnd-color-always-light);
+  color: var(--fnd-color-always-light);
+}
+:root:not([data-theme="light"]) .header-nav-link[aria-pressed="true"] {
+  --md-text-button-label-text-color: var(--fnd-color-always-light);
+  --md-text-button-hover-label-text-color: var(--fnd-color-always-light);
+  --md-text-button-pressed-label-text-color: var(--fnd-color-always-light);
+  color: var(--fnd-color-always-light);
+}
+:root:not([data-theme="light"]) .header-nav-link[aria-pressed="true"]::after {
+  background: var(--fnd-color-always-light);
+}
 
 .header-nav-right {
   display: flex;
@@ -1099,6 +1123,14 @@ a:hover { text-decoration: underline; }
   --md-filled-button-container-height: 40px;
   --md-filled-button-container-color: var(--brand-blue);
   --md-filled-button-container-shape: 10px;
+  --md-filled-button-label-text-color: var(--fnd-color-always-light);
+  --md-filled-button-icon-color: var(--fnd-color-always-light);
+  --md-filled-button-hover-label-text-color: var(--fnd-color-always-light);
+  --md-filled-button-hover-icon-color: var(--fnd-color-always-light);
+  --md-filled-button-pressed-label-text-color: var(--fnd-color-always-light);
+  --md-filled-button-pressed-icon-color: var(--fnd-color-always-light);
+  --md-filled-button-focus-label-text-color: var(--fnd-color-always-light);
+  --md-filled-button-focus-icon-color: var(--fnd-color-always-light);
   /* Slightly roomier than primary CTA (requested). */
   --md-filled-button-leading-space: 18px;
   --md-filled-button-trailing-space: 18px;
@@ -1110,12 +1142,21 @@ a:hover { text-decoration: underline; }
   --md-filled-button-hover-state-layer-color: transparent;
   --md-filled-button-pressed-state-layer-color: transparent;
   --md-filled-button-focus-state-layer-color: transparent;
+  color: var(--fnd-color-always-light);
 }
 .header-nav-primary {
   --md-filled-button-container-height: 40px;
   /* Matches the generated image */
   --md-filled-button-container-color: var(--brand-blue);
   --md-filled-button-container-shape: 10px;
+  --md-filled-button-label-text-color: var(--fnd-color-always-light);
+  --md-filled-button-icon-color: var(--fnd-color-always-light);
+  --md-filled-button-hover-label-text-color: var(--fnd-color-always-light);
+  --md-filled-button-hover-icon-color: var(--fnd-color-always-light);
+  --md-filled-button-pressed-label-text-color: var(--fnd-color-always-light);
+  --md-filled-button-pressed-icon-color: var(--fnd-color-always-light);
+  --md-filled-button-focus-label-text-color: var(--fnd-color-always-light);
+  --md-filled-button-focus-icon-color: var(--fnd-color-always-light);
   --md-filled-button-leading-space: 14px;
   --md-filled-button-trailing-space: 14px;
   --md-filled-button-with-leading-icon-leading-space: 14px;
@@ -1127,6 +1168,7 @@ a:hover { text-decoration: underline; }
   --md-filled-button-focus-state-layer-color: transparent;
   /* .hire-me-btn has legacy hero spacing; neutralize in header nav */
   margin-top: 0 !important;
+  color: var(--fnd-color-always-light);
 }
 
 .header-nav-overflow-btn,
@@ -1980,6 +2022,17 @@ main > .section {
   background: #eef4ff;
 }
 
+:root:not([data-theme="light"]) .tag {
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 82%, #ffffff 18%);
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--theme-panel-border) 88%, #ffffff 12%);
+}
+
+:root:not([data-theme="light"]) .tag:hover {
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 92%, #ffffff 8%);
+  border-color: var(--theme-panel-border-strong);
+}
+
 .profile-card {
   overflow: hidden;
   padding: 0;
@@ -1991,10 +2044,13 @@ main > .section {
 
 .profile-card-banner {
   height: 74px;
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0) 55%),
-    linear-gradient(135deg, rgba(143, 184, 255, 0.22), rgba(124, 77, 255, 0.1));
+  background: var(--theme-panel-muted);
   border-bottom: 1px solid rgba(1, 52, 122, 0.06);
+}
+
+:root:not([data-theme="light"]) .profile-card-banner {
+  background: var(--theme-panel-muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-panel-border) 86%, transparent);
 }
 
 .profile-card-body {
@@ -2010,6 +2066,11 @@ main > .section {
   display: block;
   border: 4px solid #fff;
   box-shadow: 0 10px 24px rgba(1, 52, 122, 0.16);
+}
+
+:root:not([data-theme="light"]) .profile-card-avatar {
+  border-color: var(--theme-panel);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.36);
 }
 
 .profile-card-name {
@@ -2060,6 +2121,10 @@ main > .section {
   text-transform: uppercase;
   letter-spacing: 0.6px;
   margin-bottom: 6px;
+}
+
+:root:not([data-theme="light"]) .cert-group-title {
+  color: var(--fnd-color-always-light);
 }
 
 .cert-item {
@@ -2148,6 +2213,12 @@ main > .section {
   border-radius: 999px;
 }
 
+:root:not([data-theme="light"]) .job-period {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 82%, #ffffff 18%);
+  border-color: color-mix(in srgb, var(--theme-panel-border) 88%, #ffffff 12%);
+}
+
 .job-company {
   font-size: 13px;
   color: var(--text-secondary);
@@ -2180,10 +2251,22 @@ main > .section {
   border: 1px solid #bdeecf;
 }
 
+:root:not([data-theme="light"]) .job-status-badge {
+  color: var(--theme-success-text);
+  background: var(--theme-success-bg);
+  border-color: var(--theme-success-border);
+}
+
 .job-tenure {
   color: #5c6d8e;
   background: #f7f9fd;
   border: 1px solid #e0e7f5;
+}
+
+:root:not([data-theme="light"]) .job-tenure {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 82%, #ffffff 18%);
+  border-color: color-mix(in srgb, var(--theme-panel-border) 88%, #ffffff 12%);
 }
 
 .job-bullets {
@@ -2201,6 +2284,10 @@ main > .section {
   padding-left: 14px;
   position: relative;
   line-height: 1.6;
+}
+
+:root:not([data-theme="light"]) .job-bullets li {
+  color: var(--text-secondary);
 }
 
 .job-bullets li::before {
@@ -2261,6 +2348,10 @@ main > .section {
   text-decoration: underline;
 }
 
+:root:not([data-theme="light"]) .project-meta-link a {
+  color: var(--fnd-color-always-light);
+}
+
 .project-tags {
   display: flex;
   flex-wrap: wrap;
@@ -2283,6 +2374,12 @@ main > .section {
   line-height: 1.3;
 }
 
+:root:not([data-theme="light"]) .project-tag {
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 82%, #ffffff 18%);
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--theme-panel-border) 88%, #ffffff 12%);
+}
+
 .project-link {
   display: inline-flex;
   align-items: center;
@@ -2301,10 +2398,21 @@ main > .section {
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
+:root:not([data-theme="light"]) .project-link {
+  border-color: color-mix(in srgb, var(--theme-panel-border) 88%, #ffffff 12%);
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 72%, #ffffff 28%);
+  color: var(--text);
+}
+
 .project-link:hover {
   border-color: #bfd3fb;
   box-shadow: 0 10px 22px rgba(1, 52, 122, 0.08);
   transform: translateY(-1px);
+}
+
+:root:not([data-theme="light"]) .project-link:hover {
+  border-color: var(--theme-panel-border-strong);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
 }
 
 .project-link .material-symbols-outlined {
@@ -2481,6 +2589,28 @@ main > .section {
 
 .sd-type-chip-active:hover {
   background: color-mix(in srgb, var(--theme-panel) 84%, var(--brand-blue, #01347A) 16%);
+}
+
+:root:not([data-theme="light"]) .sd-type-chip {
+  background: var(--theme-panel);
+  color: var(--text-secondary);
+  border-color: var(--theme-panel-border);
+}
+
+:root:not([data-theme="light"]) .sd-type-chip:hover {
+  background: var(--theme-panel-emphasis);
+  color: var(--fnd-color-always-light);
+  border-color: var(--theme-panel-border-strong);
+}
+
+:root:not([data-theme="light"]) .sd-type-chip-active {
+  background: var(--theme-panel-emphasis);
+  color: var(--fnd-color-always-light);
+  border-color: var(--theme-panel-border-strong);
+}
+
+:root:not([data-theme="light"]) .sd-type-chip-active:hover {
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 92%, #ffffff 8%);
 }
 
 @media (max-width: 600px) {
@@ -6144,6 +6274,27 @@ figure.sd-image-block figcaption {
   background: color-mix(in srgb, var(--brand-blue, #01347A) 6%, #ffffff 94%);
 }
 
+:root:not([data-theme="light"]) .sd-pub-topic-chip,
+:root:not([data-theme="light"]) .sd-pub-topic-more {
+  background: var(--theme-panel-emphasis);
+  color: var(--text-secondary);
+  border-color: var(--theme-panel-border);
+}
+
+:root:not([data-theme="light"]) .sd-pub-topic-chip:hover,
+:root:not([data-theme="light"]) .sd-pub-topic-more:hover {
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 92%, #ffffff 8%);
+  color: var(--fnd-color-always-light);
+  border-color: var(--theme-panel-border-strong);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+}
+
+:root:not([data-theme="light"]) .sd-pub-topic-chip-active {
+  color: var(--fnd-color-always-light);
+  border-color: var(--theme-panel-border-strong);
+  background: color-mix(in srgb, var(--theme-panel-emphasis) 88%, #ffffff 12%);
+}
+
 .sd-pub-topic-chip-hidden {
   display: none;
 }
@@ -6246,6 +6397,12 @@ figure.sd-image-block figcaption {
   text-transform: uppercase;
 }
 
+:root:not([data-theme="light"]) .sd-pub-card-eyebrow {
+  background: var(--theme-panel-emphasis);
+  color: var(--fnd-color-always-light);
+  border: 1px solid var(--theme-panel-border);
+}
+
 .sd-pub-card-title {
   margin: 0;
   font-size: 16px;
@@ -6283,6 +6440,12 @@ figure.sd-image-block figcaption {
   color: var(--text-secondary, #667085);
   font-size: 11px;
   font-weight: 600;
+}
+
+:root:not([data-theme="light"]) .sd-pub-card-tag {
+  background: var(--theme-panel-emphasis);
+  border-color: var(--theme-panel-border);
+  color: var(--text-secondary);
 }
 
 .sd-pub-card-footer {
@@ -6325,9 +6488,19 @@ figure.sd-image-block figcaption {
   font-weight: 500;
 }
 
+:root:not([data-theme="light"]) .sd-pub-card-grid-footer {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--theme-panel-emphasis) 90%, #ffffff 10%) 0%, var(--theme-panel) 100%);
+  border: 1px solid var(--theme-panel-border);
+  color: var(--text-secondary);
+}
+
 .sd-pub-card-grid-footer .material-symbols-outlined {
   font-size: 18px;
   color: var(--brand-blue, #01347A);
+}
+
+:root:not([data-theme="light"]) .sd-pub-card-grid-footer .material-symbols-outlined {
+  color: var(--fnd-color-always-light);
 }
 
 /* Premium lock chip — top-right corner of thumbnail */
@@ -6444,6 +6617,10 @@ figure.sd-image-block figcaption {
   background: color-mix(in srgb, var(--theme-panel) 82%, var(--brand-blue, #01347A) 18%);
   color: var(--brand-blue, #01347A);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+:root:not([data-theme="light"]) .sd-pub-view-btn-active {
+  color: var(--fnd-color-always-light);
 }
 
 /* ── Public SA list view (DataTable) ────────────────────────────────────── */

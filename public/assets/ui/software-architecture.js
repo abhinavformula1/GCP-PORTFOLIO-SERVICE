@@ -173,21 +173,6 @@ const CONTENT_TABS = [
   { id: 'case-study',    label: 'Case Studies',       icon: 'menu_book' },
 ];
 
-// Domain/tag icon mapping for the landing page filter chips.
-const DOMAIN_ICONS = {
-  'Integration':   'sync_alt',
-  'Security':      'shield',
-  'Scalability':   'speed',
-  'Event-Driven':  'bolt',
-  'AI':            'psychology',
-  'Cloud':         'cloud',
-  'CPQ':           'request_quote',
-  'DevOps':        'deployed_code',
-  'Performance':   'analytics',
-  'Salesforce':    'cloud_circle',
-  'MuleSoft':      'hub',
-};
-
 // Public route prefix for the Software Architecture library.
 // Keep LEGACY_PREFIX working via redirects for old links/SEO.
 const PATH_PREFIX = '/software-architecture';
@@ -500,18 +485,14 @@ function renderLandingMain() {
     html += '<div class="sd-sa-topics-chips">';
     primaryDomains.forEach(function (d) {
       const active = _activeDomain === d.name ? ' sd-pub-topic-chip-active' : '';
-      const icon = DOMAIN_ICONS[d.name] || 'label';
       html += '<button type="button" class="sd-pub-topic-chip' + active + '" data-domain="' + escapeHtml(d.name) + '">';
-      html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
       html += '<span>' + escapeHtml(d.name) + '</span>';
       html += '</button>';
     });
     secondaryDomains.forEach(function (d) {
       const active = _activeDomain === d.name ? ' sd-pub-topic-chip-active' : '';
       const hidden = _topicsExpanded ? '' : ' sd-pub-topic-chip-hidden';
-      const icon = DOMAIN_ICONS[d.name] || 'label';
       html += '<button type="button" class="sd-pub-topic-chip' + active + hidden + '" data-domain="' + escapeHtml(d.name) + '">';
-      html += '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>';
       html += '<span>' + escapeHtml(d.name) + '</span>';
       html += '</button>';
     });

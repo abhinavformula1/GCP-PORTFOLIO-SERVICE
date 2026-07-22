@@ -3,6 +3,9 @@
    public site and admin UI pull from one source of truth. */
 
 :root {
+  --fnd-color-always-dark: #000;
+  --fnd-color-always-light: #fff;
+
   /* Core brand */
   --brand-blue: #01347A;
   --brand-blue-original: #0B3A6A;
@@ -16,17 +19,17 @@
   --md-sys-color-on-primary-container:      #d9e8ff;
   --md-sys-color-secondary-container:       #133b63;
   --md-sys-color-on-secondary-container:    #dbe9ff;
-  --md-sys-color-surface:                   #0b1220;
-  --md-sys-color-surface-container-low:     #10192c;
-  --md-sys-color-surface-container:         #131f35;
-  --md-sys-color-surface-container-high:    #1b2942;
-  --md-sys-color-surface-container-highest: #243552;
-  --md-sys-color-on-surface:                #edf2ff;
-  --md-sys-color-on-surface-variant:        #b7c4de;
-  --md-sys-color-outline:                   #8290ad;
-  --md-sys-color-outline-variant:           #33435f;
-  --md-sys-color-inverse-surface:           #edf2ff;
-  --md-sys-color-inverse-on-surface:        #0f172a;
+  --md-sys-color-surface:                   var(--fnd-color-always-dark);
+  --md-sys-color-surface-container-low:     #050608;
+  --md-sys-color-surface-container:         #0b0d10;
+  --md-sys-color-surface-container-high:    #111418;
+  --md-sys-color-surface-container-highest: #181c21;
+  --md-sys-color-on-surface:                #f3f5f7;
+  --md-sys-color-on-surface-variant:        #b5bbc5;
+  --md-sys-color-outline:                   #707784;
+  --md-sys-color-outline-variant:           #252a31;
+  --md-sys-color-inverse-surface:           var(--fnd-color-always-light);
+  --md-sys-color-inverse-on-surface:        #111318;
   --md-sys-color-error:                     #ffb4ab;
   --md-sys-color-on-error:                  #690005;
   --md-sys-color-error-container:           #93000a;
@@ -65,22 +68,22 @@
   --tag-text:        #d9e8ff;
 
   /* Semantic theme tokens */
-  --theme-page-bg: linear-gradient(180deg, #f7f9ff 0%, #f2f6ff 100%);
-  --theme-panel: #ffffff;
-  --theme-panel-muted: #f8faff;
-  --theme-panel-emphasis: #eef3ff;
-  --theme-panel-border: #dbe4f5;
-  --theme-panel-border-strong: #b9c8ea;
-  --theme-shadow-sm: 0 8px 24px rgba(1, 52, 122, 0.08);
-  --theme-shadow-md: 0 16px 40px rgba(1, 52, 122, 0.14);
-  --theme-accent-soft: rgba(1, 52, 122, 0.1);
-  --theme-accent-strong: #01347A;
-  --theme-accent-stronger: #0B3A6A;
-  --theme-success-bg: #e9fbf1;
-  --theme-success-text: #13824d;
-  --theme-success-border: #b8f0cc;
-  --theme-icon-wash: linear-gradient(135deg, rgba(124, 77, 255, 0.12), rgba(31, 182, 255, 0.12));
-  --theme-icon-border: rgba(1, 52, 122, 0.16);
+  --theme-page-bg: linear-gradient(180deg, #000000 0%, #040506 100%);
+  --theme-panel: #0d1014;
+  --theme-panel-muted: #111419;
+  --theme-panel-emphasis: #171c22;
+  --theme-panel-border: #252b33;
+  --theme-panel-border-strong: #3a434f;
+  --theme-shadow-sm: 0 14px 32px rgba(0, 0, 0, 0.28);
+  --theme-shadow-md: 0 22px 54px rgba(0, 0, 0, 0.36);
+  --theme-accent-soft: rgba(255, 255, 255, 0.04);
+  --theme-accent-strong: #e7ebf2;
+  --theme-accent-stronger: var(--fnd-color-always-light);
+  --theme-success-bg: rgba(52, 211, 153, 0.12);
+  --theme-success-text: #8ff0c4;
+  --theme-success-border: rgba(52, 211, 153, 0.28);
+  --theme-icon-wash: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  --theme-icon-border: rgba(255, 255, 255, 0.1);
 
   color-scheme: dark;
 }
