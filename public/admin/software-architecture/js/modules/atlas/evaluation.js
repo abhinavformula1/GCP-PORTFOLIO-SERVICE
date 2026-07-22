@@ -73,21 +73,21 @@ const HISTORY_COLS_GENERATION = [
 ];
 
 const FAILED_COLS = [
-  { header: '#',                renderText: function (r) { return String(r.index); } },
-  { header: 'Question',         renderText: function (r) { return r.question || ''; }, className: 'sd-obs-question' },
-  { header: 'Expected Article', renderText: function (r) { return r.expectedArticleId || ''; } },
-  { header: 'Top Retrieved',    renderHtml: function (r) {
+  { header: '#',                width: 52, align: 'right', renderText: function (r) { return String(r.index); } },
+  { header: 'Question',         width: 280, renderText: function (r) { return r.question || ''; }, className: 'sd-obs-question' },
+  { header: 'Expected Article', width: 150, renderText: function (r) { return r.expectedArticleId || ''; }, className: 'sd-obs-article' },
+  { header: 'Top Retrieved',    width: 220, className: 'sd-obs-retrieved-cell', renderHtml: function (r) {
     if (r.error) return '<span class="sd-obs-error" title="' + escapeHtml(r.error) + '">⚠ error</span>';
     if (r.retrievedArticles && r.retrievedArticles.length)
       return r.retrievedArticles.slice(0, 3).map(function (id) { return '<span class="sd-obs-retrieved">' + escapeHtml(id) + '</span>'; }).join('');
     return '<span class="sd-obs-none">none</span>';
   }},
-  { header: 'Hit?',  renderHtml: function () { return '<span class="sd-obs-badge sd-obs-badge--miss">Miss</span>'; } },
-  { header: 'Rank',  renderText: function (r) { return r.rank != null ? String(r.rank) : '—'; } },
-  { header: 'Faithfulness', renderText: function (r) { return r.faithfulness != null ? (r.faithfulness * 100).toFixed(1) + '%' : '—'; } },
-  { header: 'Hallucination', renderText: function (r) { return r.hallucination != null ? (r.hallucination * 100).toFixed(1) + '%' : '—'; } },
-  { header: 'Answer Correctness', renderText: function (r) { return r.answerCorrectness != null ? (r.answerCorrectness * 100).toFixed(1) + '%' : '—'; } },
-  { header: 'Actions', renderHtml: function (r) {
+  { header: 'Hit?', width: 72, renderHtml: function () { return '<span class="sd-obs-badge sd-obs-badge--miss">Miss</span>'; } },
+  { header: 'Rank', width: 64, align: 'right', renderText: function (r) { return r.rank != null ? String(r.rank) : '—'; } },
+  { header: 'Faithfulness', width: 96, align: 'right', renderText: function (r) { return r.faithfulness != null ? (r.faithfulness * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Hallucination', width: 102, align: 'right', renderText: function (r) { return r.hallucination != null ? (r.hallucination * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Answer Correctness', width: 126, align: 'right', renderText: function (r) { return r.answerCorrectness != null ? (r.answerCorrectness * 100).toFixed(1) + '%' : '—'; } },
+  { header: 'Actions', width: 84, renderHtml: function (r) {
     return '<button type="button" class="sd-eval-golden-remove" data-dismiss-row="' + escapeHtml(String(r.index)) + '" title="Dismiss">' +
       '<span class="material-symbols-outlined" aria-hidden="true">delete</span>' +
     '</button>';
@@ -132,6 +132,7 @@ export function startRagEval(els, credential) {
   setSectionStatus(els.atlasEvalStatus, '', '');
   _show(els.ragProgressWrap, true);
   _show(els.evalMetricsWrap, false);
+  _show(els.evalGenerationMetricsWrap, false);
   _show(els.ragGateBadge,    false);
   _show(els.ragDetailWrap,   false);
   _show(els.ragHistoryWrap,  false);
@@ -387,14 +388,23 @@ function _renderHistory(els, runs) {
           _localOnly: !!latest._localOnly,
         };
         _persistLatestSummary(_latestEvalSummary);
-        _updateSummary(els, { recallAtK: latest.metrics.recallAtK, mrr: latest.metrics.mrr, hits: latest.hits, total: latest.total }, pass, latest.ranAt);
+        renderEvalMetrics(els, Object.assign({}, latest.metrics, {
+          hits: latest.hits,
+          total: latest.total,
+        }), pass);
+        _updateSummary(els, Object.assign({}, latest.metrics, {
+          hits: latest.hits,
+          total: latest.total,
+        }), pass, latest.ranAt);
       } else if (_latestEvalSummary && _latestEvalSummary.metrics) {
-        _updateSummary(els, {
-          recallAtK: _latestEvalSummary.metrics.recallAtK,
-          mrr: _latestEvalSummary.metrics.mrr,
+        renderEvalMetrics(els, Object.assign({}, _latestEvalSummary.metrics, {
           hits: _latestEvalSummary.hits,
           total: _latestEvalSummary.total,
-        }, _latestEvalSummary.pass, _latestEvalSummary.ranAt);
+        }), _latestEvalSummary.pass);
+        _updateSummary(els, Object.assign({}, _latestEvalSummary.metrics, {
+          hits: _latestEvalSummary.hits,
+          total: _latestEvalSummary.total,
+        }), _latestEvalSummary.pass, _latestEvalSummary.ranAt);
       }
     }
   }
@@ -449,7 +459,12 @@ export function renderFailedCases(els, details) {
   if (!els.ragDetailMount) return;
   const failures = details.filter(function (r) { return !r.hit; });
   if (!failures.length) { _show(els.ragDetailWrap, false); return; }
-  renderDataTable(els.ragDetailMount, { columns: FAILED_COLS, rows: failures, emptyText: 'No failures.' });
+  renderDataTable(els.ragDetailMount, {
+    columns: FAILED_COLS,
+    rows: failures,
+    emptyText: 'No failures.',
+    minWidth: 1240,
+  });
   _show(els.ragDetailWrap, true);
   _wireFailedDismiss(els);
 }
@@ -539,10 +554,12 @@ function _applyCachedSummary(els) {
   const cached = _readCachedSummary();
   if (!cached || !cached.metrics) return;
   _latestEvalSummary = cached;
-  _updateSummary(els, Object.assign({}, cached.metrics, {
+  const metrics = Object.assign({}, cached.metrics, {
     hits: cached.hits,
     total: cached.total,
-  }), cached.pass, cached.ranAt);
+  });
+  renderEvalMetrics(els, metrics, cached.pass);
+  _updateSummary(els, metrics, cached.pass, cached.ranAt);
 }
 
 function _renderGenerationEvalStatus(els) {

@@ -147,11 +147,13 @@ export function initGoogleSignIn(opts) {
  * re-rendered at the correct width instead of a stale guess.
  */
 function renderWelcomeGoogleButton(welcomeBtn) {
-  if (welcomeBtn._gsiResizeObserver) return; // already wired up once
+  if (!welcomeBtn || !window.google || !google.accounts || !google.accounts.id) return;
   let lastWidth = 0;
   const render = function () {
+    if (!window.google || !google.accounts || !google.accounts.id) return;
     const measured = Math.round(welcomeBtn.clientWidth);
-    if (!measured || Math.abs(measured - lastWidth) < 2) return;
+    if (!measured) return;
+    if (welcomeBtn.childElementCount > 0 && Math.abs(measured - lastWidth) < 2) return;
     lastWidth = measured;
     const width = Math.min(400, Math.max(200, measured));
     welcomeBtn.innerHTML = '';
@@ -164,10 +166,12 @@ function renderWelcomeGoogleButton(welcomeBtn) {
       shape: 'pill', width,
     });
   };
-  if (typeof ResizeObserver === 'function') {
+  if (!welcomeBtn._gsiResizeObserver && typeof ResizeObserver === 'function') {
     welcomeBtn._gsiResizeObserver = new ResizeObserver(render);
     welcomeBtn._gsiResizeObserver.observe(welcomeBtn);
-  } else {
-    requestAnimationFrame(render);
   }
+  requestAnimationFrame(render);
+  setTimeout(render, 120);
+  setTimeout(render, 400);
+  setTimeout(render, 900);
 }

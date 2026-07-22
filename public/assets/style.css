@@ -26,6 +26,10 @@ body {
   min-height: 100vh;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 p {
   font-size: var(--copy-font-size);
   font-weight: var(--copy-font-weight);
@@ -3622,6 +3626,60 @@ figure.sd-image-block figcaption {
   .sponsors-inner { gap: 12px; }
   .sponsors-logos { gap: 12px; }
   .sponsor-divider { height: 20px; }
+
+  /* iPhone Safari can scale the entire page down if any Software Architecture
+     content produces a layout width wider than the viewport. Keep the page
+     width pinned to the viewport and make wide blocks scroll inside
+     themselves instead of expanding the document width. */
+  :root.sa-reading,
+  :root.sa-reading body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  :root.sa-reading .page,
+  :root.sa-reading .body,
+  :root.sa-reading main,
+  :root.sa-reading aside,
+  :root.sa-reading .sd-detail,
+  :root.sa-reading .sd-list-view,
+  :root.sa-reading .sd-article-list-mount,
+  :root.sa-reading .sd-landing,
+  :root.sa-reading .sd-list-header,
+  :root.sa-reading .sd-pub-card-grid,
+  :root.sa-reading .sd-article,
+  :root.sa-reading .sd-article-head,
+  :root.sa-reading .sd-article-body {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  :root.sa-reading .sd-list-subtitle,
+  :root.sa-reading .sd-pub-card-title,
+  :root.sa-reading .sd-pub-card-subtitle,
+  :root.sa-reading .sd-article-title,
+  :root.sa-reading .sd-article-sub,
+  :root.sa-reading .sd-article-breadcrumb-current,
+  :root.sa-reading .sd-article-body,
+  :root.sa-reading .sd-article-body p,
+  :root.sa-reading .sd-article-body li {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  :root.sa-reading .sd-article-body pre,
+  :root.sa-reading .sd-article-body figure,
+  :root.sa-reading .sd-article-body table,
+  :root.sa-reading .sd-matrix-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  :root.sa-reading .sd-matrix {
+    min-width: 560px;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -6574,9 +6632,10 @@ figure.sd-image-block figcaption {
     border-bottom: 1px solid var(--border, #e0e0e0);
   }
   .sd-table-responsive .sd-analytics-table td {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: start;
+    gap: 8px 12px;
     border-bottom: none;
     padding: 4px 14px;
   }
@@ -6586,8 +6645,35 @@ figure.sd-image-block figcaption {
     font-size: 10.5px;
     text-transform: uppercase;
     color: var(--text-secondary, #888);
-    min-width: 80px;
+    min-width: 0;
     flex-shrink: 0;
+  }
+
+  .sd-table-responsive .sd-analytics-table td .sd-dt-value {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .sd-pub-articles-table-title {
+    display: block;
+    max-width: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.38;
+  }
+
+  .sd-pub-list-viewed {
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .sd-pub-chip,
+  .sd-pub-tier-badge {
+    width: fit-content;
+    max-width: 100%;
   }
 }
 
