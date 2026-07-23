@@ -946,6 +946,7 @@ a:hover { text-decoration: underline; }
    same icon spacing — no matter where they appear. Without this
    shared rule, .resume-preview-download had its own (smaller, less
    padded) token set and looked cramped next to the page CTAs. */
+.hire-me-btn,
 .hm-submit,
 .resume-preview-download {
   --md-filled-button-container-height: 48px;
@@ -974,6 +975,19 @@ a:hover { text-decoration: underline; }
   --md-filled-button-icon-size: 20px;
   /* Slotted content (the inner <span>) inherits color from the host. */
   color: #ffffff;
+}
+
+/* Dark mode: outlined "Download Resume" CTA should be readable. */
+:root:not([data-theme="light"]) button.download-resume-btn {
+  border-color: color-mix(in srgb, var(--fnd-color-always-light) 55%, transparent);
+  color: var(--fnd-color-always-light);
+}
+:root:not([data-theme="light"]) button.download-resume-btn:hover {
+  background: color-mix(in srgb, var(--fnd-color-always-light) 8%, transparent);
+  border-color: color-mix(in srgb, var(--fnd-color-always-light) 70%, transparent);
+}
+:root:not([data-theme="light"]) button.download-resume-btn:active {
+  background: color-mix(in srgb, var(--fnd-color-always-light) 12%, transparent);
 }
 .hire-me-btn-neutral {
   --md-outlined-button-container-height: 48px;
@@ -5879,13 +5893,103 @@ figure.sd-image-block figcaption {
   box-shadow: 0 0 0 1px rgba(0, 112, 210, 0.12), 0 10px 20px rgba(0, 112, 210, 0.08);
   transform: translateY(-1px);
 }
-.ga-atlas-usage {
+
+.ga-atlas-tools {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
   grid-column: 2;
   grid-row: 2;
+  width: auto;
+  max-width: 80%;
+  justify-self: start;
+  box-sizing: border-box;
+  margin: 8px 0 0 0;
+}
+.ga-atlas-tools-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(165, 199, 240, 0.9);
+  background: rgba(237, 245, 255, 0.9);
+  color: #27405f;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ga-atlas-tools-pill-muted {
+  border-color: rgba(231, 238, 248, 1);
+  background: rgba(255, 255, 255, 0.9);
+  color: #6f7f8f;
+  font-weight: 650;
+}
+
+.ga-atlas-sources {
+  grid-column: 2;
+  grid-row: 3;
+  width: auto;
+  max-width: 80%;
+  justify-self: start;
+  margin: 6px 0 0 0;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid #e7eef8;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+  box-sizing: border-box;
+}
+.ga-atlas-sources > summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  color: #27405f;
+  list-style: none;
+}
+.ga-atlas-sources > summary::-webkit-details-marker { display: none; }
+.ga-atlas-sources > summary::after {
+  content: 'expand_more';
+  font-family: 'Material Symbols Outlined';
+  font-size: 18px;
+  vertical-align: middle;
+  margin-left: 6px;
+  color: #6f7f8f;
+}
+.ga-atlas-sources[open] > summary::after { content: 'expand_less'; }
+.ga-atlas-sources-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ga-atlas-source-item {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(231, 238, 248, 1);
+  background: rgba(237, 245, 255, 0.75);
+  color: #0b3a6a;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ga-atlas-source-item:hover {
+  border-color: rgba(11, 114, 217, 0.35);
+  background: rgba(224, 240, 255, 0.9);
+}
+
+.ga-atlas-usage {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 2;
+  grid-row: 4;
   width: auto;
   max-width: 80%;
   justify-self: start;

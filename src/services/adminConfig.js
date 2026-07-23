@@ -136,6 +136,12 @@ const DEFAULT_ATLAS_CONFIG = {
   hybridSearchEnabled:      false,
   rerankerEnabled:          false,
   similarityThreshold:      0.0,
+  keywordSearchProvider:    'none',       // none | meilisearch
+  fusionStrategy:           'rrf',        // rrf
+  rrfK:                     60,
+  rerankerProvider:         'none',       // none | cohere
+  rerankerModel:            'rerank-v3.5',
+  rerankerTopN:             30,
 
   // ── 5. Prompt Configuration ──────────────────────────────────────────────
   systemPrompt:             '',
@@ -216,6 +222,12 @@ async function getAtlasConfig() {
       hybridSearchEnabled:      _bool(d.hybridSearchEnabled,     D.hybridSearchEnabled),
       rerankerEnabled:          _bool(d.rerankerEnabled,         D.rerankerEnabled),
       similarityThreshold:      _num(d.similarityThreshold,      D.similarityThreshold),
+      keywordSearchProvider:    _str(d.keywordSearchProvider,    D.keywordSearchProvider),
+      fusionStrategy:           _str(d.fusionStrategy,           D.fusionStrategy),
+      rrfK:                     _num(d.rrfK,                     D.rrfK),
+      rerankerProvider:         _str(d.rerankerProvider,         D.rerankerProvider),
+      rerankerModel:            _str(d.rerankerModel,            D.rerankerModel),
+      rerankerTopN:             _num(d.rerankerTopN,             D.rerankerTopN),
       // Prompt
       systemPrompt:             typeof d.systemPrompt === 'string' ? d.systemPrompt : D.systemPrompt,
       guardrailsEnabled:        _bool(d.guardrailsEnabled,       D.guardrailsEnabled),
@@ -287,6 +299,12 @@ async function upsertAtlasConfig(cfg) {
     hybridSearchEnabled:      _bool(cfg.hybridSearchEnabled,     D.hybridSearchEnabled),
     rerankerEnabled:          _bool(cfg.rerankerEnabled,         D.rerankerEnabled),
     similarityThreshold:      _num(cfg.similarityThreshold,      D.similarityThreshold),
+    keywordSearchProvider:    _str(cfg.keywordSearchProvider,    D.keywordSearchProvider),
+    fusionStrategy:           _str(cfg.fusionStrategy,           D.fusionStrategy),
+    rrfK:                     _num(cfg.rrfK,                     D.rrfK),
+    rerankerProvider:         _str(cfg.rerankerProvider,         D.rerankerProvider),
+    rerankerModel:            _str(cfg.rerankerModel,            D.rerankerModel),
+    rerankerTopN:             _num(cfg.rerankerTopN,             D.rerankerTopN),
     // Prompt
     systemPrompt:             typeof cfg.systemPrompt === 'string' ? cfg.systemPrompt : D.systemPrompt,
     guardrailsEnabled:        _bool(cfg.guardrailsEnabled,       D.guardrailsEnabled),

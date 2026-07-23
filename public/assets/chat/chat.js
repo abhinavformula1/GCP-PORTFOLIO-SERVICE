@@ -30,7 +30,7 @@ import {
   pendingChatHistory, setPendingChatHistory,
 } from '../core/state.js';
 import { authedFetch }     from '../core/auth.js';
-import { renderFreeFormMode, resetAtlasState } from './atlas.js?v=2026-07-19-local-atlas-dev-1';
+import { renderFreeFormMode, resetAtlasState } from './atlas.js?v=2026-07-23-tools-1';
 import { createInputRow } from './widgets.js';
 import { showWelcomeOverlay } from '../ui/welcome.js';
 
@@ -409,7 +409,10 @@ function renderAtlasEntry() {
   msgs.innerHTML = '';
   area.innerHTML = '';
 
-  if (!googleCredential || !siteProfile || siteProfile.type === 'guest') {
+  // Local preview: allow Atlas without Google sign-in on localhost so
+  // contributors can iterate on UX without configuring OAuth origins.
+  const isLocalPreview = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if ((!googleCredential || !siteProfile || siteProfile.type === 'guest') && !isLocalPreview) {
     renderAtlasSignInPrompt();
     return;
   }

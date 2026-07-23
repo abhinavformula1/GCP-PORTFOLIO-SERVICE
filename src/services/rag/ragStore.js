@@ -33,10 +33,16 @@ const { getDb }                   = require('../firestore');
 
 const RAG_COLLECTION   = 'rag_chunks';
 const VECTOR_FIELD     = 'embedding';
-const DISTANCE_MEASURE = 'COSINE'; // best for normalised text embeddings
 
 // Firestore batch writes cap at 500 ops; stay safely below.
 const BATCH_SIZE = 400;
+const MAX_TEXT_CHARS = 8_000;
+
+function sanitizeDistanceMeasure(value) {
+  const v = String(value || '').trim().toUpperCase();
+  if (v === 'COSINE' || v === 'EUCLIDEAN' || v === 'DOT_PRODUCT') return v;
+  return 'COSINE';
+}
 
 // ── Write ─────────────────────────────────────────────────────────────────────
 
@@ -73,7 +79,7 @@ async function saveChunks(chunks) {
         articleTitle: String(chunk.articleTitle || ''),
         chunkIndex:   Number(chunk.chunkIndex),
         blockType:    String(chunk.blockType    || 'paragraph'),
-        text:         String(chunk.text         || '').slice(0, 4000),
+        text:         String(chunk.text         || '').slice(0, MAX_TEXT_CHARS),
         // VectorValue wraps the float[] so Firestore stores it as a
         // first-class vector field that findNearest can operate on.
         [VECTOR_FIELD]: FieldValue.vector(chunk.embedding),
@@ -125,6 +131,7 @@ async function deleteChunksForArticle(articleId) {
  *
  * @param {number[]} queryVector   Embedding of the user's question (768-dim).
  * @param {number}   topK          Number of chunks to return (clamped 1–20).
+ * @param {{ distanceMeasure?: 'EUCLIDEAN'|'COSINE'|'DOT_PRODUCT', distanceThreshold?: number }} [opts]
  * @returns {Promise<Array<{
  *   articleId:    string,
  *   articleTitle: string,
@@ -133,21 +140,38 @@ async function deleteChunksForArticle(articleId) {
  *   text:         string,
  * }>>}
  */
-async function findNearestChunks(queryVector, topK) {
+async function findNearestChunks(queryVector, topK, opts) {
   if (!Array.isArray(queryVector) || queryVector.length === 0) return [];
 
   const k  = Math.max(1, Math.min(Number(topK) || 5, 20));
   const db = getDb();
 
-  const snap = await db
-    .collection(RAG_COLLECTION)
-    .findNearest({
+  const distanceMeasure = sanitizeDistanceMeasure(opts && opts.distanceMeasure);
+  const distanceThreshold = (opts && typeof opts.distanceThreshold === 'number' && Number.isFinite(opts.distanceThreshold))
+    ? opts.distanceThreshold
+    : null;
+
+  async function runQuery(withDistanceFields) {
+    const queryOpts = {
       vectorField:     VECTOR_FIELD,
       queryVector:     new VectorValue(queryVector),
       limit:           k,
-      distanceMeasure: DISTANCE_MEASURE,
-    })
-    .get();
+      distanceMeasure,
+    };
+    if (withDistanceFields) {
+      queryOpts.distanceResultField = 'vector_distance';
+      if (distanceThreshold != null) queryOpts.distanceThreshold = distanceThreshold;
+    }
+    return db.collection(RAG_COLLECTION).findNearest(queryOpts).get();
+  }
+
+  let snap;
+  try {
+    snap = await runQuery(true);
+  } catch (_err) {
+    // Back-compat: older Firestore SDKs may not support distanceResultField/distanceThreshold.
+    snap = await runQuery(false);
+  }
 
   return snap.docs.map((doc) => {
     const d = doc.data() || {};

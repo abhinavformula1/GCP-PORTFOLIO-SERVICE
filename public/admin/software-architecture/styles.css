@@ -8181,7 +8181,8 @@ md-dialog:not([open]) {
   border-radius: 20px;
   margin-bottom: 0;
   background: var(--sd-admin-panel-bg);
-  overflow: hidden;
+  /* Allow custom select menus to escape the card without clipping. */
+  overflow: visible;
   box-shadow: var(--sd-admin-shadow-sm);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
@@ -8222,6 +8223,8 @@ md-dialog:not([open]) {
   flex-direction: column;
   gap: 16px;
   background: color-mix(in srgb, var(--surface) 99%, white 1%);
+  border-radius: 0 0 20px 20px;
+  overflow: visible;
 }
 
 .sd-ai-accordion-head {
@@ -9528,7 +9531,8 @@ md-dialog:not([open]) {
   left: 0;
   right: 0;
   top: calc(100% + 10px);
-  z-index: 80;
+  /* Must float above accordion cards + neighbor fields. */
+  z-index: 600;
 }
 
 .sd-custom-select-list {

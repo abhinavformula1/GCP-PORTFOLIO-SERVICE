@@ -145,6 +145,17 @@ function updateTrigger(instance) {
   instance.root.classList.toggle('is-disabled', instance.select.disabled);
 }
 
+function scrollMenuListToButton(instance, optionButton) {
+  if (!instance || !instance.menuList || !(optionButton instanceof HTMLElement)) return;
+  const list = instance.menuList;
+  const viewTop = list.scrollTop;
+  const viewBottom = viewTop + list.clientHeight;
+  const top = optionButton.offsetTop;
+  const bottom = top + optionButton.offsetHeight;
+  if (top < viewTop) list.scrollTop = top;
+  else if (bottom > viewBottom) list.scrollTop = Math.max(0, bottom - list.clientHeight);
+}
+
 function focusOption(instance, index) {
   if (!instance.options.length) return;
   const safeIndex = Math.max(0, Math.min(index, instance.options.length - 1));
@@ -155,7 +166,7 @@ function focusOption(instance, index) {
     button.classList.toggle('is-focused', button === optionButton);
   });
   optionButton.focus({ preventScroll: true });
-  optionButton.scrollIntoView({ block: 'nearest' });
+  scrollMenuListToButton(instance, optionButton);
 }
 
 function openSelect(instance) {
@@ -167,9 +178,36 @@ function openSelect(instance) {
   instance.root.classList.add('is-open');
   instance.trigger.setAttribute('aria-expanded', 'true');
   activeInstance = instance;
+  instance.openedAt = Date.now();
+
+  // Position first so focusing doesn't scroll the window and instantly close.
+  positionMenu(instance);
 
   const selectedIndex = instance.options.findIndex(function (option) { return option.selected && !option.disabled; });
   focusOption(instance, selectedIndex >= 0 ? selectedIndex : 0);
+}
+
+function positionMenu(instance) {
+  if (!instance || !instance.menu || !instance.menuList) return;
+  // Reset to default (down).
+  instance.menu.style.top = '';
+  instance.menu.style.bottom = '';
+  instance.menu.dataset.placement = 'down';
+
+  if (!instance.root.classList.contains('is-open')) return;
+  const triggerRect = instance.trigger.getBoundingClientRect();
+  const margin = 12;
+  const spaceBelow = window.innerHeight - triggerRect.bottom;
+  const spaceAbove = triggerRect.top;
+  // Match CSS: max-height: min(320px, 48vh)
+  const cap = Math.min(320, Math.floor(window.innerHeight * 0.48));
+
+  // If the menu would overflow below, flip above when there's more room.
+  if (spaceBelow < cap + margin && spaceAbove > spaceBelow) {
+    instance.menu.style.top = 'auto';
+    instance.menu.style.bottom = 'calc(100% + 10px)';
+    instance.menu.dataset.placement = 'up';
+  }
 }
 
 function closeSelect(instance, restoreFocus) {
@@ -416,6 +454,14 @@ export function initCustomSelects(root = document) {
       }
     });
     window.addEventListener('resize', closeActiveSelect);
-    window.addEventListener('scroll', closeActiveSelect, true);
+    // Close on scroll *outside* the active select. If we close on every scroll
+    // event (capture), the menu immediately collapses when its own list scrolls.
+    window.addEventListener('scroll', function (event) {
+      if (!activeInstance) return;
+      if (activeInstance.openedAt && Date.now() - activeInstance.openedAt < 250) return;
+      const target = event && event.target;
+      if (target instanceof Node && activeInstance.root.contains(target)) return;
+      closeActiveSelect();
+    }, true);
   }
 }

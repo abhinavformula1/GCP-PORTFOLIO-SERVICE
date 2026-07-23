@@ -459,6 +459,8 @@ async function streamAsk(message, history) {
   let final = '';
   let usage = null;
   let cached = false;
+  let plan = null;
+  let webSearch = null;
 
   try {
     const reader = resp.body.getReader();
@@ -505,6 +507,8 @@ async function streamAsk(message, history) {
           final = parsed.done;
           usage = parsed.usage || null;
           cached = !!parsed.cached;
+          plan = parsed.plan || null;
+          webSearch = parsed.webSearch || null;
           if (bubble) {
             bubble.classList.remove('ga-typing');
             bubble.classList.add('ga-md');
@@ -528,6 +532,7 @@ async function streamAsk(message, history) {
     atlasState.history.push({ role: 'user',  text: message });
     atlasState.history.push({ role: 'model', text: answer });
     if (usage && cached) usage.cached = true;
+    appendToolsMeta(bubbleWrap, { plan, webSearch });
     appendUsageMeta(bubbleWrap, usage, {
       latencyMs: ((typeof performance !== 'undefined' && performance.now)
         ? performance.now()
@@ -564,7 +569,10 @@ async function fallbackJsonAsk(message, history) {
       || "I couldn't generate a response. Please try again.";
     const bubbleWrap = appendBotBubble(answer);
     const usage = res.body && res.body.usage;
+    const plan = res.body && res.body.plan;
+    const webSearch = res.body && res.body.webSearch;
     if (usage && res.body && res.body.cached) usage.cached = true;
+    appendToolsMeta(bubbleWrap, { plan, webSearch });
     appendUsageMeta(bubbleWrap, usage, {
       latencyMs: ((typeof performance !== 'undefined' && performance.now)
         ? performance.now()
@@ -846,6 +854,51 @@ function appendUsageMeta(wrap, usage, extras) {
   wrap.appendChild(meta);
   syncUsageWidth(wrap, meta);
   scrollToBottom();
+}
+
+function appendToolsMeta(wrap, { plan, webSearch } = {}) {
+  if (!wrap) return;
+  const useRag = !!(plan && plan.useRag);
+  const useWeb = !!(plan && plan.useWebSearch) || !!webSearch;
+  const sources = webSearch && Array.isArray(webSearch.sources) ? webSearch.sources : [];
+  const sourceCount = sources.length;
+
+  if (!useRag && !useWeb && !sourceCount) return;
+
+  const meta = document.createElement('div');
+  meta.className = 'ga-atlas-tools';
+
+  const pills = [];
+  if (useRag) pills.push('<span class="ga-atlas-tools-pill">RAG</span>');
+  if (useWeb) pills.push('<span class="ga-atlas-tools-pill">Web search</span>');
+  if (sourceCount) {
+    pills.push('<span class="ga-atlas-tools-pill ga-atlas-tools-pill-muted">Sources: ' + escapeHtml(String(sourceCount)) + '</span>');
+  }
+
+  meta.innerHTML = pills.join('');
+  wrap.appendChild(meta);
+  syncUsageWidth(wrap, meta);
+
+  if (sourceCount) {
+    const details = document.createElement('details');
+    details.className = 'ga-atlas-sources';
+    details.innerHTML = '<summary>Sources</summary>';
+
+    const list = document.createElement('div');
+    list.className = 'ga-atlas-sources-list';
+    list.innerHTML = sources.slice(0, 6).map(function (s) {
+      if (!s || typeof s !== 'object') return '';
+      const title = String(s.title || '').trim();
+      const url = String(s.url || '').trim();
+      const label = title || url || 'Source';
+      if (!url) return '<div class="ga-atlas-source-item">' + escapeHtml(label) + '</div>';
+      return '<a class="ga-atlas-source-item" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(label) + '</a>';
+    }).filter(Boolean).join('');
+
+    details.appendChild(list);
+    wrap.appendChild(details);
+    syncUsageWidth(wrap, details);
+  }
 }
 
 function formatNumber(n) {
