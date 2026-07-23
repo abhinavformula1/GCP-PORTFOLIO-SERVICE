@@ -1595,6 +1595,10 @@
                 <label class="sd-toggle-switch" aria-label="Enable tracing"><input type="checkbox" id="atlasTracingEnabled"><span class="sd-toggle-slider"></span></label>
               </div>
               <div class="sd-seo-toggle-row">
+                <div class="sd-seo-toggle-info"><strong>Enable LangSmith Tracing</strong><span>Send request traces to LangSmith (requires Cloud Run LANGSMITH_* variables).</span></div>
+                <label class="sd-toggle-switch" aria-label="Enable LangSmith tracing"><input type="checkbox" id="atlasLangsmithTracingEnabled"><span class="sd-toggle-slider"></span></label>
+              </div>
+              <div class="sd-seo-toggle-row">
                 <div class="sd-seo-toggle-info"><strong>Capture Prompts</strong><span>Store the full system + user prompt per request.</span></div>
                 <label class="sd-toggle-switch" aria-label="Capture prompts"><input type="checkbox" id="atlasCapturePrompts"><span class="sd-toggle-slider"></span></label>
               </div>
@@ -1709,6 +1713,26 @@
         </div>
       </div>
       <div id="atlasObservabilityStatus" class="sd-admin-section-status"></div>
+
+      <!-- LangSmith runtime toggle -->
+      <div class="sd-seo-group">
+        <h3 class="sd-seo-group-title">
+          <span class="material-symbols-outlined" aria-hidden="true">monitor_heart</span>
+          LangSmith Tracing
+        </h3>
+        <p class="sd-seo-group-desc">Toggle LangSmith traces (no redeploy).</p>
+        <div class="sd-seo-toggle-row">
+          <div class="sd-seo-toggle-info">
+            <strong>LangSmith traces</strong>
+            <span>LLM + orchestration runs.</span>
+          </div>
+          <label class="sd-toggle-switch" aria-label="Toggle LangSmith traces">
+            <input type="checkbox" id="obsLangsmithTracingEnabled">
+            <span class="sd-toggle-slider"></span>
+          </label>
+        </div>
+        <p class="sd-seo-field-hint" id="obsLangsmithHint" style="margin-top:10px"></p>
+      </div>
 
       <!-- ① Observability Summary ─────────────────────────────────────────── -->
       <div class="sd-seo-group">

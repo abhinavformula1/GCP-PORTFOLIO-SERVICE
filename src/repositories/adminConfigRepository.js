@@ -59,10 +59,10 @@ async function getAtlasConfigDoc() {
   return getConfigDoc(ATLAS_CONFIG_DOC);
 }
 
-async function saveAtlasConfigDoc(data) {
+async function saveAtlasConfigDoc(data, opts) {
   return setConfigDoc(ATLAS_CONFIG_DOC, Object.assign({}, data, {
     updatedAt: FieldValue.serverTimestamp(),
-  }));
+  }), opts);
 }
 
 async function getComponentRegistryDoc() {

@@ -133,6 +133,7 @@ function _fillForm(els, cfg) {
   _setV(els.atlasFaithfulnessThreshold,'value',  cfg.faithfulnessThreshold!= null ? cfg.faithfulnessThreshold: 0.70);
   // ⑧ Observability
   _setV(els.atlasTracingEnabled,      'checked', cfg.tracingEnabled === true);
+  _setV(els.atlasLangsmithTracingEnabled, 'checked', cfg.langsmithTracingEnabled === true);
   _setV(els.atlasCapturePrompts,      'checked', cfg.capturePrompts === true);
   _setV(els.atlasCaptureChunks,       'checked', cfg.captureChunks === true);
   _setV(els.atlasCaptureTokens,       'checked', cfg.captureTokens !== false);
@@ -179,6 +180,7 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
     recallThreshold:      _n(els.atlasRecallThreshold,       0.80),
     faithfulnessThreshold:_n(els.atlasFaithfulnessThreshold, 0.70),
     tracingEnabled:       _c(els.atlasTracingEnabled,        false),
+    langsmithTracingEnabled:_c(els.atlasLangsmithTracingEnabled, false),
     capturePrompts:       _c(els.atlasCapturePrompts,        false),
     captureChunks:        _c(els.atlasCaptureChunks,         false),
     captureTokens:        _c(els.atlasCaptureTokens,         true),

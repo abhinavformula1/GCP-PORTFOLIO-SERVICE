@@ -227,6 +227,7 @@ export const els = {
   atlasRecallThreshold:       g('atlasRecallThreshold'),
   atlasFaithfulnessThreshold: g('atlasFaithfulnessThreshold'),
   atlasTracingEnabled:        g('atlasTracingEnabled'),
+  atlasLangsmithTracingEnabled:g('atlasLangsmithTracingEnabled'),
   atlasCapturePrompts:        g('atlasCapturePrompts'),
   atlasCaptureChunks:         g('atlasCaptureChunks'),
   atlasCaptureTokens:         g('atlasCaptureTokens'),
@@ -287,6 +288,8 @@ export const els = {
   // ── Atlas Observability fields ────────────────────────────────────────────
   atlasObservabilityStatus: g('atlasObservabilityStatus'),
   obsRefreshBtn:        g('obsRefreshBtn'),
+  obsLangsmithTracingEnabled: g('obsLangsmithTracingEnabled'),
+  obsLangsmithHint:           g('obsLangsmithHint'),
 
   // Summary KPIs (individual badge/value elements)
   obsTracingStatus:     g('obsTracingStatus'),

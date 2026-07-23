@@ -1,6 +1,12 @@
 'use strict';
 
 const adminConfigRepository = require('../repositories/adminConfigRepository');
+const appConfig = require('../config');
+const { setLangSmithRuntimeEnabled } = require('./observability/langsmith');
+
+// Local preview override: when Firestore is unavailable, allow admin UX work by
+// persisting Atlas config changes in-memory for the current process.
+let _localAtlasConfigOverride = {};
 
 // ── Tier configuration ────────────────────────────────────────────────────────
 const DEFAULT_TIER_CONFIG = {
@@ -154,6 +160,7 @@ const DEFAULT_ATLAS_CONFIG = {
   capturePrompts:           false,
   captureChunks:            false,
   captureTokens:            true,
+  langsmithTracingEnabled:  false,
 
   // ── 9. Cost Controls ─────────────────────────────────────────────────────
   budgetCapInr:             100,
@@ -178,9 +185,13 @@ function _str(val, def)  { return typeof val === 'string' && val ? val : def; }
 async function getAtlasConfig() {
   try {
     const d = await adminConfigRepository.getAtlasConfigDoc();
-    if (!d) return { ...DEFAULT_ATLAS_CONFIG };
+    if (!d) {
+      const fallback = Object.assign({}, DEFAULT_ATLAS_CONFIG, _localAtlasConfigOverride || {});
+      setLangSmithRuntimeEnabled(fallback.langsmithTracingEnabled === true);
+      return fallback;
+    }
     const D = DEFAULT_ATLAS_CONFIG;
-    return {
+    const cfg = {
       // LLM
       enabledModels:            Array.isArray(d.enabledModels) ? d.enabledModels : D.enabledModels,
       defaultModel:             _str(d.defaultModel,             D.defaultModel),
@@ -225,6 +236,7 @@ async function getAtlasConfig() {
       capturePrompts:           _bool(d.capturePrompts,          D.capturePrompts),
       captureChunks:            _bool(d.captureChunks,           D.captureChunks),
       captureTokens:            _bool(d.captureTokens,           D.captureTokens),
+      langsmithTracingEnabled:  _bool(d.langsmithTracingEnabled, D.langsmithTracingEnabled),
       // Cost
       budgetCapInr:             _num(d.budgetCapInr,             D.budgetCapInr),
       dailyBudgetCapInr:        _num(d.dailyBudgetCapInr,        D.dailyBudgetCapInr),
@@ -238,15 +250,19 @@ async function getAtlasConfig() {
       // UI
       modelSelectorVisible:     d.modelSelectorVisible !== false,
     };
+    setLangSmithRuntimeEnabled(cfg.langsmithTracingEnabled === true);
+    return cfg;
   } catch (err) {
     console.warn('[atlas-config] Firestore read failed, using defaults:', err.message);
-    return { ...DEFAULT_ATLAS_CONFIG };
+    const fallback = Object.assign({}, DEFAULT_ATLAS_CONFIG, _localAtlasConfigOverride || {});
+    setLangSmithRuntimeEnabled(fallback.langsmithTracingEnabled === true);
+    return fallback;
   }
 }
 
 async function upsertAtlasConfig(cfg) {
   const D = DEFAULT_ATLAS_CONFIG;
-  await adminConfigRepository.saveAtlasConfigDoc({
+  const payload = {
     // LLM
     enabledModels:            Array.isArray(cfg.enabledModels) ? cfg.enabledModels : D.enabledModels,
     defaultModel:             _str(cfg.defaultModel,             D.defaultModel),
@@ -291,6 +307,7 @@ async function upsertAtlasConfig(cfg) {
     capturePrompts:           _bool(cfg.capturePrompts,          D.capturePrompts),
     captureChunks:            _bool(cfg.captureChunks,           D.captureChunks),
     captureTokens:            _bool(cfg.captureTokens,           D.captureTokens),
+    langsmithTracingEnabled:  _bool(cfg.langsmithTracingEnabled, D.langsmithTracingEnabled),
     // Cost
     budgetCapInr:             _num(cfg.budgetCapInr,             D.budgetCapInr),
     dailyBudgetCapInr:        _num(cfg.dailyBudgetCapInr,        D.dailyBudgetCapInr),
@@ -303,7 +320,36 @@ async function upsertAtlasConfig(cfg) {
     contentModerationEnabled: _bool(cfg.contentModerationEnabled,D.contentModerationEnabled),
     // UI
     modelSelectorVisible:     cfg.modelSelectorVisible !== false,
-  });
+  };
+
+  try {
+    await adminConfigRepository.saveAtlasConfigDoc(payload);
+  } catch (err) {
+    if (!appConfig.admin.localPreview) throw err;
+    console.warn('[atlas-config] Firestore write failed in local preview, continuing without persistence:', err.message);
+    _localAtlasConfigOverride = Object.assign({}, _localAtlasConfigOverride, payload);
+  } finally {
+    setLangSmithRuntimeEnabled(payload.langsmithTracingEnabled === true);
+  }
+}
+
+async function patchAtlasObservabilityConfig(partial) {
+  const enabled = partial && typeof partial.langsmithTracingEnabled === 'boolean'
+    ? partial.langsmithTracingEnabled
+    : undefined;
+  if (typeof enabled !== 'boolean') return getAtlasConfig();
+  try {
+    await adminConfigRepository.saveAtlasConfigDoc({
+      langsmithTracingEnabled: enabled,
+    }, { merge: true });
+  } catch (err) {
+    if (!appConfig.admin.localPreview) throw err;
+    console.warn('[atlas-config] Firestore patch failed in local preview, continuing without persistence:', err.message);
+    _localAtlasConfigOverride = Object.assign({}, _localAtlasConfigOverride, { langsmithTracingEnabled: enabled });
+  } finally {
+    setLangSmithRuntimeEnabled(enabled === true);
+  }
+  return getAtlasConfig();
 }
 
 // ── Component registry toggle map ─────────────────────────────────────────────
@@ -374,6 +420,7 @@ module.exports = {
   upsertSeoConfig,
   getAtlasConfig,
   upsertAtlasConfig,
+  patchAtlasObservabilityConfig,
   getComponentRegistry,
   upsertComponentRegistry,
   getContactPolicyConfig,

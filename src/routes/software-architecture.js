@@ -660,8 +660,26 @@ router.get('/admin/atlas/config', requireAdmin, async (_req, res, next) => {
         generationEvalsReason: config.gemini.apiKey
           ? 'Gemini-backed offline generation evals are available for new runs.'
           : 'Gemini API key is missing in this environment, so generation evals cannot run yet.',
+        langsmithReady: !!(config.langsmith.apiKey && config.langsmith.tracingEnabled),
+        langsmithReason: (config.langsmith.apiKey && config.langsmith.tracingEnabled)
+          ? 'LangSmith is configured in this environment. You can enable/disable tracing from the admin UI without redeploying.'
+          : 'LangSmith is not configured in this environment. Set LANGSMITH_API_KEY and LANGSMITH_TRACING=true in Cloud Run to enable LangSmith tracing.',
       },
     });
+  } catch (err) { return next(err); }
+});
+
+// ── Atlas observability toggles (admin patch) ─────────────────────────────────
+router.put('/admin/atlas/observability', requireAdmin, [
+  body('langsmithTracingEnabled').isBoolean().withMessage('langsmithTracingEnabled must be a boolean.'),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', errors: errors.array() });
+  try {
+    const updated = await adminConfig.patchAtlasObservabilityConfig({
+      langsmithTracingEnabled: req.body.langsmithTracingEnabled === true,
+    });
+    return res.status(200).json({ success: true, config: updated });
   } catch (err) { return next(err); }
 });
 
@@ -702,6 +720,7 @@ router.put('/admin/atlas/config', requireAdmin, [
   body('capturePrompts').optional().isBoolean(),
   body('captureChunks').optional().isBoolean(),
   body('captureTokens').optional().isBoolean(),
+  body('langsmithTracingEnabled').optional().isBoolean(),
   // Cost
   body('budgetCapInr').optional().isFloat({ min: 0 }),
   body('dailyBudgetCapInr').optional().isFloat({ min: 0 }),
@@ -759,6 +778,7 @@ router.put('/admin/atlas/config', requireAdmin, [
       capturePrompts:           b.capturePrompts       != null ? toBool(b.capturePrompts)       : undefined,
       captureChunks:            b.captureChunks        != null ? toBool(b.captureChunks)        : undefined,
       captureTokens:            b.captureTokens        != null ? toBool(b.captureTokens)        : undefined,
+      langsmithTracingEnabled:  b.langsmithTracingEnabled != null ? toBool(b.langsmithTracingEnabled) : undefined,
       // Cost
       budgetCapInr:             b.budgetCapInr         != null ? Number(b.budgetCapInr)         : undefined,
       dailyBudgetCapInr:        b.dailyBudgetCapInr    != null ? Number(b.dailyBudgetCapInr)    : undefined,
