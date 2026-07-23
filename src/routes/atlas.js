@@ -234,6 +234,38 @@ function prepareAtlasRequest(req, _res, next) {
   };
 }
 
+function sourceDomain(url) {
+  try {
+    return new URL(String(url || '')).hostname.replace(/^www\./, '');
+  } catch (_) {
+    return '';
+  }
+}
+
+function appendWebSources(answer, webSearch) {
+  const base = String(answer || '').trim();
+  const sources = webSearch && Array.isArray(webSearch.sources) ? webSearch.sources : [];
+  if (!base || !sources.length) return base;
+  if (/\n#{0,3}\s*Sources\b/i.test(base) || /\n\*\*Sources\*\*/i.test(base)) return base;
+
+  const seen = new Set();
+  const lines = [];
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+    const title = String(source.title || '').trim();
+    const url = String(source.url || '').trim();
+    const domain = sourceDomain(url);
+    const key = (title + '|' + domain).toLowerCase();
+    if ((!title && !domain) || seen.has(key)) continue;
+    seen.add(key);
+    lines.push(`- ${title || domain}${domain && title && title.toLowerCase() !== domain.toLowerCase() ? ` (${domain})` : ''}`);
+    if (lines.length >= 4) break;
+  }
+
+  if (!lines.length) return base;
+  return `${base}\n\n**Sources**\n${lines.join('\n')}`;
+}
+
 // ── POST /api/atlas/ask ──────────────────────────────────────────────────────
 router.post('/atlas/ask',
   requireAuth,
@@ -270,23 +302,24 @@ router.post('/atlas/ask',
 
       const { systemPrompt, generationConfig, webSearch } = await buildCallConfig(message, atlasCfg, executionPlan);
       const { answer, usage } = await ask({ message, history, model: resolvedModel, fallbackModel, systemPrompt, generationConfig });
+      const finalAnswer = appendWebSources(answer, webSearch);
 
       // Fire-and-forget persistence — we already have the answer; the
       // user shouldn't wait on Firestore to see it.
-      persistTurns(uid, message, answer, usage);
+      persistTurns(uid, message, finalAnswer, usage);
       saveCachedAnswer(cacheRef, { model: resolvedModel, answer });
 
       console.log('[atlas]', {
         transactionId, uid,
         msgLen:        message.length,
         historyTurns:  history.length,
-        answerLen:     answer.length,
+        answerLen:     finalAnswer.length,
         model:         usage && usage.model,
         usage,
         webSearchUsed: !!webSearch,
       });
 
-      return res.status(200).json({ success: true, answer, usage, cached: false, transactionId, webSearch });
+      return res.status(200).json({ success: true, answer: finalAnswer, usage, cached: false, transactionId, webSearch });
     } catch (err) {
       return next(err);
     }
@@ -354,7 +387,7 @@ router.post('/atlas/stream',
         if (evt.kind === 'chunk') {
           send({ chunk: evt.text });
         } else if (evt.kind === 'done') {
-          finalAnswer = evt.text;
+          finalAnswer = appendWebSources(evt.text, webSearch);
           usage = evt.usage;
           send({ done: finalAnswer, usage, transactionId, webSearch });
         }

@@ -6,12 +6,15 @@
  */
 
 import { state }            from '../../state.js';
-import { setSectionStatus } from '../../http.js';
+import { authedJson, setSectionStatus } from '../../http.js';
 import { escapeHtml } from '../../utils.js';
 import { atlasConfig }      from './config.js';
 import { renderDataTable }  from '../../../../../assets/ui/datatable.js';
 
 let _allTraces = [];
+let _cfg = null;
+let _meta = null;
+let _langsmithToggleWired = false;
 
 // ── Column definitions ────────────────────────────────────────────────────────
 const TRACE_COLS = [
@@ -40,10 +43,16 @@ const FEEDBACK_COLS = [
 // ── Entry point ───────────────────────────────────────────────────────────────
 export function renderObservabilityPage(els) {
   const cfg = atlasConfig || {};
+  _wireLangsmithToggle(els);
   _setBadge(els.obsTracingStatus, cfg.tracingEnabled);
   _setBadge(els.obsPromptsStatus, cfg.capturePrompts);
   _setBadge(els.obsChunksStatus,  cfg.captureChunks);
   _setBadge(els.obsTokensStatus,  cfg.captureTokens !== false);
+  if (els.obsLangsmithTracingEnabled) {
+    els.obsLangsmithTracingEnabled.checked = !!cfg.langsmithTracingEnabled;
+    els.obsLangsmithTracingEnabled.disabled = true;
+  }
+  if (els.obsLangsmithHint) els.obsLangsmithHint.textContent = '';
 
   setSectionStatus(els.atlasObservabilityStatus, '', '');
   _show(els.obsTraceDetailWrap,    false);
@@ -59,11 +68,15 @@ export function loadObservabilityData(els) {
   const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
 
   Promise.all([
+    authedJson('/api/admin/atlas/config'),
     _fetch('/api/admin/atlas/traces?limit=50',    headers),
     _fetch('/api/admin/atlas/analytics',          headers),
     _fetch('/api/admin/atlas/feedback?limit=50',  headers),
-  ]).then(function ([tracesData, analyticsData, feedbackData]) {
+  ]).then(function ([configData, tracesData, analyticsData, feedbackData]) {
     setSectionStatus(els.atlasObservabilityStatus, '', '');
+    _cfg = (configData && configData.config) ? configData.config : null;
+    _meta = (configData && configData.meta) ? configData.meta : null;
+    _refreshConfigBadges(els);
     _allTraces = (tracesData.success) ? (tracesData.traces || []) : [];
 
     _renderSummaryKpis(els, _allTraces, analyticsData);
@@ -75,6 +88,51 @@ export function loadObservabilityData(els) {
   }).catch(function (err) {
     setSectionStatus(els.atlasObservabilityStatus, err.message || 'Load failed.', 'error');
   });
+}
+
+function _wireLangsmithToggle(els) {
+  if (_langsmithToggleWired) return;
+  if (!els || !els.obsLangsmithTracingEnabled) return;
+  _langsmithToggleWired = true;
+
+  els.obsLangsmithTracingEnabled.addEventListener('change', async function () {
+    const desired = els.obsLangsmithTracingEnabled.checked === true;
+    els.obsLangsmithTracingEnabled.disabled = true;
+    setSectionStatus(els.atlasObservabilityStatus, 'Saving LangSmith toggle…', 'info');
+    try {
+      const data = await authedJson('/api/admin/atlas/observability', {
+        method: 'PUT',
+        body: JSON.stringify({ langsmithTracingEnabled: desired }),
+      });
+      _cfg = data && data.config ? data.config : _cfg;
+      setSectionStatus(els.atlasObservabilityStatus, 'LangSmith tracing updated.', 'success');
+      _refreshConfigBadges(els);
+    } catch (err) {
+      els.obsLangsmithTracingEnabled.checked = !desired;
+      setSectionStatus(els.atlasObservabilityStatus, 'Save failed: ' + (err.message || 'Request failed.'), 'error');
+    } finally {
+      const envReady = !!(_meta && _meta.langsmithReady);
+      els.obsLangsmithTracingEnabled.disabled = !envReady;
+    }
+  });
+}
+
+function _refreshConfigBadges(els) {
+  const cfg = _cfg || atlasConfig || {};
+  const meta = _meta || {};
+  _setBadge(els.obsTracingStatus, cfg.tracingEnabled);
+  _setBadge(els.obsPromptsStatus, cfg.capturePrompts);
+  _setBadge(els.obsChunksStatus,  cfg.captureChunks);
+  _setBadge(els.obsTokensStatus,  cfg.captureTokens !== false);
+  if (els.obsLangsmithTracingEnabled) {
+    els.obsLangsmithTracingEnabled.checked = !!cfg.langsmithTracingEnabled;
+    els.obsLangsmithTracingEnabled.disabled = !meta.langsmithReady;
+  }
+  if (els.obsLangsmithHint) {
+    els.obsLangsmithHint.textContent = meta && meta.langsmithReady
+      ? ''
+      : (meta && meta.langsmithReason ? String(meta.langsmithReason) : 'LangSmith is not configured in this environment.');
+  }
 }
 
 // ── ① Summary KPIs ────────────────────────────────────────────────────────────

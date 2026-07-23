@@ -4,8 +4,15 @@ const config = require('../../config');
 const { traceable } = require('langsmith/traceable');
 const warnedTraceFallbacks = new Set();
 
+let _runtimeTracingEnabled = false;
+
+function setLangSmithRuntimeEnabled(enabled) {
+  _runtimeTracingEnabled = enabled === true;
+}
+
 function isLangSmithEnabled() {
-  return !!(config.langsmith.apiKey && config.langsmith.tracingEnabled);
+  const envReady = !!(config.langsmith.apiKey && config.langsmith.tracingEnabled);
+  return envReady && _runtimeTracingEnabled;
 }
 
 function previewText(value, maxLen = 180) {
@@ -128,20 +135,43 @@ async function* withAsyncIterableFallback(iterator, fn, ctx, args, traceName) {
 }
 
 function traceIfEnabled(fn, traceConfig) {
-  if (!isLangSmithEnabled()) return fn;
-  const traced = traceable(fn, Object.assign({
-    project_name: config.langsmith.project,
-    tracingEnabled: true,
-    metadata: {
-      service: 'atlas',
-      env: config.server.env,
-    },
-  }, traceConfig || {}));
   const traceName = traceConfig && traceConfig.name ? traceConfig.name : fn.name;
+  let traced = null;
+  let tracedInitFailed = false;
+
+  function getTraced() {
+    if (traced) return traced;
+    if (tracedInitFailed) return null;
+    try {
+      traced = traceable(fn, Object.assign({
+        project_name: config.langsmith.project,
+        tracingEnabled: true,
+        metadata: {
+          service: 'atlas',
+          env: config.server.env,
+        },
+      }, traceConfig || {}));
+      return traced;
+    } catch (err) {
+      tracedInitFailed = true;
+      if (err && err.message) warnTraceFallback(traceName, err);
+      return null;
+    }
+  }
+
   return function tracedWithFallback(...args) {
+    if (!isLangSmithEnabled()) {
+      return fn.apply(this, args);
+    }
+
+    const tracedFn = getTraced();
+    if (!tracedFn) {
+      return fn.apply(this, args);
+    }
+
     let result;
     try {
-      result = traced.apply(this, args);
+      result = tracedFn.apply(this, args);
     } catch (err) {
       if (!isLangSmithTransportError(err)) throw err;
       warnTraceFallback(traceName, err);
@@ -163,6 +193,7 @@ function traceIfEnabled(fn, traceConfig) {
 
 module.exports = {
   isLangSmithEnabled,
+  setLangSmithRuntimeEnabled,
   previewText,
   maskIdentifier,
   summarizeUsage,

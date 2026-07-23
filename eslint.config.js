@@ -15,7 +15,10 @@ module.exports = [
   // Files ESLint should not look at. node_modules is excluded by default.
   {
     ignores: [
+      '.venv/**',
       'package-lock.json',
+      'playwright-report/**',
+      'test-results/**',
       'public/assets/vendor/**', // future-proof: any third-party drop-ins
     ],
   },

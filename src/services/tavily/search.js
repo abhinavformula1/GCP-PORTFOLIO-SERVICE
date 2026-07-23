@@ -115,6 +115,7 @@ function buildWebSearchContext(searchPayload) {
     'LIVE WEB SEARCH CONTEXT (Tavily)',
     'Use this only for fresh external facts or time-sensitive information.',
     'Prefer portfolio and RAG context for Abhinav-specific experience, projects, and internal product behavior.',
+    'If the user asks for current news, current events, or other external live information, answer from this web context instead of redirecting back to portfolio-only topics.',
   ];
 
   searchPayload.results.forEach(function (result, idx) {
@@ -127,6 +128,7 @@ function buildWebSearchContext(searchPayload) {
 
   lines.push('');
   lines.push('If you use these external sources, mention the source title or domain plainly in your answer.');
+  lines.push('Add a short Sources section when answering from this web context.');
   return lines.join('\n');
 }
 
