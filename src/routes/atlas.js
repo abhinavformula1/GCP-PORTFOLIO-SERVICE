@@ -258,12 +258,29 @@ function appendWebSources(answer, webSearch) {
     const key = (title + '|' + domain).toLowerCase();
     if ((!title && !domain) || seen.has(key)) continue;
     seen.add(key);
-    lines.push(`- ${title || domain}${domain && title && title.toLowerCase() !== domain.toLowerCase() ? ` (${domain})` : ''}`);
+    // Render as a safe markdown link so the chat UI can click through.
+    // We keep it short (max 4) to avoid overwhelming the answer.
+    const label = title || domain || 'Source';
+    const suffix = (domain && title && title.toLowerCase() !== domain.toLowerCase())
+      ? ` (${domain})`
+      : '';
+    if (url) lines.push(`- [${label}](${url})${suffix}`);
+    else lines.push(`- ${label}${suffix}`);
     if (lines.length >= 4) break;
   }
 
   if (!lines.length) return base;
   return `${base}\n\n**Sources**\n${lines.join('\n')}`;
+}
+
+function toPublicPlan(plan) {
+  if (!plan || typeof plan !== 'object') return null;
+  return {
+    executionMode: String(plan.executionMode || ''),
+    strategy:      String(plan.strategy || ''),
+    useRag:        !!plan.useRag,
+    useWebSearch:  !!plan.useWebSearch,
+  };
 }
 
 // ── POST /api/atlas/ask ──────────────────────────────────────────────────────
@@ -297,6 +314,7 @@ router.post('/atlas/ask',
           cached: true,
           transactionId,
           webSearch: null,
+          plan: toPublicPlan(executionPlan),
         });
       }
 
@@ -319,7 +337,15 @@ router.post('/atlas/ask',
         webSearchUsed: !!webSearch,
       });
 
-      return res.status(200).json({ success: true, answer: finalAnswer, usage, cached: false, transactionId, webSearch });
+      return res.status(200).json({
+        success: true,
+        answer: finalAnswer,
+        usage,
+        cached: false,
+        transactionId,
+        webSearch,
+        plan: toPublicPlan(executionPlan),
+      });
     } catch (err) {
       return next(err);
     }
@@ -375,7 +401,7 @@ router.post('/atlas/stream',
       if (cached && cached.answer) {
         finalAnswer = cached.answer;
         usage = cachedUsage(resolvedModel);
-        send({ done: finalAnswer, usage, cached: true, transactionId, webSearch: null });
+        send({ done: finalAnswer, usage, cached: true, transactionId, webSearch: null, plan: toPublicPlan(executionPlan) });
         persistTurns(uid, message, finalAnswer, usage);
         console.log('[atlas/stream/cache]', { transactionId, uid, model: usage.model });
         return undefined;
@@ -389,7 +415,7 @@ router.post('/atlas/stream',
         } else if (evt.kind === 'done') {
           finalAnswer = appendWebSources(evt.text, webSearch);
           usage = evt.usage;
-          send({ done: finalAnswer, usage, transactionId, webSearch });
+          send({ done: finalAnswer, usage, transactionId, webSearch, plan: toPublicPlan(executionPlan) });
         }
       }
 

@@ -22,6 +22,18 @@ function requireEnv(name) {
   return value;
 }
 
+function readEnv(name) {
+  const direct = process.env[name];
+  if (direct != null && String(direct).trim() !== '') return direct;
+  // Tolerate accidental whitespace in .env keys (e.g. "FOO = bar").
+  // Some dotenv injectors preserve the key verbatim; we fall back to the trimmed match.
+  try {
+    const match = Object.keys(process.env).find((k) => k && k.trim() === name);
+    if (match) return process.env[match] || '';
+  } catch (_) {}
+  return '';
+}
+
 function normalizeOriginUrl(value, fallback) {
   const raw = String(value || '').trim();
   if (!raw) return fallback;
@@ -56,8 +68,24 @@ const config = {
   },
 
   tavily: {
-    apiKey: process.env.TAVILY_API_KEY || '',
+    apiKey: String(readEnv('TAVILY_API_KEY') || '').trim(),
     baseUrl: process.env.TAVILY_BASE_URL || 'https://api.tavily.com',
+  },
+
+  // ── Keyword search (BM25) backend ────────────────────────────────────────────
+  // Optional. When configured, Atlas can run hybrid retrieval:
+  //   vector (Firestore) + keyword (Meilisearch BM25) fused with RRF.
+  meilisearch: {
+    host: process.env.MEILI_HOST || '',
+    apiKey: process.env.MEILI_API_KEY || '',
+    index: process.env.MEILI_INDEX || 'rag_chunks',
+  },
+
+  // ── Reranker backend (cross-encoder) ────────────────────────────────────────
+  // Optional. Used when rerankerEnabled=true and rerankerProvider='cohere'.
+  cohere: {
+    apiKey: process.env.COHERE_API_KEY || '',
+    baseUrl: process.env.COHERE_BASE_URL || 'https://api.cohere.com',
   },
 
   langsmith: {

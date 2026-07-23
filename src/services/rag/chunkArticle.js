@@ -10,17 +10,53 @@
  *   O — New block types: add a case in blockToText() and the loop below.
  *       Callers (ragStore, orchestrator) never need to change.
  *
- * Strategy: block-level chunking with short-block merging.
- *   • Each content block (heading, paragraph, list, callout) → one chunk.
- *   • Tables (matrix) and code blocks are NEVER split — losing a row or
- *     line would break the semantic unit.
- *   • Blocks shorter than MIN_CHARS are merged into the running buffer
- *     so we don't waste embeddings on stub chunks.
- *   • Each chunk carries articleId + chunkIndex as a "foreign key" back
- *     to its parent article — same role as a DB foreign key.
+ * Strategy: streaming chunk buffer with size + overlap controls.
+ *   • Maintains original block order (headings, paragraphs, lists, etc.)
+ *   • Tables (matrix) and code blocks are NEVER split — losing a row/line
+ *     breaks the semantic unit.
+ *   • A rolling buffer is cut into chunks at ~chunkSize chars, with
+ *     chunkOverlap chars repeated into the next chunk for continuity.
+ *   • Splitter type influences preferred cut boundaries.
  */
 
 const MIN_CHARS = 40; // discard/merge chunks shorter than this
+const DEFAULT_CHUNK_SIZE = 4000;
+const DEFAULT_CHUNK_OVERLAP = 200;
+
+function clampInt(n, min, max) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  const i = Math.trunc(v);
+  if (i < min) return min;
+  if (i > max) return max;
+  return i;
+}
+
+function pickCutIndex(text, limit, splitterType) {
+  const s = String(text || '');
+  const L = Math.max(1, Math.min(Number(limit) || 1, s.length));
+  if (s.length <= L) return s.length;
+
+  const before = s.slice(0, L);
+
+  // Prefer "hard" boundaries first.
+  const hard = ['\n\n', '\n', '. ', '? ', '! ', '; ', ', '];
+  for (const sep of hard) {
+    const idx = before.lastIndexOf(sep);
+    if (idx > MIN_CHARS) return idx + sep.length;
+  }
+
+  // Markdown splitter: try not to cut right before a heading marker.
+  if (String(splitterType || '').toLowerCase() === 'markdown') {
+    const idx = before.lastIndexOf('\n#');
+    if (idx > MIN_CHARS) return idx;
+  }
+
+  // Fallback: cut at last whitespace, else at the limit.
+  const ws = before.lastIndexOf(' ');
+  if (ws > MIN_CHARS) return ws;
+  return L;
+}
 
 /**
  * Extract searchable plain text from a single Firestore article block.
@@ -82,9 +118,39 @@ function chunkArticle(article) {
   const articleTitle = String((article.en && article.en.title) || article.id || '');
   const blocks       = Array.isArray(article.blocks) ? article.blocks : [];
 
+  const opts = arguments.length > 1 ? arguments[1] : null;
+  const chunkSize = clampInt(opts && opts.chunkSize != null ? opts.chunkSize : DEFAULT_CHUNK_SIZE, 500, 8000) || DEFAULT_CHUNK_SIZE;
+  const chunkOverlapRaw = clampInt(opts && opts.chunkOverlap != null ? opts.chunkOverlap : DEFAULT_CHUNK_OVERLAP, 0, 1000) || 0;
+  const chunkOverlap = Math.max(0, Math.min(chunkOverlapRaw, chunkSize - 1));
+  const splitterType = String(opts && opts.splitterType ? opts.splitterType : 'recursive').trim().toLowerCase();
+
   const rawChunks = [];
-  let buffer      = '';
-  let bufferType  = 'paragraph';
+  let buffer = '';
+  let bufferType = 'paragraph';
+
+  function emitBufferChunk(text, type) {
+    const t = String(text || '').trim();
+    if (t.length < MIN_CHARS) return;
+    rawChunks.push({ text: t, blockType: type || 'paragraph' });
+  }
+
+  function flushBuffer() {
+    emitBufferChunk(buffer, bufferType);
+    buffer = '';
+    bufferType = 'paragraph';
+  }
+
+  function cutBufferIfNeeded() {
+    while (buffer.length > chunkSize) {
+      const cut = pickCutIndex(buffer, chunkSize, splitterType);
+      const head = buffer.slice(0, cut);
+      emitBufferChunk(head, bufferType);
+      const keepFrom = Math.max(0, cut - chunkOverlap);
+      buffer = buffer.slice(keepFrom).trimStart();
+      // After a cut, treat buffer as paragraph-like even if it started with a heading.
+      if (bufferType === 'heading') bufferType = 'paragraph';
+    }
+  }
 
   for (const block of blocks) {
     const text = blockToText(block).trim();
@@ -92,48 +158,30 @@ function chunkArticle(article) {
 
     if (!text) continue;
 
-    // ── Structured blocks (table, code): always their own chunk ──────────
     const isStructured = type === 'matrix' || type === 'code';
     if (isStructured) {
-      if (buffer.length >= MIN_CHARS) {
-        rawChunks.push({ text: buffer.trim(), blockType: bufferType });
-        buffer = '';
-      }
-      rawChunks.push({ text, blockType: type });
+      flushBuffer();
+      // Never split structured blocks; keep as a dedicated chunk.
+      emitBufferChunk(text, type);
       continue;
     }
 
-    // ── Headings: always start a new chunk ───────────────────────────────
     if (type === 'heading') {
-      if (buffer.length >= MIN_CHARS) {
-        rawChunks.push({ text: buffer.trim(), blockType: bufferType });
-      }
-      buffer     = text;
+      flushBuffer();
+      const headingText = splitterType === 'markdown' ? `# ${text}` : text;
+      buffer = headingText;
       bufferType = 'heading';
+      cutBufferIfNeeded();
       continue;
     }
 
-    // ── Short text blocks: merge into the running buffer ─────────────────
-    // Prevents embedding a chunk like "See figure 2." in isolation — that
-    // has near-zero information density by itself.
-    if (text.length < MIN_CHARS) {
-      buffer    += (buffer ? ' ' : '') + text;
-      bufferType = bufferType === 'heading' ? 'paragraph' : bufferType;
-      continue;
-    }
-
-    // ── Normal text block: flush buffer, begin new one ───────────────────
-    if (buffer.length >= MIN_CHARS) {
-      rawChunks.push({ text: buffer.trim(), blockType: bufferType });
-    }
-    buffer     = text;
-    bufferType = type;
+    // Normal text blocks: append into the rolling buffer.
+    buffer += (buffer ? '\n\n' : '') + text;
+    bufferType = bufferType || type;
+    cutBufferIfNeeded();
   }
 
-  // Flush the final buffer.
-  if (buffer.trim().length >= MIN_CHARS) {
-    rawChunks.push({ text: buffer.trim(), blockType: bufferType });
-  }
+  flushBuffer();
 
   return rawChunks.map((chunk, index) => ({
     articleId,

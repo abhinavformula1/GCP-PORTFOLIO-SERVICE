@@ -1,0 +1,4 @@
+google-cloud-firestore==2.27.0
+requests==2.32.5
+python-dotenv==1.2.1
+tqdm==4.69.0

@@ -20,6 +20,10 @@ certificate.pem
 
 # Local Python venv used for one-off image processing (not part of app)
 .tools/
+.venv/
+tools/**/.venv/
+tools/**/__pycache__/
+tools/**/.pytest_cache/
 .cursor/rules/no-git-without-permission.mdc
 
 # Playwright test artifacts — generated on test run, never commit

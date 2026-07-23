@@ -7,6 +7,7 @@
  */
 
 import { authedJson, setSectionStatus } from '../../http.js';
+import { state } from '../../state.js';
 
 export const ATLAS_ALL_MODELS = {
   'flash-lite': { label: 'Flash-Lite', detail: 'Gemini 2.5 Flash-Lite · Fast & economical · Default' },
@@ -15,6 +16,8 @@ export const ATLAS_ALL_MODELS = {
 
 /** Exposed so evaluation.js can read thresholds without a second fetch. */
 export let atlasConfig = null;
+let _reindexSource = null;
+let _reindexWired = false;
 
 export async function renderAtlasConfig(els) {
   setSectionStatus(els.atlasConfigStatus, 'Loading…', 'info');
@@ -25,6 +28,7 @@ export async function renderAtlasConfig(els) {
     });
     _wireConfigAccordion();
     _wireConfigInputs();
+    _wireReindex(els);
     _fillForm(els, atlasConfig);
     setSectionStatus(els.atlasConfigStatus, '', '');
   } catch (err) {
@@ -105,7 +109,7 @@ function _fillForm(els, cfg) {
   _syncLinkedInput('atlasTopP');
   _syncLinkedInput('atlasMaxOutputTokens');
   // ② Embedding
-  _setV(els.atlasEmbeddingModel,      'value',   cfg.embeddingModel  || 'gemini-embedding-001');
+  _setV(els.atlasEmbeddingModel,      'value',   cfg.embeddingModel  || 'text-embedding-004');
   _setV(els.atlasEmbeddingDimensions, 'value',   cfg.embeddingDimensions || 768);
   _setV(els.atlasDistanceMetric,      'value',   cfg.distanceMetric  || 'COSINE');
   _setV(els.atlasEmbeddingBatchSize,  'value',   cfg.embeddingBatchSize != null ? cfg.embeddingBatchSize : 5);
@@ -116,8 +120,14 @@ function _fillForm(els, cfg) {
   if (splitterEl) splitterEl.checked = true;
   // ④ Retrieval
   _setV(els.atlasRagEnabled,          'checked', cfg.ragEnabled === true);
-  _setV(els.atlasHybridSearch,        'checked', cfg.hybridSearch === true);
-  _setV(els.atlasReranker,            'checked', cfg.reranker === true);
+  _setV(els.atlasHybridSearch,        'checked', cfg.hybridSearchEnabled === true);
+  _setV(els.atlasReranker,            'checked', cfg.rerankerEnabled === true);
+  _setV(els.atlasKeywordSearchProvider,'value',  cfg.keywordSearchProvider || 'none');
+  _setV(els.atlasFusionStrategy,      'value',   cfg.fusionStrategy || 'rrf');
+  _setV(els.atlasRrfK,                'value',   cfg.rrfK != null ? cfg.rrfK : 60);
+  _setV(els.atlasRerankerProvider,    'value',   cfg.rerankerProvider || 'none');
+  _setV(els.atlasRerankerModel,       'value',   cfg.rerankerModel || 'rerank-v3.5');
+  _setV(els.atlasRerankerTopN,        'value',   cfg.rerankerTopN != null ? cfg.rerankerTopN : 30);
   _setV(els.atlasRagTopK,             'value',   cfg.ragTopK    != null ? cfg.ragTopK    : 5);
   _setV(els.atlasSimilarityThreshold, 'value',   cfg.similarityThreshold != null ? cfg.similarityThreshold : 0);
   // ⑤ Prompt
@@ -159,7 +169,7 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
     maxOutputTokens:      _n(els.atlasMaxOutputTokens,       900),
     streamingEnabled:     _c(els.atlasStreamingEnabled,      true),
     modelSelectorVisible: _c(els.atlasModelSelectorVisible,  true),
-    embeddingModel:       _g(els.atlasEmbeddingModel,        'value')  || 'gemini-embedding-001',
+    embeddingModel:       _g(els.atlasEmbeddingModel,        'value')  || 'text-embedding-004',
     embeddingDimensions:  _n(els.atlasEmbeddingDimensions,   768),
     distanceMetric:       _g(els.atlasDistanceMetric,        'value')  || 'COSINE',
     embeddingBatchSize:   _n(els.atlasEmbeddingBatchSize,    5),
@@ -167,8 +177,14 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
     chunkOverlap:         _n(els.atlasChunkOverlap,          200),
     splitterType:         splitterRadio ? splitterRadio.value : 'recursive',
     ragEnabled:           _c(els.atlasRagEnabled,            false),
-    hybridSearch:         _c(els.atlasHybridSearch,          false),
-    reranker:             _c(els.atlasReranker,              false),
+    hybridSearchEnabled:  _c(els.atlasHybridSearch,          false),
+    rerankerEnabled:      _c(els.atlasReranker,              false),
+    keywordSearchProvider:_g(els.atlasKeywordSearchProvider, 'value') || 'none',
+    fusionStrategy:       _g(els.atlasFusionStrategy,        'value') || 'rrf',
+    rrfK:                 _n(els.atlasRrfK,                  60),
+    rerankerProvider:     _g(els.atlasRerankerProvider,      'value') || 'none',
+    rerankerModel:        _g(els.atlasRerankerModel,         'value') || 'rerank-v3.5',
+    rerankerTopN:         _n(els.atlasRerankerTopN,          30),
     ragTopK:              _n(els.atlasRagTopK,               5),
     similarityThreshold:  _n(els.atlasSimilarityThreshold,   0),
     systemPrompt:         (_g(els.atlasSystemPrompt,         'value') || '').trim(),
@@ -193,6 +209,61 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
     contentModeration:    _c(els.atlasContentModeration,     false),
     rateLimitPerMinute:   _n(els.atlasRateLimitPerMinute,    20),
   };
+}
+
+function _wireReindex(els) {
+  if (_reindexWired) return;
+  if (!els || !els.atlasRagReindexBtn) return;
+  _reindexWired = true;
+
+  els.atlasRagReindexBtn.addEventListener('click', function () {
+    const credential = state && state.credential ? state.credential : '';
+    if (!credential) {
+      if (els.atlasRagReindexStatus) els.atlasRagReindexStatus.textContent = 'Not signed in.';
+      return;
+    }
+
+    if (_reindexSource) { _reindexSource.close(); _reindexSource = null; }
+    els.atlasRagReindexBtn.disabled = true;
+    if (els.atlasRagReindexStatus) els.atlasRagReindexStatus.textContent = 'Connecting…';
+
+    const source = new EventSource('/api/admin/atlas/rag-reindex?token=' + encodeURIComponent(credential));
+    _reindexSource = source;
+
+    source.onopen = function () {
+      if (els.atlasRagReindexStatus) els.atlasRagReindexStatus.textContent = 'Starting…';
+    };
+
+    source.addEventListener('progress', function (evt) {
+      try {
+        const d = JSON.parse(evt.data);
+        const title = d && d.title ? String(d.title) : (d && d.articleId ? String(d.articleId) : '');
+        const extra = d && typeof d.indexedChunks === 'number' ? ` (${d.indexedChunks} chunks)` : '';
+        if (els.atlasRagReindexStatus) {
+          els.atlasRagReindexStatus.textContent = `Reindexing ${d.index}/${d.total}: ${title}${extra}`;
+        }
+      } catch (_) {}
+    });
+
+    source.addEventListener('error', function (evt) {
+      let msg = 'Reindex failed.';
+      try { msg = JSON.parse(evt.data).message || msg; } catch (_) {}
+      if (els.atlasRagReindexStatus) els.atlasRagReindexStatus.textContent = msg;
+    });
+
+    source.addEventListener('done', function () {
+      source.close(); _reindexSource = null;
+      if (els.atlasRagReindexStatus) els.atlasRagReindexStatus.textContent = 'Reindex complete.';
+      els.atlasRagReindexBtn.disabled = false;
+    });
+
+    source.onerror = function () {
+      if (source.readyState === EventSource.CLOSED) {
+        source.close(); _reindexSource = null;
+        els.atlasRagReindexBtn.disabled = false;
+      }
+    };
+  });
 }
 
 function _wireConfigAccordion() {

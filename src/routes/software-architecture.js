@@ -706,6 +706,12 @@ router.put('/admin/atlas/config', requireAdmin, [
   body('hybridSearchEnabled').optional().isBoolean(),
   body('rerankerEnabled').optional().isBoolean(),
   body('similarityThreshold').optional().isFloat({ min: 0, max: 1 }),
+  body('keywordSearchProvider').optional().isIn(['none', 'meilisearch']),
+  body('fusionStrategy').optional().isIn(['rrf']),
+  body('rrfK').optional().isInt({ min: 1, max: 200 }),
+  body('rerankerProvider').optional().isIn(['none', 'cohere']),
+  body('rerankerModel').optional().isString().isLength({ min: 1, max: 60 }),
+  body('rerankerTopN').optional().isInt({ min: 5, max: 100 }),
   // Prompt
   body('guardrailsEnabled').optional().isBoolean(),
   body('conversationMemoryTurns').optional().isInt({ min: 0, max: 20 }),
@@ -762,6 +768,12 @@ router.put('/admin/atlas/config', requireAdmin, [
       hybridSearchEnabled:      b.hybridSearchEnabled  != null ? toBool(b.hybridSearchEnabled)  : undefined,
       rerankerEnabled:          b.rerankerEnabled      != null ? toBool(b.rerankerEnabled)      : undefined,
       similarityThreshold:      b.similarityThreshold  != null ? Number(b.similarityThreshold)  : undefined,
+      keywordSearchProvider:    b.keywordSearchProvider,
+      fusionStrategy:           b.fusionStrategy,
+      rrfK:                     b.rrfK != null ? Number(b.rrfK) : undefined,
+      rerankerProvider:         b.rerankerProvider,
+      rerankerModel:            b.rerankerModel,
+      rerankerTopN:             b.rerankerTopN != null ? Number(b.rerankerTopN) : undefined,
       // Prompt
       systemPrompt:             typeof b.systemPrompt === 'string' ? b.systemPrompt : undefined,
       guardrailsEnabled:        b.guardrailsEnabled    != null ? toBool(b.guardrailsEnabled)    : undefined,
@@ -953,6 +965,64 @@ router.get('/admin/atlas/rag-eval', requireAdminAccess({ allowQueryToken: true, 
     send('result', { metrics, details, passed, savedRun });
   } catch (err) {
     send('error', { message: err.message || 'Evaluation failed.' });
+  } finally {
+    send('done', {});
+    res.end();
+  }
+});
+
+// ── RAG Reindex SSE endpoint ────────────────────────────────────────────────
+//
+// GET /api/admin/atlas/rag-reindex?token=<idToken>
+//
+// Streams progress while re-indexing all published articles using the
+// current Atlas chunking + embedding configuration.
+//
+//   progress  { index, total, articleId, title, indexedChunks }
+//   done      {}
+//   error     { message }
+//
+router.get('/admin/atlas/rag-reindex', requireAdminAccess({ allowQueryToken: true, allowHeaderToken: false }), async (req, res) => {
+  res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const send = (eventName, data) => {
+    res.write(`event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  let aborted = false;
+  req.on('close', function () { aborted = true; });
+
+  try {
+    const articles = await articlesRepository.listPublishedArticles();
+    const total = Array.isArray(articles) ? articles.length : 0;
+    if (!total) {
+      send('done', {});
+      res.end();
+      return;
+    }
+
+    for (let i = 0; i < articles.length; i++) {
+      if (aborted) break;
+      const a = articles[i];
+      try {
+        const out = await indexArticle(a);
+        send('progress', {
+          index: i + 1,
+          total,
+          articleId: a && a.id ? String(a.id) : '',
+          title: a && a.en && a.en.title ? String(a.en.title) : '',
+          indexedChunks: out && typeof out.indexed === 'number' ? out.indexed : null,
+        });
+      } catch (oneErr) {
+        send('error', { message: `Reindex failed for ${a && a.id ? a.id : 'article'}: ${oneErr.message || 'error'}` });
+      }
+    }
+  } catch (err) {
+    send('error', { message: err.message || 'Reindex failed.' });
   } finally {
     send('done', {});
     res.end();

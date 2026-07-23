@@ -10,25 +10,37 @@
  *   L — Contract: (text: string) => Promise<number[]>.  Any function satisfying
  *       this signature is a valid drop-in replacement.
  *
- * Uses Google's text-embedding-004 model via the Gemini v1beta endpoint.
- * The returned vector has 768 dimensions and is suitable for cosine similarity.
+ * Uses Google's embedding models via the Gemini v1beta endpoint.
+ * Model + output dimensionality are provided at runtime from Atlas config.
  */
 
 const config = require('../../config');
 
 const EMBED_API_BASE   = 'https://generativelanguage.googleapis.com/v1beta/models';
-const EMBED_MODEL      = 'gemini-embedding-001';
 const EMBED_TIMEOUT_MS = 10_000;
 const MAX_TEXT_CHARS   = 8_000; // stay well within the 2 048-token model limit
+
+const DEFAULT_MODEL = 'text-embedding-004';
+const DEFAULT_DIMS  = 768;
+
+function clampInt(n, min, max) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  const i = Math.trunc(v);
+  if (i < min) return min;
+  if (i > max) return max;
+  return i;
+}
 
 /**
  * Convert a string into a dense vector embedding.
  *
  * @param {string} text  Plain text to embed (will be trimmed + capped).
- * @returns {Promise<number[]>}  768-dimensional float vector.
+ * @param {{ model?: string, outputDimensionality?: number }} [opts]
+ * @returns {Promise<number[]>}  Dense float vector (dims depend on model/options).
  * @throws {Error}  If the API key is absent or the upstream call fails.
  */
-async function embedText(text) {
+async function embedText(text, opts) {
   if (!config.gemini.apiKey) {
     const err = new Error('Gemini API key missing — embedText is disabled.');
     err.code          = 'EMBED_DISABLED';
@@ -36,6 +48,9 @@ async function embedText(text) {
     err.isOperational = true;
     throw err;
   }
+
+  const model = String(opts && opts.model ? opts.model : DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+  const dims  = clampInt(opts && opts.outputDimensionality != null ? opts.outputDimensionality : DEFAULT_DIMS, 1, 2048) || DEFAULT_DIMS;
 
   const safeText = String(text || '').trim().slice(0, MAX_TEXT_CHARS);
   if (!safeText) {
@@ -50,16 +65,15 @@ async function embedText(text) {
   let res;
   try {
     res = await fetch(
-      `${EMBED_API_BASE}/${EMBED_MODEL}:embedContent?key=${config.gemini.apiKey}`,
+      `${EMBED_API_BASE}/${encodeURIComponent(model)}:embedContent?key=${config.gemini.apiKey}`,
       {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          model:             `models/${EMBED_MODEL}`,
+          model:             `models/${model}`,
           content:           { parts: [{ text: safeText }] },
-          // Reduce from 3072 → 768 dims — stays well within Firestore's
-          // 2048-dimension limit while retaining high semantic quality.
-          outputDimensionality: 768,
+          // Firestore vector fields cap at 2048 dimensions.
+          outputDimensionality: dims,
         }),
         signal: controller.signal,
       }

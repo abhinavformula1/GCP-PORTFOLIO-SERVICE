@@ -1341,6 +1341,30 @@
                 <input id="atlasEmbeddingBatchSize" type="number" min="1" max="50" step="1" placeholder="5" />
               </label>
             </div>
+
+            <div class="sd-ai-field-row sd-ai-field-row-3" style="margin-top:12px">
+              <label class="sd-seo-field">
+                <span>Vector Store <span class="sd-ai-hint">(read-only)</span></span>
+                <input type="text" readonly value="Firestore" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Collection <span class="sd-ai-hint">(read-only)</span></span>
+                <input type="text" readonly value="rag_chunks" />
+              </label>
+              <label class="sd-seo-field">
+                <span>Vector Field <span class="sd-ai-hint">(read-only)</span></span>
+                <input type="text" readonly value="embedding" />
+              </label>
+            </div>
+
+            <div class="sd-seo-toggle-row" style="margin-top:14px">
+              <div class="sd-seo-toggle-info">
+                <strong>Reindex published articles</strong>
+                <span>Apply chunking/embedding changes to the knowledge base.</span>
+              </div>
+              <button type="button" id="atlasRagReindexBtn" class="sd-admin-primary">Reindex</button>
+            </div>
+            <p class="sd-seo-field-hint" id="atlasRagReindexStatus" style="margin-top:10px"></p>
           </div>
         </details>
 
@@ -1431,6 +1455,46 @@
                   <span class="sd-toggle-slider"></span>
                 </label>
               </div>
+            </div>
+            <div class="sd-ai-field-row sd-ai-field-row-3" style="margin-top:12px">
+              <label class="sd-seo-field">
+                <span>Keyword Backend <span class="sd-ai-hint">(BM25)</span></span>
+                <select id="atlasKeywordSearchProvider">
+                  <option value="none" data-icon="block" data-description="Vector-only search (Firestore).">None</option>
+                  <option value="meilisearch" data-icon="manage_search" data-description="Meilisearch BM25 keyword index + vector fusion.">Meilisearch</option>
+                </select>
+              </label>
+              <label class="sd-seo-field">
+                <span>Fusion <span class="sd-ai-hint">(Hybrid)</span></span>
+                <select id="atlasFusionStrategy">
+                  <option value="rrf" data-icon="merge" data-description="Reciprocal Rank Fusion — robust rank-based fusion across retrievers.">RRF</option>
+                </select>
+              </label>
+              <label class="sd-seo-field">
+                <span>RRF K <span class="sd-ai-hint">(1 – 200)</span></span>
+                <input id="atlasRrfK" type="number" min="1" max="200" step="1" placeholder="60" />
+              </label>
+            </div>
+            <div class="sd-ai-field-row sd-ai-field-row-3" style="margin-top:12px">
+              <label class="sd-seo-field">
+                <span>Reranker Provider</span>
+                <select id="atlasRerankerProvider">
+                  <option value="none" data-icon="block" data-description="No reranking. Uses fused/vector rank order.">None</option>
+                  <option value="cohere" data-icon="swap_vert" data-description="Cohere cross-encoder rerank (requires COHERE_API_KEY).">Cohere</option>
+                </select>
+              </label>
+              <label class="sd-seo-field">
+                <span>Reranker Model</span>
+                <select id="atlasRerankerModel">
+                  <option value="rerank-v3.5" data-icon="bolt" data-description="Good quality rerank model.">rerank-v3.5</option>
+                  <option value="rerank-v4.0-fast" data-icon="speed" data-description="Lower-latency rerank model.">rerank-v4.0-fast</option>
+                  <option value="rerank-v4.0-pro" data-icon="auto_awesome" data-description="Higher-quality rerank model.">rerank-v4.0-pro</option>
+                </select>
+              </label>
+              <label class="sd-seo-field">
+                <span>Rerank Top-N <span class="sd-ai-hint">(5 – 100)</span></span>
+                <input id="atlasRerankerTopN" type="number" min="5" max="100" step="1" placeholder="30" />
+              </label>
             </div>
             <div class="sd-ai-field-row sd-ai-field-row-2">
               <label class="sd-seo-field">
