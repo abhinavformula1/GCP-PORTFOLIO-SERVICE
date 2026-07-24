@@ -723,6 +723,7 @@ router.put('/admin/atlas/config', requireAdmin, [
   body('faithfulnessThreshold').optional().isFloat({ min: 0, max: 1 }),
   // Observability
   body('tracingEnabled').optional().isBoolean(),
+  body('langsmithTracingEnabled').optional().isBoolean(),
   body('capturePrompts').optional().isBoolean(),
   body('captureChunks').optional().isBoolean(),
   body('captureTokens').optional().isBoolean(),
@@ -787,10 +788,10 @@ router.put('/admin/atlas/config', requireAdmin, [
       faithfulnessThreshold:    b.faithfulnessThreshold != null ? Number(b.faithfulnessThreshold) : undefined,
       // Observability
       tracingEnabled:           b.tracingEnabled       != null ? toBool(b.tracingEnabled)       : undefined,
+      langsmithTracingEnabled:  b.langsmithTracingEnabled != null ? toBool(b.langsmithTracingEnabled) : undefined,
       capturePrompts:           b.capturePrompts       != null ? toBool(b.capturePrompts)       : undefined,
       captureChunks:            b.captureChunks        != null ? toBool(b.captureChunks)        : undefined,
       captureTokens:            b.captureTokens        != null ? toBool(b.captureTokens)        : undefined,
-      langsmithTracingEnabled:  b.langsmithTracingEnabled != null ? toBool(b.langsmithTracingEnabled) : undefined,
       // Cost
       budgetCapInr:             b.budgetCapInr         != null ? Number(b.budgetCapInr)         : undefined,
       dailyBudgetCapInr:        b.dailyBudgetCapInr    != null ? Number(b.dailyBudgetCapInr)    : undefined,

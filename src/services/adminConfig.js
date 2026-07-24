@@ -151,7 +151,9 @@ const DEFAULT_ATLAS_CONFIG = {
   // ── 6. Model Routing ─────────────────────────────────────────────────────
   executionMode:            'single-agent',   // pure-model | single-agent | multiagent
   routingStrategy:          'default',         // default | rule-based | classifier
-  routingFallbackModel:     'flash-lite',
+  // If the default (Flash‑Lite) hits the free-tier request ceiling, auto-fallback
+  // to Flash so the assistant stays usable.
+  routingFallbackModel:     'flash',
   webSearchEnabled:         true,
   webSearchMode:            'web-intent',      // disabled | web-intent | always
   webSearchMaxResults:      5,
@@ -181,7 +183,12 @@ const DEFAULT_ATLAS_CONFIG = {
   contentModerationEnabled: false,
 
   // ── UI ───────────────────────────────────────────────────────────────────
-  modelSelectorVisible:     true,
+  // Hide model selection in the public chat UI by default. The backend chooses
+  // the default model; admins can explicitly enable the picker if desired.
+  modelSelectorVisible:     false,
+
+  // Env vars supply credentials; this flag allows runtime enable/disable
+  // without redeploying Cloud Run.
 };
 
 function _num(val, def)  { return typeof val === 'number' ? val : def; }
@@ -245,10 +252,10 @@ async function getAtlasConfig() {
       faithfulnessThreshold:    _num(d.faithfulnessThreshold,    D.faithfulnessThreshold),
       // Observability
       tracingEnabled:           _bool(d.tracingEnabled,          D.tracingEnabled),
+      langsmithTracingEnabled:  _bool(d.langsmithTracingEnabled, D.langsmithTracingEnabled),
       capturePrompts:           _bool(d.capturePrompts,          D.capturePrompts),
       captureChunks:            _bool(d.captureChunks,           D.captureChunks),
       captureTokens:            _bool(d.captureTokens,           D.captureTokens),
-      langsmithTracingEnabled:  _bool(d.langsmithTracingEnabled, D.langsmithTracingEnabled),
       // Cost
       budgetCapInr:             _num(d.budgetCapInr,             D.budgetCapInr),
       dailyBudgetCapInr:        _num(d.dailyBudgetCapInr,        D.dailyBudgetCapInr),
@@ -322,10 +329,10 @@ async function upsertAtlasConfig(cfg) {
     faithfulnessThreshold:    _num(cfg.faithfulnessThreshold,    D.faithfulnessThreshold),
     // Observability
     tracingEnabled:           _bool(cfg.tracingEnabled,          D.tracingEnabled),
+    langsmithTracingEnabled:  _bool(cfg.langsmithTracingEnabled, D.langsmithTracingEnabled),
     capturePrompts:           _bool(cfg.capturePrompts,          D.capturePrompts),
     captureChunks:            _bool(cfg.captureChunks,           D.captureChunks),
     captureTokens:            _bool(cfg.captureTokens,           D.captureTokens),
-    langsmithTracingEnabled:  _bool(cfg.langsmithTracingEnabled, D.langsmithTracingEnabled),
     // Cost
     budgetCapInr:             _num(cfg.budgetCapInr,             D.budgetCapInr),
     dailyBudgetCapInr:        _num(cfg.dailyBudgetCapInr,        D.dailyBudgetCapInr),

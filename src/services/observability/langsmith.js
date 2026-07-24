@@ -5,10 +5,23 @@ const { traceable } = require('langsmith/traceable');
 const warnedTraceFallbacks = new Set();
 
 let _runtimeTracingEnabled = false;
+let _runtimeCapturePrompts = false;
+let _runtimeCaptureChunks = false;
+let _runtimeCaptureTokens = true;
 
 function setLangSmithRuntimeEnabled(enabled) {
   _runtimeTracingEnabled = enabled === true;
 }
+
+function setLangSmithCapturePolicy({ capturePrompts, captureChunks, captureTokens } = {}) {
+  if (capturePrompts != null) _runtimeCapturePrompts = capturePrompts === true;
+  if (captureChunks != null)  _runtimeCaptureChunks  = captureChunks === true;
+  if (captureTokens != null)  _runtimeCaptureTokens  = captureTokens !== false;
+}
+
+function shouldCapturePrompts() { return _runtimeCapturePrompts === true; }
+function shouldCaptureChunks()  { return _runtimeCaptureChunks === true; }
+function shouldCaptureTokens()  { return _runtimeCaptureTokens !== false; }
 
 function isLangSmithEnabled() {
   const envReady = !!(config.langsmith.apiKey && config.langsmith.tracingEnabled);
@@ -78,18 +91,28 @@ function summarizeWebSearchMeta(webSearch) {
 
 function summarizeStreamEvents(events) {
   if (!Array.isArray(events) || events.length === 0) {
-    return { chunkCount: 0, usage: null, finalAnswerChars: 0 };
+    return { chunkCount: 0, usage: null, finalAnswerChars: 0, finalAnswerPreview: '', finalAnswer: '' };
   }
   let chunkCount = 0;
   let usage = null;
   let finalAnswerChars = 0;
+  let finalText = '';
   events.forEach(function (evt) {
     if (!evt || typeof evt !== 'object') return;
     if (evt.kind === 'chunk' && typeof evt.text === 'string') chunkCount += 1;
     if (evt.kind === 'usage' && evt.usage) usage = summarizeUsage(evt.usage);
-    if (evt.kind === 'done' && typeof evt.text === 'string') finalAnswerChars = evt.text.length;
+    if (evt.kind === 'done' && typeof evt.text === 'string') {
+      finalAnswerChars = evt.text.length;
+      finalText = evt.text;
+    }
   });
-  return { chunkCount, usage, finalAnswerChars };
+  return {
+    chunkCount,
+    usage,
+    finalAnswerChars,
+    finalAnswerPreview: previewText(finalText, 600),
+    finalAnswer: shouldCapturePrompts() ? String(finalText || '') : '',
+  };
 }
 
 function isPromiseLike(value) {
@@ -194,6 +217,10 @@ function traceIfEnabled(fn, traceConfig) {
 module.exports = {
   isLangSmithEnabled,
   setLangSmithRuntimeEnabled,
+  setLangSmithCapturePolicy,
+  shouldCapturePrompts,
+  shouldCaptureChunks,
+  shouldCaptureTokens,
   previewText,
   maskIdentifier,
   summarizeUsage,

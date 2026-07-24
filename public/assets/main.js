@@ -60,7 +60,7 @@ import {
   toggleChatTeaser,
   resetChatState, applyGoogleProfileToChat,
   initChat,
-} from './chat/chat.js?v=2026-07-23-tools-1';
+} from './chat/chat.js?v=2026-07-25-routing-note-v1';
 import {
   refreshRecommendations, updateRecommendationCta,
   openLeaveRecommendation, closeLeaveRecommendation,

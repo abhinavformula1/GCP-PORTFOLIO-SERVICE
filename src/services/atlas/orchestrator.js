@@ -24,6 +24,19 @@ const {
   toPublicWebSearchMeta,
 } = require('../tavily/search');
 
+function looksLikePortfolioOrArticleQuery(text) {
+  const t = String(text || '').toLowerCase();
+  if (!t) return false;
+  return /\b(atlas|portfolio|system design|architecture|case study|article|firestore|cloud run|gcp|salesforce|rag|retrieval|embedding|vector)\b/.test(t);
+}
+
+function shouldUseRag(userMessage, atlasCfg, { useWebSearch } = {}) {
+  if (!(atlasCfg && atlasCfg.ragEnabled === true)) return false;
+  // If the intent is clearly external/live web, avoid mixing RAG into the plan/tag.
+  if (useWebSearch && !looksLikePortfolioOrArticleQuery(userMessage)) return false;
+  return looksLikePortfolioOrArticleQuery(userMessage);
+}
+
 function buildGenerationConfig(atlasCfg) {
   const cfg = atlasCfg && typeof atlasCfg === 'object' ? atlasCfg : {};
   const generationConfig = {};
@@ -82,7 +95,7 @@ function buildExecutionPlan(userMessage, atlasCfg) {
   }
 
   const useWebSearch = shouldUseWebSearch(userMessage, cfg);
-  const useRag = !!(cfg && cfg.ragEnabled);
+  const useRag = shouldUseRag(userMessage, cfg, { useWebSearch });
 
   if (executionMode === 'multiagent') {
     const plan = Object.assign({}, common, {
@@ -115,7 +128,8 @@ async function loadRuntimeConfig() {
 async function buildCallConfig(userMessage, atlasCfg, executionPlan) {
   try {
     const cfg = atlasCfg || await loadRuntimeConfig();
-    const plan = executionPlan || buildExecutionPlan(userMessage, cfg);
+    const plan0 = executionPlan || buildExecutionPlan(userMessage, cfg);
+    const plan = Object.assign({}, plan0);
     const generationConfig = buildGenerationConfig(cfg);
     const basePrompt = resolveBasePrompt(cfg);
 
@@ -146,9 +160,13 @@ async function buildCallConfig(userMessage, atlasCfg, executionPlan) {
           baseSystemPrompt: promptBase,
           atlasCfg: cfg,
         });
+        if (systemPrompt === promptBase) {
+          plan.useRag = false;
+        }
       } catch (ragErr) {
         console.warn('[atlas/rag] RAG context failed, falling back to base prompt:', ragErr.message);
         systemPrompt = promptBase;
+        plan.useRag = false;
       }
     } else {
       systemPrompt = promptBase !== SYSTEM_PROMPT ? promptBase : undefined;

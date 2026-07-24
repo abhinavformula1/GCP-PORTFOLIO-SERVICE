@@ -4138,7 +4138,7 @@ figure.sd-image-block figcaption {
 .ga-msg-user { justify-content: flex-end; }
 
 .ga-bubble {
-  max-width: 80%;
+  max-width: 70%;
   padding: 10px 14px;
   border-radius: 12px;
   font-size: 13.5px;
@@ -5049,7 +5049,7 @@ figure.sd-image-block figcaption {
 
 /* Bubbles */
 .ga-bubble {
-  max-width: 80%;
+  max-width: 70%;
   padding: 12px 14px;
   font-size: 14px;
   line-height: 1.62;
@@ -5074,7 +5074,7 @@ figure.sd-image-block figcaption {
   grid-template-columns: 14px minmax(0, max-content);
   align-items: start;
   column-gap: 0;
-  row-gap: 8px;
+  row-gap: 4px;
 }
 .ga-msg-bot::before {
   content: '';
@@ -5092,13 +5092,29 @@ figure.sd-image-block figcaption {
   grid-column: 1;
   grid-row: 1;
 }
+/* First message in the thread: avoid the "pulled up" avatar look */
+.ga-messages > .ga-msg-bot:first-child::before {
+  margin-top: 0;
+}
+/* First message in the thread: keep the same right edge as other bot bubbles */
+.ga-messages > .ga-msg-bot:first-child {
+  grid-template-columns: 14px 1fr;
+  margin-top: 10px; /* ensure avatar isn't clipped by scroll container */
+}
+.ga-messages > .ga-msg-bot:first-child .ga-bubble-bot {
+  /* Align with other bot bubbles (including error bubble) */
+  width: 70%;
+  max-width: 70%;
+}
 /* Make room for the avatar overlap inside the bubble */
 .ga-msg-bot .ga-bubble-bot {
   grid-column: 2;
   grid-row: 1;
   width: fit-content;
   padding-left: 28px;
+  padding-right: 46px; /* room for copy button */
   border-top-left-radius: 28px;
+  position: relative;
 }
 /* Hide the avatar on subsequent bot messages in a sequence — only the
    first bot bubble in a group shows Atlas, like Slack/Aura. */
@@ -5964,7 +5980,10 @@ figure.sd-image-block figcaption {
   margin-top: 10px;
 }
 .ga-atlas-source-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 8px 10px;
   border-radius: 12px;
   border: 1px solid rgba(231, 238, 248, 1);
@@ -5975,12 +5994,237 @@ figure.sd-image-block figcaption {
   line-height: 1.35;
   text-decoration: none;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ga-atlas-source-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ga-atlas-source-badge {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(231, 238, 248, 1);
+  background: rgba(255, 255, 255, 0.92);
+  color: #6f7f8f;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1;
 }
 .ga-atlas-source-item:hover {
   border-color: rgba(11, 114, 217, 0.35);
   background: rgba(224, 240, 255, 0.9);
+}
+
+/* ── Compact Sources (Meta/Google-style) ─────────────────────────────────── */
+.ga-atlas-sources-compact {
+  grid-column: 2;
+  grid-row: 3;
+  width: auto;
+  max-width: 80%;
+  justify-self: start;
+  box-sizing: border-box;
+  margin: 6px 0 0 0;
+  position: relative;
+  z-index: 3;
+}
+.ga-atlas-sources-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(231, 238, 248, 1);
+  background: rgba(255, 255, 255, 0.92);
+  color: #27405f;
+  cursor: pointer;
+  position: relative;
+  z-index: 4;
+}
+.ga-atlas-sources-toggle-label {
+  font-size: 11px;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+.ga-atlas-sources-toggle-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+  overflow: hidden;
+}
+.ga-atlas-source-badge--compact {
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(231, 238, 248, 1);
+  background: rgba(237, 245, 255, 0.75);
+  color: #4b5563;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ga-atlas-source-badge--muted {
+  background: rgba(255, 255, 255, 0.92);
+  color: #6f7f8f;
+}
+.ga-atlas-sources-toggle-icon {
+  flex: 0 0 auto;
+  font-family: 'Material Symbols Outlined';
+  font-size: 18px;
+  line-height: 1;
+  color: #6f7f8f;
+}
+
+.ga-atlas-sources-popover {
+  grid-column: 2;
+  grid-row: 4;
+  width: auto;
+  max-width: 80%;
+  justify-self: start;
+  margin: 8px 0 0 0;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid #e7eef8;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.10);
+  box-sizing: border-box;
+  position: relative;
+  z-index: 5;
+}
+.ga-atlas-sources-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ga-atlas-sources-popover-head strong {
+  font-size: 11px;
+  font-weight: 900;
+  color: #27405f;
+}
+.ga-atlas-sources-popover-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Material Symbols Outlined';
+  font-size: 18px;
+  color: #6f7f8f;
+  padding: 4px;
+}
+.ga-atlas-sources-popover-list {
+  display: grid;
+  gap: 8px;
+}
+.ga-atlas-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(231, 238, 248, 1);
+  background: rgba(237, 245, 255, 0.55);
+  color: #0b3a6a;
+  text-decoration: none;
+}
+.ga-atlas-source-row:hover {
+  border-color: rgba(11, 114, 217, 0.35);
+  background: rgba(224, 240, 255, 0.85);
+}
+
+/* Inline source pills (inside the answer bubble) */
+.ga-atlas-inline-source-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(231, 238, 248, 1);
+  background: rgba(255, 255, 255, 0.92);
+  color: #27405f;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1;
+  text-decoration: none;
+  vertical-align: middle;
+  margin: 0 2px;
+}
+.ga-bubble.ga-md a.ga-atlas-inline-source-pill,
+.ga-bubble.ga-md a.ga-atlas-inline-source-pill:visited {
+  color: #27405f !important;
+  text-decoration: none !important;
+}
+.ga-atlas-inline-source-pill:hover {
+  border-color: rgba(11, 114, 217, 0.35);
+  background: rgba(224, 240, 255, 0.9);
+}
+.ga-bubble.ga-md a.ga-atlas-inline-source-pill:hover {
+  color: #27405f !important;
+  text-decoration: none !important;
+}
+
+.ga-atlas-inline-source-tooltip {
+  position: fixed;
+  z-index: 9999;
+  width: min(340px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(17, 24, 39, 0.96);
+  color: #e5e7eb;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+/* Countdown inside rate-limit error bubbles */
+.ga-atlas-countdown-wrap {
+  font-weight: 750;
+}
+.ga-atlas-countdown {
+  font-variant-numeric: tabular-nums;
+}
+.ga-atlas-countdown--done {
+  opacity: 0.9;
+}
+.ga-atlas-inline-source-tooltip-top {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+.ga-atlas-inline-source-tooltip-title {
+  font-size: 13px;
+  font-weight: 850;
+  color: #ffffff;
+  line-height: 1.25;
+}
+.ga-atlas-inline-source-tooltip-host {
+  font-size: 11px;
+  color: rgba(229, 231, 235, 0.75);
+}
+.ga-atlas-inline-source-tooltip-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 750;
+  width: fit-content;
+}
+.ga-atlas-inline-source-tooltip-link:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .ga-atlas-usage {
@@ -5991,10 +6235,10 @@ figure.sd-image-block figcaption {
   grid-column: 2;
   grid-row: 4;
   width: auto;
-  max-width: 80%;
+  max-width: 70%;
   justify-self: start;
   box-sizing: border-box;
-  margin: 8px 0 0 0;
+  margin: 4px 0 0 0;
   padding: 10px 14px;
   border-radius: 16px;
   border: 1px solid #f0d3b4;
@@ -6003,6 +6247,8 @@ figure.sd-image-block figcaption {
   font-size: 10.5px;
   line-height: 1.35;
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+  position: relative;
+  z-index: 1;
 }
 .ga-atlas-usage-item {
   color: #6b7280;
@@ -6056,6 +6302,48 @@ figure.sd-image-block figcaption {
   background: #fdecec !important;
   color: #8c1e1e !important;
   border: 1px solid #f4c2c2;
+}
+/* Error bubbles should align with "full" bot bubble width */
+.ga-msg-bot .ga-bubble-error {
+  width: 70%;
+  max-width: 70%;
+}
+
+/* Copy button (bot bubbles) */
+.ga-bubble-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(165, 199, 240, 0.9);
+  background: rgba(255, 255, 255, 0.98);
+  color: #27405f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.9;
+  transform: translateY(-2px);
+  transition: opacity 140ms ease, transform 140ms ease, background 140ms ease;
+  z-index: 3;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+.ga-msg-bot:hover .ga-bubble-copy-btn,
+.ga-msg-bot:focus-within .ga-bubble-copy-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+.ga-bubble-copy-btn:hover {
+  background: rgba(255, 255, 255, 1);
+}
+.ga-bubble-copy-btn--copied {
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #166534;
+}
+@media (hover: none) {
+  .ga-bubble-copy-btn { opacity: 0.95; transform: none; }
 }
 
 /* ── Markdown render output (.ga-md inside .ga-bubble-bot) ────────── */
