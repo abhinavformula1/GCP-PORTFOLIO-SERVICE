@@ -27,6 +27,7 @@ const {
   summarizeGenerationConfig,
   summarizeUsage,
   summarizeStreamEvents,
+  shouldCapturePrompts,
 } = require('../observability/langsmith');
 const { AppError } = require('../../errors');
 
@@ -95,8 +96,21 @@ function normaliseModel(model) {
 
 
 function isQuotaError(err) {
+  if (err && Number(err.upstreamStatus) === 429) return true;
   const text = String(err && (err.upstream || err.message) || '').toLowerCase();
   return text.includes('quota exceeded') || text.includes('resource_exhausted') || text.includes('error 429');
+}
+
+function parseRetryAfterSeconds(err) {
+  const headerSec = Number(err && err.retryAfterSec);
+  if (Number.isFinite(headerSec) && headerSec > 0) return Math.min(600, Math.max(5, Math.ceil(headerSec)));
+  const text = String(err && (err.upstream || err.message) || '');
+  // Gemini sometimes includes: "Please retry in 37.103293786s."
+  const m = text.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+  if (!m) return 0;
+  const sec = Number(m[1]);
+  // Add a small floor so the UX doesn't immediately flash "00:00".
+  return Number.isFinite(sec) && sec > 0 ? Math.min(600, Math.max(5, Math.ceil(sec))) : 0;
 }
 
 function normaliseFallbackModel(model, primaryModel) {
@@ -114,14 +128,37 @@ function shouldRetryWithFallback(primaryModel, fallbackModel, err) {
 }
 
 function toFriendlyQuotaError(primaryModel, fallbackModel, err) {
-  if (!err || !isQuotaError(err) || primaryModel !== 'flash') return err;
+  if (!err || !isQuotaError(err)) return err;
+
+  const retrySec = parseRetryAfterSeconds(err);
+  const retryHint = retrySec ? ` Please retry in ~${retrySec}s.` : ' Please retry in a moment.';
+
+  const modelLabel = (LLM_MODELS && LLM_MODELS[primaryModel] && LLM_MODELS[primaryModel].label)
+    ? LLM_MODELS[primaryModel].label
+    : String(primaryModel || 'Gemini');
+
   const hasFallback = !!fallbackModel && fallbackModel !== primaryModel;
+  const upstreamText = String(err && err.upstream || '');
+  const freeTierQuotaHit = upstreamText.includes('generate_content_free_tier_requests');
   const message = hasFallback
-    ? 'Gemini 2.5 Flash is out of free quota right now, and the configured fallback model is unavailable. Please ask the admin to check Atlas model settings.'
-    : 'Gemini 2.5 Flash is out of free quota right now. Please ask the admin to switch Atlas to Flash-Lite and try again.';
-  const friendly = new AppError(message, 429, 'MODEL_QUOTA_EXCEEDED');
+    ? (freeTierQuotaHit
+      ? `${modelLabel} hit the free-tier request limit.${retryHint} Switching models automatically…`
+      : `${modelLabel} is rate-limited right now.${retryHint}`)
+    : (freeTierQuotaHit
+      ? `${modelLabel} hit the free-tier request limit.${retryHint} Enable billing / raise quota, or switch Atlas to Gemini Flash.`
+      : `${modelLabel} is rate-limited right now.${retryHint} If this persists, ask the admin to check Gemini API quota/billing or switch Atlas to a different model.`);
+
+  const friendly = new AppError(message, 429, 'MODEL_RATE_LIMITED');
+  if (retrySec) friendly.retryAfterSec = retrySec;
   friendly.upstream = err.upstream;
   return friendly;
+}
+
+function routingReasonFromError(err) {
+  const upstreamText = String(err && err.upstream || '');
+  if (upstreamText.includes('generate_content_free_tier_requests')) return 'FREE_TIER_LIMIT';
+  if (err && Number(err.upstreamStatus) === 429) return 'RATE_LIMIT';
+  return 'RATE_LIMIT';
 }
 
 /**
@@ -181,13 +218,22 @@ async function ask(args) {
   const fallbackModel = normaliseFallbackModel(args && args.fallbackModel, call.model);
   try {
     const result = await generateChatResponse(call);
-    return { answer: sanitiseReply(result.text), usage: result.usage };
+    return { answer: sanitiseReply(result.text), usage: result.usage, routing: null };
   } catch (err) {
     if (!shouldRetryWithFallback(call.model, fallbackModel, err)) {
       throw toFriendlyQuotaError(call.model, fallbackModel, err);
     }
     const fallbackResult = await generateChatResponse(Object.assign({}, call, { model: fallbackModel }));
-    return { answer: sanitiseReply(fallbackResult.text), usage: fallbackResult.usage };
+    return {
+      answer: sanitiseReply(fallbackResult.text),
+      usage: fallbackResult.usage,
+      routing: {
+        usedFallback: true,
+        fromModel: call.model,
+        toModel: fallbackModel,
+        reason: routingReasonFromError(err),
+      },
+    };
   }
 }
 
@@ -205,6 +251,7 @@ async function* askStream(args) {
   const fallbackModel = normaliseFallbackModel(args && args.fallbackModel, call.model);
   let acc = '';
   let usage = null;
+  let routing = null;
 
   const streamWithModel = async function* (modelKey) {
     for await (const evt of generateChatResponseStream(Object.assign({}, call, { model: modelKey }))) {
@@ -223,12 +270,18 @@ async function* askStream(args) {
     if (!shouldRetryWithFallback(call.model, fallbackModel, err)) {
       throw toFriendlyQuotaError(call.model, fallbackModel, err);
     }
+    routing = {
+      usedFallback: true,
+      fromModel: call.model,
+      toModel: fallbackModel,
+      reason: routingReasonFromError(err),
+    };
     acc = '';
     usage = null;
     yield* streamWithModel(fallbackModel);
   }
 
-  yield { kind: 'done', text: sanitiseReply(acc), usage };
+  yield { kind: 'done', text: sanitiseReply(acc), usage, routing };
 }
 
 module.exports = {
@@ -255,9 +308,11 @@ module.exports = {
       };
     },
     processOutputs(outputs) {
+      const full = String(outputs.answer || '');
       return {
-        answerPreview: previewText(outputs.answer),
-        answerChars: String(outputs.answer || '').length,
+        answerPreview: previewText(full, 600),
+        answer: shouldCapturePrompts() ? full : '',
+        answerChars: full.length,
         usage: summarizeUsage(outputs.usage),
       };
     },

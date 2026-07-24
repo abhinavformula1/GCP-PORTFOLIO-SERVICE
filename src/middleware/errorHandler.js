@@ -23,6 +23,7 @@ function errorHandler(err, req, res, _next) {
       success: false,
       code,
       error: message,
+      ...(err.retryAfterSec && { retryAfterSec: err.retryAfterSec }),
       ...(err.fields && { fields: err.fields }),
     });
   }

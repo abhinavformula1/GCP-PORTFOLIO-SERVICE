@@ -30,7 +30,7 @@ import {
   pendingChatHistory, setPendingChatHistory,
 } from '../core/state.js';
 import { authedFetch }     from '../core/auth.js';
-import { renderFreeFormMode, resetAtlasState } from './atlas.js?v=2026-07-23-tools-1';
+import { renderFreeFormMode, resetAtlasState } from './atlas.js?v=2026-07-25-routing-note-v1';
 import { createInputRow } from './widgets.js';
 import { showWelcomeOverlay } from '../ui/welcome.js';
 

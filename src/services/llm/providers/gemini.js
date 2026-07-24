@@ -24,6 +24,26 @@ const {
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const USD_TO_INR = 83;
 
+function parseRetryAfterSecondsHeader(headers) {
+  try {
+    if (!headers || typeof headers.get !== 'function') return 0;
+    const raw = String(headers.get('retry-after') || headers.get('Retry-After') || '').trim();
+    if (!raw) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.min(3600, Math.ceil(n)) : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function parseRetryHintFromBodySeconds(text) {
+  const t = String(text || '');
+  const m = t.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+  if (!m) return 0;
+  const sec = Number(m[1]);
+  return Number.isFinite(sec) && sec > 0 ? Math.min(3600, Math.ceil(sec)) : 0;
+}
+
 function requireApiKey() {
   if (!config.gemini.apiKey) {
     const err = new Error('Gemini is not configured (GEMINI_API_KEY missing).');
@@ -130,6 +150,8 @@ async function callGemini(body, opts) {
     err.statusCode = 502;
     err.code = 'UPSTREAM_ERROR';
     err.upstream = text.slice(0, 500);
+    err.upstreamStatus = res.status;
+    err.retryAfterSec = parseRetryAfterSecondsHeader(res.headers) || parseRetryHintFromBodySeconds(text);
     throw err;
   }
 
@@ -196,6 +218,8 @@ async function* generateChatResponseStream(args, opts) {
     e.statusCode = 502;
     e.code = 'UPSTREAM_ERROR';
     e.upstream = text.slice(0, 500);
+    e.upstreamStatus = res.status;
+    e.retryAfterSec = parseRetryAfterSecondsHeader(res.headers) || parseRetryHintFromBodySeconds(text);
     throw e;
   }
 

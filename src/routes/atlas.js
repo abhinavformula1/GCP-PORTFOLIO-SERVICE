@@ -46,6 +46,10 @@ const {
   loadRuntimeConfig,
   buildCallConfig,
 } = require('../services/atlas/orchestrator');
+const {
+  setLangSmithRuntimeEnabled,
+  setLangSmithCapturePolicy,
+} = require('../services/observability/langsmith');
 const { ValidationError } = require('../errors');
 
 const router = express.Router();
@@ -242,35 +246,210 @@ function sourceDomain(url) {
   }
 }
 
-function appendWebSources(answer, webSearch) {
+function titleCaseWords(value) {
+  return String(value || '')
+    .replace(/[-_]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function publisherLabelFromSource(source) {
+  const title = String(source && source.title || '').trim();
+  const url = String(source && source.url || '').trim();
+  const host = sourceDomain(url).toLowerCase();
+
+  // Prefer a publisher label over platform domains (e.g., YouTube).
+  if (/\btoday show\b/i.test(title)) return 'TODAY Show';
+  if (/\beuronews\b/i.test(title) || host.includes('euronews.com')) return 'Euronews';
+  if (/\babc news\b/i.test(title) || host.includes('abcnews.go.com')) return 'ABC News';
+  if (/\bcbs news\b/i.test(title) || host.includes('cbsnews.com')) return 'CBS News';
+  if (/\bap news\b/i.test(title)  || host.includes('apnews.com')) return 'AP News';
+  if (/\b(pbs news hour|pbs newshour)\b/i.test(title) || host.includes('pbs.org')) return 'PBS News Hour';
+  if (/\bal jazeera\b/i.test(title)) return 'Al Jazeera';
+  if (/\bwashington post\b/i.test(title) || host.includes('washingtonpost.com')) return 'The Washington Post';
+
+  // Domain-derived fallback.
+  const base = host.split('.').filter(Boolean);
+  const guess = base.length >= 2 ? base[base.length - 2] : host;
+  return titleCaseWords(guess || 'Source') || 'Source';
+}
+
+function tokenize(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .filter((w) => w.length >= 4);
+}
+
+function bestSourceForLine(line, sources) {
+  const words = new Set(tokenize(line));
+  if (!words.size) return null;
+  let best = null;
+  let bestScore = -1;
+
+  for (const s of sources) {
+    if (!s || typeof s !== 'object') continue;
+    const titleWords = tokenize(s.title);
+    let overlap = 0;
+    for (const w of titleWords) if (words.has(w)) overlap++;
+    const score = overlap * 10 + (typeof s.score === 'number' ? s.score : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = s;
+    }
+  }
+  return best;
+}
+
+function looksLikeSourceCitation(textInsideParens) {
+  const raw = String(textInsideParens || '').trim();
+  if (!raw) return false;
+  // Avoid stripping legitimate content like "(2019)" / "(₹500)".
+  if (/\d/.test(raw)) return false;
+  const t = raw.toLowerCase();
+  if (t.includes(',')) return true;
+  if (t.includes('http')) return true;
+  if (/(instagram|facebook|youtube|twitter|x\.com)/i.test(t)) return true;
+  // Single hostname-ish token (e.g. independent.co.uk)
+  if (/^[a-z0-9.-]+$/i.test(raw) && raw.includes('.') && !raw.includes(' ')) return true;
+  // Short publisher-style label (e.g. "AP News", "Euronews")
+  if (raw.length <= 28 && /^[A-Za-z][A-Za-z\s.&-]{2,}$/.test(raw)) return true;
+  return false;
+}
+
+function stripTrailingSourceCitation(text) {
+  const s = String(text || '');
+  const m = s.match(/\s*\(([^)]+)\)\s*[.!?]?\s*$/);
+  if (!m) return s;
+  return looksLikeSourceCitation(m[1])
+    ? s.replace(/\s*\([^)]+\)\s*[.!?]?\s*$/, '').trim()
+    : s;
+}
+
+function stripInlineSourceCitations(text) {
+  let out = String(text || '');
+  if (!out || out.indexOf('(') === -1) return out;
+
+  out = out.replace(/\(([^)]+)\)/g, function (m, inside) {
+    return looksLikeSourceCitation(inside) ? '' : m;
+  });
+
+  // Clean up spacing/punctuation left behind by removals.
+  out = out
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .replace(/([.,;:!?])\s*\./g, '$1')
+    .replace(/\s+[·•]\s+$/g, '')
+    .trim();
+  return out;
+}
+
+function isPlatformSource(source) {
+  const url = String(source && source.url || '').trim();
+  const host = sourceDomain(url).toLowerCase();
+  if (!host) return false;
+  return (
+    host.includes('youtube.com')
+    || host.includes('youtu.be')
+    || host.includes('instagram.com')
+    || host.includes('facebook.com')
+    || host === 'x.com'
+    || host.endsWith('.x.com')
+    || host.includes('twitter.com')
+    || host.includes('news.google.com')
+  );
+}
+
+function preferPublisherSources(sources) {
+  const arr = Array.isArray(sources) ? sources : [];
+  const nonPlatform = arr.filter((s) => !isPlatformSource(s));
+  return nonPlatform.length ? nonPlatform : arr;
+}
+
+function isLikelyHeadlinesQuery(userMessage) {
+  const t = String(userMessage || '').toLowerCase();
+  if (!t) return false;
+  return /\b(today|todays|latest|top)\b/.test(t) && /\b(news|headlines)\b/.test(t);
+}
+
+function formatIstTimestamp(now) {
+  try {
+    const d = now instanceof Date ? now : new Date();
+    const date = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(d);
+    const time = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(d);
+    return date + ', ' + time + ' IST';
+  } catch (_) {
+    return '';
+  }
+}
+
+function prependHeadlinesHeadingIfNeeded(answer, userMessage, webSearch) {
+  const base = String(answer || '').trim();
+  const hasWeb = !!(webSearch && Array.isArray(webSearch.sources) && webSearch.sources.length);
+  if (!base || !hasWeb) return base;
+
+  const lines = base.split('\n').map((l) => String(l || ''));
+  const bulletCount = lines.filter((l) => /^\s*[-*•]\s+/.test(l)).length;
+  if (bulletCount < 2) return base;
+  if (!isLikelyHeadlinesQuery(userMessage)) return base;
+
+  // Remove any existing generic heading line like "Here's some of the latest news…"
+  let startIdx = 0;
+  while (startIdx < lines.length && !lines[startIdx].trim()) startIdx++;
+  if (startIdx < lines.length && !/^\s*[-*•]\s+/.test(lines[startIdx])) {
+    // Drop the first non-bullet line if it looks like a heading.
+    startIdx++;
+    while (startIdx < lines.length && !lines[startIdx].trim()) startIdx++;
+  }
+  const rest = lines.slice(startIdx).join('\n').trim();
+
+  const ts = formatIstTimestamp(new Date());
+  const heading = "Here are today's top headlines" + (ts ? ' (' + ts + '):' : ':');
+  return heading + '\n\n' + rest;
+}
+
+function appendSourcesPerBullet(answer, webSearch) {
   const base = String(answer || '').trim();
   const sources = webSearch && Array.isArray(webSearch.sources) ? webSearch.sources : [];
   if (!base || !sources.length) return base;
-  if (/\n#{0,3}\s*Sources\b/i.test(base) || /\n\*\*Sources\*\*/i.test(base)) return base;
 
-  const seen = new Set();
-  const lines = [];
-  for (const source of sources) {
-    if (!source || typeof source !== 'object') continue;
-    const title = String(source.title || '').trim();
-    const url = String(source.url || '').trim();
-    const domain = sourceDomain(url);
-    const key = (title + '|' + domain).toLowerCase();
-    if ((!title && !domain) || seen.has(key)) continue;
-    seen.add(key);
-    // Render as a safe markdown link so the chat UI can click through.
-    // We keep it short (max 4) to avoid overwhelming the answer.
-    const label = title || domain || 'Source';
-    const suffix = (domain && title && title.toLowerCase() !== domain.toLowerCase())
-      ? ` (${domain})`
-      : '';
-    if (url) lines.push(`- [${label}](${url})${suffix}`);
-    else lines.push(`- ${label}${suffix}`);
-    if (lines.length >= 4) break;
-  }
+  const preferredSources = preferPublisherSources(sources);
+  const lines = base.split('\n');
+  let srcIdx = 0;
 
-  if (!lines.length) return base;
-  return `${base}\n\n**Sources**\n${lines.join('\n')}`;
+  const out = lines.map(function (ln) {
+    const line = String(ln || '');
+    const m = line.match(/^(\s*[-*•]\s+)(.+)$/);
+    if (!m) return line;
+    const prefix = m[1];
+    const body0 = m[2];
+    // Always prefer exactly one source label per bullet.
+    const body1 = stripInlineSourceCitations(body0);
+    const body = stripTrailingSourceCitation(body1) || stripTrailingSourceCitation(body0);
+
+    // Try to pick the best matching source by title overlap; fall back to round-robin.
+    const picked = bestSourceForLine(body, preferredSources) || preferredSources[srcIdx++ % preferredSources.length];
+    const label = publisherLabelFromSource(picked);
+    return prefix + body.trim() + ' (' + label + ')';
+  });
+
+  return out.join('\n');
 }
 
 function toPublicPlan(plan) {
@@ -296,6 +475,12 @@ router.post('/atlas/ask',
     try {
       const history = await loadServerHistory(uid);
       const atlasCfg = await loadRuntimeConfig();
+      setLangSmithRuntimeEnabled(!!(atlasCfg && atlasCfg.langsmithTracingEnabled));
+      setLangSmithCapturePolicy({
+        capturePrompts: atlasCfg && atlasCfg.capturePrompts,
+        captureChunks:  atlasCfg && atlasCfg.captureChunks,
+        captureTokens:  atlasCfg && atlasCfg.captureTokens,
+      });
       const resolvedModel = resolveAtlasModel(model, atlasCfg);
       const fallbackModel = resolveAtlasFallbackModel(resolvedModel, atlasCfg);
       const executionPlan = buildExecutionPlan(message, atlasCfg);
@@ -319,8 +504,9 @@ router.post('/atlas/ask',
       }
 
       const { systemPrompt, generationConfig, webSearch } = await buildCallConfig(message, atlasCfg, executionPlan);
-      const { answer, usage } = await ask({ message, history, model: resolvedModel, fallbackModel, systemPrompt, generationConfig });
-      const finalAnswer = appendWebSources(answer, webSearch);
+      const { answer, usage, routing } = await ask({ message, history, model: resolvedModel, fallbackModel, systemPrompt, generationConfig });
+      const withSources = appendSourcesPerBullet(answer, webSearch);
+      const finalAnswer = prependHeadlinesHeadingIfNeeded(withSources, message, webSearch);
 
       // Fire-and-forget persistence — we already have the answer; the
       // user shouldn't wait on Firestore to see it.
@@ -344,6 +530,7 @@ router.post('/atlas/ask',
         cached: false,
         transactionId,
         webSearch,
+        routing,
         plan: toPublicPlan(executionPlan),
       });
     } catch (err) {
@@ -391,6 +578,12 @@ router.post('/atlas/stream',
     try {
       const history = await loadServerHistory(uid);
       const atlasCfg = await loadRuntimeConfig();
+      setLangSmithRuntimeEnabled(!!(atlasCfg && atlasCfg.langsmithTracingEnabled));
+      setLangSmithCapturePolicy({
+        capturePrompts: atlasCfg && atlasCfg.capturePrompts,
+        captureChunks:  atlasCfg && atlasCfg.captureChunks,
+        captureTokens:  atlasCfg && atlasCfg.captureTokens,
+      });
       const resolvedModel = resolveAtlasModel(model, atlasCfg);
       const fallbackModel = resolveAtlasFallbackModel(resolvedModel, atlasCfg);
       const executionPlan = buildExecutionPlan(message, atlasCfg);
@@ -413,9 +606,10 @@ router.post('/atlas/stream',
         if (evt.kind === 'chunk') {
           send({ chunk: evt.text });
         } else if (evt.kind === 'done') {
-          finalAnswer = appendWebSources(evt.text, webSearch);
+          const withSources = appendSourcesPerBullet(evt.text, webSearch);
+          finalAnswer = prependHeadlinesHeadingIfNeeded(withSources, message, webSearch);
           usage = evt.usage;
-          send({ done: finalAnswer, usage, transactionId, webSearch, plan: toPublicPlan(executionPlan) });
+          send({ done: finalAnswer, usage, routing: evt.routing || null, transactionId, webSearch, plan: toPublicPlan(executionPlan) });
         }
       }
 
@@ -441,7 +635,13 @@ router.post('/atlas/stream',
       const safeMessage = isUserError
         ? err.message
         : 'Atlas is having trouble responding right now. Please try again in a moment.';
-      send({ error: safeMessage, code, transactionId });
+      const retryAfterSec = Number(err && err.retryAfterSec);
+      send({
+        error: safeMessage,
+        code,
+        transactionId,
+        ...(Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? { retryAfterSec: Math.ceil(retryAfterSec) } : {}),
+      });
       console.error('[atlas/stream] error:', {
         transactionId,
         code,
@@ -513,7 +713,8 @@ router.get('/atlas/config',
         enabledModels,
         defaultModel,
         modelOptions: cfg.modelOptions || {},
-        modelSelectorVisible: cfg.modelSelectorVisible,
+        // Public chat UX: keep model choice admin-controlled (no user picker).
+        modelSelectorVisible: false,
       });
     } catch (err) {
       // Local preview mode is used for admin UX work without requiring GCP
@@ -530,7 +731,7 @@ router.get('/atlas/config',
             'flash-lite': { label: 'Fast & economical', detail: 'Default' },
             flash: { label: 'More detailed', detail: 'Higher cost' },
           },
-          modelSelectorVisible: true,
+          modelSelectorVisible: false,
           degraded: true,
           degradedReason: 'FIRESTORE_NOT_CONFIGURED',
         });
