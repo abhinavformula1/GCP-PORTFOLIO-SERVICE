@@ -92,13 +92,14 @@ test.describe('Active subscriber', () => {
   });
 
   test('premium articles remain visible in list view', async ({ page }) => {
+    const sessionResponse = page.waitForResponse(resp =>
+      resp.url().includes('/api/session/start') && resp.status() === 200
+    );
     await page.goto(SA_PAGE);
     await page.waitForSelector('#pubViewList');
     await page.locator('#pubViewList').click();
-    // Wait for session/start to complete so siteProfile is set, then re-render applies
-    await page.waitForResponse(resp =>
-      resp.url().includes('/api/session/start') && resp.status() === 200
-    );
+    // The response may complete during navigation, so register the waiter first.
+    await sessionResponse;
     // Small render-tick settle
     await page.waitForTimeout(400);
     await expect(page.locator('.sd-pub-tier-premium').first()).toBeVisible();
@@ -114,15 +115,15 @@ test.describe('Active subscriber', () => {
     await expect(page.locator('.sd-tier-gate')).not.toBeAttached();
   });
 
-  test('sees Manage button, not Subscribe button', async ({ page }) => {
-    await page.goto(PREMIUM_ARTICLE);
-    // Wait for session/start so siteProfile.subscription.active is set
-    await page.waitForResponse(resp =>
+  test('does not show purchase controls while premium access is active', async ({ page }) => {
+    const sessionResponse = page.waitForResponse(resp =>
       resp.url().includes('/api/session/start') && resp.status() === 200
     );
+    await page.goto(PREMIUM_ARTICLE);
+    await sessionResponse;
     await page.waitForTimeout(400);
-    await expect(page.locator('#sdManageSubBtn')).toBeVisible();
-    await expect(page.locator('#sdSubscribeBtn')).toBeHidden();
+    await expect(page.locator('#sdSubscribeBtn')).not.toBeAttached();
+    await expect(page.locator('#sdManageSubBtn')).not.toBeAttached();
   });
 });
 

@@ -109,7 +109,7 @@ function _fillForm(els, cfg) {
   _syncLinkedInput('atlasTopP');
   _syncLinkedInput('atlasMaxOutputTokens');
   // ② Embedding
-  _setV(els.atlasEmbeddingModel,      'value',   cfg.embeddingModel  || 'text-embedding-004');
+  _setV(els.atlasEmbeddingModel,      'value',   cfg.embeddingModel  || 'gemini-embedding-2');
   _setV(els.atlasEmbeddingDimensions, 'value',   cfg.embeddingDimensions || 768);
   _setV(els.atlasDistanceMetric,      'value',   cfg.distanceMetric  || 'COSINE');
   _setV(els.atlasEmbeddingBatchSize,  'value',   cfg.embeddingBatchSize != null ? cfg.embeddingBatchSize : 5);
@@ -135,7 +135,7 @@ function _fillForm(els, cfg) {
   _setV(els.atlasConversationMemory,  'value',   cfg.conversationMemory != null ? cfg.conversationMemory : 5);
   _setV(els.atlasGuardrails,          'checked', cfg.guardrails === true);
   // ⑥ Routing
-  _setV(els.atlasExecutionMode,       'value',   cfg.executionMode || 'single-agent');
+  _setV(els.atlasExecutionMode,       'value',   cfg.executionMode || 'multiagent');
   _setV(els.atlasRoutingStrategy,     'value',   cfg.routingStrategy || 'default');
   _setV(els.atlasRoutingFallbackModel,'value',   cfg.routingFallbackModel || 'flash-lite');
   // ⑦ Evaluation
@@ -169,7 +169,7 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
     maxOutputTokens:      _n(els.atlasMaxOutputTokens,       900),
     streamingEnabled:     _c(els.atlasStreamingEnabled,      true),
     modelSelectorVisible: _c(els.atlasModelSelectorVisible,  true),
-    embeddingModel:       _g(els.atlasEmbeddingModel,        'value')  || 'text-embedding-004',
+    embeddingModel:       _g(els.atlasEmbeddingModel,        'value')  || 'gemini-embedding-2',
     embeddingDimensions:  _n(els.atlasEmbeddingDimensions,   768),
     distanceMetric:       _g(els.atlasDistanceMetric,        'value')  || 'COSINE',
     embeddingBatchSize:   _n(els.atlasEmbeddingBatchSize,    5),
@@ -190,7 +190,7 @@ function _buildPayload(els, enabledModels, defaultModel, splitterRadio) {
     systemPrompt:         (_g(els.atlasSystemPrompt,         'value') || '').trim(),
     conversationMemory:   _n(els.atlasConversationMemory,    5),
     guardrails:           _c(els.atlasGuardrails,            false),
-    executionMode:        _g(els.atlasExecutionMode,         'value')  || 'single-agent',
+    executionMode:        _g(els.atlasExecutionMode,         'value')  || 'multiagent',
     routingStrategy:      _g(els.atlasRoutingStrategy,       'value')  || 'default',
     routingFallbackModel: _g(els.atlasRoutingFallbackModel,  'value')  || 'flash-lite',
     recallThreshold:      _n(els.atlasRecallThreshold,       0.80),

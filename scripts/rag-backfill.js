@@ -20,7 +20,7 @@
  * What it does per article:
  *   1. chunkArticle()   → splits blocks into text pieces
  *   2. deleteChunks()   → removes any stale chunks from a previous run
- *   3. embedText() × N  → calls Google text-embedding-004 for each chunk
+ *   3. embedText() × N  → calls Google gemini-embedding-* for each chunk
  *   4. saveChunks()     → writes documents into the rag_chunks collection
  *
  * Rate limiting: 200ms pause between articles to stay within Gemini's
@@ -29,8 +29,12 @@
 
 require('dotenv').config();
 
-const articlesRepository     = require('../src/repositories/articlesRepository');
-const { indexArticle }       = require('../src/services/rag');
+const { buildComposition } = require('../src/main/composition');
+const config = require('../src/infrastructure/config');
+const { createRuntime } = require('../src/main/runtime');
+const composition = buildComposition(createRuntime(config), { config });
+const articlesRepository = composition.repositories.articles;
+const { indexArticle } = composition.rag;
 
 const DELAY_BETWEEN_ARTICLES_MS = 1000; // pause between articles
 const DELAY_BETWEEN_CHUNKS_MS   = 500;  // pause between chunk embeddings (rate limit)
@@ -109,7 +113,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('\nFatal error:', err.message);
-  process.exitCode = 1;
-});
+main()
+  .catch((err) => {
+    console.error('\nFatal error:', err.message);
+    process.exitCode = 1;
+  })
+  .finally(() => composition.firestore.close().catch((err) => {
+    console.error('\nFirestore shutdown failed:', err.message);
+    process.exitCode = 1;
+  }));

@@ -77,16 +77,25 @@ async function mockSessionStart(page: Page, profile: Record<string, unknown>) {
 }
 
 /**
- * Mocks the article API so hasAccess is controlled by the test, independent
- * of the server's localPreview flag (which always returns hasAccess:true locally).
+ * Mocks the article collection API so hasAccess is controlled by the test,
+ * independent of the server's localPreview flag. Preserve the remaining
+ * server-provided articles because navigation tests depend on the full catalog.
  */
 export async function mockArticleAccess(page: Page, hasAccess: boolean) {
   const article = hasAccess ? PREMIUM_ARTICLE_FULL : PREMIUM_ARTICLE_LOCKED;
-  await page.route(`**/api/system-design/articles/${PREMIUM_ARTICLE_ID}`, async (route) => {
+  await page.route(/\/api\/system-design\/articles(?:\?.*)?$/, async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    const articles = Array.isArray(payload.articles) ? payload.articles : [];
+    const found = articles.some((item: { id?: string }) => item.id === PREMIUM_ARTICLE_ID);
+    const updated = articles.map((item: { id?: string }) => (
+      item.id === PREMIUM_ARTICLE_ID ? { ...article, hasAccess } : item
+    ));
+    if (!found) updated.push({ ...article, hasAccess });
+
     await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, article: { ...article, hasAccess } }),
+      response,
+      json: { ...payload, articles: updated },
     });
   });
 }

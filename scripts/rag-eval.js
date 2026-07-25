@@ -28,12 +28,16 @@
 
 require('dotenv').config();
 
-const { evaluateRetrieval } = require('../src/services/rag/evaluate');
-const { GOLDEN_SET }        = require('../src/services/rag/goldenSet');
+const { buildComposition } = require('../src/main/composition');
+const config = require('../src/infrastructure/config');
+const { createRuntime } = require('../src/main/runtime');
+const composition = buildComposition(createRuntime(config), { config });
+const { evaluateRetrieval } = composition.ragEvaluation;
+const { GOLDEN_SET }        = require('../src/domain/rag/goldenSet');
 
 const PASS_THRESHOLD = 0.80;
 
-// Golden set is now in src/services/rag/goldenSet.js (shared with the admin SSE endpoint).
+// Golden set is now in src/domain/rag/goldenSet.js (shared with the admin SSE endpoint).
 
 // ── Runner ─────────────────────────────────────────────────────────────────
 
@@ -86,7 +90,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('\nFatal error:', err.message);
-  process.exitCode = 1;
-});
+main()
+  .catch((err) => {
+    console.error('\nFatal error:', err.message);
+    process.exitCode = 1;
+  })
+  .finally(() => composition.firestore.close().catch((err) => {
+    console.error('\nFirestore shutdown failed:', err.message);
+    process.exitCode = 1;
+  }));

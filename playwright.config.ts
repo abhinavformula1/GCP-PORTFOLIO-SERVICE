@@ -14,6 +14,10 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
-  // The local server must already be running (npm start).
-  // We do not use webServer here to avoid restarting it mid-test.
+  webServer: {
+    command: 'NODE_ENV=test PORT=8080 npm start',
+    url: 'http://localhost:8080/health',
+    reuseExistingServer: true,
+    timeout: 30_000,
+  },
 });
