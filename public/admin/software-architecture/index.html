@@ -1318,8 +1318,9 @@
               <label class="sd-seo-field">
                 <span>Embedding Model</span>
                 <select id="atlasEmbeddingModel">
-                  <option value="text-embedding-004" data-icon="hub" data-description="Balanced retrieval quality and cost for Atlas article search." data-badge="Recommended">text-embedding-004 (recommended)</option>
-                  <option value="gemini-embedding-001" data-icon="token" data-description="Legacy Gemini embedding option for compatibility testing.">gemini-embedding-001</option>
+                  <option value="gemini-embedding-2" data-icon="hub" data-description="Latest Gemini embedding model. Best default for new indexing." data-badge="Recommended">gemini-embedding-2 (recommended)</option>
+                  <option value="gemini-embedding-001" data-icon="token" data-description="Stable fallback embedding model (use if gemini-embedding-2 is unavailable).">gemini-embedding-001</option>
+                  <option value="text-embedding-004" data-icon="warning" data-description="Deprecated/unsupported for your current API key. Kept only for older configs — switch away and re-index.">text-embedding-004 (deprecated)</option>
                 </select>
               </label>
               <label class="sd-seo-field">
@@ -1572,22 +1573,22 @@
             </span>
           </summary>
           <div class="sd-ai-accordion-body">
-            <p class="sd-seo-group-desc">Choose whether Atlas should answer as a pure model, a single orchestrated agent, or a future-ready multiagent supervisor flow.</p>
+            <p class="sd-seo-group-desc">Choose between direct generation, the legacy orchestrator, or the LangGraph supervisor with specialist agents.</p>
             <label class="sd-seo-field">
               <span>Execution Mode</span>
               <select id="atlasExecutionMode">
                 <option value="pure-model" data-icon="deployed_code" data-description="Direct model response only. No retrieval and no web search." data-badge="Fastest">Pure Model — direct LLM, no RAG or web search</option>
-                <option value="single-agent" data-icon="smart_toy" data-description="One orchestrator can choose RAG, web search, or both before generating the answer." data-badge="Recommended">Single Agent — one orchestrator can use RAG, web search, or both</option>
-                <option value="multiagent" data-icon="hub" data-description="Supervisor-ready mode for future specialist agents and delegated workflows.">Multiagent — supervisor-ready mode for specialist agents</option>
+                <option value="single-agent" data-icon="smart_toy" data-description="Legacy orchestrator with sequential RAG and web-search execution.">Single Agent — legacy orchestrator</option>
+                <option value="multiagent" data-icon="hub" data-description="LangGraph supervisor routes to specialist agents and can run independent specialists in parallel." data-badge="Recommended">Multiagent — LangGraph supervisor</option>
               </select>
             </label>
-            <p class="sd-seo-field-hint">Today, multiagent mode uses the same response path as the orchestrator but records a supervisor-style execution plan so the architecture can grow without a rewrite.</p>
+            <p class="sd-seo-field-hint">The supervisor uses deterministic routing for clear intent and Gemini classification only for ambiguous requests. Final answers keep the existing Atlas streaming path.</p>
             <label class="sd-seo-field" style="margin-top:12px">
               <span>Routing Strategy</span>
               <select id="atlasRoutingStrategy">
-                <option value="default" data-icon="filter_alt" data-description="Always use the selected default model for every request.">Default — always use default model</option>
-                <option value="rule-based" data-icon="alt_route" data-description="Use explicit rules or heuristics to switch models by query type.">Rule-Based — keyword/intent rules</option>
-                <option value="classifier" data-icon="neurology" data-description="Use an LLM-driven classifier to predict which model should answer.">LLM Classifier — route by predicted task type</option>
+                <option value="default" data-icon="filter_alt" data-description="Use deterministic routing first and Gemini only when intent is ambiguous.">Hybrid — deterministic first, classifier when needed</option>
+                <option value="rule-based" data-icon="alt_route" data-description="Use deterministic keyword and intent rules without a classifier call.">Rule-Based — deterministic routing only</option>
+                <option value="classifier" data-icon="neurology" data-description="Use Gemini to select specialists for every multiagent request.">LLM Classifier — classify every request</option>
               </select>
             </label>
             <label class="sd-seo-field">

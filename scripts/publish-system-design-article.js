@@ -4,7 +4,11 @@ require('dotenv').config();
 
 const fs = require('node:fs');
 const path = require('node:path');
-const articlesRepository = require('../src/repositories/articlesRepository');
+const config = require('../src/infrastructure/config');
+const { createRuntime } = require('../src/main/runtime');
+const { buildComposition } = require('../src/main/composition');
+const composition = buildComposition(createRuntime(config), { config });
+const articlesRepository = composition.repositories.articles;
 
 async function main() {
   const input = process.argv[2];
@@ -30,7 +34,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(() => composition.firestore.close().catch((err) => {
+    console.error('Firestore shutdown failed:', err.message);
+    process.exitCode = 1;
+  }));

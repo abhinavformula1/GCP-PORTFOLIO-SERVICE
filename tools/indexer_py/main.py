@@ -28,7 +28,7 @@ SYSTEM_DESIGN_COLLECTION = "systemDesignArticles"
 RAG_COLLECTION = "rag_chunks"
 INDEX_STATE_COLLECTION = "rag_index_state"
 
-DEFAULT_EMBED_MODEL = "text-embedding-004"
+DEFAULT_EMBED_MODEL = "gemini-embedding-2"
 DEFAULT_DIMS = 768
 
 MAX_TEXT_CHARS = 8000
@@ -105,6 +105,18 @@ def clamp_int(v: Any, min_v: int, max_v: int) -> int:
     except Exception:
         return min_v
     return max(min_v, min(max_v, n))
+
+def normalize_embed_model(model: str) -> str:
+    raw = (model or "").strip()
+    if raw.startswith("models/"):
+        raw = raw[len("models/") :]
+    aliases = {
+        # Older docs/samples used this name; many keys no longer expose it.
+        "text-embedding-004": "gemini-embedding-2",
+        # Keep common naming variants safe.
+        "embedding-001": "gemini-embedding-001",
+    }
+    return aliases.get(raw, raw) or DEFAULT_EMBED_MODEL
 
 
 def pick_cut_index(text: str, limit: int, splitter_type: str) -> int:
@@ -231,20 +243,28 @@ def embed_text(
     if not safe:
         raise ValueError("embed_text: text must not be empty")
 
-    model = (model or DEFAULT_EMBED_MODEL).strip() or DEFAULT_EMBED_MODEL
+    model = normalize_embed_model(model or DEFAULT_EMBED_MODEL)
     dims = clamp_int(dims, 1, 2048)
 
     # Generative Language API (Gemini) embeddings endpoint.
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent"
-    payload = {
-        "model": f"models/{model}",
-        "content": {"parts": [{"text": safe}]},
-        "outputDimensionality": dims,
-    }
-    res = requests.post(url, params={"key": api_key}, json=payload, timeout=timeout_s)
+    def _call(m: str) -> requests.Response:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:embedContent"
+        payload = {
+            "model": f"models/{m}",
+            "content": {"parts": [{"text": safe}]},
+            "outputDimensionality": dims,
+        }
+        return requests.post(url, params={"key": api_key}, json=payload, timeout=timeout_s)
+
+    res = _call(model)
+    if res.status_code == 404 and model != "gemini-embedding-001":
+        # Fall back for API keys that don't expose the requested model.
+        res = _call("gemini-embedding-001")
+
     if res.status_code >= 400:
         body = res.text[:500]
         raise RuntimeError(f"Gemini embed API error {res.status_code}: {body}")
+
     data = res.json()
     values = (data.get("embedding") or {}).get("values")
     if not isinstance(values, list) or not values:

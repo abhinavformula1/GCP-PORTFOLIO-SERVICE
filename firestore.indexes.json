@@ -21,7 +21,7 @@
 
   "indexes": [
     {
-      "//": "Powers GET /api/recommendations — listActiveRecommendations() in src/services/firestore.js. Filters by status=Active and orders by submittedAt desc. Without this index that query throws (the GET handler degrades to an empty list, which renders as 'Be the first to leave a recommendation' even when records exist).",
+      "//": "Powers GET /api/recommendations — listActiveRecommendations() in src/infrastructure/persistence/firestore/client.js. Filters by status=Active and orders by submittedAt desc. Without this index that query throws (the GET handler degrades to an empty list, which renders as 'Be the first to leave a recommendation' even when records exist).",
       "collectionGroup": "recommendations",
       "queryScope": "COLLECTION",
       "fields": [
@@ -30,7 +30,7 @@
       ]
     },
     {
-      "//": "Powers RAG vector search — findNearestChunks() in src/services/rag/ragStore.js. Firestore requires an explicit vector index on the embedding field before findNearest() is usable in production. Deploy: firebase deploy --only firestore:indexes",
+      "//": "Powers RAG vector search — findNearestChunks() in src/infrastructure/ai/rag/ragStore.js. Firestore requires an explicit vector index on the embedding field before findNearest() is usable in production. Deploy: firebase deploy --only firestore:indexes",
       "collectionGroup": "rag_chunks",
       "queryScope": "COLLECTION",
       "fields": [
