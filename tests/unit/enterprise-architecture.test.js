@@ -100,7 +100,6 @@ function recommendationUseCases(overrides = {}) {
       async listActiveRecommendations() { return []; },
       async upsertRecommendation() { return { isNew: true }; },
       async deleteRecommendation() { return { deleted: true }; },
-      async writeRecommendationReply() { return { applied: true }; },
     }, overrides.repository),
     salesforce: Object.assign({
       async upsertRecommendation() { return { id: 'sf-1' }; },
@@ -108,10 +107,7 @@ function recommendationUseCases(overrides = {}) {
     }, overrides.salesforce),
     identity: { async verifyIdToken() { return { uid: 'u1', email: 'a@example.com', name: 'A', picture: null }; } },
     randomUUID: () => 'tx-1',
-    secureCompare: (left, right) => left === right,
-    nowIso: () => '2026-01-01T00:00:00.000Z',
     logger: { error() {} },
-    callbackSecret: 'secret',
   });
 }
 
