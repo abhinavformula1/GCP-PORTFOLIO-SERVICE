@@ -15,10 +15,21 @@ const functions = require('@google-cloud/functions-framework');
 const { Firestore, Timestamp, FieldValue } = require('@google-cloud/firestore');
 
 const COLLECTION = 'recommendations';
-const ACCEPTED_EVENT_TYPE = 'TESTIMONIAL_UPSERT';
+// Attribute contract with the Salesforce publisher (TestimonialSyncQueueable).
+// The live publisher sends eventType="TESTIMONIAL_UPSERT". We also accept
+// "testimonial.updated" (an alternate value that appeared in the SF handoff
+// brief) so the sync is robust to whichever value the org actually emits.
+// Both sets are env-overridable so a contract change never needs a redeploy.
+const ACCEPTED_EVENT_TYPES = new Set(
+  (process.env.ACCEPTED_EVENT_TYPES || 'TESTIMONIAL_UPSERT,testimonial.updated')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
 // Forward-compat guard: drop unknown versions rather than mis-parse them.
+// Covers both the vN scheme and the "1.0" scheme seen in the SF brief.
 const ACCEPTED_EVENT_VERSIONS = new Set(
-  (process.env.ACCEPTED_EVENT_VERSIONS || 'v1,v2,v3')
+  (process.env.ACCEPTED_EVENT_VERSIONS || 'v1,v2,v3,1.0')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
@@ -69,12 +80,12 @@ functions.cloudEvent('syncTestimonialToFirestore', async (cloudEvent) => {
   const eventVersion = attributes.eventVersion;
 
   // --- Attribute gate (before decoding the body): forward-compat guard. ---
-  if (eventType !== ACCEPTED_EVENT_TYPE) {
-    log('INFO', 'drop_unknown_event_type', { messageId, eventType, metric: 'sync_dropped' });
+  if (!ACCEPTED_EVENT_TYPES.has(eventType)) {
+    log('WARNING', 'drop_unknown_event_type', { messageId, eventType, expected: [...ACCEPTED_EVENT_TYPES].join(','), metric: 'sync_dropped' });
     return; // ack
   }
   if (!ACCEPTED_EVENT_VERSIONS.has(eventVersion)) {
-    log('INFO', 'drop_unknown_event_version', { messageId, eventVersion, metric: 'sync_dropped' });
+    log('WARNING', 'drop_unknown_event_version', { messageId, eventVersion, expected: [...ACCEPTED_EVENT_VERSIONS].join(','), metric: 'sync_dropped' });
     return; // ack
   }
 
