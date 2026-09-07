@@ -1,22 +1,18 @@
 'use strict';
 
-const { AppError, ValidationError } = require('../../domain/errors');
+const { AppError } = require('../../domain/errors');
 const { assertDependencies } = require('../ports/assert');
 
 function createRecommendationUseCases(dependencies) {
   assertDependencies(dependencies, 'application.recommendations', {
-    repository: ['listActiveRecommendations', 'upsertRecommendation', 'deleteRecommendation', 'writeRecommendationReply'],
+    repository: ['listActiveRecommendations', 'upsertRecommendation', 'deleteRecommendation'],
     salesforce: ['upsertRecommendation', 'deleteRecommendation'],
     identity: ['verifyIdToken'],
     randomUUID: 'function',
-    secureCompare: 'function',
-    nowIso: 'function',
     logger: 'value',
-    callbackSecret: 'value',
   });
   const {
-    repository, salesforce, identity, randomUUID, secureCompare,
-    nowIso, logger, callbackSecret,
+    repository, salesforce, identity, randomUUID, logger,
   } = dependencies;
 
   async function list() {
@@ -86,38 +82,12 @@ function createRecommendationUseCases(dependencies) {
     };
   }
 
-  async function applyReply({ apiKey, uid, reply, repliedAt }) {
-    if (!callbackSecret) {
-      throw new AppError('Salesforce callback is not configured on this environment.', 503, 'SF_CALLBACK_NOT_CONFIGURED');
-    }
-    if (!secureCompare(String(apiKey || '').trim(), callbackSecret)) {
-      throw new AppError('Invalid callback signature.', 401, 'UNAUTHORIZED');
-    }
-    const normalizedUid = String(uid || '').trim();
-    const normalizedReply = String(reply || '').trim();
-    if (!normalizedUid) throw new ValidationError('uid path param is required.');
-    if (!normalizedReply) throw new ValidationError('reply body field is required.');
-    if (normalizedReply.length > 1000) {
-      throw new ValidationError('reply must be 1000 characters or fewer.');
-    }
-    const result = await repository.writeRecommendationReply(normalizedUid, {
-      reply: normalizedReply,
-      repliedAt: repliedAt || nowIso(),
-    });
-    if (!result.applied) {
-      return {
-        statusCode: 409,
-        body: {
-          success: false,
-          code: 'RECOMMENDATION_NOT_FOUND',
-          error: `No recommendation found for uid=${normalizedUid}; SF should retry.`,
-        },
-      };
-    }
-    return { statusCode: 200, body: { success: true, uid: normalizedUid } };
-  }
+  // NOTE: applyReply (the SF → Cloud Run reply callback) was retired under
+  // Option B. Salesforce now publishes to Pub/Sub and the
+  // sync-testimonial-to-firestore Cloud Function is the sole writer of
+  // reply/repliedAt/status. See docs/architecture/gcp-side-review.md.
 
-  return Object.freeze({ list, submit, remove, applyReply });
+  return Object.freeze({ list, submit, remove });
 }
 
 module.exports = { createRecommendationUseCases };

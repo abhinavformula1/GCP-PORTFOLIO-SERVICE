@@ -3,9 +3,14 @@
 /**
  * Recommendation routes — three handlers serve the round-trip:
  *
- *   GET  /api/recommendations             ← public read (page render)
- *   POST /api/recommendation              ← Google-signed-in submit
- *   POST /api/recommendation/:uid/reply   ← Salesforce → Cloud Run callback
+ *   GET    /api/recommendations           ← public read (page render)
+ *   POST   /api/recommendation            ← Google-signed-in submit
+ *   DELETE /api/recommendation            ← Google-signed-in retract
+ *
+ * The Salesforce reply → site path is NOT here anymore: SF publishes to the
+ * `sf-testimonial-events` Pub/Sub topic and the sync-testimonial-to-firestore
+ * Cloud Function writes reply/repliedAt/status to Firestore (Option B scoped
+ * sync). This app is no longer a writer of those workflow fields.
  *
  * Architectural shape (CQRS-lite):
  *
@@ -52,7 +57,7 @@ const { assertDependencies }          = require('../../../application/ports/asse
 function createRouter(dependencies) {
   assertDependencies(dependencies, 'interfaces.routes.recommendation', {
     recommendationLimiter: 'function',
-    recommendations: ['list', 'submit', 'remove', 'applyReply'],
+    recommendations: ['list', 'submit', 'remove'],
   });
   const {
     recommendationLimiter,
@@ -166,36 +171,13 @@ router.delete('/recommendation', async (req, res, next) => {
   }
 });
 
-// ── POST /api/recommendation/:uid/reply ──────────────────────────────────────
-//
-// SF → GCP callback handler. Apex trigger fires this when I write a Reply
-// on the Recommendation__c record in Salesforce.
-//
-// Auth: shared secret in the X-API-Key header. The Salesforce External
-// Credential `GCP` is configured to send this on every callout via the
-// linked Named Credential `Portfolio_Service`, so a rogue caller without
-// the secret cannot inject a reply onto a recommendation.
-//
-// Why X-API-Key (not the original X-SF-Callback-Secret): the SF org's
-// External Credential already uses X-API-Key as a convention across
-// integrations. We match it here rather than force a rename.
-//
-// Why a constant-time comparison: a naive `===` allows a timing attack
-// where an attacker can guess the secret one character at a time by
-// measuring response latency. crypto.timingSafeEqual eliminates that.
-router.post('/recommendation/:uid/reply', async (req, res, next) => {
-  try {
-    const result = await recommendations.applyReply({
-      apiKey: req.get('X-API-Key'),
-      uid: req.params.uid,
-      reply: req.body && req.body.reply,
-      repliedAt: req.body && req.body.repliedAt,
-    });
-    return res.status(result.statusCode).json(result.body);
-  } catch (error) {
-    return next(error);
-  }
-});
+// The SF → GCP reply path is no longer an HTTP callback here. Salesforce now
+// publishes a TESTIMONIAL_UPSERT event to the Pub/Sub topic
+// `sf-testimonial-events`; the `sync-testimonial-to-firestore` Cloud Function
+// (see functions/) is the sole writer of reply/repliedAt/status on the
+// Firestore doc. Under Option B (scoped sync) this app no longer writes those
+// workflow fields, so the old POST /api/recommendation/:uid/reply endpoint and
+// its applyReply use case were retired. See docs/architecture/gcp-side-review.md.
 
   return router;
 }

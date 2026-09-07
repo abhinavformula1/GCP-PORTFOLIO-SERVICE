@@ -66,7 +66,7 @@ module.exports = [
   // Back-end: CommonJS running on Node. Includes config files at the repo
   // root (eslint.config.js itself) so they get the right globals.
   {
-    files: ['src/**/*.js', 'server.js', 'scripts/**/*.js', '*.js'],
+    files: ['src/**/*.js', 'functions/**/*.js', 'server.js', 'scripts/**/*.js', '*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',

@@ -239,15 +239,7 @@ function buildComposition(runtime, options = {}) {
     salesforce,
     identity: googleAuth,
     randomUUID: crypto.randomUUID,
-    secureCompare(left, right) {
-      const leftBuffer = Buffer.from(left);
-      const rightBuffer = Buffer.from(right);
-      return leftBuffer.length === rightBuffer.length
-        && crypto.timingSafeEqual(leftBuffer, rightBuffer);
-    },
-    nowIso: () => new Date().toISOString(),
     logger: console,
-    callbackSecret: String(config.sfCallback.secret || '').trim(),
   });
   const httpCapabilities = createHttpCapabilities({
     atlasRepository: repositories.atlas,

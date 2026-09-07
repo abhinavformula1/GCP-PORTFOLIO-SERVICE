@@ -8,7 +8,7 @@ const CAPABILITIES = {
   chat: ['getActive', 'saveActive', 'clearActive', 'completeActive'],
   inquiries: ['submitHire', 'submitQuestion'],
   session: ['startSession'],
-  recommendationUseCases: ['list', 'submit', 'remove', 'applyReply'],
+  recommendationUseCases: ['list', 'submit', 'remove'],
   billingUseCases: ['status', 'prices', 'createCheckout', 'claim', 'overview'],
   mediaUseCases: ['upload', 'audit', 'removeObject', 'saveSponsorship'],
   atlasChat: ['submit', 'stream', 'activeConversation', 'publicConfig'],
@@ -54,8 +54,7 @@ const REPOSITORY_PORTS = {
     'saveRagEvalRun', 'listRagEvalRuns', 'deleteRagEvalRun',
   ],
   recommendations: [
-    'upsertRecommendation', 'listActiveRecommendations',
-    'writeRecommendationReply', 'deleteRecommendation',
+    'upsertRecommendation', 'listActiveRecommendations', 'deleteRecommendation',
   ],
   sponsorBanner: ['getSponsorBanner', 'upsertSponsorBanner', 'deleteSponsorBanner'],
   sponsorships: [

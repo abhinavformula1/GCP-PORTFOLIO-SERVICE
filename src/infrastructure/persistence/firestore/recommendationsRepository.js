@@ -77,19 +77,9 @@ async function listActiveRecommendations() {
   });
 }
 
-async function writeRecommendationReply(uid, { reply }) {
-  const ref = recommendationDocRef(uid);
-  const snap = await ref.get();
-  if (!snap.exists) return { applied: false, reason: 'not_found' };
-
-  const now = FieldValue.serverTimestamp();
-  await ref.update({
-    reply: String(reply || '').slice(0, 1000),
-    repliedAt: now,
-    updatedAt: now,
-  });
-  return { applied: true };
-}
+// reply/repliedAt are owned by Salesforce and written by the
+// sync-testimonial-to-firestore Cloud Function (Option B scoped sync), not by
+// this app — so there is no writeRecommendationReply here anymore.
 
 async function deleteRecommendation(uid) {
   const ref = recommendationDocRef(uid);
@@ -102,7 +92,6 @@ async function deleteRecommendation(uid) {
 return Object.freeze({
   upsertRecommendation,
   listActiveRecommendations,
-  writeRecommendationReply,
   deleteRecommendation,
 });
 }

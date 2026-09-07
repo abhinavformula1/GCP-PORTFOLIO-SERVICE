@@ -1,0 +1,16 @@
+{
+  "name": "sync-testimonial-to-firestore",
+  "version": "1.0.0",
+  "description": "Eventarc/Pub/Sub → Firestore sync for Salesforce testimonial workflow fields (Option B scoped sync).",
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "start": "functions-framework --target=syncTestimonialToFirestore --signature-type=cloudevent"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.4.0",
+    "@google-cloud/firestore": "^7.9.0"
+  }
+}
